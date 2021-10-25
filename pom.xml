@@ -21,6 +21,7 @@
         <module>macula-core</module>
         <module>macula-gateway</module>
         <module>macula-oauth</module>
+        <module>macula-samples</module>
     </modules>
 
 </project>
