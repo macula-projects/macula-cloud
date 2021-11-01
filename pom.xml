@@ -18,9 +18,12 @@
     </properties>
 
     <modules>
-        <module>macula-core</module>
-        <module>macula-gateway</module>
+        <module>macula-boot</module>
+        <module>macula-upms</module>
         <module>macula-oauth</module>
+        <module>macula-gateway</module>
+        <module>macula-plugins</module>
+        <module>macula-msf</module>
         <module>macula-samples</module>
     </modules>
 
