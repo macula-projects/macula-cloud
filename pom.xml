@@ -18,13 +18,11 @@
     </properties>
 
     <modules>
-        <module>macula-boot</module>
         <module>macula-upms</module>
         <module>macula-oauth</module>
         <module>macula-gateway</module>
-        <module>macula-plugins</module>
+        <module>macula-apps</module>
         <module>macula-msf</module>
-        <module>macula-samples</module>
     </modules>
 
 </project>
