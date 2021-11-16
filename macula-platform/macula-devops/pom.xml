@@ -3,21 +3,11 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <parent>
-        <artifactId>macula-cloud</artifactId>
+        <artifactId>macula-platform</artifactId>
         <groupId>org.macula</groupId>
         <version>${revision}</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
-    <artifactId>macula-platform</artifactId>
-    <packaging>pom</packaging>
-    <modules>
-        <module>macula-job</module>
-        <module>macula-yapi</module>
-        <module>macula-dts</module>
-        <module>macula-dms</module>
-        <module>macula-oss</module>
-        <module>macula-devops</module>
-    </modules>
-
+    <artifactId>macula-devops</artifactId>
 </project>
