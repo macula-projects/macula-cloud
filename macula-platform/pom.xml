@@ -9,11 +9,14 @@
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
-    <artifactId>macula-admin</artifactId>
-
-    <properties>
-        <maven.compiler.source>8</maven.compiler.source>
-        <maven.compiler.target>8</maven.compiler.target>
-    </properties>
+    <artifactId>macula-platform</artifactId>
+    <packaging>pom</packaging>
+    <modules>
+        <module>macula-oss</module>
+        <module>macula-job</module>
+        <module>macula-dts</module>
+        <module>macula-dms</module>
+        <module>macula-yapi</module>
+    </modules>
 
 </project>

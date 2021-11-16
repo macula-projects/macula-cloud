@@ -12,10 +12,9 @@
     <artifactId>macula-apps</artifactId>
     <packaging>pom</packaging>
     <modules>
-        <module>macula-apps-docs</module>
-        <module>macula-apps-job</module>
-        <module>macula-apps-report</module>
-        <module>macula-apps-flow</module>
+        <module>macula-bi</module>
+        <module>macula-flow</module>
+        <module>macula-code</module>
     </modules>
 
     <properties>

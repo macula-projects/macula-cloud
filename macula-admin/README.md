@@ -1,6 +1,7 @@
 # macula-admin
 
-微服务框架管理，包括（配置、注册、服务治理、限流、熔断、分布式事务、MQ、多租户和应用管理）
+管理UI的聚合API，包括nacos、sentinel、seata、gateway等聚合
+以及各个platform和apps服务的API代理透传
 
 ### nacos
 
