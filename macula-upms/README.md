@@ -1,3 +1,3 @@
-# macula-system
+# macula-upms
 
 该模块提供租户管理、应用管理、用户管理、权限管理等服务，是macula微服务平台的最基础服务

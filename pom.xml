@@ -18,12 +18,11 @@
     </properties>
 
     <modules>
+        <module>macula-upms</module>
+        <module>macula-manager-api</module>
         <module>macula-oauth</module>
-        <module>macula-gateway</module>
-        <module>macula-system</module>
-        <module>macula-apps</module>
-        <module>macula-admin</module>
-        <module>macula-platform</module>
+        <module>macula-open-api</module>
+        <module>macula-base</module>
     </modules>
 
 </project>
