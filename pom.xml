@@ -4,7 +4,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>org.macula</groupId>
+    <groupId>org.macula.cloud</groupId>
     <artifactId>macula-cloud</artifactId>
     <version>${revision}</version>
     <packaging>pom</packaging>
@@ -16,15 +16,42 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <maven.compiler.encoding>UTF-8</maven.compiler.encoding>
+        <macula-boot.version>5.0.0-SNAPSHOT</macula-boot.version>
     </properties>
 
     <modules>
-        <module>macula-oauth</module>
-        <module>macula-manager-api</module>
-        <module>macula-open-api</module>
-        <module>macula-base</module>
-        <module>macula-upms</module>
-        <module>macula-gateway</module>
+        <module>macula-cloud-gateway</module>
+        <module>macula-cloud-api</module>
+        <module>macula-cloud-oauth</module>
+        <module>macula-cloud-base</module>
+        <module>macula-cloud-tinyid</module>
+        <module>macula-cloud-upms</module>
     </modules>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.macula.boot</groupId>
+                <artifactId>macula-boot-dependencies</artifactId>
+                <version>${macula-boot.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
 </project>
