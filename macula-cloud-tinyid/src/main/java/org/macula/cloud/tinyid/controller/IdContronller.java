@@ -1,6 +1,6 @@
 package org.macula.cloud.tinyid.controller;
 
-import org.macula.boot.starter.api.Result;
+import org.macula.boot.api.Result;
 import org.macula.boot.starter.tinyid.base.entity.SegmentId;
 import org.macula.boot.starter.tinyid.base.factory.IdGeneratorFactory;
 import org.macula.boot.starter.tinyid.base.generator.IdGenerator;

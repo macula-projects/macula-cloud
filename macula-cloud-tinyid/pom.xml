@@ -14,7 +14,7 @@
     <dependencies>
         <dependency>
             <groupId>org.macula.boot</groupId>
-            <artifactId>macula-boot-starter-api</artifactId>
+            <artifactId>macula-boot-commons</artifactId>
         </dependency>
         <dependency>
             <groupId>org.macula.boot</groupId>
