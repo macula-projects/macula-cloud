@@ -26,6 +26,7 @@
         <module>macula-cloud-base</module>
         <module>macula-cloud-tinyid</module>
         <module>macula-cloud-upms</module>
+        <module>macula-cloud-powerjob</module>
     </modules>
 
     <dependencies>
