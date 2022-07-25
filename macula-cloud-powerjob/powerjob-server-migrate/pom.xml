@@ -3,7 +3,7 @@
          xmlns="http://maven.apache.org/POM/4.0.0"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <parent>
-        <groupId>org.macula.cloud</groupId>
+        <groupId>dev.macula.cloud</groupId>
         <artifactId>macula-cloud-powerjob</artifactId>
         <version>${revision}</version>
     </parent>
@@ -13,12 +13,12 @@
 
     <dependencies>
         <dependency>
-            <groupId>org.macula.cloud</groupId>
+            <groupId>dev.macula.cloud</groupId>
             <artifactId>powerjob-server-persistence</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>org.macula.cloud</groupId>
+            <groupId>dev.macula.cloud</groupId>
             <artifactId>powerjob-server-extension</artifactId>
             <version>${project.version}</version>
         </dependency>
