@@ -4,6 +4,12 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
+    <parent>
+        <groupId>dev.macula.boot</groupId>
+        <artifactId>macula-boot-parent</artifactId>
+        <version>${revision}</version>
+    </parent>
+
     <groupId>dev.macula.cloud</groupId>
     <artifactId>macula-cloud</artifactId>
     <version>${revision}</version>
@@ -11,12 +17,6 @@
 
     <properties>
         <revision>5.0.0-SNAPSHOT</revision>
-        <maven.compiler.source>8</maven.compiler.source>
-        <maven.compiler.target>8</maven.compiler.target>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-        <maven.compiler.encoding>UTF-8</maven.compiler.encoding>
-        <macula-boot.version>5.0.0-SNAPSHOT</macula-boot.version>
     </properties>
 
     <modules>
@@ -43,16 +43,14 @@
         </dependency>
     </dependencies>
 
-    <dependencyManagement>
-        <dependencies>
-            <dependency>
-                <groupId>dev.macula.boot</groupId>
-                <artifactId>macula-boot-dependencies</artifactId>
-                <version>${macula-boot.version}</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-        </dependencies>
-    </dependencyManagement>
+    <repositories>
+        <repository>
+            <id>ossrh</id>
+            <url>https://s01.oss.sonatype.org/content/repositories/snapshots/</url>
+            <snapshots>
+                <enabled>true</enabled>
+            </snapshots>
+        </repository>
+    </repositories>
 
 </project>

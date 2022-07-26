@@ -17,6 +17,7 @@ target
 *.iml
 *.ipr
 .flattened-pom.xml
+flattened.xml
 
 ### NetBeans ###
 nbproject/private/
