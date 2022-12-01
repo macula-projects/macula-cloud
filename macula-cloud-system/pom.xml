@@ -9,6 +9,12 @@
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
-    <artifactId>macula-cloud-upms</artifactId>
+    <artifactId>macula-cloud-system</artifactId>
 
+    <dependencies>
+        <dependency>
+            <groupId>dev.macula.boot</groupId>
+            <artifactId>macula-boot-starter-mybatis-plus</artifactId>
+        </dependency>
+    </dependencies>
 </project>

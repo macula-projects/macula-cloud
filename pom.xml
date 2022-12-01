@@ -23,10 +23,12 @@
         <module>macula-cloud-gateway</module>
         <module>macula-cloud-api</module>
         <module>macula-cloud-oauth</module>
-        <module>macula-cloud-base</module>
         <module>macula-cloud-tinyid</module>
-        <module>macula-cloud-upms</module>
+        <module>macula-cloud-system</module>
         <module>macula-cloud-powerjob</module>
+        <module>macula-cloud-oss</module>
+        <module>macula-cloud-msg</module>
+        <module>macula-cloud-cdc</module>
     </modules>
 
     <dependencies>

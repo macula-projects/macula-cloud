@@ -5,19 +5,19 @@
 
 macua-oauth提供基于OAUTH2.0协议的统一认证服务，所有服务经过网站认证
 
-### macula-base
+### macula-system
 
-macula-base是统一的租户、应用
+macula-system是统一的租户、应用、用户、权限等管理
 
-### macula-upms
+### macula-channel
 
-macula-upms是统一的权限管理
+macula-channel是移动生态应用的管理和微信能力对接服务
 
-### macula-canal
+### macula-cdc
 
 订阅数据库变更发布事件
 
-### macula-job
+### macula-powerjob
 
 批处理任务管理系统
 
