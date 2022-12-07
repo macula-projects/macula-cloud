@@ -28,7 +28,7 @@
         <module>macula-cloud-powerjob</module>
         <module>macula-cloud-oss</module>
         <module>macula-cloud-msg</module>
-        <module>macula-cloud-cdc</module>
+        <module>macula-cloud-connect</module>
     </modules>
 
     <dependencies>
