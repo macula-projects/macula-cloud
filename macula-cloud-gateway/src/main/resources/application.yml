@@ -1,0 +1,36 @@
+server:
+  port: 9000
+
+spring:
+  cloud:
+    nacos:
+      discovery:
+        enabled: true
+        server-addr: 127.0.0.1:8848
+        # namespace:
+        # group:
+    gateway:
+      routes:
+        - id: macula-cloud-system
+          uri: lb://macula-cloud-system
+          predicates:
+            - Path=/system/**
+          filters:
+            - StripPrefix=1
+  security:
+    oauth2:
+      resourceserver:
+        opaquetoken:
+          client-id: macula-example-gateway #${spring.application.name}
+          client-secret: password
+          introspection-uri: https://goauth-dev.infinitus.com.cn/introspect
+macula:
+  security:
+    ignore-urls: /api/v3/**
+    only-auth-urls: /api/**
+
+logging:
+  level:
+    com.alibaba.nacos.client: error
+    dev.macula.cloud.gateway: debug
+    org.springframework.boot: debug

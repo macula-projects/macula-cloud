@@ -1,35 +1,52 @@
 # macula-cloud
+
 基于macula-boot的微服务应用开发平台，提供多租户、应用管理、权限、工作流、低代码、报表、批处理、数据订阅、资源中心、API管理、表结构管理和SQL审计等通用技术平台能力。
 
-### macula-oauth
+### macula-cloud-oauth
 
-macua-oauth提供基于OAUTH2.0协议的统一认证服务，所有服务经过网站认证
+提供基于OAUTH2.0协议的统一认证服务，所有服务经过网站认证
 
-### macula-system
+### macula-cloud-gateway
 
-macula-system是统一的租户、应用、用户、权限等管理
+Macula Cloud平台的网关，提供统一鉴权、路由等能力
 
-### macula-channel
+### macula-cloud-tinyid
 
-macula-channel是移动生态应用的管理和微信能力对接服务
+ID生成服务
 
-### macula-cdc
+### macula-cloud-system
 
-订阅数据库变更发布事件
+统一的租户、应用、用户、权限等管理
 
-### macula-powerjob
+### macula-cloud-channel
+
+移动生态应用的管理和微信能力对接服务
+
+### macula-cloud-msg
+
+消息中心
+
+### macula-cloud-oss
+
+资源中心
+
+### macula-cloud-powerjob
 
 批处理任务管理系统
 
-### macula-xxx
+### macula-cloud-connect
+
+基于RocketMQ Connect组件订阅数据库、Redis等变更日志发布到MQ中供订阅
+
+### macula-cloud-openapi
+
+macula-cloud对外开放的API聚合
+
+### macula-cloud-api
+
+内部微服务之间的接口定义
+
+### macula-cloud-xxx
 
 该模块下面是可选择的一些加快开发周期的低代码应用，比如工作流、低代码、报表、
 API接口和DB结构的管理、数据订阅、批处理、资源中心、应用发布管理等应用
-
-### macula-admin-api
-
-macula-admin是前端管理UI的API聚合
-
-### macula-open-api
-
-macula-open-api是开放API聚合

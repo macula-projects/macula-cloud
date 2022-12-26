@@ -19,7 +19,7 @@ package dev.macula.cloud.tinyid.vo;
 
 import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
-import dev.macula.boot.api.ResultCode;
+import dev.macula.boot.result.ResultCode;
 
 import java.io.Serializable;
 

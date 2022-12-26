@@ -11,5 +11,10 @@
 
     <artifactId>macula-cloud-gateway</artifactId>
 
-
+    <dependencies>
+        <dependency>
+            <groupId>dev.macula.boot</groupId>
+            <artifactId>macula-boot-starter-cloud-alibaba-scg</artifactId>
+        </dependency>
+    </dependencies>
 </project>

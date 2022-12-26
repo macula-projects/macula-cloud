@@ -13,7 +13,6 @@
     <artifactId>macula-cloud-api</artifactId>
 
     <modules>
-        <module>macula-cloud-api-manager</module>
-        <module>macula-cloud-api-open</module>
+        <module>macula-cloud-system-api</module>
     </modules>
 </project>

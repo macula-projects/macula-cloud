@@ -13,8 +13,44 @@
 
     <dependencies>
         <dependency>
+            <groupId>dev.macula.cloud</groupId>
+            <artifactId>macula-cloud-system-api</artifactId>
+            <version>${revision}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>dev.macula.boot</groupId>
+            <artifactId>macula-boot-starter-cloud-alibaba</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>dev.macula.boot</groupId>
+            <artifactId>macula-boot-starter-web</artifactId>
+        </dependency>
+
+        <dependency>
             <groupId>dev.macula.boot</groupId>
             <artifactId>macula-boot-starter-mybatis-plus</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>dev.macula.boot</groupId>
+            <artifactId>macula-boot-starter-mapstruct</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>dev.macula.boot</groupId>
+            <artifactId>macula-boot-starter-springdoc</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>dev.macula.boot</groupId>
+            <artifactId>macula-boot-starter-security</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>dev.macula.boot</groupId>
+            <artifactId>macula-boot-starter-redis</artifactId>
         </dependency>
     </dependencies>
 </project>

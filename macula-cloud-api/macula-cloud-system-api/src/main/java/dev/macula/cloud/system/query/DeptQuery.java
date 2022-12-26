@@ -15,24 +15,25 @@
  * limitations under the License.
  */
 
-package dev.macula.cloud.tinyid;
+package dev.macula.cloud.system.query;
 
-import org.springframework.boot.SpringApplication;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.boot.web.servlet.ServletComponentScan;
-import org.springframework.scheduling.annotation.EnableAsync;
-import org.springframework.scheduling.annotation.EnableScheduling;
+import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.Data;
 
 /**
- * @author du_imba
+ * 部门分页查询对象
+ *
+ * @author haoxr
+ * @date 2022/6/11
  */
-@EnableAsync
-@SpringBootApplication
-@ServletComponentScan
-@EnableScheduling
-public class TinyIdApplication {
+@Schema(description = "部门分页查询对象")
+@Data
+public class DeptQuery {
 
-    public static void main(String[] args) {
-        SpringApplication.run(TinyIdApplication.class, args);
-    }
+    @Schema(description = "关键字(部门名称)")
+    private String keywords;
+
+    @Schema(description = "状态(1->正常；0->禁用)")
+    private Integer status;
+
 }
