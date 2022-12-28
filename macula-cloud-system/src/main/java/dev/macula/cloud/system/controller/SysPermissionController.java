@@ -102,8 +102,11 @@ public class SysPermissionController {
     public boolean deletePermissions(
             @PathVariable String ids
     ) {
-        boolean status = sysPermissionService.removeByIds(Arrays.asList(ids.split(",")));
-        return status;
+        boolean result = sysPermissionService.removeByIds(Arrays.asList(ids.split(",")));
+        if (result) {
+            sysPermissionService.refreshPermRolesRules();
+        }
+        return result;
     }
 }
 

@@ -98,6 +98,4 @@ public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, S
         }
         return true;
     }
-
-
 }

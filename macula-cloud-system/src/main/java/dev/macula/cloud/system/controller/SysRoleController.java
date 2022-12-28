@@ -22,6 +22,7 @@ import dev.macula.boot.result.Option;
 import dev.macula.cloud.system.form.RoleForm;
 import dev.macula.cloud.system.pojo.entity.SysRole;
 import dev.macula.cloud.system.query.RolePageQuery;
+import dev.macula.cloud.system.service.SysPermissionService;
 import dev.macula.cloud.system.service.SysRoleService;
 import dev.macula.cloud.system.vo.role.RolePageVO;
 import io.swagger.v3.oas.annotations.Operation;
@@ -39,6 +40,8 @@ import java.util.List;
 @RequiredArgsConstructor
 public class SysRoleController {
     private final SysRoleService roleService;
+
+    private final SysPermissionService sysPermissionService;
 
     @Operation(summary = "角色分页列表")
     @GetMapping("/pages")
@@ -117,6 +120,9 @@ public class SysRoleController {
             @RequestBody List<Long> menuIds
     ) {
         boolean result = roleService.updateRoleMenus(roleId, menuIds);
+        if (result) {
+            sysPermissionService.refreshPermRolesRules();
+        }
         return result;
     }
 }

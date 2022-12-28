@@ -17,8 +17,6 @@
 
 package dev.macula.cloud.system.pojo.bo;
 
-import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableId;
 import dev.macula.cloud.system.enums.MenuTypeEnum;
 import lombok.Data;
 
@@ -30,9 +28,8 @@ import java.util.List;
 @Data
 public class RouteBO {
     /**
-     *
+     * 菜单ID
      */
-    @TableId(type = IdType.AUTO)
     private Long id;
 
     /**

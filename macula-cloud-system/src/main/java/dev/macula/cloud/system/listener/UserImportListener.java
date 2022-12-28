@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package dev.macula.cloud.system.listener.excel;
+package dev.macula.cloud.system.listener;
 
 import com.alibaba.excel.context.AnalysisContext;
 import com.alibaba.excel.event.AnalysisEventListener;

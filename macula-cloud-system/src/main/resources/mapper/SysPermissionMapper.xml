@@ -2,7 +2,7 @@
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.youlai.dev.macula.cloud.system.mapper.SysPermissionMapper">
+<mapper namespace="dev.macula.cloud.system.mapper.SysPermissionMapper">
 
     <resultMap id="PermRolesMap" type="dev.macula.cloud.system.pojo.entity.SysPermission">
         <id property="id" column="id" jdbcType="BIGINT"/>

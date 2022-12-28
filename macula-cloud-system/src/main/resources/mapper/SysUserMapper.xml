@@ -13,15 +13,15 @@
         u.mobile,
         u.gender,
         u.avatar,
-        u.STATUS,
-        d.NAME AS dept_name,
-        GROUP_CONCAT( r.NAME ) AS roleNames,
+        u.status,
+        d.name AS dept_name,
+        GROUP_CONCAT( r.name ) AS roleNames,
         u.create_time
         FROM
         sys_user u
         LEFT JOIN sys_dept d ON u.dept_id = d.id
-        LEFT JOIN sys_user_role ur ON u.id = ur.user_id
-        LEFT JOIN sys_role r ON ur.role_id = r.id
+        LEFT JOIN sys_user_role sr ON u.id = sr.user_id
+        LEFT JOIN sys_role r ON sr.role_id = r.id
         <where>
             u.deleted = 0 AND u.username != 'root'
             <if test='queryParams.keywords!=null and queryParams.keywords.trim() neq ""'>

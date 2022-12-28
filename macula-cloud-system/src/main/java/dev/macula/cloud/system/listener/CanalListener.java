@@ -15,14 +15,12 @@
  * limitations under the License.
  */
 
-package dev.macula.cloud.system.listener.rabbitmq;
+package dev.macula.cloud.system.listener;
 
 import dev.macula.cloud.system.service.SysMenuService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-
-import java.util.Arrays;
 
 /**
  * Canal + RabbitMQ 监听数据库数据变化
