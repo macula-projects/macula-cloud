@@ -21,8 +21,8 @@ spring:
     oauth2:
       resourceserver:
         opaquetoken:
-          client-id: macula-example-gateway #${spring.application.name}
-          client-secret: password
+          client-id: ${spring.application.name}
+          client-secret: gateway
           introspection-uri: https://goauth-dev.infinitus.com.cn/introspect
 macula:
   security:

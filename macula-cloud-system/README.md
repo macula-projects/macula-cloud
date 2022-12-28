@@ -30,3 +30,23 @@
 - service层依赖mapper层，将dto转为entity或则将entity或者bo转为dto。不可以在service接口出现entity或者bo
 - controller层依赖service，将vo转为dto或者dto转为vo返回。如果vo与dto没有差别，可以直接使用dto
 
+### 认证、鉴权记录
+
+- 在oauth2服务的UserDetailService的loadUserByName方法中读取用户信息，包括基本信息、角色、按钮权限等信息
+
+  考虑到按钮权限数据量大（登录的时候按钮权限信息放到redis，不作为JWT或者introspect接口返回）
+  - 对于JWT，在Token生成的地方把按钮权限缓存到redis
+  - 对于Token，在introspect方法中，把按钮权限缓存到redis，不要直接返回
+  - TODO oauth2要在JWT或者introspect方法返回deptId、dataScope、nickname属性
+
+- 按钮权限在菜单表，前端有一个directive，调用/api/v1/users/me 接口，返回用户的角色、按钮权限数据，按钮权限数据来自redis
+
+- 在macula-boot-starter-security模块中的PermissionService也是给Controller的方法注解用于判定按钮权限，权限数据来自redis
+  - （这里依赖redis有问题，导致每个微服务都要依赖system的redis）
+
+- URL权限通过定时任务后台缓存，在网关层获取URL权限信息，并检查URL访问权限
+  - TODO 监控数据表，触发更新
+
+### 租户、应用
+
+创建应用，设置应用的租户ID。具体某个应用的后端界面获取菜单时提供应用ID，获取该租户的菜单信息。（后面搞一个模版，默认就包含系统管理功能，租户隔离）

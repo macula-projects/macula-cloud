@@ -44,8 +44,4 @@ public class PermPageVO {
 
     @Schema(description = "URL权限标识-请求方式")
     private String requestPath;
-
-    @Schema(description = "按钮权限标识")
-    private String btnPerm;
-
 }

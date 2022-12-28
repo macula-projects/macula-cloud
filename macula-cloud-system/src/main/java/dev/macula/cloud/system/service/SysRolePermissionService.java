@@ -15,27 +15,26 @@
  * limitations under the License.
  */
 
-package dev.macula.cloud.system.pojo.entity;
+package dev.macula.cloud.system.service;
 
-import com.baomidou.mybatisplus.annotation.TableField;
-import dev.macula.boot.starter.mp.entity.BaseEntity;
-import lombok.Data;
-import lombok.experimental.Accessors;
+import com.baomidou.mybatisplus.extension.service.IService;
+import dev.macula.cloud.system.pojo.entity.SysRolePermission;
 
 import java.util.List;
 
-@Data
-@Accessors(chain = true)
-public class SysPermission extends BaseEntity {
+/**
+ * 角色权限业务接口
+ *
+ * @author haoxr
+ * @date 2022/6/4
+ */
+public interface SysRolePermissionService extends IService<SysRolePermission> {
 
-    private String name;
-
-    private Long menuId;
-
-    private String urlPerm;
-
-    // 有权限的角色编号集合
-    @TableField(exist = false)
-    private List<String> roles;
-
+    /**
+     * 获取角色拥有的权限ID集合
+     *
+     * @param roleId
+     * @return
+     */
+    List<Long> listPermIdsByRoleId(Long roleId);
 }

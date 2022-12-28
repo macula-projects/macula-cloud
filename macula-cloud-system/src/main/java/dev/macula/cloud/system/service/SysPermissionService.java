@@ -15,28 +15,23 @@
  * limitations under the License.
  */
 
-package dev.macula.cloud.system.mapper;
+package dev.macula.cloud.system.service;
 
-import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.baomidou.mybatisplus.extension.service.IService;
 import dev.macula.cloud.system.pojo.entity.SysPermission;
 import dev.macula.cloud.system.query.PermPageQuery;
 import dev.macula.cloud.system.vo.perm.PermPageVO;
-import org.apache.ibatis.annotations.Mapper;
 
 import java.util.List;
 
-@Mapper
-public interface SysPermissionMapper extends BaseMapper<SysPermission> {
-
-    /**
-     * 获取权限分页列表
-     *
-     * @param page
-     * @param queryParams
-     * @return
-     */
-    List<PermPageVO> listPermPages(Page<PermPageVO> page, PermPageQuery queryParams);
+/**
+ * 权限业务接口
+ *
+ * @author haoxr
+ * @date 2022/1/22
+ */
+public interface SysPermissionService extends IService<SysPermission> {
 
     /**
      * 权限<->有权限的角色集合
@@ -45,4 +40,16 @@ public interface SysPermissionMapper extends BaseMapper<SysPermission> {
      */
     List<SysPermission> listPermRoles();
 
+    /**
+     * 获取权限分页列表
+     *
+     * @param permPageQuery
+     * @return
+     */
+    Page<PermPageVO> listPermPages(PermPageQuery permPageQuery);
+
+    /**
+     * 刷新Redis缓存中角色菜单的权限规则，角色和菜单信息变更调用
+     */
+    boolean refreshPermRolesRules();
 }

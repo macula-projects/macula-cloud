@@ -24,19 +24,15 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import dev.macula.boot.result.Option;
 import dev.macula.boot.constants.GlobalConstants;
+import dev.macula.boot.result.Option;
 import dev.macula.boot.starter.security.utils.SecurityUtils;
 import dev.macula.cloud.system.converter.RoleConverter;
 import dev.macula.cloud.system.form.RoleForm;
 import dev.macula.cloud.system.mapper.SysRoleMapper;
-import dev.macula.cloud.system.pojo.entity.SysRole;
-import dev.macula.cloud.system.pojo.entity.SysRoleMenu;
-import dev.macula.cloud.system.pojo.entity.SysUserRole;
+import dev.macula.cloud.system.pojo.entity.*;
 import dev.macula.cloud.system.query.RolePageQuery;
-import dev.macula.cloud.system.service.SysRoleMenuService;
-import dev.macula.cloud.system.service.SysRoleService;
-import dev.macula.cloud.system.service.SysUserRoleService;
+import dev.macula.cloud.system.service.*;
 import dev.macula.cloud.system.vo.role.RolePageVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
@@ -58,6 +54,9 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
 
     private final SysRoleMenuService sysRoleMenuService;
     private final SysUserRoleService sysUserRoleService;
+
+    private final SysRolePermissionService sysRolePermissionService;
+    private final SysPermissionService sysPermissionService;
     private final RoleConverter roleConverter;
 
     /**
@@ -132,6 +131,11 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
         SysRole role = roleConverter.form2Entity(roleForm);
 
         boolean result = this.saveOrUpdate(role);
+
+        if (result) {
+            sysPermissionService.refreshPermRolesRules();
+        }
+
         return result;
     }
 
@@ -198,13 +202,25 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
     public boolean updateRoleMenus(Long roleId, List<Long> menuIds) {
         // 删除角色菜单
         sysRoleMenuService.remove(new LambdaQueryWrapper<SysRoleMenu>().eq(SysRoleMenu::getRoleId, roleId));
-        // 新增角色菜单
+        // 新增角色菜单关系
         if (CollectionUtil.isNotEmpty(menuIds)) {
             List<SysRoleMenu> roleMenus = menuIds.stream()
                     .map(menuId -> new SysRoleMenu(roleId, menuId))
                     .collect(Collectors.toList());
             sysRoleMenuService.saveBatch(roleMenus);
         }
+
+        // 删除角色权限
+        sysRolePermissionService.remove(new LambdaQueryWrapper<SysRolePermission>().eq(SysRolePermission::getRoleId, roleId));
+        // 新增角色权限关系（用勾选的菜单ID获取权限，用权限ID和角色ID组装sys_role_permission表)
+        List<SysPermission> permList = sysPermissionService.list(
+                new LambdaQueryWrapper<SysPermission>()
+                        .in(menuIds != null, SysPermission::getMenuId, menuIds));
+        if (CollectionUtil.isNotEmpty(permList)) {
+            List<SysRolePermission> rolePerms = permList.stream().map(perm -> new SysRolePermission(roleId, perm.getId())).collect(Collectors.toList());
+            sysRolePermissionService.saveBatch(rolePerms);
+        }
+
         return true;
     }
 

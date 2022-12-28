@@ -354,6 +354,7 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
                 .eq(SysUser::getUsername, SecurityUtils.getCurrentUser())
                 .select(
                         SysUser::getId,
+                        SysUser::getUsername,
                         SysUser::getNickname,
                         SysUser::getAvatar
                 )
