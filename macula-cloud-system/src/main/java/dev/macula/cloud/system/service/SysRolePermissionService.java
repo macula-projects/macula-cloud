@@ -26,7 +26,7 @@ import java.util.List;
  * 角色权限业务接口
  *
  * @author haoxr
- * @date 2022/6/4
+ * @since 2022/6/4
  */
 public interface SysRolePermissionService extends IService<SysRolePermission> {
 

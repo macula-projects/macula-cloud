@@ -25,7 +25,7 @@ import lombok.Data;
  * 角色分页查询实体
  *
  * @author haoxr
- * @date 2022/6/3
+ * @since 2022/6/3
  */
 @Data
 public class RolePageQuery extends BasePageQuery {

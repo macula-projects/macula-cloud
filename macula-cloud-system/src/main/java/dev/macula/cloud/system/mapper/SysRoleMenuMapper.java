@@ -27,7 +27,7 @@ import java.util.List;
  * 角色<->菜单持久层
  *
  * @author haoxr
- * @date 2022/6/4
+ * @since 2022/6/4
  */
 @Mapper
 public interface SysRoleMenuMapper extends BaseMapper<SysRoleMenu> {

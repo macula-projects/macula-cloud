@@ -34,7 +34,7 @@ import java.util.List;
  * 用户持久层
  *
  * @author haoxr
- * @date 2022/1/14
+ * @since 2022/1/14
  */
 @Mapper
 public interface SysUserMapper extends BaseMapper<SysUser> {

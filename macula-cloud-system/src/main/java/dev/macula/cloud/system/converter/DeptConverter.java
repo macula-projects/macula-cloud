@@ -17,8 +17,8 @@
 
 package dev.macula.cloud.system.converter;
 
-import dev.macula.cloud.system.pojo.entity.SysDept;
 import dev.macula.cloud.system.form.DeptForm;
+import dev.macula.cloud.system.pojo.entity.SysDept;
 import dev.macula.cloud.system.vo.dept.DeptVO;
 import org.mapstruct.Mapper;
 
@@ -26,7 +26,7 @@ import org.mapstruct.Mapper;
  * 部门对象转换器
  *
  * @author haoxr
- * @date 2022/7/29
+ * @since 2022/7/29
  */
 @Mapper(componentModel = "spring")
 public interface DeptConverter {

@@ -29,7 +29,7 @@ import java.util.List;
  * 权限业务接口
  *
  * @author haoxr
- * @date 2022/1/22
+ * @since 2022/1/22
  */
 public interface SysPermissionService extends IService<SysPermission> {
 
@@ -44,12 +44,12 @@ public interface SysPermissionService extends IService<SysPermission> {
      * 获取权限分页列表
      *
      * @param permPageQuery
-     * @return
+     * @return 权限列表
      */
     Page<PermPageVO> listPermPages(PermPageQuery permPageQuery);
 
     /**
      * 刷新Redis缓存中角色菜单的权限规则，角色和菜单信息变更调用
      */
-    boolean refreshPermRolesRules();
+    void refreshPermRolesRules();
 }

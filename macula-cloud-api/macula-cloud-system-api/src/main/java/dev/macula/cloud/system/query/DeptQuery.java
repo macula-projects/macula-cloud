@@ -24,7 +24,7 @@ import lombok.Data;
  * 部门分页查询对象
  *
  * @author haoxr
- * @date 2022/6/11
+ * @since 2022/6/11
  */
 @Schema(description = "部门分页查询对象")
 @Data

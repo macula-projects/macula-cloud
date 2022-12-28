@@ -24,7 +24,7 @@ import lombok.Data;
  * 权限视图对象
  *
  * @author haoxr
- * @date 2021/10/30 10:54
+ * @since 2021/10/30 10:54
  */
 @Schema(description = "权限视图对象")
 @Data

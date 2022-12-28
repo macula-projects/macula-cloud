@@ -25,7 +25,7 @@ import java.util.List;
  * user表单对象
  *
  * @author haoxr
- * @date 2022/6/10
+ * @since 2022/6/10
  */
 @Data
 public class UserFormBO {

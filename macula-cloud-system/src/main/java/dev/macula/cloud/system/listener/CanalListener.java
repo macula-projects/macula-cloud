@@ -26,7 +26,7 @@ import org.springframework.stereotype.Component;
  * Canal + RabbitMQ 监听数据库数据变化
  *
  * @author haoxr
- * @date 2021/11/4 23:14
+ * @since 2021/11/4 23:14
  */
 @Component
 @Slf4j

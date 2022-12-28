@@ -20,8 +20,8 @@ package dev.macula.cloud.system.controller;
 import dev.macula.boot.result.Option;
 import dev.macula.cloud.system.form.DeptForm;
 import dev.macula.cloud.system.query.DeptQuery;
-import dev.macula.cloud.system.vo.dept.DeptVO;
 import dev.macula.cloud.system.service.SysDeptService;
+import dev.macula.cloud.system.vo.dept.DeptVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -35,7 +35,7 @@ import java.util.List;
  * 部门控制器
  *
  * @author haoxr
- * @date 2020/11/6
+ * @since 2020/11/6
  */
 @Tag(name = "部门接口", description = "部门接口")
 @RestController

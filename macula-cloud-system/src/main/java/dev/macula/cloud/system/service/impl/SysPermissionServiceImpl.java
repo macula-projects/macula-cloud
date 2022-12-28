@@ -29,6 +29,7 @@ import dev.macula.cloud.system.service.SysPermissionService;
 import dev.macula.cloud.system.vo.perm.PermPageVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
@@ -40,7 +41,7 @@ import java.util.stream.Collectors;
  * 权限业务实现类
  *
  * @author haoxr
- * @date 2022/1/22
+ * @since 2022/1/22
  */
 @Service
 @RequiredArgsConstructor
@@ -78,7 +79,8 @@ public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, S
      * @return
      */
     @Override
-    public boolean refreshPermRolesRules() {
+    @Async
+    public void refreshPermRolesRules() {
         redisTemplate.delete(GlobalConstants.URL_PERM_ROLES_KEY);
         List<SysPermission> permissions = this.listPermRoles();
         if (CollectionUtil.isNotEmpty(permissions)) {
@@ -96,6 +98,5 @@ public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, S
                 redisTemplate.opsForHash().putAll(GlobalConstants.URL_PERM_ROLES_KEY, urlPermRoles);
             }
         }
-        return true;
     }
 }

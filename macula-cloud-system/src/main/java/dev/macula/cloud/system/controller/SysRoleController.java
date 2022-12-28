@@ -78,6 +78,9 @@ public class SysRoleController {
     @PutMapping(value = "/{id}")
     public boolean updateRole(@Valid @RequestBody RoleForm roleForm) {
         boolean result = roleService.saveRole(roleForm);
+        if (result) {
+            sysPermissionService.refreshPermRolesRules();
+        }
         return result;
     }
 

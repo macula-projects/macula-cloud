@@ -46,7 +46,7 @@ import java.util.stream.Collectors;
  * 角色业务实现类
  *
  * @author haoxr
- * @date 2022/6/3
+ * @since 2022/6/3
  */
 @Service
 @RequiredArgsConstructor
@@ -131,10 +131,6 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
         SysRole role = roleConverter.form2Entity(roleForm);
 
         boolean result = this.saveOrUpdate(role);
-
-        if (result) {
-            sysPermissionService.refreshPermRolesRules();
-        }
 
         return result;
     }

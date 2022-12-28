@@ -26,7 +26,7 @@ import java.util.Set;
  * 登录用户信息对象
  *
  * @author haoxr
- * @date 2022/1/14
+ * @since 2022/1/14
  */
 @Schema(description = "当前登录用户对象")
 @Data

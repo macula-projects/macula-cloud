@@ -26,7 +26,7 @@ import java.util.List;
  * 用户认证信息业务对象
  *
  * @author haoxr
- * @date 2021/9/27
+ * @since 2021/9/27
  */
 @Data
 public class UserAuthBO {

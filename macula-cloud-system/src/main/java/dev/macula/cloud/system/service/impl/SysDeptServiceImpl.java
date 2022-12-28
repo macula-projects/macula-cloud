@@ -23,16 +23,16 @@ import cn.hutool.core.lang.Validator;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import dev.macula.boot.result.Option;
 import dev.macula.boot.constants.GlobalConstants;
 import dev.macula.boot.enums.StatusEnum;
+import dev.macula.boot.result.Option;
 import dev.macula.cloud.system.converter.DeptConverter;
+import dev.macula.cloud.system.form.DeptForm;
 import dev.macula.cloud.system.mapper.SysDeptMapper;
 import dev.macula.cloud.system.pojo.entity.SysDept;
-import dev.macula.cloud.system.form.DeptForm;
 import dev.macula.cloud.system.query.DeptQuery;
-import dev.macula.cloud.system.vo.dept.DeptVO;
 import dev.macula.cloud.system.service.SysDeptService;
+import dev.macula.cloud.system.vo.dept.DeptVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -43,7 +43,7 @@ import java.util.stream.Collectors;
  * 部门业务实现类
  *
  * @author haoxr
- * @date 2021-08-22
+ * @since 2021-08-22
  */
 @Service
 @RequiredArgsConstructor

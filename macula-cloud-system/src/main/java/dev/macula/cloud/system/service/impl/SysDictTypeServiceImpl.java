@@ -46,7 +46,7 @@ import java.util.stream.Collectors;
  * 数据字典类型业务实现类
  *
  * @author haoxr
- * @date 2022/10/12
+ * @since 2022/10/12
  */
 @Service
 @RequiredArgsConstructor

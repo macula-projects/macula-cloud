@@ -26,7 +26,7 @@ import java.util.Date;
  * 用户业务对象
  *
  * @author haoxr
- * @date 2022/6/10
+ * @since 2022/6/10
  */
 @Data
 public class UserBO {

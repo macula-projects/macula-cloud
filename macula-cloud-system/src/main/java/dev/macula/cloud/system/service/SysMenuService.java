@@ -32,7 +32,7 @@ import java.util.Set;
  * 菜单业务接口
  *
  * @author haoxr
- * @date 2020/11/06
+ * @since 2020/11/06
  */
 public interface SysMenuService extends IService<SysMenu> {
 

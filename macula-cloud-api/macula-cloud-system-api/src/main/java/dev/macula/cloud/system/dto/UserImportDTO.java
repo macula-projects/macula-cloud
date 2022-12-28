@@ -29,7 +29,7 @@ import java.util.List;
  * 用户导入对象
  *
  * @author haoxr
- * @date 2022/4/10
+ * @since 2022/4/10
  */
 @Data
 public class UserImportDTO {

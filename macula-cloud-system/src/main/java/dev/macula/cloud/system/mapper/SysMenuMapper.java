@@ -21,7 +21,7 @@ package dev.macula.cloud.system.mapper;
  * 菜单持久层
  *
  * @author haoxr
- * @date 2022/1/24
+ * @since 2022/1/24
  */
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;

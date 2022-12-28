@@ -19,8 +19,8 @@ package dev.macula.cloud.system.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
 import dev.macula.boot.result.Option;
-import dev.macula.cloud.system.pojo.entity.SysDept;
 import dev.macula.cloud.system.form.DeptForm;
+import dev.macula.cloud.system.pojo.entity.SysDept;
 import dev.macula.cloud.system.query.DeptQuery;
 import dev.macula.cloud.system.vo.dept.DeptVO;
 
@@ -30,7 +30,7 @@ import java.util.List;
  * 部门业务接口
  *
  * @author haoxr
- * @date 2021/8/22
+ * @since 2021/8/22
  */
 public interface SysDeptService extends IService<SysDept> {
     /**

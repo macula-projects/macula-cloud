@@ -33,7 +33,7 @@ import org.mapstruct.Mappings;
  * 用户对象转换器
  *
  * @author haoxr
- * @date 2022/6/8
+ * @since 2022/6/8
  */
 @Mapper(componentModel = "spring")
 public interface UserConverter {

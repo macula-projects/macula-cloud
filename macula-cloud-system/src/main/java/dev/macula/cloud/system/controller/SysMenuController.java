@@ -21,10 +21,10 @@ import dev.macula.boot.result.Option;
 import dev.macula.boot.result.Result;
 import dev.macula.cloud.system.pojo.entity.SysMenu;
 import dev.macula.cloud.system.query.MenuQuery;
+import dev.macula.cloud.system.service.SysMenuService;
 import dev.macula.cloud.system.vo.menu.MenuVO;
 import dev.macula.cloud.system.vo.menu.ResourceVO;
 import dev.macula.cloud.system.vo.menu.RouteVO;
-import dev.macula.cloud.system.service.SysMenuService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -40,7 +40,7 @@ import java.util.List;
  * 菜单控制器
  *
  * @author haoxr
- * @date 2020/11/06
+ * @since 2020/11/06
  */
 @Tag(name = "菜单接口")
 @RestController

@@ -26,7 +26,7 @@ import lombok.Data;
  * 菜单实体类
  *
  * @author haoxr
- * @date 2021/11/06
+ * @since 2021/11/06
  */
 @Data
 @JsonInclude(JsonInclude.Include.NON_EMPTY)
