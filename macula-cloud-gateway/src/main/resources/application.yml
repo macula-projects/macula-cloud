@@ -17,6 +17,12 @@ spring:
             - Path=/system/**
           filters:
             - StripPrefix=1
+        - id: macula-cloud-tinyid
+          uri: lb://macula-cloud-tinyid
+          predicates:
+            - Path=/tinyid/**
+          filters:
+            - StripPrefix=1
   security:
     oauth2:
       resourceserver:
@@ -26,8 +32,8 @@ spring:
           introspection-uri: https://goauth-dev.infinitus.com.cn/introspect
 macula:
   security:
-    ignore-urls: /api/v3/**
-    only-auth-urls: /api/**
+    ignore-urls: /tinyid/**
+    only-auth-urls: /mall/api/**
 
 logging:
   level:
