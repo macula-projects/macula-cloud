@@ -15,20 +15,18 @@
  * limitations under the License.
  */
 
-package dev.macula.cloud.system;
+package dev.macula.cloud.system.mapper;
 
-import org.springframework.boot.SpringApplication;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
-import org.springframework.context.annotation.EnableAspectJAutoProxy;
-import org.springframework.scheduling.annotation.EnableAsync;
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import dev.macula.cloud.system.pojo.bo.AuditLogBO;
+import dev.macula.cloud.system.pojo.entity.SysLog;
+import dev.macula.cloud.system.query.LogPageQuery;
+import org.apache.ibatis.annotations.Mapper;
 
-@SpringBootApplication
-@EnableDiscoveryClient
-@EnableAspectJAutoProxy
-@EnableAsync
-public class MaculaSystemApplication {
-    public static void main(String[] args) {
-        SpringApplication.run(MaculaSystemApplication.class, args);
-    }
+@Mapper
+public interface SysLogMapper extends BaseMapper<SysLog> {
+
+    Page<AuditLogBO> listLogPages(Page<SysLog> page, LogPageQuery queryParams);
+
 }
