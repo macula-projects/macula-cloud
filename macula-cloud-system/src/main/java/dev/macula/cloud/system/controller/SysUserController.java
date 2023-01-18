@@ -21,6 +21,7 @@ import com.alibaba.excel.EasyExcel;
 import com.alibaba.excel.ExcelWriter;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import dev.macula.cloud.system.annotation.AuditLog;
 import dev.macula.cloud.system.dto.UserAuthInfo;
 import dev.macula.cloud.system.dto.UserImportDTO;
 import dev.macula.cloud.system.form.UserForm;
@@ -136,6 +137,7 @@ public class SysUserController {
     }
 
     @Operation(summary = "获取登录用户信息")
+    @AuditLog(title = "获取登录用户信息")
     @GetMapping("/me")
     public UserLoginVO getLoginUserInfo() {
         UserLoginVO userLoginVO = userService.getLoginUserInfo();
