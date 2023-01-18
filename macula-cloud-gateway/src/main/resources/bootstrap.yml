@@ -3,10 +3,10 @@ spring:
     name: macula-cloud-gateway
   cloud:
     nacos:
-      username: nacos
-      password: nacos
+      username: maculav5
+      password: maculav5-dev
       config:
-        server-addr: 127.0.0.1:8848
+        server-addr: 10.94.108.55:8848
         # namespace:
         # group:
         refresh-enabled: true

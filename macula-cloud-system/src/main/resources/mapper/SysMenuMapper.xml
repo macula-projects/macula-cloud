@@ -1,28 +1,88 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper
-        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
-        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="dev.macula.cloud.system.mapper.SysMenuMapper">
 
-    <!-- 菜单路由映射 -->
-    <resultMap id="RouteMap" type="dev.macula.cloud.system.pojo.bo.RouteBO">
-        <id property="id" column="id" jdbcType="BIGINT"/>
-        <result property="name" column="name" jdbcType="VARCHAR"/>
-        <result property="parentId" column="parent_id" jdbcType="BIGINT"/>
-        <result property="path" column="path" jdbcType="VARCHAR"/>
-        <result property="component" column="component" jdbcType="VARCHAR"/>
-        <result property="redirect" column="redirect" jdbcType="VARCHAR"/>
-        <result property="icon" column="icon" jdbcType="VARCHAR"/>
-        <result property="sort" column="sort" jdbcType="INTEGER"/>
-        <result property="visible" column="visible" jdbcType="BOOLEAN"/>
-        <result property="type" column="type" jdbcType="OTHER"/>
-        <collection property="roles" ofType="string" javaType="list">
-            <result column="code"/>
-        </collection>
-    </resultMap>
+  <!-- 菜单路由映射 -->
+  <resultMap id="RouteMap" type="dev.macula.cloud.system.pojo.bo.RouteBO">
+    <id property="id" column="id" jdbcType="BIGINT"/>
+    <result property="name" column="name" jdbcType="VARCHAR"/>
+    <result property="parentId" column="parent_id" jdbcType="BIGINT"/>
+    <result property="path" column="path" jdbcType="VARCHAR"/>
+    <result property="component" column="component" jdbcType="VARCHAR"/>
+    <result property="redirect" column="redirect" jdbcType="VARCHAR"/>
+    <result property="icon" column="icon" jdbcType="VARCHAR"/>
+    <result property="sort" column="sort" jdbcType="INTEGER"/>
+    <result property="visible" column="visible" jdbcType="BOOLEAN"/>
+    <result property="type" column="type" jdbcType="OTHER"/>
+    <collection property="roles" ofType="string" javaType="list">
+      <result column="code"/>
+    </collection>
+  </resultMap>
 
-    <!-- 获取路由列表 -->
-    <select id="listRoutes" resultMap="RouteMap">
+  <!-- 加载我的菜单列表对象 -->
+  <resultMap id="MyMenuBOMap" type="dev.macula.cloud.system.pojo.bo.MyMenuBO">
+    <id property="id" column="id" jdbcType="BIGINT"/>
+    <result property="name" column="name" jdbcType="VARCHAR"/>
+    <result property="path" column="path" jdbcType="VARCHAR"/>
+    <result property="component" column="component" jdbcType="VARCHAR"/>
+    <association property="meta" javaType="dev.macula.cloud.system.dto.MenuMetaDTO">
+      <result property="title" column="name" jdbcType="VARCHAR"/>
+      <result property="icon" column="icon" jdbcType="VARCHAR"/>
+      <result property="type" column="type" javaType="dev.macula.cloud.system.enums.MenuTypeEnum"
+              typeHandler="dev.macula.cloud.system.handler.MybatisEnumKeyTypeHandler" jdbcType="INTEGER"/>
+    </association>
+  </resultMap>
+
+  <!-- 根据父菜单id与菜单类型获取菜单列表 -->
+  <select id="getMyMenuList" resultMap="MyMenuBOMap">
+    select id, name, path, component, icon, type
+    from sys_menu
+    where parent_id = #{parentId} and type = #{type}
+  </select>
+
+  <!-- 获取菜单管理列表菜单对象 -->
+  <resultMap id="MenuListBoMap" type="dev.macula.cloud.system.pojo.bo.MenuListBO">
+    <id property="id" column="id" jdbcType="BIGINT"/>
+    <result property="parentId" column="parent_id" jdbcType="BIGINT"/>
+    <result property="name" column="name" jdbcType="VARCHAR"/>
+    <result property="path" column="path" jdbcType="VARCHAR"/>
+    <result property="component" column="component" jdbcType="VARCHAR"/>
+    <association property="meta" javaType="dev.macula.cloud.system.dto.MenuMetaDTO">
+      <result property="title" column="name" jdbcType="VARCHAR"/>
+      <result property="icon" column="icon" jdbcType="VARCHAR"/>
+      <result property="type" column="type" javaType="dev.macula.cloud.system.enums.MenuTypeEnum"
+              typeHandler="dev.macula.cloud.system.handler.MybatisEnumKeyTypeHandler" jdbcType="INTEGER"/>
+    </association>
+    <collection property="apiList" column="id" ofType="dev.macula.cloud.system.dto.PermDTO" javaType="list"
+                select="getPermsByMenuId"/>
+  </resultMap>
+
+  <!-- 获取菜单管理菜单列表 -->
+  <select id="getMenuList" resultMap="MenuListBoMap">
+    select  id, parent_id, name, path, component, icon, type
+    from sys_menu
+    where parent_id = #{parentId}
+  </select>
+
+  <!-- 根据指定菜单id查询权限信息 -->
+  <select id="getPermsByMenuId" resultType="dev.macula.cloud.system.dto.PermDTO">
+    select name as code, url_perm as url
+    from sys_permission
+    where menu_id = #{id}
+  </select>
+
+  <!-- 根据菜单id获取按钮权限列表 -->
+  <select id="listButtonPermsByParentId" resultType="java.lang.String">
+    SELECT DISTINCT perm
+    FROM
+    sys_menu
+    where parent_id = #{parentId} and type = '${@dev.macula.cloud.system.enums.MenuTypeEnum@BUTTON.getValue()}'
+  </select>
+
+  <!-- 获取路由列表 -->
+  <select id="listRoutes" resultMap="RouteMap">
         SELECT t1.id,
                t1.name,
                t1.parent_id,
@@ -41,27 +101,27 @@
         ORDER BY t1.sort asc
     </select>
 
-    <!-- 获取角色拥有的权限集合 -->
-    <select id="listRolePerms" resultType="java.lang.String">
-        SELECT
-        DISTINCT t1.perm
-        FROM
-        sys_menu t1
-        INNER JOIN sys_role_menu t2 ON t2.menu_id = t1.id
-        INNER JOIN sys_role t3 ON t2.role_id=t3.id
-        WHERE
-        t1.type = '${@dev.macula.cloud.system.enums.MenuTypeEnum@BUTTON.getValue()}'
-        AND t1.perm IS NOT NULL
-        <choose>
-            <when test="roles!=null and roles.size()>0">
-                AND t3.CODE IN
-                <foreach collection="roles" item="role" separator="," open="(" close=")">
-                    #{role}
-                </foreach>
-            </when>
-            <otherwise>
-                AND t1.id = -1
-            </otherwise>
-        </choose>
-    </select>
+  <!-- 获取角色拥有的权限集合 -->
+  <select id="listRolePerms" resultType="java.lang.String">
+    SELECT
+    DISTINCT t1.perm
+    FROM
+    sys_menu t1
+    INNER JOIN sys_role_menu t2 ON t2.menu_id = t1.id
+    INNER JOIN sys_role t3 ON t2.role_id=t3.id
+    WHERE
+    t1.type = '${@dev.macula.cloud.system.enums.MenuTypeEnum@BUTTON.getValue()}'
+    AND t1.perm IS NOT NULL
+    <choose>
+      <when test="roles!=null and roles.size()>0">
+        AND t3.CODE IN
+        <foreach collection="roles" item="role" separator="," open="(" close=")">
+          #{role}
+        </foreach>
+      </when>
+      <otherwise>
+        AND t1.id = -1
+      </otherwise>
+    </choose>
+  </select>
 </mapper>

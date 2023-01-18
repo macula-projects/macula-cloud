@@ -17,9 +17,12 @@
 
 package dev.macula.cloud.system.converter;
 
+import dev.macula.cloud.system.dto.MenuDTO;
 import dev.macula.cloud.system.pojo.entity.SysMenu;
 import dev.macula.cloud.system.vo.menu.MenuVO;
 import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+import org.mapstruct.Mappings;
 
 /**
  * 菜单对象转换器
@@ -30,6 +33,19 @@ import org.mapstruct.Mapper;
 @Mapper(componentModel = "spring")
 public interface MenuConverter {
 
-    MenuVO entity2VO(SysMenu entity);
+  MenuVO entity2VO(SysMenu entity);
 
+  @Mappings({
+    @Mapping(source = "meta.title", target = "name"),
+    @Mapping(source = "meta.type", target = "type"),
+    @Mapping(source = "meta.icon", target = "icon"),
+    @Mapping(target = "visible", expression = "java(toInt(dto.getMeta().getHidden()))"),
+    @Mapping(target = "fullPage", expression = "java(toInt(dto.getMeta().getFullpage()))"),
+    @Mapping(source = "name", target = "perm"),
+  })
+  SysMenu MenuDTO2Entity(MenuDTO dto);
+
+  default Integer toInt(Boolean bool){
+    return bool == null ? 0 : (bool ? 1 : 0);
+  }
 }
