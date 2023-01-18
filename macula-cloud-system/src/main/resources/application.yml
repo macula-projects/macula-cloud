@@ -18,7 +18,7 @@ spring:
       discovery:
         enabled: true
         server-addr: 10.94.108.55:8848
-        # namespace:
+        namespace: MACULA5_DEV
         # group:
     sentinel:
       enabled: false
