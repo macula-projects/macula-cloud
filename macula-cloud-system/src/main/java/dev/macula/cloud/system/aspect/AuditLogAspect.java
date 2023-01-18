@@ -79,7 +79,6 @@ public class AuditLogAspect {
             // 处理设置注解上的参数
             getControllerMethodDescription(joinPoint, controllerLog, opLog, jsonResult);
             // 保存数据库
-            System.out.println(" opLog -> " + opLog);
             sysLogService.save(opLog);
 
         } catch (Exception exp) {
