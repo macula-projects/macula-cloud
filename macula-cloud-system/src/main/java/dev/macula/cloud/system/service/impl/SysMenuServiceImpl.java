@@ -51,6 +51,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -281,7 +282,9 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
   }
 
   @Override
-  public Long add(MenuDTO menuDTO) {
+  @Transactional
+  public JSONObject add(MenuDTO menuDTO) {
+    JSONObject jsonObject = new JSONObject();
     SysMenu menu = menuConverter.MenuDTO2Entity(menuDTO);
     if (Objects.nonNull(menu.getId())) {
       this.baseMapper.updateById(menu);
@@ -289,15 +292,61 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
       this.baseMapper.insert(menu);
     }
     Assert.notNull(menu.getId(), "保存菜单失败，稍后重试！");
+    jsonObject.put("menuId", menu.getId());
     if (CollectionUtil.isEmpty(menuDTO.getApiList())) {
-      return menu.getId();
+      sysPermissionMapper.delete(new LambdaQueryWrapper<SysPermission>().eq(SysPermission::getMenuId, menu.getId()));
+      return jsonObject;
     }
+    List<Long> updatePermIds = new ArrayList<>();
+    Map<String, PermDTO> permDTOMap = new HashMap<>();
     for(PermDTO permDTO: menuDTO.getApiList()) {
       SysPermission permission = permissionConverter.permDTO2Entity(permDTO);
       permission.setMenuId(menu.getId());
-      sysPermissionMapper.insert(permission);
+      if (Objects.nonNull(permission.getId())) {
+        sysPermissionMapper.updateById(permission);
+      } else {
+        sysPermissionMapper.insert(permission);
+      }
+      updatePermIds.add(permission.getId());
+      permDTO.setId(permission.getId());
+      permDTOMap.put(permDTO.getCode()+"_"+permDTO.getUrl(), permDTO);
     }
-    return menu.getId();
+    jsonObject.put("apiList", permDTOMap);
+    List<SysPermission> permissions =sysPermissionMapper.selectList(
+      new LambdaQueryWrapper<SysPermission>()
+        .eq(SysPermission::getMenuId, menu.getId())
+        .notIn(SysPermission::getId, updatePermIds));
+    if(!permissions.isEmpty()) {
+      List<Long> deleteIds = permissions.stream().map(SysPermission::getId).collect(Collectors.toList());
+      sysPermissionMapper.delete(new LambdaQueryWrapper<SysPermission>().in(SysPermission::getId, deleteIds));
+    }
+    return jsonObject;
+  }
+
+  @Override
+  @Transactional
+  public List<Long> del(List<Long> menuIds) {
+    List<Long> idList = new ArrayList<>();
+    for(Long id: menuIds) {
+      idList.add(id);
+      loopDelMenu(id);
+    }
+    return idList;
+  }
+
+  private void loopDelMenu(Long menuId){
+    try {
+      List<SysMenu> subMenu = this.baseMapper.selectList(new LambdaQueryWrapper<SysMenu>().eq(SysMenu::getParentId, menuId));
+      if (subMenu.isEmpty()) {
+        return;
+      }
+      for (SysMenu sysMenu : subMenu) {
+        loopDelMenu(sysMenu.getId());
+      }
+    } finally {
+      sysPermissionMapper.delete(new LambdaQueryWrapper<SysPermission>().eq(SysPermission::getMenuId, menuId));
+      this.baseMapper.deleteById(menuId);
+    }
   }
 
   private void loopLoadMenu(Long parentId, List<MenuListBO> menuListBOS) {

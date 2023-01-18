@@ -68,7 +68,7 @@
 
   <!-- 根据指定菜单id查询权限信息 -->
   <select id="getPermsByMenuId" resultType="dev.macula.cloud.system.dto.PermDTO">
-    select name as code, url_perm as url
+    select id as id, name as code, url_perm as url
     from sys_permission
     where menu_id = #{id}
   </select>

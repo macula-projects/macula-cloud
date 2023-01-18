@@ -17,7 +17,8 @@ public interface PermissionConverter {
 
   @Mappings({
     @Mapping(source = "code", target = "name"),
-    @Mapping(source = "url", target = "urlPerm")
+    @Mapping(source = "url", target = "urlPerm"),
+    @Mapping(source = "id", target = "id")
   })
   SysPermission permDTO2Entity(PermDTO permDTO);
 }

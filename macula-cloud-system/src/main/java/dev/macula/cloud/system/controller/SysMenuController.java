@@ -63,17 +63,23 @@ public class SysMenuController {
   }
 
   @Operation(summary = "菜单列表")
-  @GetMapping
+  @GetMapping("/list")
   public Result listMenus(MenuListQueryDto menuListQueryDto) {
     JSONArray data = menuService.listMenus(menuListQueryDto);
     return Result.success(data);
   }
 
-  @Operation(summary = "添加菜单及权限信息")
+  @Operation(summary = "添加更新菜单及权限信息")
   @PostMapping("/add")
   public Result addMenu(@RequestBody MenuDTO menuDTO) {
     log.info("menuDto: {}", menuDTO);
     return Result.success(menuService.add(menuDTO));
+  }
+
+  @Operation(summary = "删除菜单")
+  @DeleteMapping("/delete")
+  public Result delMenu(@RequestBody List<Long> menuIds) {
+    return Result.success(menuService.del(menuIds));
   }
 
   @Operation(summary = "资源(菜单+权限)列表")

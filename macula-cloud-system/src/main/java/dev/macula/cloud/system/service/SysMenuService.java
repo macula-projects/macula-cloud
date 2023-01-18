@@ -120,5 +120,12 @@ public interface SysMenuService extends IService<SysMenu> {
    * @param menuDTO
    * @return DTO对象的菜单id
    */
-  Long add(MenuDTO menuDTO);
+  JSONObject add(MenuDTO menuDTO);
+
+  /**
+   * 根据id列表删除指定id菜单
+   * @param menuIds 菜单id列表
+   * @return
+   */
+  List<Long> del(List<Long> menuIds);
 }
