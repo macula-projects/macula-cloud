@@ -18,10 +18,15 @@
 package dev.macula.cloud.system.service.impl;
 
 import cn.hutool.core.collection.CollectionUtil;
+import cn.hutool.core.lang.Assert;
 import cn.hutool.core.util.StrUtil;
+import com.baomidou.mybatisplus.core.conditions.Wrapper;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import dev.macula.boot.constants.GlobalConstants;
+import dev.macula.cloud.system.converter.PermissionConverter;
+import dev.macula.cloud.system.dto.PermDTO;
 import dev.macula.cloud.system.mapper.SysPermissionMapper;
 import dev.macula.cloud.system.pojo.entity.SysPermission;
 import dev.macula.cloud.system.query.PermPageQuery;
@@ -31,10 +36,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -48,6 +52,8 @@ import java.util.stream.Collectors;
 public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, SysPermission> implements SysPermissionService {
 
     private final RedisTemplate redisTemplate;
+
+    private final PermissionConverter permissionConverter;
 
     /**
      * 获取权限分页列表
@@ -97,6 +103,69 @@ public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, S
                 });
                 redisTemplate.opsForHash().putAll(GlobalConstants.URL_PERM_ROLES_KEY, urlPermRoles);
             }
+        }
+    }
+
+    @Override
+    @Transactional
+    public Map<String, PermDTO> handlerAddMenuPerms(List<PermDTO> apiList, Long menuId) {
+        // 获取更新和添加的菜单权限id,用来删除其余该菜单下的其它菜单权限信息
+        List<Long> updatePermIds = new ArrayList<>();
+        Map<String, PermDTO> permDTOMap = handlerAddOrUpdateMenuPerms(apiList, menuId, updatePermIds);
+        if (!updatePermIds.isEmpty()) {
+            deleteOtherMenuPerms(menuId, updatePermIds);
+        }
+        return permDTOMap;
+    }
+
+    @Override
+    public void deleteByMenuId(Long menuId) {
+        Assert.notNull(menuId, "根据菜单id删除权限失败，菜单id为空，稍后重试！");
+        getBaseMapper().delete(new LambdaQueryWrapper<SysPermission>().eq(SysPermission::getMenuId, menuId));
+    }
+
+    @Override
+    public List<PermDTO> listDTO(Wrapper queryWrapper) {
+        List<SysPermission> sysPermissions = list(queryWrapper);
+        return permissionConverter.listEntities2DTO(sysPermissions);
+    }
+
+    private Map<String, PermDTO> handlerAddOrUpdateMenuPerms(List<PermDTO> permDTOList, Long menuId, List<Long> updatePermIds) {
+        Map<String, PermDTO> permDTOMap = new HashMap<>();
+        // 没有更新或添加的菜单权限直接清空权限列表
+        if (CollectionUtil.isEmpty(permDTOList)) {
+            getBaseMapper().delete(new LambdaQueryWrapper<SysPermission>().eq(SysPermission::getMenuId, menuId));
+            return permDTOMap;
+        }
+        for (PermDTO permDTO : permDTOList) {
+            Long permId = addOrUpdateMenuPermission(permDTO, menuId);
+            Assert.notNull(permId, "保存菜单失败，权限添加失败，稍后重试！");
+            updatePermIds.add(permId);
+            permDTO.setId(permId);
+            permDTOMap.put(permDTO.getCode() + "_" + permDTO.getUrl(), permDTO);
+        }
+        return permDTOMap;
+    }
+
+    private Long addOrUpdateMenuPermission(PermDTO permDTO, Long menuId) {
+        SysPermission permission = permissionConverter.permDTO2Entity(permDTO);
+        permission.setMenuId(menuId);
+        if (Objects.nonNull(permission.getId())) {
+            getBaseMapper().updateById(permission);
+        } else {
+            getBaseMapper().insert(permission);
+        }
+        return permission.getId();
+    }
+
+    private void deleteOtherMenuPerms(Long menuId, List<Long> updatePermIds) {
+        List<SysPermission> permissions = getBaseMapper().selectList(
+                new LambdaQueryWrapper<SysPermission>()
+                        .eq(SysPermission::getMenuId, menuId)
+                        .notIn(SysPermission::getId, updatePermIds));
+        if (!permissions.isEmpty()) {
+            List<Long> deleteIds = permissions.stream().map(SysPermission::getId).collect(Collectors.toList());
+            getBaseMapper().delete(new LambdaQueryWrapper<SysPermission>().in(SysPermission::getId, deleteIds));
         }
     }
 }

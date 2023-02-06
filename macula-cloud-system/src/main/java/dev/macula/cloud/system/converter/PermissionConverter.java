@@ -6,6 +6,8 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.Mappings;
 
+import java.util.List;
+
 /**
  * 权限对象转换器
  *
@@ -15,10 +17,17 @@ import org.mapstruct.Mappings;
 @Mapper(componentModel = "spring")
 public interface PermissionConverter {
 
-  @Mappings({
-    @Mapping(source = "code", target = "name"),
-    @Mapping(source = "url", target = "urlPerm"),
-    @Mapping(source = "id", target = "id")
-  })
-  SysPermission permDTO2Entity(PermDTO permDTO);
+    @Mappings({
+            @Mapping(source = "code", target = "name"),
+            @Mapping(source = "url", target = "urlPerm")
+    })
+    SysPermission permDTO2Entity(PermDTO permDTO);
+
+    @Mappings({
+            @Mapping(source = "name", target = "code"),
+            @Mapping(source = "urlPerm", target = "url")
+    })
+    PermDTO entity2DTO(SysPermission entity);
+
+    List<PermDTO> listEntities2DTO(List<SysPermission> entities);
 }

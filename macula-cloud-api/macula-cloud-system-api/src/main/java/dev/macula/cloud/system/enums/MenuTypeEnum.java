@@ -34,8 +34,9 @@ public enum MenuTypeEnum implements IBaseEnum<Integer> {
     MENU(1, "菜单"),
     CATALOG(2, "目录"),
     EXTLINK(3, "外链"),
+    IFRAME(4, "Iframe"),
 
-    BUTTON(4, "按钮");
+    BUTTON(5, "按钮");
 
     @Getter
     @EnumValue //  Mybatis-Plus 提供注解表示插入数据库时插入该值

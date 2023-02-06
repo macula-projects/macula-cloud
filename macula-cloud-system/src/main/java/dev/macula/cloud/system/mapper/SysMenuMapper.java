@@ -25,8 +25,6 @@ package dev.macula.cloud.system.mapper;
  */
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import dev.macula.cloud.system.pojo.bo.MenuListBO;
-import dev.macula.cloud.system.pojo.bo.MyMenuBO;
 import dev.macula.cloud.system.pojo.bo.RouteBO;
 import dev.macula.cloud.system.pojo.entity.SysMenu;
 import org.apache.ibatis.annotations.Mapper;
@@ -52,25 +50,4 @@ public interface SysMenuMapper extends BaseMapper<SysMenu> {
      */
     Set<String> listRolePerms(Set<String> roles);
 
-    /**
-     * 获取我的菜单列表，根据父菜单id与菜单类型获取菜单列表
-     * @param parentId 父菜单id, 根（root）菜单id为0，因为默认自增id最小id为1
-     * @param type (1：菜单；2：目录；3：外链；4：按钮)
-     * @return
-     */
-      List<MyMenuBO> getMyMenuList(Long parentId, int type);
-
-  /**
-   * 通过父菜单id获取按钮权限信息
-   * @param parentId
-   * @return
-   */
-  Set<String> listButtonPermsByParentId(Long parentId);
-
-  /**
-   * 通过父菜单id获取菜单管理的菜单列表对象
-   * @param parentId 父菜单id, 根（root）菜单id为0
-   * @return
-   */
-  List<MenuListBO> getMenuList(Long parentId);
 }
