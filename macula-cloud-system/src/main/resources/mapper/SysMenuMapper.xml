@@ -21,66 +21,6 @@
     </collection>
   </resultMap>
 
-  <!-- 加载我的菜单列表对象 -->
-  <resultMap id="MyMenuBOMap" type="dev.macula.cloud.system.pojo.bo.MyMenuBO">
-    <id property="id" column="id" jdbcType="BIGINT"/>
-    <result property="name" column="name" jdbcType="VARCHAR"/>
-    <result property="path" column="path" jdbcType="VARCHAR"/>
-    <result property="component" column="component" jdbcType="VARCHAR"/>
-    <association property="meta" javaType="dev.macula.cloud.system.dto.MenuMetaDTO">
-      <result property="title" column="name" jdbcType="VARCHAR"/>
-      <result property="icon" column="icon" jdbcType="VARCHAR"/>
-      <result property="type" column="type" javaType="dev.macula.cloud.system.enums.MenuTypeEnum"
-              typeHandler="dev.macula.cloud.system.handler.MybatisEnumKeyTypeHandler" jdbcType="INTEGER"/>
-    </association>
-  </resultMap>
-
-  <!-- 根据父菜单id与菜单类型获取菜单列表 -->
-  <select id="getMyMenuList" resultMap="MyMenuBOMap">
-    select id, name, path, component, icon, type
-    from sys_menu
-    where parent_id = #{parentId} and type = #{type}
-  </select>
-
-  <!-- 获取菜单管理列表菜单对象 -->
-  <resultMap id="MenuListBoMap" type="dev.macula.cloud.system.pojo.bo.MenuListBO">
-    <id property="id" column="id" jdbcType="BIGINT"/>
-    <result property="parentId" column="parent_id" jdbcType="BIGINT"/>
-    <result property="name" column="name" jdbcType="VARCHAR"/>
-    <result property="path" column="path" jdbcType="VARCHAR"/>
-    <result property="component" column="component" jdbcType="VARCHAR"/>
-    <association property="meta" javaType="dev.macula.cloud.system.dto.MenuMetaDTO">
-      <result property="title" column="name" jdbcType="VARCHAR"/>
-      <result property="icon" column="icon" jdbcType="VARCHAR"/>
-      <result property="type" column="type" javaType="dev.macula.cloud.system.enums.MenuTypeEnum"
-              typeHandler="dev.macula.cloud.system.handler.MybatisEnumKeyTypeHandler" jdbcType="INTEGER"/>
-    </association>
-    <collection property="apiList" column="id" ofType="dev.macula.cloud.system.dto.PermDTO" javaType="list"
-                select="getPermsByMenuId"/>
-  </resultMap>
-
-  <!-- 获取菜单管理菜单列表 -->
-  <select id="getMenuList" resultMap="MenuListBoMap">
-    select  id, parent_id, name, path, component, icon, type
-    from sys_menu
-    where parent_id = #{parentId}
-  </select>
-
-  <!-- 根据指定菜单id查询权限信息 -->
-  <select id="getPermsByMenuId" resultType="dev.macula.cloud.system.dto.PermDTO">
-    select id as id, name as code, url_perm as url
-    from sys_permission
-    where menu_id = #{id}
-  </select>
-
-  <!-- 根据菜单id获取按钮权限列表 -->
-  <select id="listButtonPermsByParentId" resultType="java.lang.String">
-    SELECT DISTINCT perm
-    FROM
-    sys_menu
-    where parent_id = #{parentId} and type = '${@dev.macula.cloud.system.enums.MenuTypeEnum@BUTTON.getValue()}'
-  </select>
-
   <!-- 获取路由列表 -->
   <select id="listRoutes" resultMap="RouteMap">
         SELECT t1.id,
