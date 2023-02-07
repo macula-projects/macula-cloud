@@ -12,7 +12,7 @@ spring:
     gateway:
       routes:
         - id: macula-cloud-system
-          uri: http://localhost:8081
+          uri: lb://macula-cloud-system
           predicates:
             - Path=/system/**
           filters:
