@@ -21,6 +21,7 @@ import com.alibaba.excel.EasyExcel;
 import com.alibaba.excel.ExcelWriter;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import dev.macula.cloud.system.annotation.AuditLog;
 import dev.macula.cloud.system.dto.UserAuthInfo;
 import dev.macula.cloud.system.dto.UserImportDTO;
@@ -62,9 +63,9 @@ public class SysUserController {
     private final SysUserService userService;
 
     @Operation(summary = "用户分页列表")
-    @GetMapping("/pages")
-    public IPage<UserVO> listUserPages(UserPageQuery queryParams) {
-        IPage<UserVO> result = userService.listUserPages(queryParams);
+    @GetMapping
+    public Page<UserVO> listUserPages(UserPageQuery queryParams) {
+        Page<UserVO> result = userService.listUserPages(queryParams);
         return result;
     }
 
@@ -80,7 +81,7 @@ public class SysUserController {
 
     @Operation(summary = "新增用户")
     @PostMapping
-    @PreAuthorize("@pms.hasPermission('sys:user:add')")
+//    @PreAuthorize("@pms.hasPermission('sys:user:add')")
     public boolean saveUser(
             @Validated @RequestBody UserForm userForm
     ) {
@@ -91,7 +92,7 @@ public class SysUserController {
     @Operation(summary = "修改用户")
     @Parameter(name = "用户ID")
     @PutMapping(value = "/{userId}")
-    @PreAuthorize("@pms.hasPermission('sys:user:edit')")
+//    @PreAuthorize("@pms.hasPermission('sys:user:edit')")
     public boolean updateUser(
             @PathVariable Long userId,
             @RequestBody @Validated UserForm userForm) {
@@ -102,7 +103,7 @@ public class SysUserController {
     @Operation(summary = "删除用户")
     @Parameter(name = "用户ID", description = "用户ID，多个以英文逗号(,)分割")
     @DeleteMapping("/{ids}")
-    @PreAuthorize("@pms.hasPermission('sys:user:del')")
+//    @PreAuthorize("@pms.hasPermission('sys:user:del')")
     public boolean deleteUsers(
             @PathVariable String ids
     ) {
