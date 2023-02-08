@@ -17,13 +17,15 @@
 
 package dev.macula.cloud.system.service;
 
-import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
 import dev.macula.boot.result.Option;
 import dev.macula.cloud.system.controller.SysMenuController;
 import dev.macula.cloud.system.dto.MenuDTO;
+import dev.macula.cloud.system.pojo.bo.MenuBO;
 import dev.macula.cloud.system.pojo.entity.SysMenu;
+import dev.macula.cloud.system.query.MenuPageQuery;
 import dev.macula.cloud.system.query.MenuQuery;
 import dev.macula.cloud.system.vo.menu.MenuVO;
 import dev.macula.cloud.system.vo.menu.ResourceVO;
@@ -114,10 +116,10 @@ public interface SysMenuService extends IService<SysMenu> {
     /**
      * 获取菜单管理列表
      *
-     * @param menuListQueryDto
+     * @param menuPageQuery
      * @return
      */
-    JSONArray listMenus(SysMenuController.MenuListQueryDto menuListQueryDto);
+    IPage<MenuBO> pagesMenus(MenuPageQuery menuPageQuery);
 
     /**
      * 添加或更新菜单，返回添加或更新的id

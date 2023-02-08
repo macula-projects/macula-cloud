@@ -17,15 +17,15 @@
 
 package dev.macula.cloud.system.controller;
 
-import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import dev.macula.boot.result.Option;
 import dev.macula.boot.result.Result;
 import dev.macula.cloud.system.dto.MenuDTO;
+import dev.macula.cloud.system.pojo.bo.MenuBO;
 import dev.macula.cloud.system.pojo.entity.SysMenu;
-import dev.macula.cloud.system.query.MenuQuery;
+import dev.macula.cloud.system.query.MenuPageQuery;
 import dev.macula.cloud.system.service.SysMenuService;
-import dev.macula.cloud.system.vo.menu.MenuVO;
 import dev.macula.cloud.system.vo.menu.ResourceVO;
 import dev.macula.cloud.system.vo.menu.RouteVO;
 import io.swagger.v3.oas.annotations.Operation;
@@ -63,10 +63,10 @@ public class SysMenuController {
   }
 
   @Operation(summary = "菜单列表")
-  @GetMapping("/list")
-  public Result listMenus(MenuListQueryDto menuListQueryDto) {
-    JSONArray data = menuService.listMenus(menuListQueryDto);
-    return Result.success(data);
+  @GetMapping("/pages")
+  public IPage<MenuBO> pagesMenus(MenuPageQuery menuPageQuery) {
+    IPage<MenuBO> data = menuService.pagesMenus(menuPageQuery);
+    return data;
   }
 
   @Operation(summary = "添加更新菜单及权限信息")
@@ -165,12 +165,6 @@ public class SysMenuController {
   @Schema(description = "查询我的菜单对象")
   @Data
   public static class MyMenuQueryDto {
-
-  }
-
-  @Schema(description = "查询菜单列表对象")
-  @Data
-  public static class MenuListQueryDto {
 
   }
 }
