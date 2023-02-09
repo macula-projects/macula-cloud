@@ -21,7 +21,6 @@ import com.alibaba.fastjson.JSONObject;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
 import dev.macula.boot.result.Option;
-import dev.macula.cloud.system.controller.SysMenuController;
 import dev.macula.cloud.system.dto.MenuDTO;
 import dev.macula.cloud.system.pojo.bo.MenuBO;
 import dev.macula.cloud.system.pojo.entity.SysMenu;
@@ -45,6 +44,11 @@ public interface SysMenuService extends IService<SysMenu> {
      * 根菜单id
      */
     Long ROOT_ID = 0L;
+
+    /**
+     * 菜单可见
+     */
+    Integer VISIBLED = 1;
 
     /**
      * 获取菜单表格列表
@@ -108,10 +112,10 @@ public interface SysMenuService extends IService<SysMenu> {
     /**
      * 获取我的菜单列表
      *
-     * @param myMenuQueryDto
+     * @param menuQuery
      * @return
      */
-    JSONObject getMyMenu(SysMenuController.MyMenuQueryDto myMenuQueryDto);
+    JSONObject getMyMenu(MenuQuery menuQuery);
 
     /**
      * 获取菜单管理列表

@@ -59,8 +59,8 @@ public class SysMenuController {
 
     @Operation(summary = "获取当前登录用户的菜单列表")
     @GetMapping("/my")
-    public Result getUserMenu(MyMenuQueryDto myMenuQueryDto) {
-        JSONObject data = menuService.getMyMenu(myMenuQueryDto);
+    public Result getUserMenu(MenuQuery menuQuery) {
+        JSONObject data = menuService.getMyMenu(menuQuery);
         return Result.success(data);
     }
 

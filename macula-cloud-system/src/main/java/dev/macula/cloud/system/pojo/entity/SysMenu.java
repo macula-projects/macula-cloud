@@ -67,11 +67,6 @@ public class SysMenu extends BaseEntity {
     private String perm;
 
     /**
-     * 菜单所属租户id
-     */
-    private Long tenantId;
-
-    /**
      * 菜单标签
      */
     private String tag;

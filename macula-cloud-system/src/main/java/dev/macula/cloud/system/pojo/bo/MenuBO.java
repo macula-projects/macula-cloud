@@ -34,8 +34,6 @@ public class MenuBO {
     private List<MenuBO> children;
     @Schema(defaultValue = "菜单重定向地址")
     private String redirect;
-    @Schema(description = "菜单租户id")
-    private Long tenantId;
     @Schema(defaultValue = "菜单排序")
     private Integer sort;
     @Schema(description = "按钮权限标识")
