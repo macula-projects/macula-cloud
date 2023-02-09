@@ -20,10 +20,11 @@ package dev.macula.cloud.system.service.impl;
 import cn.hutool.core.collection.CollectionUtil;
 import cn.hutool.core.lang.Assert;
 import cn.hutool.core.util.StrUtil;
-import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import dev.macula.boot.constants.GlobalConstants;
 import dev.macula.boot.enums.StatusEnum;
@@ -38,6 +39,7 @@ import dev.macula.cloud.system.pojo.bo.MenuBO;
 import dev.macula.cloud.system.pojo.bo.RouteBO;
 import dev.macula.cloud.system.pojo.entity.SysMenu;
 import dev.macula.cloud.system.pojo.entity.SysPermission;
+import dev.macula.cloud.system.query.MenuPageQuery;
 import dev.macula.cloud.system.query.MenuQuery;
 import dev.macula.cloud.system.service.SysMenuService;
 import dev.macula.cloud.system.service.SysPermissionService;
@@ -46,6 +48,7 @@ import dev.macula.cloud.system.vo.menu.ResourceVO;
 import dev.macula.cloud.system.vo.menu.RouteVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
@@ -270,12 +273,18 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
     }
 
     @Override
-    public JSONArray listMenus(SysMenuController.MenuListQueryDto menuListQueryDto) {
-        JSONArray array = new JSONArray();
+    public IPage<MenuBO> pagesMenus(MenuPageQuery menuPageQuery) {
         List<MenuBO> menuBOS = new ArrayList<>();
-        loopLoadListMenu(ROOT_ID, menuBOS);
-        array.addAll(menuBOS);
-        return array;
+        Set<Long> containKeyWorkShowMenuParentId = null;
+        if (StringUtils.isNotBlank(menuPageQuery.getKeywords())) {
+            containKeyWorkShowMenuParentId = getBaseMapper().listShowMenuParentIdByName(menuPageQuery.getKeywords());
+        }
+        loopLoadListMenu(ROOT_ID, menuBOS, menuPageQuery, containKeyWorkShowMenuParentId);
+        IPage<MenuBO> data = new Page<>(menuPageQuery.getPageNum(), menuPageQuery.getPageSize(), menuBOS.size());
+        int startIndex = (menuPageQuery.getPageNum() - 1) * menuPageQuery.getPageSize();
+        int endIndex = (menuPageQuery.getPageNum()) * menuPageQuery.getPageSize();
+        data.setRecords(menuBOS.subList(startIndex, Math.min(endIndex, menuBOS.size())));
+        return data;
     }
 
     @Override
@@ -342,13 +351,23 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
     }
 
     /**
-     * 使用递归，获取父菜单id下的所有菜单信息
+     * 使用递归，查询父菜单id下的所有菜单信息
      *
      * @param parentId
      * @param menuBOS
+     * @param menuPageQuery
+     * @param showMenuParentIds 根目录下的菜单，可见的顶级菜单列表
      */
-    private void loopLoadListMenu(Long parentId, List<MenuBO> menuBOS) {
-        List<SysMenu> entities = getBaseMapper().selectList(new LambdaQueryWrapper<SysMenu>().eq(SysMenu::getParentId, parentId));
+    private void loopLoadListMenu(Long parentId, List<MenuBO> menuBOS, MenuPageQuery menuPageQuery, Set<Long> showMenuParentIds) {
+        List<SysMenu> entities = getBaseMapper().selectList(new LambdaQueryWrapper<SysMenu>()
+                .eq(SysMenu::getParentId, parentId)
+                .and(Objects.nonNull(showMenuParentIds) && !showMenuParentIds.isEmpty(),
+                        wrapper -> wrapper.in(SysMenu::getId, showMenuParentIds))
+                .and(Objects.nonNull(menuPageQuery.getTenantId()),
+                        wrapper -> wrapper.eq(SysMenu::getTenantId, menuPageQuery.getTenantId()))
+                .and(Objects.nonNull(menuPageQuery.getStatus()),
+                        wrapper -> wrapper.eq(SysMenu::getVisible, menuPageQuery.getStatus()))
+                .orderByAsc(SysMenu::getSort));
         if (entities.isEmpty()) {
             return;
         }
@@ -363,7 +382,7 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
             }
             List<MenuBO> subDbDatas = new ArrayList<>();
             menuBO.setChildren(subDbDatas);
-            loopLoadListMenu(menuBO.getId(), subDbDatas);
+            loopLoadListMenu(menuBO.getId(), subDbDatas, menuPageQuery, null);
         }
     }
 
@@ -376,7 +395,7 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
      */
     private void loopLoadMyMenu(Long parentId, List<MenuBO> menus, List<String> permissions) {
         LambdaQueryWrapper queryWrapper = new LambdaQueryWrapper<SysMenu>().eq(SysMenu::getParentId, parentId)
-                .in(SysMenu::getType, MenuTypeEnum.MENU, MenuTypeEnum.CATALOG).isNotNull(SysMenu::getPath).orderByAsc(SysMenu::getSort);
+                .in(SysMenu::getType, MenuTypeEnum.MENU, MenuTypeEnum.CATALOG).ne(SysMenu::getPath, "").orderByAsc(SysMenu::getSort);
         List<SysMenu> entities = list(queryWrapper);
         if (entities.isEmpty()) {
             return;

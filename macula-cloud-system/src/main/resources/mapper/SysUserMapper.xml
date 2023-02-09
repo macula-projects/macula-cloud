@@ -70,7 +70,8 @@
                avatar,
                email,
                STATUS,
-               dept_id
+               dept_id,
+               password
         FROM sys_user
         WHERE id = #{userId}
           AND deleted = 0

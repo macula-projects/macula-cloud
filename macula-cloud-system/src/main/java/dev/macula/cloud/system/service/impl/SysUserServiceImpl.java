@@ -136,9 +136,9 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         // 实体转换 form->entity
         SysUser entity = userConverter.form2Entity(userForm);
 
-        // 设置默认加密密码
-        String defaultEncryptPwd = passwordEncoder.encode(GlobalConstants.DEFAULT_USER_PASSWORD);
-        entity.setPassword(defaultEncryptPwd);
+        // 加密密码
+        String encryptPwd = passwordEncoder.encode(userForm.getPassword());
+        entity.setPassword(encryptPwd);
 
         // 新增用户
         boolean result = this.save(entity);
