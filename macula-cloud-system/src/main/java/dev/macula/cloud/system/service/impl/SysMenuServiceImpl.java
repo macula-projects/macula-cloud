@@ -48,6 +48,7 @@ import dev.macula.cloud.system.vo.menu.ResourceVO;
 import dev.macula.cloud.system.vo.menu.RouteVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
@@ -274,11 +275,15 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
     @Override
     public IPage<MenuBO> pagesMenus(MenuPageQuery menuPageQuery) {
         List<MenuBO> menuBOS = new ArrayList<>();
-        loopLoadListMenu(ROOT_ID, menuBOS, menuPageQuery);
+        Set<Long> containKeyWorkShowMenuParentId = null;
+        if (StringUtils.isNotBlank(menuPageQuery.getKeywords())) {
+            containKeyWorkShowMenuParentId = getBaseMapper().listShowMenuParentIdByName(menuPageQuery.getKeywords());
+        }
+        loopLoadListMenu(ROOT_ID, menuBOS, menuPageQuery, containKeyWorkShowMenuParentId);
         IPage<MenuBO> data = new Page<>(menuPageQuery.getPageNum(), menuPageQuery.getPageSize(), menuBOS.size());
-        int startIndex = (menuPageQuery.getPageNum()-1) * menuPageQuery.getPageSize();
+        int startIndex = (menuPageQuery.getPageNum() - 1) * menuPageQuery.getPageSize();
         int endIndex = (menuPageQuery.getPageNum()) * menuPageQuery.getPageSize();
-        data.setRecords(menuBOS.subList(startIndex, Math.min(endIndex,menuBOS.size())));
+        data.setRecords(menuBOS.subList(startIndex, Math.min(endIndex, menuBOS.size())));
         return data;
     }
 
@@ -351,14 +356,17 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
      * @param parentId
      * @param menuBOS
      * @param menuPageQuery
+     * @param showMenuParentIds 根目录下的菜单，可见的顶级菜单列表
      */
-    private void loopLoadListMenu(Long parentId, List<MenuBO> menuBOS, MenuPageQuery menuPageQuery) {
+    private void loopLoadListMenu(Long parentId, List<MenuBO> menuBOS, MenuPageQuery menuPageQuery, Set<Long> showMenuParentIds) {
         List<SysMenu> entities = getBaseMapper().selectList(new LambdaQueryWrapper<SysMenu>()
                 .eq(SysMenu::getParentId, parentId)
+                .and(Objects.nonNull(showMenuParentIds) && !showMenuParentIds.isEmpty(),
+                        wrapper -> wrapper.in(SysMenu::getId, showMenuParentIds))
                 .and(Objects.nonNull(menuPageQuery.getTenantId()),
-                wrapper->wrapper.eq(SysMenu::getTenantId, menuPageQuery.getTenantId()))
+                        wrapper -> wrapper.eq(SysMenu::getTenantId, menuPageQuery.getTenantId()))
                 .and(Objects.nonNull(menuPageQuery.getStatus()),
-                        wrapper->wrapper.eq(SysMenu::getVisible, menuPageQuery.getStatus()))
+                        wrapper -> wrapper.eq(SysMenu::getVisible, menuPageQuery.getStatus()))
                 .orderByAsc(SysMenu::getSort));
         if (entities.isEmpty()) {
             return;
@@ -374,7 +382,7 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
             }
             List<MenuBO> subDbDatas = new ArrayList<>();
             menuBO.setChildren(subDbDatas);
-            loopLoadListMenu(menuBO.getId(), subDbDatas, menuPageQuery);
+            loopLoadListMenu(menuBO.getId(), subDbDatas, menuPageQuery, null);
         }
     }
 
