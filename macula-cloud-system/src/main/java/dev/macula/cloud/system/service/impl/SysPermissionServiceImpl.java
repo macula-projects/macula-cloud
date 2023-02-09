@@ -130,6 +130,11 @@ public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, S
         return permissionConverter.listEntities2DTO(sysPermissions);
     }
 
+    @Override
+    public PermDTO toDTO(SysPermission entity) {
+        return permissionConverter.entity2DTO(entity);
+    }
+
     private Map<String, PermDTO> handlerAddOrUpdateMenuPerms(List<PermDTO> permDTOList, Long menuId, List<Long> updatePermIds) {
         Map<String, PermDTO> permDTOMap = new HashMap<>();
         // 没有更新或添加的菜单权限直接清空权限列表

@@ -79,4 +79,11 @@ public interface SysPermissionService extends IService<SysPermission> {
      * @return
      */
     List<PermDTO> listDTO(Wrapper queryWrapper);
+
+    /**
+     * 实体类转换成DTO对象
+     * @param entity
+     * @return
+     */
+    PermDTO toDTO(SysPermission entity);
 }

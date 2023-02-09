@@ -279,7 +279,7 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
         if (StringUtils.isNotBlank(menuPageQuery.getKeywords())) {
             containKeyWorkShowMenuParentId = getBaseMapper().listShowMenuParentIdByName(menuPageQuery.getKeywords());
         }
-        loopLoadListMenu(ROOT_ID, menuBOS, menuPageQuery, containKeyWorkShowMenuParentId);
+        loopLoadListMenu(CollectionUtil.newHashSet(ROOT_ID), menuBOS, menuPageQuery, containKeyWorkShowMenuParentId, new HashMap<Long, MenuBO>());
         IPage<MenuBO> data = new Page<>(menuPageQuery.getPageNum(), menuPageQuery.getPageSize(), menuBOS.size());
         int startIndex = (menuPageQuery.getPageNum() - 1) * menuPageQuery.getPageSize();
         int endIndex = (menuPageQuery.getPageNum()) * menuPageQuery.getPageSize();
@@ -353,37 +353,62 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
     /**
      * 使用递归，查询父菜单id下的所有菜单信息
      *
-     * @param parentId
+     * @param parentIds     查询的父菜单ids
      * @param menuBOS
      * @param menuPageQuery
-     * @param showMenuParentIds 根目录下的菜单，可见的顶级菜单列表
+     * @param menuIds       查询的菜单ids
+     * @param handlerMenu   暂存处理后的sysMenu的BO对象
      */
-    private void loopLoadListMenu(Long parentId, List<MenuBO> menuBOS, MenuPageQuery menuPageQuery, Set<Long> showMenuParentIds) {
+    private void loopLoadListMenu(Set<Long> parentIds, List<MenuBO> menuBOS, MenuPageQuery menuPageQuery,
+                                  Set<Long> menuIds, Map<Long, MenuBO> handlerMenu) {
         List<SysMenu> entities = getBaseMapper().selectList(new LambdaQueryWrapper<SysMenu>()
-                .eq(SysMenu::getParentId, parentId)
-                .and(Objects.nonNull(showMenuParentIds) && !showMenuParentIds.isEmpty(),
-                        wrapper -> wrapper.in(SysMenu::getId, showMenuParentIds))
+                .and(Objects.nonNull(parentIds) && !parentIds.isEmpty(),
+                        wrapper -> wrapper.in(SysMenu::getParentId, parentIds))
+                .and(Objects.nonNull(menuIds) && !menuIds.isEmpty(),
+                        wrapper -> wrapper.in(SysMenu::getId, menuIds))
                 .and(Objects.nonNull(menuPageQuery.getTenantId()),
                         wrapper -> wrapper.eq(SysMenu::getTenantId, menuPageQuery.getTenantId()))
                 .and(Objects.nonNull(menuPageQuery.getStatus()),
                         wrapper -> wrapper.eq(SysMenu::getVisible, menuPageQuery.getStatus()))
+                .orderByAsc(SysMenu::getParentId)
                 .orderByAsc(SysMenu::getSort));
         if (entities.isEmpty()) {
             return;
         }
+        Long lastParentId = null;
+        Set<Long> subParentIds = new HashSet<>();
+        List<MenuBO> lastParentMenus = new ArrayList<>();
         for (SysMenu entity : entities) {
+            if (Objects.isNull(lastParentId)) {
+                lastParentId = entity.getParentId();
+            }
             MenuBO menuBO = menuConverter.entity2BO(entity);
-            menuBOS.add(menuBO);
-            menuBO.setApiList(permissionService.listDTO(new LambdaQueryWrapper<SysPermission>()
-                    .eq(SysPermission::getMenuId, menuBO.getId())));
-            // 按钮直接过滤掉，不增加sql压力
-            if (MenuTypeEnum.BUTTON.equals(entity.getType())) {
+            menuBO.setApiList(new ArrayList<>());
+            if (ROOT_ID.equals(entity.getParentId())) {
+                menuBOS.add(menuBO);
+                handlerMenu.put(entity.getId(), menuBO);
+                subParentIds.add(entity.getId());
                 continue;
             }
-            List<MenuBO> subDbDatas = new ArrayList<>();
-            menuBO.setChildren(subDbDatas);
-            loopLoadListMenu(menuBO.getId(), subDbDatas, menuPageQuery, null);
+            if (!lastParentId.equals(entity.getParentId())) {
+                handlerMenu.get(lastParentId).setChildren(lastParentMenus);
+                lastParentId = entity.getParentId();
+                lastParentMenus = new ArrayList<>();
+            }
+            lastParentMenus.add(menuBO);
+            handlerMenu.put(entity.getId(), menuBO);
+            subParentIds.add(entity.getId());
         }
+        if (!ROOT_ID.equals(lastParentId)) {
+            handlerMenu.get(lastParentId).setChildren(lastParentMenus);
+        }
+        if (subParentIds.isEmpty()) {
+            return;
+        }
+        List<SysPermission> sysPermissionList= permissionService.list(new LambdaQueryWrapper<SysPermission>()
+                .in(SysPermission::getMenuId, subParentIds));
+        sysPermissionList.forEach(sysPerm -> handlerMenu.get(sysPerm.getMenuId()).getApiList().add(permissionService.toDTO(sysPerm)));
+        loopLoadListMenu(subParentIds, menuBOS, menuPageQuery, null, handlerMenu);
     }
 
     /**
