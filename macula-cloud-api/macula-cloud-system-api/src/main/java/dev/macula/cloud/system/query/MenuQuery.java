@@ -34,7 +34,7 @@ public class MenuQuery {
     private String keywords;
 
     @Schema(description = "状态(1->显示；0->隐藏)")
-    private Integer status;
+    private Integer status = 1;
 
     @Schema(description = "应用id")
     private String appId;

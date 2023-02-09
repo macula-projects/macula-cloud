@@ -35,6 +35,4 @@ public class MenuDTO implements Serializable {
     private String redirect;
     @Schema(description = "排序")
     private Integer sort;
-    @Schema(description = "菜单所属租户")
-    private Long tenantId;
 }

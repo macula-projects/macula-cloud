@@ -29,7 +29,6 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import dev.macula.boot.constants.GlobalConstants;
 import dev.macula.boot.enums.StatusEnum;
 import dev.macula.boot.result.Option;
-import dev.macula.cloud.system.controller.SysMenuController;
 import dev.macula.cloud.system.converter.MenuConverter;
 import dev.macula.cloud.system.dto.MenuDTO;
 import dev.macula.cloud.system.dto.PermDTO;
@@ -262,11 +261,11 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
     }
 
     @Override
-    public JSONObject getMyMenu(SysMenuController.MyMenuQueryDto myMenuQueryDto) {
+    public JSONObject getMyMenu(MenuQuery menuQuery) {
         JSONObject data = new JSONObject();
         List<String> permissions = new ArrayList<>();
         List<MenuBO> menus = new ArrayList<>();
-        loopLoadMyMenu(0L, menus, permissions);
+        loopLoadMyMenu(0L, menus, permissions, menuQuery);
         data.put("permissions", permissions);
         data.put("menu", menus);
         return data;
@@ -366,10 +365,6 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
                         wrapper -> wrapper.in(SysMenu::getParentId, parentIds))
                 .and(Objects.nonNull(menuIds) && !menuIds.isEmpty(),
                         wrapper -> wrapper.in(SysMenu::getId, menuIds))
-                .and(Objects.nonNull(menuPageQuery.getTenantId()),
-                        wrapper -> wrapper.eq(SysMenu::getTenantId, menuPageQuery.getTenantId()))
-                .and(Objects.nonNull(menuPageQuery.getStatus()),
-                        wrapper -> wrapper.eq(SysMenu::getVisible, menuPageQuery.getStatus()))
                 .orderByAsc(SysMenu::getParentId)
                 .orderByAsc(SysMenu::getSort));
         if (entities.isEmpty()) {
@@ -418,9 +413,11 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
      * @param menus
      * @param permissions
      */
-    private void loopLoadMyMenu(Long parentId, List<MenuBO> menus, List<String> permissions) {
+    private void loopLoadMyMenu(Long parentId, List<MenuBO> menus, List<String> permissions, MenuQuery menuQuery) {
         LambdaQueryWrapper queryWrapper = new LambdaQueryWrapper<SysMenu>().eq(SysMenu::getParentId, parentId)
-                .in(SysMenu::getType, MenuTypeEnum.MENU, MenuTypeEnum.CATALOG).ne(SysMenu::getPath, "").orderByAsc(SysMenu::getSort);
+                .in(SysMenu::getType, MenuTypeEnum.MENU, MenuTypeEnum.CATALOG).ne(SysMenu::getPath, "")
+                .eq(SysMenu::getVisible, Objects.nonNull(menuQuery.getStatus()) ? menuQuery.getStatus() : VISIBLED)
+                .orderByAsc(SysMenu::getSort);
         List<SysMenu> entities = list(queryWrapper);
         if (entities.isEmpty()) {
             return;
@@ -438,7 +435,7 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
             } else {
                 List<MenuBO> subMenus = new ArrayList<>();
                 menuBO.setChildren(subMenus);
-                loopLoadMyMenu(entity.getId(), subMenus, permissions);
+                loopLoadMyMenu(entity.getId(), subMenus, permissions, menuQuery);
             }
         }
     }
