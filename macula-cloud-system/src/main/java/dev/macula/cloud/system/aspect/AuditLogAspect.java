@@ -26,6 +26,13 @@ import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.Map;
 
+/**
+ * 审计日志切面类
+ * 使用方式：
+ *  在需要审计的接口使用注解 @AuditLog
+ *  例如：
+ *  @AuditLog(title = "接口说明")
+ */
 @Aspect
 @Component
 @Slf4j
@@ -113,7 +120,7 @@ public class AuditLogAspect {
      */
     private void setRequestValue(JoinPoint joinPoint, SysLog opLog) {
         String requestMethod = opLog.getOpRequestMethod();
-        if (HttpMethod.PUT.equals(requestMethod) || HttpMethod.POST.equals(requestMethod) || HttpMethod.GET.equals(requestMethod)) {
+        if (HttpMethod.PUT.equals(requestMethod) || HttpMethod.POST.equals(requestMethod)) {
             String params = argsArrayToString(joinPoint.getArgs());
             opLog.setOpParam(StringUtils.substring(params,0,2000));
         } else {

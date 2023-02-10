@@ -18,6 +18,7 @@
 package dev.macula.cloud.system.controller;
 
 import dev.macula.boot.result.Option;
+import dev.macula.cloud.system.annotation.AuditLog;
 import dev.macula.cloud.system.form.DeptForm;
 import dev.macula.cloud.system.query.DeptQuery;
 import dev.macula.cloud.system.service.SysDeptService;
@@ -68,6 +69,7 @@ public class SysDeptController {
     }
 
     @Operation(summary = "新增部门")
+    @AuditLog(title = "新增部门")
     @PostMapping
     public Long saveDept(
             @Valid @RequestBody DeptForm formData
@@ -77,6 +79,7 @@ public class SysDeptController {
     }
 
     @Operation(summary = "修改部门")
+    @AuditLog(title = "修改部门")
     @PutMapping(value = "/{deptId}")
     public Long updateDept(
             @PathVariable Long deptId,
