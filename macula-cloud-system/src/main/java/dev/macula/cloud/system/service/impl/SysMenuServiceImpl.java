@@ -266,7 +266,7 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
         JSONObject data = new JSONObject();
         Set<Long> buttonParentIds = new HashSet<>();
         List<MenuBO> menus = new ArrayList<>();
-        loopLoadMyMenu(CollectionUtil.newHashSet(ROOT_ID), menus, buttonParentIds, menuQuery, new HashMap<>());
+        loopLoadMyMenu(CollectionUtil.newHashSet(), menus, buttonParentIds, menuQuery, new HashMap<>());
         data.put("menu", menus);
         if (!buttonParentIds.isEmpty()) {
             List<SysMenu> subButtonPerm = list(new LambdaQueryWrapper<SysMenu>()
@@ -280,11 +280,11 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
     @Override
     public IPage<MenuBO> pagesMenus(MenuPageQuery menuPageQuery) {
         List<MenuBO> menuBOS = new ArrayList<>();
-        Set<Long> containKeyWorkShowMenuParentId = null;
+        Set<Long> containKeyWorkShowMenuParentId = new HashSet<>();
         if (StringUtils.isNotBlank(menuPageQuery.getKeywords())) {
             containKeyWorkShowMenuParentId = getBaseMapper().listShowMenuParentIdByName(menuPageQuery.getKeywords());
         }
-        loopLoadListMenu(CollectionUtil.newHashSet(ROOT_ID), menuBOS, menuPageQuery, containKeyWorkShowMenuParentId, new HashMap<Long, MenuBO>());
+        loopLoadListMenu(containKeyWorkShowMenuParentId, menuBOS, menuPageQuery, new HashMap<Long, MenuBO>());
         IPage<MenuBO> data = new Page<>(menuPageQuery.getPageNum(), menuPageQuery.getPageSize(), menuBOS.size());
         int startIndex = (menuPageQuery.getPageNum() - 1) * menuPageQuery.getPageSize();
         int endIndex = (menuPageQuery.getPageNum()) * menuPageQuery.getPageSize();
@@ -358,96 +358,84 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
     /**
      * 使用递归，查询父菜单id下的所有菜单信息
      *
-     * @param parentIds     查询的父菜单ids
+     * @param showParentIds 符合显示条件的顶层菜单id
      * @param menuBOS
      * @param menuPageQuery 查询对象
-     * @param menuIds       查询的菜单ids
      * @param handlerMenu   暂存处理后的sysMenu的BO对象
      */
-    private void loopLoadListMenu(Set<Long> parentIds, List<MenuBO> menuBOS, MenuPageQuery menuPageQuery,
-                                  Set<Long> menuIds, Map<Long, MenuBO> handlerMenu) {
+    private void loopLoadListMenu(Set<Long> showParentIds, List<MenuBO> menuBOS, MenuPageQuery menuPageQuery,
+                                  Map<Long, MenuBO> handlerMenu) {
         Wrapper queryWrapper = new LambdaQueryWrapper<SysMenu>()
-                .and(Objects.nonNull(parentIds) && !parentIds.isEmpty(),
-                        wrapper -> wrapper.in(SysMenu::getParentId, parentIds))
-                .and(Objects.nonNull(menuIds) && !menuIds.isEmpty(),
-                        wrapper -> wrapper.in(SysMenu::getId, menuIds))
                 .orderByAsc(SysMenu::getParentId)
                 .orderByAsc(SysMenu::getSort);
-        innerHandlerLoopMenu(queryWrapper, parentIds, menuBOS, handlerMenu, null);
-        if (!parentIds.isEmpty()) {
-            List<SysPermission> sysPermissionList = permissionService.list(new LambdaQueryWrapper<SysPermission>()
-                    .in(SysPermission::getMenuId, parentIds));
-            sysPermissionList.forEach(sysPerm -> handlerMenu.get(sysPerm.getMenuId()).getApiList().add(permissionService.toDTO(sysPerm)));
-            loopLoadListMenu(parentIds, menuBOS, menuPageQuery, null, handlerMenu);
-        }
+        Set<Long> handlerMenuIds = innerHandlerLoopMenu(queryWrapper, showParentIds, menuBOS, handlerMenu, null);
+        List<SysPermission> sysPermissionList = permissionService.list(new LambdaQueryWrapper<SysPermission>()
+                .in(SysPermission::getMenuId, handlerMenuIds));
+        sysPermissionList.forEach(sysPerm -> handlerMenu.get(sysPerm.getMenuId()).getApiList().add(permissionService.toDTO(sysPerm)));
     }
 
     /**
      * 使用递归，获取父菜单id下的所有我的菜单，用于我的菜单列表显示
      *
-     * @param parentIds
+     * @param showParentIds   符合显示条件的顶层菜单id
      * @param buttonParentIds 按钮的上一层菜单id集合
      * @param menus
      * @param menuQuery
      * @param handlerMenu     暂存处理后的sysMenu的BO对象
      */
-    private void loopLoadMyMenu(Set<Long> parentIds, List<MenuBO> menus, Set<Long> buttonParentIds, MenuQuery menuQuery, Map<Long, MenuBO> handlerMenu) {
+    private void loopLoadMyMenu(Set<Long> showParentIds, List<MenuBO> menus, Set<Long> buttonParentIds, MenuQuery menuQuery, Map<Long, MenuBO> handlerMenu) {
         Wrapper queryWrapper = new LambdaQueryWrapper<SysMenu>()
-                .in(SysMenu::getParentId, parentIds)
                 .in(SysMenu::getType, MenuTypeEnum.MENU, MenuTypeEnum.CATALOG, MenuTypeEnum.EXTLINK, MenuTypeEnum.IFRAME)
                 .ne(SysMenu::getPath, "")
                 .eq(SysMenu::getVisible, Objects.nonNull(menuQuery.getStatus()) ? menuQuery.getStatus() : VISIBLED)
                 .orderByAsc(SysMenu::getParentId)
                 .orderByAsc(SysMenu::getSort);
-        innerHandlerLoopMenu(queryWrapper, parentIds, menus, handlerMenu, buttonParentIds);
-        if (!parentIds.isEmpty()) {
-            loopLoadMyMenu(parentIds, menus, buttonParentIds, menuQuery, handlerMenu);
-        }
+        innerHandlerLoopMenu(queryWrapper, showParentIds, menus, handlerMenu, buttonParentIds);
     }
 
     /**
      * 我的菜单列表及菜单管理列表遍历菜单中的内部实现2BO
-     * @param queryWrapper 菜单查询条件
-     * @param parentIds 菜单查询中的parentId,及下次遍历查询的parentId集合
-     * @param menuBOS 查询出来并转换后的BO对象集合
-     * @param handlerMenu 暂存处理后的sysMenu的BO对象
+     *
+     * @param queryWrapper    菜单查询条件
+     * @param showParentIds   菜单查询中的parentId,及下次遍历查询的parentId集合
+     * @param menuBOS         查询出来并转换后的BO对象集合
+     * @param handlerMenu     暂存处理后的sysMenu的BO对象
      * @param buttonParentIds 该参数来自我的菜单接口， 需要获取按钮的权限信息；菜单管理列表遍历无该参数传null
      */
-    private void innerHandlerLoopMenu(Wrapper queryWrapper, Set<Long> parentIds, List<MenuBO> menuBOS, Map<Long, MenuBO> handlerMenu, Set<Long> buttonParentIds) {
+    private Set<Long> innerHandlerLoopMenu(Wrapper queryWrapper, Set<Long> showParentIds, List<MenuBO> menuBOS, Map<Long, MenuBO> handlerMenu, Set<Long> buttonParentIds) {
         List<SysMenu> entities = list(queryWrapper);
-        parentIds.clear();
+        Set<Long> handlerMenuIds = new HashSet<>();
         if (entities.isEmpty()) {
-            return;
+            return handlerMenuIds;
         }
         Long lastParentId = null;
         List<MenuBO> lastParentMenus = new ArrayList<>();
         for (SysMenu entity : entities) {
+            handlerMenuIds.add(entity.getId());
             if (Objects.isNull(lastParentId)) {
                 lastParentId = entity.getParentId();
             }
             MenuBO menuBO = menuConverter.entity2BO(entity);
             handlerMenu.put(entity.getId(), menuBO);
             menuBO.setApiList(new ArrayList<>());
-            if (Objects.nonNull(buttonParentIds) && MenuTypeEnum.MENU.equals(entity.getType())) {
-                buttonParentIds.add(entity.getId());
-            }
-            if (Objects.isNull(buttonParentIds) || MenuTypeEnum.CATALOG.equals(entity.getType())) {
-                parentIds.add(entity.getId());
-            }
-            if (ROOT_ID.equals(entity.getParentId())) {
+            if (ROOT_ID.equals(entity.getParentId()) && (showParentIds.isEmpty() || showParentIds.contains(entity.getId()))) {
                 menuBOS.add(menuBO);
                 continue;
             }
             if (!lastParentId.equals(entity.getParentId())) {
-                handlerMenu.get(lastParentId).setChildren(lastParentMenus);
+                if (!ROOT_ID.equals(lastParentId)) {
+                    handlerMenu.get(lastParentId).setChildren(lastParentMenus);
+                }
                 lastParentId = entity.getParentId();
                 lastParentMenus = new ArrayList<>();
             }
             lastParentMenus.add(menuBO);
         }
         if (!ROOT_ID.equals(lastParentId)) {
-            handlerMenu.get(lastParentId).setChildren(lastParentMenus);
+            // 防止配置错误，没有父菜单子结果集报错兼容， 这个default的BO对象不会返回前端
+            handlerMenu.getOrDefault(lastParentId, new MenuBO()).setChildren(lastParentMenus);
         }
+        return handlerMenuIds;
     }
 
     /**

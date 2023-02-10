@@ -74,7 +74,6 @@ public class SysMenuController {
     @Operation(summary = "添加更新菜单及权限信息")
     @PostMapping("/add")
     public Result addMenu(@RequestBody MenuDTO menuDTO) {
-        log.info("menuDto: {}", menuDTO);
         return Result.success(menuService.add(menuDTO));
     }
 

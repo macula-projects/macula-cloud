@@ -102,4 +102,20 @@ public interface SysRoleService extends IService<SysRole> {
      * @return
      */
     Integer getMaximumDataScope(Set<String> roles);
+
+    /**
+     * 验证角色是否可配置该角色code
+     *
+     * @param id
+     * @param code
+     * @return
+     */
+    boolean validtorForCode(Long id, String code);
+
+    /**
+     * 获取数据权限的下拉列表
+     *
+     * @return
+     */
+    List<Option> optionsByDataScope();
 }

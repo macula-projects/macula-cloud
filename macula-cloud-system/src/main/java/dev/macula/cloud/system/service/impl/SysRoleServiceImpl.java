@@ -28,6 +28,7 @@ import dev.macula.boot.constants.GlobalConstants;
 import dev.macula.boot.result.Option;
 import dev.macula.boot.starter.security.utils.SecurityUtils;
 import dev.macula.cloud.system.converter.RoleConverter;
+import dev.macula.cloud.system.enums.RoleDataScopeEnum;
 import dev.macula.cloud.system.form.RoleForm;
 import dev.macula.cloud.system.mapper.SysRoleMapper;
 import dev.macula.cloud.system.pojo.entity.*;
@@ -82,6 +83,7 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
                                                 .like(StrUtil.isNotBlank(keywords), SysRole::getCode, keywords)
                         )
                         .ne(!SecurityUtils.isRoot(), SysRole::getCode, GlobalConstants.ROOT_ROLE_CODE) // 非超级管理员不显示超级管理员角色
+                        .orderByAsc(SysRole::getSort)
         );
 
         // Page<SysRole> rolePage = this.baseMapper.listRolePages( new Page<>(pageNum, pageSize), queryParams,UserUtils.isRoot(),GlobalConstants.ROOT_ROLE_CODE);
@@ -123,9 +125,9 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
         long count = this.count(new LambdaQueryWrapper<SysRole>()
                 .ne(roleId != null, SysRole::getId, roleId)
                 .and(wrapper ->
-                        wrapper.eq(SysRole::getCode, roleCode).or().eq(SysRole::getName, roleCode)
+                        wrapper.eq(SysRole::getCode, roleCode)
                 ));
-        Assert.isTrue(count == 0, "角色名称或角色编码重复，请检查！");
+        Assert.isTrue(count == 0, "角色编码重复，请检查！");
 
         // 实体转换
         SysRole role = roleConverter.form2Entity(roleForm);
@@ -230,6 +232,24 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
     public Integer getMaximumDataScope(Set<String> roles) {
         Integer dataScope = this.baseMapper.getMaximumDataScope(roles);
         return dataScope;
+    }
+
+    @Override
+    public boolean validtorForCode(Long id, String code) {
+        long count = this.count(new LambdaQueryWrapper<SysRole>()
+                .ne(id != null, SysRole::getId, id)
+                .and(wrapper ->
+                        wrapper.eq(SysRole::getCode, code)
+                ));
+        return count == 0;
+    }
+
+    @Override
+    public List<Option> optionsByDataScope() {
+        return Arrays.asList(RoleDataScopeEnum.values())
+                .stream()
+                .map(roleDataScopeEnum -> new Option<>(roleDataScopeEnum, roleDataScopeEnum.getLabel()))
+                .collect(Collectors.toList());
     }
 
 }
