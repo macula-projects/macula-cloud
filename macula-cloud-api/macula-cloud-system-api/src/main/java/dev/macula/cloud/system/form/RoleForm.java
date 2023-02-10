@@ -17,6 +17,7 @@
 
 package dev.macula.cloud.system.form;
 
+import dev.macula.cloud.system.enums.RoleDataScopeEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
@@ -44,6 +45,6 @@ public class RoleForm {
     private Integer status;
 
     @Schema(description = "数据范围（1：全部数据权限  2：本部门数据权限 3：本部门及以下数据权限 4:本人数据）")
-    private Integer dataScope;
+    private RoleDataScopeEnum dataScope;
 
 }

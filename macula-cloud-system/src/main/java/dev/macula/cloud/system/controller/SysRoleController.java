@@ -128,4 +128,18 @@ public class SysRoleController {
         }
         return result;
     }
+
+    @Operation(summary = "角色编码值验证器")
+    @Parameter(name = "角色id", description = "允许为空，新增时为空，编辑时携带")
+    @Parameter(name = "角色编码")
+    @GetMapping("/validtor/code")
+    public boolean validtorForCode(@RequestParam(required = false) Long id, @RequestParam String code) {
+        return roleService.validtorForCode(id, code);
+    }
+
+    @Operation(summary = "获取数据权限的下拉列表")
+    @GetMapping("/optionsByDataScope")
+    public List<Option> optionsByDataScope() {
+        return roleService.optionsByDataScope();
+    }
 }
