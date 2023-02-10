@@ -38,7 +38,6 @@ public class SysLogController {
     private final SysLogService sysLogService;
 
     @Operation(summary = "审计日志分页列表")
-    @AuditLog(title = "审计日志分页列表")
     @GetMapping("/page")
     public Page<AuditLogVO> listAuditLogPages(LogPageQuery pageQuery) {
         Page<AuditLogVO> result = sysLogService.listUserPages(pageQuery);
