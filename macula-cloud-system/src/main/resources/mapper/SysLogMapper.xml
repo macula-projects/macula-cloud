@@ -34,6 +34,7 @@
                 AND date_format(create_time,'%Y-%m-%d') &lt;= date_format(#{queryParams.endDate},'%Y-%m-%d')
             </if>
         </where>
+            ORDER BY create_time DESC
     </select>
 
 </mapper>
