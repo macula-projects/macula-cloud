@@ -21,6 +21,7 @@ import cn.hutool.core.collection.CollectionUtil;
 import cn.hutool.core.lang.Assert;
 import cn.hutool.core.util.StrUtil;
 import com.alibaba.fastjson.JSONObject;
+import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
@@ -263,11 +264,16 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
     @Override
     public JSONObject getMyMenu(MenuQuery menuQuery) {
         JSONObject data = new JSONObject();
-        List<String> permissions = new ArrayList<>();
+        Set<Long> buttonParentIds = new HashSet<>();
         List<MenuBO> menus = new ArrayList<>();
-        loopLoadMyMenu(0L, menus, permissions, menuQuery);
-        data.put("permissions", permissions);
+        loopLoadMyMenu(CollectionUtil.newHashSet(ROOT_ID), menus, buttonParentIds, menuQuery, new HashMap<>());
         data.put("menu", menus);
+        if (!buttonParentIds.isEmpty()) {
+            List<SysMenu> subButtonPerm = list(new LambdaQueryWrapper<SysMenu>()
+                    .in(SysMenu::getParentId, buttonParentIds)
+                    .eq(SysMenu::getType, MenuTypeEnum.BUTTON).orderByAsc(SysMenu::getSort));
+            data.put("permissions", subButtonPerm.stream().map(SysMenu::getPerm).collect(Collectors.toList()));
+        }
         return data;
     }
 
@@ -354,35 +360,82 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
      *
      * @param parentIds     查询的父菜单ids
      * @param menuBOS
-     * @param menuPageQuery
+     * @param menuPageQuery 查询对象
      * @param menuIds       查询的菜单ids
      * @param handlerMenu   暂存处理后的sysMenu的BO对象
      */
     private void loopLoadListMenu(Set<Long> parentIds, List<MenuBO> menuBOS, MenuPageQuery menuPageQuery,
                                   Set<Long> menuIds, Map<Long, MenuBO> handlerMenu) {
-        List<SysMenu> entities = getBaseMapper().selectList(new LambdaQueryWrapper<SysMenu>()
+        Wrapper queryWrapper = new LambdaQueryWrapper<SysMenu>()
                 .and(Objects.nonNull(parentIds) && !parentIds.isEmpty(),
                         wrapper -> wrapper.in(SysMenu::getParentId, parentIds))
                 .and(Objects.nonNull(menuIds) && !menuIds.isEmpty(),
                         wrapper -> wrapper.in(SysMenu::getId, menuIds))
                 .orderByAsc(SysMenu::getParentId)
-                .orderByAsc(SysMenu::getSort));
+                .orderByAsc(SysMenu::getSort);
+        innerHandlerLoopMenu(queryWrapper, parentIds, menuBOS, handlerMenu, null);
+        if (!parentIds.isEmpty()) {
+            List<SysPermission> sysPermissionList = permissionService.list(new LambdaQueryWrapper<SysPermission>()
+                    .in(SysPermission::getMenuId, parentIds));
+            sysPermissionList.forEach(sysPerm -> handlerMenu.get(sysPerm.getMenuId()).getApiList().add(permissionService.toDTO(sysPerm)));
+            loopLoadListMenu(parentIds, menuBOS, menuPageQuery, null, handlerMenu);
+        }
+    }
+
+    /**
+     * 使用递归，获取父菜单id下的所有我的菜单，用于我的菜单列表显示
+     *
+     * @param parentIds
+     * @param buttonParentIds 按钮的上一层菜单id集合
+     * @param menus
+     * @param menuQuery
+     * @param handlerMenu     暂存处理后的sysMenu的BO对象
+     */
+    private void loopLoadMyMenu(Set<Long> parentIds, List<MenuBO> menus, Set<Long> buttonParentIds, MenuQuery menuQuery, Map<Long, MenuBO> handlerMenu) {
+        Wrapper queryWrapper = new LambdaQueryWrapper<SysMenu>()
+                .in(SysMenu::getParentId, parentIds)
+                .in(SysMenu::getType, MenuTypeEnum.MENU, MenuTypeEnum.CATALOG, MenuTypeEnum.EXTLINK, MenuTypeEnum.IFRAME)
+                .ne(SysMenu::getPath, "")
+                .eq(SysMenu::getVisible, Objects.nonNull(menuQuery.getStatus()) ? menuQuery.getStatus() : VISIBLED)
+                .orderByAsc(SysMenu::getParentId)
+                .orderByAsc(SysMenu::getSort);
+        innerHandlerLoopMenu(queryWrapper, parentIds, menus, handlerMenu, buttonParentIds);
+        if (!parentIds.isEmpty()) {
+            loopLoadMyMenu(parentIds, menus, buttonParentIds, menuQuery, handlerMenu);
+        }
+    }
+
+    /**
+     * 我的菜单列表及菜单管理列表遍历菜单中的内部实现2BO
+     * @param queryWrapper 菜单查询条件
+     * @param parentIds 菜单查询中的parentId,及下次遍历查询的parentId集合
+     * @param menuBOS 查询出来并转换后的BO对象集合
+     * @param handlerMenu 暂存处理后的sysMenu的BO对象
+     * @param buttonParentIds 该参数来自我的菜单接口， 需要获取按钮的权限信息；菜单管理列表遍历无该参数传null
+     */
+    private void innerHandlerLoopMenu(Wrapper queryWrapper, Set<Long> parentIds, List<MenuBO> menuBOS, Map<Long, MenuBO> handlerMenu, Set<Long> buttonParentIds) {
+        List<SysMenu> entities = list(queryWrapper);
+        parentIds.clear();
         if (entities.isEmpty()) {
             return;
         }
         Long lastParentId = null;
-        Set<Long> subParentIds = new HashSet<>();
         List<MenuBO> lastParentMenus = new ArrayList<>();
         for (SysMenu entity : entities) {
             if (Objects.isNull(lastParentId)) {
                 lastParentId = entity.getParentId();
             }
             MenuBO menuBO = menuConverter.entity2BO(entity);
+            handlerMenu.put(entity.getId(), menuBO);
             menuBO.setApiList(new ArrayList<>());
+            if (Objects.nonNull(buttonParentIds) && MenuTypeEnum.MENU.equals(entity.getType())) {
+                buttonParentIds.add(entity.getId());
+            }
+            if (Objects.isNull(buttonParentIds) || MenuTypeEnum.CATALOG.equals(entity.getType())) {
+                parentIds.add(entity.getId());
+            }
             if (ROOT_ID.equals(entity.getParentId())) {
                 menuBOS.add(menuBO);
-                handlerMenu.put(entity.getId(), menuBO);
-                subParentIds.add(entity.getId());
                 continue;
             }
             if (!lastParentId.equals(entity.getParentId())) {
@@ -391,52 +444,9 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
                 lastParentMenus = new ArrayList<>();
             }
             lastParentMenus.add(menuBO);
-            handlerMenu.put(entity.getId(), menuBO);
-            subParentIds.add(entity.getId());
         }
         if (!ROOT_ID.equals(lastParentId)) {
             handlerMenu.get(lastParentId).setChildren(lastParentMenus);
-        }
-        if (subParentIds.isEmpty()) {
-            return;
-        }
-        List<SysPermission> sysPermissionList= permissionService.list(new LambdaQueryWrapper<SysPermission>()
-                .in(SysPermission::getMenuId, subParentIds));
-        sysPermissionList.forEach(sysPerm -> handlerMenu.get(sysPerm.getMenuId()).getApiList().add(permissionService.toDTO(sysPerm)));
-        loopLoadListMenu(subParentIds, menuBOS, menuPageQuery, null, handlerMenu);
-    }
-
-    /**
-     * 使用递归，获取父菜单id下的所有我的菜单，用于我的菜单列表显示
-     *
-     * @param parentId
-     * @param menus
-     * @param permissions
-     */
-    private void loopLoadMyMenu(Long parentId, List<MenuBO> menus, List<String> permissions, MenuQuery menuQuery) {
-        LambdaQueryWrapper queryWrapper = new LambdaQueryWrapper<SysMenu>().eq(SysMenu::getParentId, parentId)
-                .in(SysMenu::getType, MenuTypeEnum.MENU, MenuTypeEnum.CATALOG).ne(SysMenu::getPath, "")
-                .eq(SysMenu::getVisible, Objects.nonNull(menuQuery.getStatus()) ? menuQuery.getStatus() : VISIBLED)
-                .orderByAsc(SysMenu::getSort);
-        List<SysMenu> entities = list(queryWrapper);
-        if (entities.isEmpty()) {
-            return;
-        }
-        for (SysMenu entity : entities) {
-            MenuBO menuBO = menuConverter.entity2BO(entity);
-            menus.add(menuBO);
-            if (Objects.nonNull(entity.getType())
-                    && MenuTypeEnum.MENU.equals(entity.getType())) {
-                List<SysMenu> subButtonPerm = list(new LambdaQueryWrapper<SysMenu>().eq(SysMenu::getParentId, entity.getId())
-                        .eq(SysMenu::getType, MenuTypeEnum.BUTTON).orderByAsc(SysMenu::getSort));
-                if (!subButtonPerm.isEmpty()) {
-                    permissions.addAll(subButtonPerm.stream().map(SysMenu::getPerm).collect(Collectors.toList()));
-                }
-            } else {
-                List<MenuBO> subMenus = new ArrayList<>();
-                menuBO.setChildren(subMenus);
-                loopLoadMyMenu(entity.getId(), subMenus, permissions, menuQuery);
-            }
         }
     }
 
