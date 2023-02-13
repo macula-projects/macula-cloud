@@ -418,6 +418,9 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
             MenuBO menuBO = menuConverter.entity2BO(entity);
             handlerMenu.put(entity.getId(), menuBO);
             menuBO.setApiList(new ArrayList<>());
+            if (Objects.nonNull(buttonParentIds) && MenuTypeEnum.MENU.equals(entity.getType())) {
+                buttonParentIds.add(entity.getId());
+            }
             if (ROOT_ID.equals(entity.getParentId()) && (showParentIds.isEmpty() || showParentIds.contains(entity.getId()))) {
                 menuBOS.add(menuBO);
                 continue;
