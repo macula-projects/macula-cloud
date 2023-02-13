@@ -12,10 +12,12 @@ import lombok.Getter;
  */
 
 public enum RoleDataScopeEnum implements IBaseEnum<Integer> {
-    ME(1, "我的数据"),
-    DEPT(2, "本部门下的数据"),
-    DEPTS(3, "部门及子部门数据"),
-    ALL(4, "所有数据");
+    ALL(1, "全部可见"),
+    ME(2, "本人可见"),
+    DEPT(3, "所在部门可见"),
+    DEPTS(4, "所在部门及子级可见"),
+    CUSTOM_DEP(5, "选择部门可见"),
+    CUSTOM(6, "自定义");
     @Getter
     @EnumValue //  Mybatis-Plus 提供注解表示插入数据库时插入该值
     private Integer value;
