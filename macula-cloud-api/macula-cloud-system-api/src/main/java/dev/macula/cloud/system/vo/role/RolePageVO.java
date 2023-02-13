@@ -23,6 +23,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Schema(description = "角色分页视图对象")
 @Data
@@ -45,6 +46,12 @@ public class RolePageVO {
 
     @Schema(description = "角色数据范围")
     private RoleDataScopeEnum dataScope;
+
+    @Schema(description = "自定义部门数据权限拓展字段")
+    private List<Long> customDepts;
+
+    @Schema(description = "自定义数据权限规则拓展字段")
+    private String custom;
 
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createTime;

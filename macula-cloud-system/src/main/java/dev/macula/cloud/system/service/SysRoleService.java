@@ -113,6 +113,14 @@ public interface SysRoleService extends IService<SysRole> {
     boolean validtorForCode(Long id, String code);
 
     /**
+     * 验证角色是否可配置该角色名称
+     * @param id
+     * @param name
+     * @return
+     */
+    boolean validtorForName(Long id, String name);
+
+    /**
      * 获取数据权限的下拉列表
      *
      * @return
