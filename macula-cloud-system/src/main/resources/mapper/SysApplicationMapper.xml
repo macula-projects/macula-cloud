@@ -10,6 +10,7 @@
             application_name,
             code,
             manager,
+            maintainer,
             mobile,
             create_time
         FROM

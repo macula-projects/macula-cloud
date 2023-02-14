@@ -40,6 +40,9 @@ public class ApplicationVO {
     @Schema(description = "负责人")
     private String manager;
 
+    @Schema(description = "维护人")
+    private String maintainer;
+
     @Schema(description = "联系方式")
     private String mobile;
 

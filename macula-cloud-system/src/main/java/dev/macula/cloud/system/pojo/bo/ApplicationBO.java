@@ -43,6 +43,11 @@ public class ApplicationBO {
     private String manager;
 
     /**
+     * 维护人
+     */
+    private String maintainer;
+
+    /**
      * 手机号
      */
     private String mobile;
