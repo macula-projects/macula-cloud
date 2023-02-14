@@ -57,4 +57,12 @@ public class SysApplicationServiceImpl extends ServiceImpl<SysApplicationMapper,
         boolean result = this.removeByIds(ids);
         return result;
     }
+
+    @Override
+    public boolean addMaintainer(Long appId, ApplicationForm appForm) {
+        SysApplication application = this.getById(appId);
+        application.setMaintainer(appForm.getMaintainer());
+        boolean result = this.updateById(application);
+        return result;
+    }
 }

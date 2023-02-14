@@ -78,4 +78,17 @@ public class SysApplicationController {
         return result;
     }
 
+
+    @Operation(summary = "添加维护人")
+    @Parameter(name = "userId，多个以英文逗号(,)分割")
+    @PutMapping("/addMaintainer/{appId}")
+    public boolean addMaintainer(
+            @PathVariable Long appId,
+            @RequestBody ApplicationForm formData
+    ) {
+        boolean result = applicationService.addMaintainer(appId, formData);
+        return result;
+    }
+
+
 }

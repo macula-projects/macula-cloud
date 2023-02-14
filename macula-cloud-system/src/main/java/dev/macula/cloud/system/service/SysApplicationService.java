@@ -64,4 +64,11 @@ public interface SysApplicationService extends IService<SysApplication> {
      */
     boolean deleteApplications(String idsStr);
 
+    /**
+     * 管理维护人
+     * @param appId
+     * @param appForm
+     * @return
+     */
+    boolean addMaintainer(Long appId, ApplicationForm appForm);
 }
