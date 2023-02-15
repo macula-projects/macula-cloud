@@ -29,7 +29,7 @@ spring:
         opaquetoken:
           client-id: ${spring.application.name}
           client-secret: gateway
-          introspection-uri: https://goauth-dev.infinitus.com.cn/introspect
+          introspection-uri: http://localhost:8081/api/token/introspect
   redis:
     database: 0
     host: 10.94.108.61
@@ -40,6 +40,7 @@ macula:
     ignore-urls:
       - /tinyid/**
       - /system/api/token
+      - /system/api/token/introspect
     only-auth-urls: /mall/api/**
 
 logging:

@@ -27,9 +27,11 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.google.common.base.Joiner;
 import dev.macula.boot.constants.GlobalConstants;
 import dev.macula.boot.enums.StatusEnum;
 import dev.macula.boot.result.Option;
+import dev.macula.boot.starter.security.utils.SecurityUtils;
 import dev.macula.cloud.system.converter.MenuConverter;
 import dev.macula.cloud.system.dto.MenuDTO;
 import dev.macula.cloud.system.dto.PermDTO;
@@ -53,6 +55,7 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.RequestMethod;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -320,6 +323,13 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
         return idList;
     }
 
+    @Override
+    public List<Option> requestMethodOption() {
+        return Arrays.asList(RequestMethod.values()).stream()
+                .map(method->new Option(method.toString(), method.toString()))
+                .collect(Collectors.toList());
+    }
+
     /**
      * 添加或更新菜单信息
      *
@@ -368,7 +378,8 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
         Wrapper queryWrapper = new LambdaQueryWrapper<SysMenu>()
                 .orderByAsc(SysMenu::getParentId)
                 .orderByAsc(SysMenu::getSort);
-        Set<Long> handlerMenuIds = innerHandlerLoopMenu(queryWrapper, showParentIds, menuBOS, handlerMenu, null);
+        List<SysMenu> entities = list(queryWrapper);
+        Set<Long> handlerMenuIds = innerHandlerLoopMenu(entities, showParentIds, menuBOS, handlerMenu, null);
         List<SysPermission> sysPermissionList = permissionService.list(new LambdaQueryWrapper<SysPermission>()
                 .in(SysPermission::getMenuId, handlerMenuIds));
         sysPermissionList.forEach(sysPerm -> handlerMenu.get(sysPerm.getMenuId()).getApiList().add(permissionService.toDTO(sysPerm)));
@@ -384,26 +395,30 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
      * @param handlerMenu     暂存处理后的sysMenu的BO对象
      */
     private void loopLoadMyMenu(Set<Long> showParentIds, List<MenuBO> menus, Set<Long> buttonParentIds, MenuQuery menuQuery, Map<Long, MenuBO> handlerMenu) {
+        String roleMenuIdSql = "select rm.menu_id from sys_role r left join sys_role_menu rm on r.id = rm.role_id where find_in_set( r.code, '"
+                + Joiner.on(",").join(SecurityUtils.getRoles())
+                + "')";
         Wrapper queryWrapper = new LambdaQueryWrapper<SysMenu>()
+                .inSql(SysMenu::getId, roleMenuIdSql)
                 .in(SysMenu::getType, MenuTypeEnum.MENU, MenuTypeEnum.CATALOG, MenuTypeEnum.EXTLINK, MenuTypeEnum.IFRAME)
                 .ne(SysMenu::getPath, "")
                 .eq(SysMenu::getVisible, Objects.nonNull(menuQuery.getStatus()) ? menuQuery.getStatus() : VISIBLED)
                 .orderByAsc(SysMenu::getParentId)
                 .orderByAsc(SysMenu::getSort);
-        innerHandlerLoopMenu(queryWrapper, showParentIds, menus, handlerMenu, buttonParentIds);
+        List<SysMenu> entities = list(queryWrapper);
+        innerHandlerLoopMenu(entities, showParentIds, menus, handlerMenu, buttonParentIds);
     }
 
     /**
      * 我的菜单列表及菜单管理列表遍历菜单中的内部实现2BO
      *
-     * @param queryWrapper    菜单查询条件
+     * @param entities    菜单实体对象
      * @param showParentIds   菜单查询中的parentId,及下次遍历查询的parentId集合
      * @param menuBOS         查询出来并转换后的BO对象集合
      * @param handlerMenu     暂存处理后的sysMenu的BO对象
      * @param buttonParentIds 该参数来自我的菜单接口， 需要获取按钮的权限信息；菜单管理列表遍历无该参数传null
      */
-    private Set<Long> innerHandlerLoopMenu(Wrapper queryWrapper, Set<Long> showParentIds, List<MenuBO> menuBOS, Map<Long, MenuBO> handlerMenu, Set<Long> buttonParentIds) {
-        List<SysMenu> entities = list(queryWrapper);
+    private Set<Long> innerHandlerLoopMenu(List<SysMenu> entities, Set<Long> showParentIds, List<MenuBO> menuBOS, Map<Long, MenuBO> handlerMenu, Set<Long> buttonParentIds) {
         Set<Long> handlerMenuIds = new HashSet<>();
         if (entities.isEmpty()) {
             return handlerMenuIds;
