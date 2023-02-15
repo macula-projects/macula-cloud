@@ -9,6 +9,8 @@ public class SysApplication extends BaseEntity {
 
     private String applicationName;
 
+    private String homepage;
+
     private String manager;
 
     private String maintainer;

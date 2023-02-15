@@ -25,7 +25,6 @@ import java.time.LocalDateTime;
 
 /**
  * 应用分页视图对象
- *
  */
 @Schema(description = "应用分页视图对象")
 @Data
@@ -36,6 +35,9 @@ public class ApplicationVO {
 
     @Schema(description = "应用名")
     private String applicationName;
+
+    @Schema(description = "主页")
+    private String homepage;
 
     @Schema(description = "负责人")
     private String manager;

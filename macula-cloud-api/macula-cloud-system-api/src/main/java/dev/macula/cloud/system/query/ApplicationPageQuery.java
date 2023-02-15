@@ -23,9 +23,6 @@ import lombok.Data;
 
 /**
  * 应用分页查询实体
- *
- * @author haoxr
- * @since 2022/6/3
  */
 @Data
 public class ApplicationPageQuery extends BasePageQuery {
