@@ -27,7 +27,6 @@ import dev.macula.cloud.system.vo.app.ApplicationVO;
 
 /**
  * 应用业务接口
-
  */
 public interface SysApplicationService extends IService<SysApplication> {
 

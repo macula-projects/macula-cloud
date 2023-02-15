@@ -8,6 +8,7 @@
         SELECT
             id,
             application_name,
+            homepage,
             code,
             manager,
             maintainer,

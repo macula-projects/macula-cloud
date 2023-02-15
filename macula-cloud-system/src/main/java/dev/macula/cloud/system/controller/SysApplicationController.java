@@ -32,7 +32,6 @@ import javax.validation.Valid;
 
 /**
  * 应用控制器
- *
  */
 @Tag(name = "应用接口", description = "应用接口")
 @RestController

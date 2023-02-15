@@ -34,6 +34,9 @@ public class ApplicationForm {
     @NotBlank(message = "应用名称不能为空")
     private String applicationName;
 
+    @Schema(description = "主页")
+    private String homepage;
+
     @Schema(description = "应用编码")
     @NotBlank(message = "应用编码不能为空")
     private String code;
