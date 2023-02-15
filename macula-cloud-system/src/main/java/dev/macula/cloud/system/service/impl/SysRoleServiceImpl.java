@@ -211,9 +211,12 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
         // 删除角色权限
         sysRolePermissionService.remove(new LambdaQueryWrapper<SysRolePermission>().eq(SysRolePermission::getRoleId, roleId));
         // 新增角色权限关系（用勾选的菜单ID获取权限，用权限ID和角色ID组装sys_role_permission表)
+        if(CollectionUtil.isEmpty(menuIds)){
+            return true;
+        }
         List<SysPermission> permList = sysPermissionService.list(
                 new LambdaQueryWrapper<SysPermission>()
-                        .in(menuIds != null, SysPermission::getMenuId, menuIds));
+                        .in(SysPermission::getMenuId, menuIds));
         if (CollectionUtil.isNotEmpty(permList)) {
             List<SysRolePermission> rolePerms = permList.stream().map(perm -> new SysRolePermission(roleId, perm.getId())).collect(Collectors.toList());
             sysRolePermissionService.saveBatch(rolePerms);
