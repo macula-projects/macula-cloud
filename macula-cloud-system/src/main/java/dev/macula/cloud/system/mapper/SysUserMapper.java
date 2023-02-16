@@ -50,6 +50,14 @@ public interface SysUserMapper extends BaseMapper<SysUser> {
     Page<UserBO> listUserPages(Page<UserBO> page, UserPageQuery queryParams);
 
     /**
+     * 根据用户id获取用户分页列表
+     * @param page
+     * @param queryParams
+     * @return
+     */
+    Page<UserBO> listUserPagesByIds(Page<UserBO> page, UserPageQuery queryParams);
+
+    /**
      * 获取用户表单详情
      *
      * @param userId 用户ID

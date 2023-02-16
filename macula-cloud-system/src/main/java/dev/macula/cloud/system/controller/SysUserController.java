@@ -190,4 +190,13 @@ public class SysUserController {
         UserAuthInfo user = userService.getUserAuthInfo(username);
         return user;
     }
+
+    @Operation(summary = "根据id查询单个/多个用户", hidden = true)
+    @GetMapping("/getUsers")
+    public Page<UserVO> getUsers(
+            UserPageQuery queryParams
+    ) {
+        Page<UserVO> result = userService.listUserPagesByIds(queryParams);
+        return result;
+    }
 }

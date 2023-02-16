@@ -41,6 +41,46 @@
         GROUP BY u.id
     </select>
 
+    <!-- 根据id获取用户分页列表 -->
+    <select id="listUserPagesByIds" resultType="dev.macula.cloud.system.pojo.bo.UserBO">
+        SELECT
+        u.id,
+        u.username,
+        u.nickname,
+        u.mobile,
+        u.gender,
+        u.avatar,
+        u.status,
+        d.name AS dept_name,
+        GROUP_CONCAT( r.name ) AS roleNames,
+        u.create_time
+        FROM
+        sys_user u
+        LEFT JOIN sys_dept d ON u.dept_id = d.id
+        LEFT JOIN sys_user_role sr ON u.id = sr.user_id
+        LEFT JOIN sys_role r ON sr.role_id = r.id
+        <where>
+            u.deleted = 0 AND u.username != 'root'
+            <if test='queryParams.keywords!=null and queryParams.keywords.trim() neq ""'>
+                AND
+                u.username LIKE CONCAT('%',#{queryParams.keywords},'%')
+            </if>
+            <if test='queryParams.status!=null'>
+                AND u.status = #{queryParams.status}
+            </if>
+            <if test='queryParams.deptId!=null'>
+                AND concat(',',concat(d.tree_path,',',d.id),',') like concat('%,',#{queryParams.deptId},',%')
+            </if>
+            <if test='queryParams.ids!=null and queryParams.ids.trim() neq ""'>
+                AND u.id IN
+                <foreach collection="queryParams.ids.split(',')" index="index" item="item" open="(" separator="," close=")">
+                    #{item}
+                </foreach>
+            </if>
+        </where>
+        GROUP BY u.id
+    </select>
+
     <!-- 用户表单信息映射 -->
     <resultMap id="UserFormMap" type="dev.macula.cloud.system.pojo.bo.UserFormBO">
         <id property="id" column="id" jdbcType="BIGINT"/>
