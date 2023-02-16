@@ -28,7 +28,7 @@ import dev.macula.boot.constants.GlobalConstants;
 import dev.macula.boot.result.Option;
 import dev.macula.boot.starter.security.utils.SecurityUtils;
 import dev.macula.cloud.system.converter.RoleConverter;
-import dev.macula.cloud.system.enums.RoleDataScopeEnum;
+import dev.macula.cloud.system.enums.DataScopeEnum;
 import dev.macula.cloud.system.form.RoleForm;
 import dev.macula.cloud.system.mapper.SysRoleMapper;
 import dev.macula.cloud.system.pojo.entity.*;
@@ -259,7 +259,7 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
 
     @Override
     public List<Option> optionsByDataScope() {
-        return Arrays.asList(RoleDataScopeEnum.values())
+        return Arrays.asList(DataScopeEnum.values())
                 .stream()
                 .map(roleDataScopeEnum -> new Option<>(roleDataScopeEnum, roleDataScopeEnum.getLabel()))
                 .collect(Collectors.toList());

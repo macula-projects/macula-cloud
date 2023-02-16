@@ -269,10 +269,14 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
         JSONObject data = new JSONObject();
         Set<Long> buttonParentIds = new HashSet<>();
         List<MenuBO> menus = new ArrayList<>();
-        loopLoadMyMenu(CollectionUtil.newHashSet(), menus, buttonParentIds, menuQuery, new HashMap<>());
+        String roleMenuIdSql = "select rm.menu_id from sys_role r left join sys_role_menu rm on r.id = rm.role_id where find_in_set( r.code, '"
+                + Joiner.on(",").join(SecurityUtils.getRoles())
+                + "')";
+        loopLoadMyMenu(CollectionUtil.newHashSet(), menus, buttonParentIds, menuQuery, new HashMap<>(), roleMenuIdSql);
         data.put("menu", menus);
         if (!buttonParentIds.isEmpty()) {
             List<SysMenu> subButtonPerm = list(new LambdaQueryWrapper<SysMenu>()
+                    .inSql(SysMenu::getId, roleMenuIdSql)
                     .in(SysMenu::getParentId, buttonParentIds)
                     .eq(SysMenu::getType, MenuTypeEnum.BUTTON).orderByAsc(SysMenu::getSort));
             data.put("permissions", subButtonPerm.stream().map(SysMenu::getPerm).collect(Collectors.toList()));
@@ -393,11 +397,10 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
      * @param menus
      * @param menuQuery
      * @param handlerMenu     暂存处理后的sysMenu的BO对象
+     * @param roleMenuIdSql   角色菜单id子查询sql
      */
-    private void loopLoadMyMenu(Set<Long> showParentIds, List<MenuBO> menus, Set<Long> buttonParentIds, MenuQuery menuQuery, Map<Long, MenuBO> handlerMenu) {
-        String roleMenuIdSql = "select rm.menu_id from sys_role r left join sys_role_menu rm on r.id = rm.role_id where find_in_set( r.code, '"
-                + Joiner.on(",").join(SecurityUtils.getRoles())
-                + "')";
+    private void loopLoadMyMenu(Set<Long> showParentIds, List<MenuBO> menus, Set<Long> buttonParentIds,
+                                MenuQuery menuQuery, Map<Long, MenuBO> handlerMenu, String roleMenuIdSql) {
         Wrapper queryWrapper = new LambdaQueryWrapper<SysMenu>()
                 .inSql(SysMenu::getId, roleMenuIdSql)
                 .in(SysMenu::getType, MenuTypeEnum.MENU, MenuTypeEnum.CATALOG, MenuTypeEnum.EXTLINK, MenuTypeEnum.IFRAME)
