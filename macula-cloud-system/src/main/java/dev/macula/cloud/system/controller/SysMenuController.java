@@ -83,6 +83,12 @@ public class SysMenuController {
         return Result.success(menuService.del(menuIds));
     }
 
+    @Operation(summary = "获取请求方法下拉列表")
+    @GetMapping("/methodOption")
+    public List<Option> requestMethodOption(){
+        return menuService.requestMethodOption();
+    }
+
     @Operation(summary = "资源(菜单+权限)列表")
     @GetMapping("/resources")
     public Result<List<ResourceVO>> listResources() {

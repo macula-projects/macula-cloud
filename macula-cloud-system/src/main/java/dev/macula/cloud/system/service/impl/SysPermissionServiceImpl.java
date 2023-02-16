@@ -24,6 +24,7 @@ import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.google.common.base.Joiner;
 import dev.macula.boot.constants.GlobalConstants;
 import dev.macula.cloud.system.converter.PermissionConverter;
 import dev.macula.cloud.system.dto.PermDTO;
@@ -37,6 +38,7 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.RequestMethod;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -133,6 +135,16 @@ public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, S
     @Override
     public PermDTO toDTO(SysPermission entity) {
         return permissionConverter.entity2DTO(entity);
+    }
+
+    @Override
+    public boolean validtorUrlPerm(Long id, String url, RequestMethod requestMethod) {
+        StringBuffer stringBuffer = new StringBuffer();
+        stringBuffer.append(requestMethod.toString()).append(":").append(url);
+        long count = count(new LambdaQueryWrapper<SysPermission>()
+                .eq(SysPermission::getUrlPerm, stringBuffer.toString())
+                .and(Objects.nonNull(id), wrapper->wrapper.ne(SysPermission::getId, id)));
+        return count == 0;
     }
 
     private Map<String, PermDTO> handlerAddOrUpdateMenuPerms(List<PermDTO> permDTOList, Long menuId, List<Long> updatePermIds) {

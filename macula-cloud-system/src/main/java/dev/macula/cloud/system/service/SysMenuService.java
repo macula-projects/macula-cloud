@@ -140,4 +140,10 @@ public interface SysMenuService extends IService<SysMenu> {
      * @return
      */
     List<Long> del(List<Long> menuIds);
+
+    /**
+     * 请求方法下拉列表
+     * @return
+     */
+    List<Option> requestMethodOption();
 }
