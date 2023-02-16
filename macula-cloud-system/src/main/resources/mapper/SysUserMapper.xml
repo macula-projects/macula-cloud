@@ -89,7 +89,7 @@
         </collection>
     </resultMap>
 
-    <!-- 根据用户名获取认证信息 -->
+    <!-- 根据用户名获取认证信息, 过滤禁用的角色状态 -->
     <select id="getUserAuthInfo" resultMap="UserAuthMap">
         SELECT t1.id      userId,
                t1.username,
@@ -103,6 +103,7 @@
                  LEFT JOIN sys_role t3 ON t3.id = t2.role_id
         WHERE t1.username = #{username}
           and t1.deleted = 0
+          and t3.status = 1
     </select>
 
     <!-- 获取用户导出列表 -->
