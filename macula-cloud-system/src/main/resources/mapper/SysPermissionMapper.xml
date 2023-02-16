@@ -71,6 +71,7 @@
                  LEFT JOIN sys_role t3 ON t2.role_id = t3.id
     </select>
 
+    <!-- 根据pageWrapper查询权限菜单信息，分配的角色的权限排序优先返回 -->
     <select id="pagesResourcePerm" resultType="dev.macula.cloud.system.vo.perm.ResourcePermPageVO">
         select
             id,

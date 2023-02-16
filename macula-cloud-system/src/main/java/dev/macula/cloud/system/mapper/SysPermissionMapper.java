@@ -51,9 +51,10 @@ public interface SysPermissionMapper extends BaseMapper<SysPermission> {
     List<SysPermission> listPermRoles();
 
     /**
-     * 角色权限分页列表
+     * 根据pageWrapper查询权限菜单信息，分配的角色的权限排序优先返回
      * @param page
      * @param pageWrapper
+     * @param roles
      * @return
      */
     Page<ResourcePermPageVO> pagesResourcePerm(Page<ResourcePermPageVO> page,
