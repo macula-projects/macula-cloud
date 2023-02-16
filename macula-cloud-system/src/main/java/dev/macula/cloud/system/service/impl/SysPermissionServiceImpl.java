@@ -27,6 +27,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.google.common.base.Joiner;
 import dev.macula.boot.constants.GlobalConstants;
+import dev.macula.boot.starter.security.utils.SecurityUtils;
 import dev.macula.cloud.system.converter.PermissionConverter;
 import dev.macula.cloud.system.dto.PermDTO;
 import dev.macula.cloud.system.mapper.SysPermissionMapper;
@@ -159,7 +160,7 @@ public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, S
                         wrapper->wrapper.inSql(SysPermission::getMenuId,
                                 "select id from sys_menu where name like '%"+permPageQuery.getMenuName()+"%'"));
         Page<ResourcePermPageVO> page = new Page<>(permPageQuery.getPageNum(),permPageQuery.getPageSize());
-        Page<ResourcePermPageVO> result = getBaseMapper().pagesResourcePerm(page, pageWrapper);
+        Page<ResourcePermPageVO> result = getBaseMapper().pagesResourcePerm(page, pageWrapper, SecurityUtils.getRoles());
         return result;
     }
 

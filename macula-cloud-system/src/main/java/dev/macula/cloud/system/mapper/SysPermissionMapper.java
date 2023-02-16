@@ -29,6 +29,7 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
+import java.util.Set;
 
 @Mapper
 public interface SysPermissionMapper extends BaseMapper<SysPermission> {
@@ -55,5 +56,7 @@ public interface SysPermissionMapper extends BaseMapper<SysPermission> {
      * @param pageWrapper
      * @return
      */
-    Page<ResourcePermPageVO> pagesResourcePerm(Page<ResourcePermPageVO> page,@Param(Constants.WRAPPER) Wrapper<SysPermission> pageWrapper);
+    Page<ResourcePermPageVO> pagesResourcePerm(Page<ResourcePermPageVO> page,
+                                               @Param(Constants.WRAPPER) Wrapper<SysPermission> pageWrapper,
+                                               @Param("roles") Set<String> roles);
 }
