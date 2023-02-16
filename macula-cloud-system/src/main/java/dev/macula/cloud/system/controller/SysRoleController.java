@@ -150,4 +150,25 @@ public class SysRoleController {
     public List<Option> optionsByDataScope() {
         return roleService.optionsByDataScope();
     }
+
+    @Operation(summary = "获取角色的权限id集合")
+    @Parameter(name = "角色ID")
+    @GetMapping("/{roleId}/permIds")
+    public List<Long> getRolePermIds(@PathVariable("roleId") Long roleId){
+        List<Long> resourcePermIds = roleService.getRolePermIds(roleId);
+        return resourcePermIds;
+    }
+
+    @Operation(summary = "分配角色的路径权限")
+    @PutMapping("/{roleId}/perms")
+    public boolean updateRolePerms(
+            @PathVariable Long roleId,
+            @RequestBody List<Long> permIds
+    ) {
+        boolean result = roleService.updateRolePerms(roleId, permIds);
+        if (result) {
+            sysPermissionService.refreshPermRolesRules();
+        }
+        return result;
+    }
 }

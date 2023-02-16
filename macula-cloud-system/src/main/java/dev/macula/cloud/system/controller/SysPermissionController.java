@@ -24,6 +24,7 @@ import dev.macula.cloud.system.query.PermPageQuery;
 import dev.macula.cloud.system.service.SysPermissionService;
 import dev.macula.cloud.system.service.SysRolePermissionService;
 import dev.macula.cloud.system.vo.perm.PermPageVO;
+import dev.macula.cloud.system.vo.perm.ResourcePermPageVO;
 import feign.Param;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -44,6 +45,13 @@ public class SysPermissionController {
     private final SysPermissionService sysPermissionService;
 
     private final SysRolePermissionService sysRolePermissionService;
+
+    @Operation(summary = "角色权限分页列表")
+    @GetMapping("/role/permPages")
+    public Page<ResourcePermPageVO> pagesResourcePerm(PermPageQuery permPageQuery){
+        Page<ResourcePermPageVO> result = sysPermissionService.pagesResourcePerm(permPageQuery);
+        return result;
+    }
 
     @Operation(summary = "权限分页列表")
     @GetMapping("/page")

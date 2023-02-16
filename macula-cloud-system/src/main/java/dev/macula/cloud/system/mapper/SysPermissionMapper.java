@@ -17,12 +17,16 @@
 
 package dev.macula.cloud.system.mapper;
 
+import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.baomidou.mybatisplus.core.toolkit.Constants;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import dev.macula.cloud.system.pojo.entity.SysPermission;
 import dev.macula.cloud.system.query.PermPageQuery;
 import dev.macula.cloud.system.vo.perm.PermPageVO;
+import dev.macula.cloud.system.vo.perm.ResourcePermPageVO;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
 
@@ -45,4 +49,11 @@ public interface SysPermissionMapper extends BaseMapper<SysPermission> {
      */
     List<SysPermission> listPermRoles();
 
+    /**
+     * 角色权限分页列表
+     * @param page
+     * @param pageWrapper
+     * @return
+     */
+    Page<ResourcePermPageVO> pagesResourcePerm(Page<ResourcePermPageVO> page,@Param(Constants.WRAPPER) Wrapper<SysPermission> pageWrapper);
 }
