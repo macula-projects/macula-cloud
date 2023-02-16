@@ -24,6 +24,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.google.common.base.Joiner;
 import dev.macula.boot.constants.GlobalConstants;
 import dev.macula.boot.result.Option;
 import dev.macula.boot.starter.security.utils.SecurityUtils;
@@ -191,15 +192,18 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
      * 修改角色的资源权限
      *
      * @param roleId
-     * @param menuIds
+     * @param mapMenuIds
      * @return
      */
     @Override
     @Transactional
     @CacheEvict(cacheNames = "system", key = "'routes'")
-    public boolean updateRoleMenus(Long roleId, List<Long> menuIds) {
-        // 删除角色菜单
-        sysRoleMenuService.remove(new LambdaQueryWrapper<SysRoleMenu>().eq(SysRoleMenu::getRoleId, roleId));
+    public boolean updateRoleMenus(Long roleId, Map<String,List<Long>> mapMenuIds) {
+        // 删除当前页角色菜单
+        sysRoleMenuService.remove(new LambdaQueryWrapper<SysRoleMenu>()
+                .eq(SysRoleMenu::getRoleId, roleId)
+                .in(Objects.nonNull(mapMenuIds.get("curPage")), SysRoleMenu::getMenuId, mapMenuIds.get("curPage")));
+        List<Long> menuIds = mapMenuIds.get("new");
         // 新增角色菜单关系
         if (CollectionUtil.isNotEmpty(menuIds)) {
             List<SysRoleMenu> roleMenus = menuIds.stream()
@@ -207,9 +211,13 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
                     .collect(Collectors.toList());
             sysRoleMenuService.saveBatch(roleMenus);
         }
-
         // 删除角色权限
-        sysRolePermissionService.remove(new LambdaQueryWrapper<SysRolePermission>().eq(SysRolePermission::getRoleId, roleId));
+        if(Objects.nonNull(mapMenuIds.get("curPage"))) {
+            sysRolePermissionService.remove(new LambdaQueryWrapper<SysRolePermission>()
+                    .eq(SysRolePermission::getRoleId, roleId)
+                    .inSql(Objects.nonNull(mapMenuIds.get("curPage")), SysRolePermission::getPermissionId,
+                            "select id from sys_permission where menu_id in (" + Joiner.on(",").join(mapMenuIds.get("curPage")) + ")"));
+        }
         // 新增角色权限关系（用勾选的菜单ID获取权限，用权限ID和角色ID组装sys_role_permission表)
         if(CollectionUtil.isEmpty(menuIds)){
             return true;
@@ -271,8 +279,12 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
     }
 
     @Override
-    public boolean updateRolePerms(Long roleId, List<Long> permIds) {
-        sysRolePermissionService.remove(new LambdaQueryWrapper<SysRolePermission>().eq(SysRolePermission::getRoleId, roleId));
+    public boolean updateRolePerms(Long roleId, Map<String,List<Long>> mapPermIds) {
+        //删除当前页的路径权限信息
+        sysRolePermissionService.remove(new LambdaQueryWrapper<SysRolePermission>()
+                .eq(SysRolePermission::getRoleId, roleId)
+                .in(Objects.nonNull(mapPermIds.get("curPage")), SysRolePermission::getPermissionId, mapPermIds.get("curPage")));
+        List<Long> permIds = mapPermIds.get("new");
         // 新增角色权限关系
         if (CollectionUtil.isNotEmpty(permIds)) {
             List<SysRolePermission> roleMenus = permIds.stream()

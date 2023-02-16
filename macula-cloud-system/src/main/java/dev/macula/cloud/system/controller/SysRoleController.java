@@ -33,6 +33,7 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.validation.Valid;
 import java.util.List;
+import java.util.Map;
 
 @Tag(name = "角色接口")
 @RestController
@@ -120,7 +121,7 @@ public class SysRoleController {
     @PutMapping("/{roleId}/menus")
     public boolean updateRoleMenus(
             @PathVariable Long roleId,
-            @RequestBody List<Long> menuIds
+            @RequestBody Map<String,List<Long>> menuIds
     ) {
         boolean result = roleService.updateRoleMenus(roleId, menuIds);
         if (result) {
@@ -163,7 +164,7 @@ public class SysRoleController {
     @PutMapping("/{roleId}/perms")
     public boolean updateRolePerms(
             @PathVariable Long roleId,
-            @RequestBody List<Long> permIds
+            @RequestBody Map<String,List<Long>> permIds
     ) {
         boolean result = roleService.updateRolePerms(roleId, permIds);
         if (result) {

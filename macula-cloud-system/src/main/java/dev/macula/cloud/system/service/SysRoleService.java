@@ -27,6 +27,7 @@ import dev.macula.cloud.system.query.RolePageQuery;
 import dev.macula.cloud.system.vo.role.RolePageVO;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -93,7 +94,7 @@ public interface SysRoleService extends IService<SysRole> {
      * @param menuIds
      * @return
      */
-    boolean updateRoleMenus(Long roleId, List<Long> menuIds);
+    boolean updateRoleMenus(Long roleId, Map<String,List<Long>> menuIds);
 
     /**
      * 获取最大范围的数据权限
@@ -140,5 +141,5 @@ public interface SysRoleService extends IService<SysRole> {
      * @param permIds
      * @return
      */
-    boolean updateRolePerms(Long roleId, List<Long> permIds);
+    boolean updateRolePerms(Long roleId, Map<String,List<Long>> permIds);
 }
