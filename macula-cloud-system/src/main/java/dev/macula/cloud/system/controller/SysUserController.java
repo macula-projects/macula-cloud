@@ -80,6 +80,7 @@ public class SysUserController {
     }
 
     @Operation(summary = "新增用户")
+    @AuditLog(title = "新增用户")
     @PostMapping
 //    @PreAuthorize("@pms.hasPermission('sys:user:add')")
     public boolean saveUser(
@@ -90,6 +91,7 @@ public class SysUserController {
     }
 
     @Operation(summary = "修改用户")
+    @AuditLog(title = "修改用户")
     @Parameter(name = "用户ID")
     @PutMapping(value = "/{userId}")
 //    @PreAuthorize("@pms.hasPermission('sys:user:edit')")
@@ -101,6 +103,7 @@ public class SysUserController {
     }
 
     @Operation(summary = "删除用户")
+    @AuditLog(title = "删除用户")
     @Parameter(name = "用户ID", description = "用户ID，多个以英文逗号(,)分割")
     @DeleteMapping("/{ids}")
 //    @PreAuthorize("@pms.hasPermission('sys:user:del')")
@@ -112,6 +115,7 @@ public class SysUserController {
     }
 
     @Operation(summary = "修改用户密码")
+    @AuditLog(title = "修改用户密码")
     @Parameter(name = "用户ID")
     @PatchMapping(value = "/{userId}/password")
     public boolean updatePassword(
@@ -124,6 +128,7 @@ public class SysUserController {
 
     @Operation(summary = "修改用户状态")
     @Parameter(name = "用户ID")
+    @AuditLog(title = "修改用户状态")
     @Parameter(name = "用户状态", description = "用户状态(1:启用;0:禁用)")
     @PatchMapping(value = "/{userId}/status")
     public boolean updatePassword(
@@ -162,6 +167,7 @@ public class SysUserController {
     }
 
     @Operation(summary = "导入用户")
+    @AuditLog(title = "导入用户")
     @PostMapping("/_import")
     public String importUsers(UserImportDTO userImportDTO) throws IOException {
         String msg = userService.importUsers(userImportDTO);

@@ -21,6 +21,7 @@ import com.alibaba.fastjson.JSONObject;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import dev.macula.boot.result.Option;
 import dev.macula.boot.result.Result;
+import dev.macula.cloud.system.annotation.AuditLog;
 import dev.macula.cloud.system.dto.MenuDTO;
 import dev.macula.cloud.system.pojo.bo.MenuBO;
 import dev.macula.cloud.system.pojo.entity.SysMenu;
@@ -72,12 +73,14 @@ public class SysMenuController {
     }
 
     @Operation(summary = "添加更新菜单及权限信息")
+    @AuditLog(title = "添加更新菜单及权限信息")
     @PostMapping("/add")
     public Result addMenu(@RequestBody MenuDTO menuDTO) {
         return Result.success(menuService.add(menuDTO));
     }
 
     @Operation(summary = "删除菜单")
+    @AuditLog(title = "删除菜单")
     @DeleteMapping("/delete")
     public Result delMenu(@RequestBody List<Long> menuIds) {
         return Result.success(menuService.del(menuIds));
@@ -128,6 +131,7 @@ public class SysMenuController {
     }
 
     @Operation(summary = "新增菜单")
+    @AuditLog(title = "新增菜单")
     @PostMapping
     @CacheEvict(cacheNames = "system", key = "'routes'")
     public Result addMenu(@RequestBody SysMenu menu) {
@@ -136,6 +140,7 @@ public class SysMenuController {
     }
 
     @Operation(summary = "修改菜单")
+    @AuditLog(title = "修改菜单")
     @PutMapping(value = "/{id}")
     @CacheEvict(cacheNames = "system", key = "'routes'")
     public Result updateMenu(
@@ -146,6 +151,7 @@ public class SysMenuController {
     }
 
     @Operation(summary = "删除菜单")
+    @AuditLog(title = "删除菜单")
     @Parameter(name = "菜单ID", description = "菜单ID，多个以英文(,)分割")
     @DeleteMapping("/{ids}")
     @CacheEvict(cacheNames = "system", key = "'routes'")
@@ -157,6 +163,7 @@ public class SysMenuController {
     }
 
     @Operation(summary = "修改菜单显示状态")
+    @AuditLog(title = "修改菜单显示状态")
     @Parameter(name = "菜单ID")
     @Parameter(name = "显示状态", description = "显示状态(1:显示;0:隐藏)")
     @PatchMapping("/{menuId}")
