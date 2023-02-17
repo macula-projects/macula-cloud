@@ -18,7 +18,7 @@
 package dev.macula.cloud.system.vo.role;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
-import dev.macula.cloud.system.enums.RoleDataScopeEnum;
+import dev.macula.cloud.system.enums.DataScopeEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
@@ -45,7 +45,7 @@ public class RolePageVO {
     private Integer sort;
 
     @Schema(description = "角色数据范围")
-    private RoleDataScopeEnum dataScope;
+    private DataScopeEnum dataScope;
 
     @Schema(description = "自定义部门数据权限拓展字段")
     private List<Long> customDepts;

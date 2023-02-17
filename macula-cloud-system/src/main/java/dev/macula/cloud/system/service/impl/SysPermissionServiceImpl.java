@@ -22,9 +22,12 @@ import cn.hutool.core.lang.Assert;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.google.common.base.Joiner;
 import dev.macula.boot.constants.GlobalConstants;
+import dev.macula.boot.starter.security.utils.SecurityUtils;
 import dev.macula.cloud.system.converter.PermissionConverter;
 import dev.macula.cloud.system.dto.PermDTO;
 import dev.macula.cloud.system.mapper.SysPermissionMapper;
@@ -32,11 +35,14 @@ import dev.macula.cloud.system.pojo.entity.SysPermission;
 import dev.macula.cloud.system.query.PermPageQuery;
 import dev.macula.cloud.system.service.SysPermissionService;
 import dev.macula.cloud.system.vo.perm.PermPageVO;
+import dev.macula.cloud.system.vo.perm.ResourcePermPageVO;
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.RequestMethod;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -133,6 +139,29 @@ public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, S
     @Override
     public PermDTO toDTO(SysPermission entity) {
         return permissionConverter.entity2DTO(entity);
+    }
+
+    @Override
+    public boolean validtorUrlPerm(Long id, String url, RequestMethod requestMethod) {
+        StringBuffer stringBuffer = new StringBuffer();
+        stringBuffer.append(requestMethod.toString()).append(":").append(url);
+        long count = count(new LambdaQueryWrapper<SysPermission>()
+                .eq(SysPermission::getUrlPerm, stringBuffer.toString())
+                .and(Objects.nonNull(id), wrapper->wrapper.ne(SysPermission::getId, id)));
+        return count == 0;
+    }
+
+    @Override
+    public Page<ResourcePermPageVO> pagesResourcePerm(PermPageQuery permPageQuery) {
+        Wrapper<SysPermission> pageWrapper = new LambdaQueryWrapper<SysPermission>()
+                .and(StringUtils.isNotBlank(permPageQuery.getName()),
+                        wrapper->wrapper.like(SysPermission::getUrlPerm, permPageQuery.getName()))
+                .and(StringUtils.isNotBlank(permPageQuery.getMenuName()),
+                        wrapper->wrapper.inSql(SysPermission::getMenuId,
+                                "select id from sys_menu where name like '%"+permPageQuery.getMenuName()+"%'"));
+        Page<ResourcePermPageVO> page = new Page<>(permPageQuery.getPageNum(),permPageQuery.getPageSize());
+        Page<ResourcePermPageVO> result = getBaseMapper().pagesResourcePerm(page, pageWrapper, SecurityUtils.getRoles());
+        return result;
     }
 
     private Map<String, PermDTO> handlerAddOrUpdateMenuPerms(List<PermDTO> permDTOList, Long menuId, List<Long> updatePermIds) {

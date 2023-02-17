@@ -27,7 +27,6 @@ import dev.macula.cloud.system.vo.app.ApplicationVO;
 
 /**
  * 应用业务接口
-
  */
 public interface SysApplicationService extends IService<SysApplication> {
 
@@ -64,4 +63,11 @@ public interface SysApplicationService extends IService<SysApplication> {
      */
     boolean deleteApplications(String idsStr);
 
+    /**
+     * 管理维护人
+     * @param appId
+     * @param appForm
+     * @return
+     */
+    boolean addMaintainer(Long appId, ApplicationForm appForm);
 }

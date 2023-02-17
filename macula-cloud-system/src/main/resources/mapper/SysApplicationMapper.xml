@@ -8,8 +8,10 @@
         SELECT
             id,
             application_name,
+            homepage,
             code,
             manager,
+            maintainer,
             mobile,
             create_time
         FROM

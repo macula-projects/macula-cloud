@@ -34,6 +34,9 @@ public class ApplicationForm {
     @NotBlank(message = "应用名称不能为空")
     private String applicationName;
 
+    @Schema(description = "主页")
+    private String homepage;
+
     @Schema(description = "应用编码")
     @NotBlank(message = "应用编码不能为空")
     private String code;
@@ -41,6 +44,9 @@ public class ApplicationForm {
     @Schema(description = "负责人")
     @NotBlank(message = "负责人不能为空")
     private String manager;
+
+    @Schema(description = "维护人")
+    private String maintainer;
 
     @Pattern(regexp = "^1(3\\d|4[5-9]|5[0-35-9]|6[2567]|7[0-8]|8\\d|9[0-35-9])\\d{8}$", message = "{phone.valid}")
     private String mobile;

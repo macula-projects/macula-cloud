@@ -27,6 +27,7 @@ import dev.macula.cloud.system.query.RolePageQuery;
 import dev.macula.cloud.system.vo.role.RolePageVO;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -93,7 +94,7 @@ public interface SysRoleService extends IService<SysRole> {
      * @param menuIds
      * @return
      */
-    boolean updateRoleMenus(Long roleId, List<Long> menuIds);
+    boolean updateRoleMenus(Long roleId, Map<String,List<Long>> menuIds);
 
     /**
      * 获取最大范围的数据权限
@@ -126,4 +127,19 @@ public interface SysRoleService extends IService<SysRole> {
      * @return
      */
     List<Option> optionsByDataScope();
+
+    /**
+     * 获取角色的权限id列表
+     * @param roleId
+     * @return
+     */
+    List<Long> getRolePermIds(Long roleId);
+
+    /**
+     * 修改角色的路径权限信息
+     * @param roleId
+     * @param permIds
+     * @return
+     */
+    boolean updateRolePerms(Long roleId, Map<String,List<Long>> permIds);
 }

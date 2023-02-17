@@ -25,7 +25,6 @@ import java.util.Date;
 
 /**
  * 应用业务对象
- *
  */
 @Data
 public class ApplicationBO {
@@ -38,9 +37,19 @@ public class ApplicationBO {
     private String applicationName;
 
     /**
+     * 主页
+     */
+    private String homepage;
+
+    /**
      * 负责人
      */
     private String manager;
+
+    /**
+     * 维护人
+     */
+    private String maintainer;
 
     /**
      * 手机号

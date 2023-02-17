@@ -123,4 +123,12 @@ public interface SysUserService extends IService<SysUser> {
      * @return
      */
     UserLoginVO getLoginUserInfo();
+
+    /**
+     * 根据用户id获取用户分页列表
+     * @param queryParams
+     * @return
+     */
+    Page<UserVO> listUserPagesByIds(UserPageQuery queryParams);
+
 }

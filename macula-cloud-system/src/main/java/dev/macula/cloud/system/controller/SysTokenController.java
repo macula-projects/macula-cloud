@@ -4,10 +4,14 @@ import com.alibaba.fastjson.JSONObject;
 import dev.macula.boot.result.ApiResultCode;
 import dev.macula.boot.result.Result;
 import dev.macula.boot.starter.security.utils.SecurityUtils;
+import dev.macula.boot.starter.web.annotation.NotControllerResponseAdvice;
+import dev.macula.cloud.system.dto.UserAuthInfo;
+import dev.macula.cloud.system.service.SysUserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.Data;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.http.client.config.RequestConfig;
@@ -21,19 +25,25 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.http.converter.HttpMessageConverter;
 import org.springframework.http.converter.StringHttpMessageConverter;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
 
+import javax.json.JsonObject;
 import javax.validation.Valid;
 import javax.validation.constraints.NotNull;
 import java.io.Serializable;
 import java.nio.charset.Charset;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 登录token的控制器
+ * 登录token的控制器 临时处理类
  * @author qiuyuhao
  * @date 2023.01.16
  */
@@ -41,15 +51,60 @@ import java.util.List;
 @RequestMapping("/api/token")
 @RestController
 @Slf4j
+@Deprecated
+@RequiredArgsConstructor
 public class SysTokenController {
+  private static final Map<String, UserAuthInfo> USER_TOKEN_MAP = new ConcurrentHashMap<>();
   private static final HttpHeaders DEFAULT_HEADERS;
+  private final SysUserService userService;
+  private final PasswordEncoder passwordEncoder;
   static {
     DEFAULT_HEADERS = new HttpHeaders();
     DEFAULT_HEADERS.set("Authorization", getBaseAuthHeader("client", "secret"));
   }
 
-  @Operation(summary = "获取用户登录token")
+  @Operation(summary = "MaculaV5获取用户权限信息")
+  @PostMapping("/introspect")
+  @NotControllerResponseAdvice
+  public JSONObject postIntrospect(@RequestParam("token") String token){
+    JSONObject jsonObject = new JSONObject();
+    UserAuthInfo userAuthInfo = USER_TOKEN_MAP.get(token);
+    if(Objects.isNull(userAuthInfo)){
+      jsonObject.put("active", false);
+      return jsonObject;
+    }
+    jsonObject.put("active", true);
+    jsonObject.put("exp", 359999);
+    jsonObject.put("scope", "all");
+    jsonObject.put("sub", userAuthInfo.getUsername());
+    jsonObject.put("authorities", userAuthInfo.getRoles());
+    return jsonObject;
+  }
+
+  @Operation(summary = "MaculaV5获取用户登录token")
   @PostMapping
+  public Result postMaculaV5Token(@RequestBody @Valid UserDto userDto) throws Exception{
+    UserAuthInfo userAuthInfo = userService.getUserAuthInfo(userDto.getUsername());
+    JSONObject jsonObject = new JSONObject();
+    if(Objects.nonNull(userAuthInfo) && passwordEncoder.matches(userDto.getPassword(), userAuthInfo.getPassword())){
+      String token = Base64.encodeBase64String((UUID.randomUUID().toString()+"##"+userDto.getUsername()).getBytes("UTF-8"));
+      USER_TOKEN_MAP.put(token, userAuthInfo);
+      jsonObject.put("access_token", token);
+      jsonObject.put("token_type", "bearer");
+      jsonObject.put("refresh_token", token);
+      jsonObject.put("expires_in", 359999);
+      jsonObject.put("scope", "all");
+      jsonObject.put("real_username", userDto.getUsername());
+      jsonObject.put("is_show_user_agreement", "false");
+      return Result.success(jsonObject);
+    }
+    jsonObject.put("msg", "用户名或密码错误");
+    return Result.failed(ApiResultCode.FAILED, jsonObject);
+  }
+
+  @Operation(summary = "获取用户登录token")
+  //@PostMapping
+  @Deprecated
   public Result postToken(@RequestBody @Valid SysTokenController.UserDto userVo){
     MultiValueMap<String, String> params = new LinkedMultiValueMap<String, String>();
     params.add("grant_type", "password");

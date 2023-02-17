@@ -24,8 +24,11 @@ import dev.macula.cloud.system.query.PermPageQuery;
 import dev.macula.cloud.system.service.SysPermissionService;
 import dev.macula.cloud.system.service.SysRolePermissionService;
 import dev.macula.cloud.system.vo.perm.PermPageVO;
+import dev.macula.cloud.system.vo.perm.ResourcePermPageVO;
+import feign.Param;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.Parameters;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -42,6 +45,13 @@ public class SysPermissionController {
     private final SysPermissionService sysPermissionService;
 
     private final SysRolePermissionService sysRolePermissionService;
+
+    @Operation(summary = "角色权限分页列表")
+    @GetMapping("/role/permPages")
+    public Page<ResourcePermPageVO> pagesResourcePerm(PermPageQuery permPageQuery){
+        Page<ResourcePermPageVO> result = sysPermissionService.pagesResourcePerm(permPageQuery);
+        return result;
+    }
 
     @Operation(summary = "权限分页列表")
     @GetMapping("/page")
@@ -107,6 +117,18 @@ public class SysPermissionController {
             sysPermissionService.refreshPermRolesRules();
         }
         return result;
+    }
+
+    @Operation(summary = "接口权限路径验证器")
+    @Parameters({
+            @Parameter(name = "权限id", description = "权限id"),
+            @Parameter(name = "权限路径", description = "基于gateway网关的相对路径或相对路径匹配符"),
+            @Parameter(name = "请求方式", description = "HTTP的请求方式")
+    })
+    @GetMapping("/validtor/urlPerm")
+    public boolean validtorUrlPerm(@RequestParam(required = false) Long id, @RequestParam String url,
+                                   @RequestParam RequestMethod method ){
+        return sysPermissionService.validtorUrlPerm(id, url, method);
     }
 }
 

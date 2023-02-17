@@ -33,6 +33,7 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.validation.Valid;
 import java.util.List;
+import java.util.Map;
 
 @Tag(name = "角色接口")
 @RestController
@@ -120,7 +121,7 @@ public class SysRoleController {
     @PutMapping("/{roleId}/menus")
     public boolean updateRoleMenus(
             @PathVariable Long roleId,
-            @RequestBody List<Long> menuIds
+            @RequestBody Map<String,List<Long>> menuIds
     ) {
         boolean result = roleService.updateRoleMenus(roleId, menuIds);
         if (result) {
@@ -149,5 +150,26 @@ public class SysRoleController {
     @GetMapping("/optionsByDataScope")
     public List<Option> optionsByDataScope() {
         return roleService.optionsByDataScope();
+    }
+
+    @Operation(summary = "获取角色的权限id集合")
+    @Parameter(name = "角色ID")
+    @GetMapping("/{roleId}/permIds")
+    public List<Long> getRolePermIds(@PathVariable("roleId") Long roleId){
+        List<Long> resourcePermIds = roleService.getRolePermIds(roleId);
+        return resourcePermIds;
+    }
+
+    @Operation(summary = "分配角色的路径权限")
+    @PutMapping("/{roleId}/perms")
+    public boolean updateRolePerms(
+            @PathVariable Long roleId,
+            @RequestBody Map<String,List<Long>> permIds
+    ) {
+        boolean result = roleService.updateRolePerms(roleId, permIds);
+        if (result) {
+            sysPermissionService.refreshPermRolesRules();
+        }
+        return result;
     }
 }

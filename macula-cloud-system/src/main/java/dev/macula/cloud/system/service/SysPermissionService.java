@@ -24,6 +24,8 @@ import dev.macula.cloud.system.dto.PermDTO;
 import dev.macula.cloud.system.pojo.entity.SysPermission;
 import dev.macula.cloud.system.query.PermPageQuery;
 import dev.macula.cloud.system.vo.perm.PermPageVO;
+import dev.macula.cloud.system.vo.perm.ResourcePermPageVO;
+import org.springframework.web.bind.annotation.RequestMethod;
 
 import java.util.List;
 import java.util.Map;
@@ -86,4 +88,21 @@ public interface SysPermissionService extends IService<SysPermission> {
      * @return
      */
     PermDTO toDTO(SysPermission entity);
+
+    /**
+     * 接口权限路径验证器
+     *
+     * @param id
+     * @param url
+     * @param requestMethod
+     * @return
+     */
+    boolean validtorUrlPerm(Long id, String url, RequestMethod requestMethod);
+
+    /**
+     * 获取角色权限列表分页对象
+     * @param permPageQuery
+     * @return
+     */
+    Page<ResourcePermPageVO> pagesResourcePerm(PermPageQuery permPageQuery);
 }

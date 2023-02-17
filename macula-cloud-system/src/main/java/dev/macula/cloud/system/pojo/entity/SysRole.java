@@ -17,11 +17,10 @@
 
 package dev.macula.cloud.system.pojo.entity;
 
-import cn.hutool.core.collection.CollectionUtil;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import dev.macula.boot.starter.mp.entity.BaseEntity;
-import dev.macula.cloud.system.enums.RoleDataScopeEnum;
+import dev.macula.cloud.system.enums.DataScopeEnum;
 import dev.macula.cloud.system.handler.MybatisListToStringHandler;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
@@ -44,7 +43,7 @@ public class SysRole extends BaseEntity {
 
     private Integer status;
 
-    private RoleDataScopeEnum dataScope;
+    private DataScopeEnum dataScope;
 
     @Schema(description = "逻辑删除标识 0-未删除 1-已删除")
     //@TableLogic(value = "0", delval = "1")
