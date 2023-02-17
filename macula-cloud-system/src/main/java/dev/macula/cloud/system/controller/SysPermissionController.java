@@ -19,6 +19,7 @@ package dev.macula.cloud.system.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import dev.macula.cloud.system.annotation.AuditLog;
 import dev.macula.cloud.system.pojo.entity.SysPermission;
 import dev.macula.cloud.system.query.PermPageQuery;
 import dev.macula.cloud.system.service.SysPermissionService;
@@ -84,6 +85,7 @@ public class SysPermissionController {
     }
 
     @Operation(summary = "新增权限")
+    @AuditLog(title = "新增权限")
     @PostMapping
     public boolean addPerm(
             @RequestBody SysPermission permission
@@ -93,6 +95,7 @@ public class SysPermissionController {
     }
 
     @Operation(summary = "修改权限")
+    @AuditLog(title = "修改权限")
     @Parameter(name = "权限ID")
     @PutMapping(value = "/{permissionId}")
     public boolean updatePerm(
@@ -107,6 +110,7 @@ public class SysPermissionController {
     }
 
     @Operation(summary = "删除权限")
+    @AuditLog(title = "删除权限")
     @Parameter(name = "权限ID", description = "权限ID，多个以英文逗号(,)分割")
     @DeleteMapping("/{ids}")
     public boolean deletePermissions(

@@ -90,6 +90,7 @@ public class SysDeptController {
     }
 
     @Operation(summary = "删除部门")
+    @AuditLog(title = "删除部门")
     @Parameter(name = "部门ID，多个以英文逗号(,)分割")
     @DeleteMapping("/{ids}")
     public boolean deleteDepartments(

@@ -19,6 +19,7 @@ package dev.macula.cloud.system.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import dev.macula.boot.result.Option;
+import dev.macula.cloud.system.annotation.AuditLog;
 import dev.macula.cloud.system.form.DictTypeForm;
 import dev.macula.cloud.system.query.DictTypePageQuery;
 import dev.macula.cloud.system.vo.dict.DictTypePageVO;
@@ -57,6 +58,7 @@ public class SysDictTypeController {
     }
 
     @Operation(summary = "新增字典类型")
+    @AuditLog(title = "新增字典类型")
     @PostMapping
     public boolean saveDictType(@RequestBody DictTypeForm dictTypeForm) {
         boolean result = dictTypeService.saveDictType(dictTypeForm);
@@ -64,6 +66,7 @@ public class SysDictTypeController {
     }
 
     @Operation(summary = "修改字典类型")
+    @AuditLog(title = "修改字典类型")
     @PutMapping("/{id}")
     public boolean updateDict(@PathVariable Long id, @RequestBody DictTypeForm dictTypeForm) {
         boolean status = dictTypeService.updateDictType(id, dictTypeForm);
@@ -71,6 +74,7 @@ public class SysDictTypeController {
     }
 
     @Operation(summary = "删除字典类型")
+    @AuditLog(title = "删除字典类型")
     @Parameter(name = "字典ID", description = "字典类型ID，多个以英文逗号(,)分割")
     @DeleteMapping("/{ids}")
     public boolean deleteDictTypes(
