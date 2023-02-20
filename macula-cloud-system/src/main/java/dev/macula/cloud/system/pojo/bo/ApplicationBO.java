@@ -36,6 +36,10 @@ public class ApplicationBO {
      */
     private String applicationName;
 
+    private String ak;
+
+    private String sk;
+
     /**
      * 主页
      */

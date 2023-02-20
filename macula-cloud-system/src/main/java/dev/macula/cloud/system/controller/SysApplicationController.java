@@ -18,6 +18,7 @@
 package dev.macula.cloud.system.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import dev.macula.cloud.system.annotation.AuditLog;
 import dev.macula.cloud.system.form.ApplicationForm;
 import dev.macula.cloud.system.query.ApplicationPageQuery;
 import dev.macula.cloud.system.service.SysApplicationService;
@@ -49,6 +50,7 @@ public class SysApplicationController {
     }
 
     @Operation(summary = "新增应用")
+    @AuditLog(title = "新增应用")
     @PostMapping
     public boolean saveApplication(
             @Valid @RequestBody ApplicationForm formData
@@ -58,6 +60,7 @@ public class SysApplicationController {
     }
 
     @Operation(summary = "修改应用")
+    @AuditLog(title = "修改应用")
     @PutMapping(value = "/{appId}")
     public boolean updateApplication(
             @PathVariable Long appId,
@@ -68,6 +71,7 @@ public class SysApplicationController {
     }
 
     @Operation(summary = "删除应用")
+    @AuditLog(title = "删除应用")
     @Parameter(name = "应用ID，多个以英文逗号(,)分割")
     @DeleteMapping("/{ids}")
     public boolean deleteApplications(
@@ -79,6 +83,7 @@ public class SysApplicationController {
 
 
     @Operation(summary = "添加维护人")
+    @AuditLog(title = "添加维护人")
     @Parameter(name = "userId，多个以英文逗号(,)分割")
     @PutMapping("/addMaintainer/{appId}")
     public boolean addMaintainer(

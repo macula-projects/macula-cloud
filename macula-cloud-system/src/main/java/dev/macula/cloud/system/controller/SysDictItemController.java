@@ -19,6 +19,7 @@ package dev.macula.cloud.system.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import dev.macula.boot.result.Result;
+import dev.macula.cloud.system.annotation.AuditLog;
 import dev.macula.cloud.system.form.DictItemForm;
 import dev.macula.cloud.system.query.DictItemPageQuery;
 import dev.macula.cloud.system.vo.dict.DictItemPageVO;
@@ -57,6 +58,7 @@ public class SysDictItemController {
     }
 
     @Operation(summary = "新增字典数据")
+    @AuditLog(title = "新增字典数据")
     @PostMapping
     public boolean saveDictItem(
             @RequestBody DictItemForm DictItemForm
@@ -66,6 +68,7 @@ public class SysDictItemController {
     }
 
     @Operation(summary = "修改字典数据")
+    @AuditLog(title = "修改字典数据")
     @PutMapping("/{id}")
     public Result updateDictItem(
             @PathVariable Long id,
@@ -76,6 +79,7 @@ public class SysDictItemController {
     }
 
     @Operation(summary = "删除字典")
+    @AuditLog(title = "删除字典")
     @Parameter(name = "字典ID", description = "字典ID，多个以英文逗号(,)拼接")
     @DeleteMapping("/{ids}")
     public Result deleteDictItems(

@@ -160,8 +160,8 @@ public class SysDeptServiceImpl extends ServiceImpl<SysDeptMapper, SysDept> impl
                 .orderByAsc(SysDept::getSort)
         );
 
-        //   List<Option> options = recurDeptTreeOptions(SystemConstants.ROOT_NODE_ID, deptList);
-        List<Option> options = buildDeptTree(deptList);
+           List<Option> options = recurDeptTreeOptions(GlobalConstants.ROOT_NODE_ID, deptList);
+//        List<Option> options = buildDeptTree(deptList);
         return options;
     }
 
