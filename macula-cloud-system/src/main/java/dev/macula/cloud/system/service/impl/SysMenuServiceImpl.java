@@ -41,10 +41,12 @@ import dev.macula.cloud.system.pojo.bo.MenuBO;
 import dev.macula.cloud.system.pojo.bo.RouteBO;
 import dev.macula.cloud.system.pojo.entity.SysMenu;
 import dev.macula.cloud.system.pojo.entity.SysPermission;
+import dev.macula.cloud.system.pojo.entity.SysRoleMenu;
 import dev.macula.cloud.system.query.MenuPageQuery;
 import dev.macula.cloud.system.query.MenuQuery;
 import dev.macula.cloud.system.service.SysMenuService;
 import dev.macula.cloud.system.service.SysPermissionService;
+import dev.macula.cloud.system.service.SysRoleMenuService;
 import dev.macula.cloud.system.vo.menu.MenuVO;
 import dev.macula.cloud.system.vo.menu.ResourceVO;
 import dev.macula.cloud.system.vo.menu.RouteVO;
@@ -73,6 +75,7 @@ import java.util.stream.Collectors;
 public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> implements SysMenuService {
     private final MenuConverter menuConverter;
     private final SysPermissionService permissionService;
+    private final SysRoleMenuService roleMenuService;
 
     /**
      * 递归生成菜单下拉层级列表
@@ -366,6 +369,7 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
         } finally {
             permissionService.deleteByMenuId(menuId);
             getBaseMapper().deleteById(menuId);
+            roleMenuService.remove(new LambdaQueryWrapper<SysRoleMenu>().eq(SysRoleMenu::getMenuId, menuId));
         }
     }
 

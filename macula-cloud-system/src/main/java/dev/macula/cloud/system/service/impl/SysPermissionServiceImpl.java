@@ -32,8 +32,11 @@ import dev.macula.cloud.system.converter.PermissionConverter;
 import dev.macula.cloud.system.dto.PermDTO;
 import dev.macula.cloud.system.mapper.SysPermissionMapper;
 import dev.macula.cloud.system.pojo.entity.SysPermission;
+import dev.macula.cloud.system.pojo.entity.SysRole;
+import dev.macula.cloud.system.pojo.entity.SysRolePermission;
 import dev.macula.cloud.system.query.PermPageQuery;
 import dev.macula.cloud.system.service.SysPermissionService;
+import dev.macula.cloud.system.service.SysRolePermissionService;
 import dev.macula.cloud.system.vo.perm.PermPageVO;
 import dev.macula.cloud.system.vo.perm.ResourcePermPageVO;
 import lombok.RequiredArgsConstructor;
@@ -60,6 +63,8 @@ public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, S
     private final RedisTemplate redisTemplate;
 
     private final PermissionConverter permissionConverter;
+
+    private final SysRolePermissionService rolePermissionService;
 
     /**
      * 获取权限分页列表
@@ -127,7 +132,13 @@ public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, S
     @Override
     public void deleteByMenuId(Long menuId) {
         Assert.notNull(menuId, "根据菜单id删除权限失败，菜单id为空，稍后重试！");
-        getBaseMapper().delete(new LambdaQueryWrapper<SysPermission>().eq(SysPermission::getMenuId, menuId));
+        List<SysPermission> sysPermissions = list(new LambdaQueryWrapper<SysPermission>().eq(SysPermission::getMenuId, menuId));
+        if(sysPermissions.isEmpty()){
+            return;
+        }
+        Set<Long> batchIds = sysPermissions.stream().map(SysPermission::getId).collect(Collectors.toSet());
+        getBaseMapper().deleteBatchIds(batchIds);
+        rolePermissionService.remove(new LambdaQueryWrapper<SysRolePermission>().in(SysRolePermission::getPermissionId, batchIds));
     }
 
     @Override

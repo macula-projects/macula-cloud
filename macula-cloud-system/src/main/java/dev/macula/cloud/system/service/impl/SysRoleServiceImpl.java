@@ -203,7 +203,7 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
         sysRoleMenuService.remove(new LambdaQueryWrapper<SysRoleMenu>()
                 .eq(SysRoleMenu::getRoleId, roleId)
                 .in(Objects.nonNull(mapMenuIds.get("curPage")), SysRoleMenu::getMenuId, mapMenuIds.get("curPage")));
-        List<Long> menuIds = mapMenuIds.get("new");
+        List<Long> menuIds = mapMenuIds.get("curSel");
         // 新增角色菜单关系
         if (CollectionUtil.isNotEmpty(menuIds)) {
             List<SysRoleMenu> roleMenus = menuIds.stream()
@@ -284,7 +284,7 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
         sysRolePermissionService.remove(new LambdaQueryWrapper<SysRolePermission>()
                 .eq(SysRolePermission::getRoleId, roleId)
                 .in(Objects.nonNull(mapPermIds.get("curPage")), SysRolePermission::getPermissionId, mapPermIds.get("curPage")));
-        List<Long> permIds = mapPermIds.get("new");
+        List<Long> permIds = mapPermIds.get("curSel");
         // 新增角色权限关系
         if (CollectionUtil.isNotEmpty(permIds)) {
             List<SysRolePermission> roleMenus = permIds.stream()
