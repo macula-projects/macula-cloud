@@ -19,6 +19,7 @@ package dev.macula.cloud.system.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import dev.macula.boot.result.Option;
+import dev.macula.cloud.system.annotation.AuditLog;
 import dev.macula.cloud.system.form.RoleForm;
 import dev.macula.cloud.system.pojo.entity.SysRole;
 import dev.macula.cloud.system.query.RolePageQuery;
@@ -33,8 +34,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import javax.validation.Valid;
-import java.io.Serializable;
-import java.lang.reflect.Array;
 import java.util.List;
 import java.util.Map;
 
@@ -72,6 +71,7 @@ public class SysRoleController {
     }
 
     @Operation(summary = "新增角色")
+    @AuditLog(title = "新增角色")
     @PostMapping
     public boolean addRole(@Valid @RequestBody RoleForm roleForm) {
         boolean result = roleService.saveRole(roleForm);
@@ -79,6 +79,7 @@ public class SysRoleController {
     }
 
     @Operation(summary = "修改角色")
+    @AuditLog(title = "修改角色")
     @PutMapping(value = "/{id}")
     public boolean updateRole(@Valid @RequestBody RoleForm roleForm) {
         boolean result = roleService.saveRole(roleForm);
@@ -89,6 +90,7 @@ public class SysRoleController {
     }
 
     @Operation(summary = "删除角色")
+    @AuditLog(title = "删除角色")
     @Parameter(description = "删除角色，多个以英文逗号(,)分割")
     @DeleteMapping("/{ids}")
     public boolean deleteRoles(
@@ -99,6 +101,7 @@ public class SysRoleController {
     }
 
     @Operation(summary = "修改角色状态")
+    @AuditLog(title = "修改角色状态")
     @Parameter(name = "角色ID")
     @Parameter(name = "角色状态", description = "角色状态:1-启用；0-禁用")
     @PutMapping(value = "/{roleId}/status")
@@ -133,6 +136,7 @@ public class SysRoleController {
                             @SchemaProperty(name = "curSel", array= @ArraySchema(arraySchema = @Schema(implementation = List.class), schema = @Schema(implementation = Long.class)))}
             )}
     )
+    @AuditLog(title = "分配角色的资源权限")
     @PutMapping("/{roleId}/menus")
     public boolean updateRoleMenus(
             @PathVariable Long roleId,
@@ -176,6 +180,7 @@ public class SysRoleController {
     }
 
     @Operation(summary = "分配角色的路径权限")
+    @AuditLog(title = "分配角色的路径权限")
     @io.swagger.v3.oas.annotations.parameters.RequestBody(
             description = "更新角色权限的请求体对象,先删除当前分页【curPage】(没有则全部删除)该角色拥有的权限信息," +
                     "后添加当前选择的权限信息," +

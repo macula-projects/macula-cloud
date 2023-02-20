@@ -120,7 +120,8 @@ public class AuditLogAspect {
      */
     private void setRequestValue(JoinPoint joinPoint, SysLog opLog) {
         String requestMethod = opLog.getOpRequestMethod();
-        if (HttpMethod.PUT.equals(requestMethod) || HttpMethod.POST.equals(requestMethod)) {
+        if (HttpMethod.PUT.equals(requestMethod) || HttpMethod.POST.equals(requestMethod) || HttpMethod.DELETE.equals(requestMethod)
+                || HttpMethod.PATCH.equals(requestMethod)) {
             String params = argsArrayToString(joinPoint.getArgs());
             opLog.setOpParam(StringUtils.substring(params,0,2000));
         } else {

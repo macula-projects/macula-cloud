@@ -36,6 +36,10 @@ public class ApplicationVO {
     @Schema(description = "应用名")
     private String applicationName;
 
+    private String ak;
+
+    private String sk;
+
     @Schema(description = "主页")
     private String homepage;
 
