@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="dev.macula.cloud.system.mapper.SysTenantMapper">
+
+    <!-- 租户分页列表 -->
+    <select id="listTenantpages" resultType="dev.macula.cloud.system.pojo.bo.TenantBo">
+        SELECT
+        t.id,
+        t.name,
+        t.code,
+        t.tenant_id,
+        t.description,
+        t.supervisor,
+        t.create_time
+        FROM
+        sys_tenant t
+        <where>
+            <if test='queryParams.keywords!=null and queryParams.keywords.trim() neq ""'>
+                AND (
+                t.name LIKE CONCAT('%',#{queryParams.keywords},'%')
+                OR t.code LIKE CONCAT('%',#{queryParams.keywords},'%')
+                OR u.supervisor LIKE CONCAT('%',#{queryParams.keywords},'%')
+                )
+            </if>
+        </where>
+        order by t.create_time desc
+    </select>
+
+</mapper>
