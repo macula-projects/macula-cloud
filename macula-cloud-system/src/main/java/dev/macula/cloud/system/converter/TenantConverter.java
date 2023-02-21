@@ -2,7 +2,7 @@ package dev.macula.cloud.system.converter;
 
 
 import dev.macula.cloud.system.form.TenantForm;
-import dev.macula.cloud.system.pojo.entity.SysTenant;
+import dev.macula.cloud.system.pojo.entity.SysTenantInfo;
 import org.mapstruct.InheritInverseConfiguration;
 import org.mapstruct.Mapper;
 
@@ -10,5 +10,5 @@ import org.mapstruct.Mapper;
 public interface TenantConverter {
 
     @InheritInverseConfiguration(name = "entity2Form")
-    SysTenant form2Entity(TenantForm entity);
+    SysTenantInfo form2Entity(TenantForm entity);
 }

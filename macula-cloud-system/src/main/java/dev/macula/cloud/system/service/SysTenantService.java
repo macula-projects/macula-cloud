@@ -4,11 +4,11 @@ package dev.macula.cloud.system.service;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
 import dev.macula.cloud.system.form.TenantForm;
-import dev.macula.cloud.system.pojo.entity.SysTenant;
+import dev.macula.cloud.system.pojo.entity.SysTenantInfo;
 import dev.macula.cloud.system.query.TenantPageQuery;
 import dev.macula.cloud.system.vo.tenant.TenantPageVO;
 
-public interface SysTenantService extends IService<SysTenant> {
+public interface SysTenantService extends IService<SysTenantInfo> {
 
     /**
      *  租户分页列表

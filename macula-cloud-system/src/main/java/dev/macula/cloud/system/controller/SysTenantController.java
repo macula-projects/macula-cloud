@@ -35,7 +35,7 @@ public class SysTenantController {
     @Operation(summary = "新增租户")
     @AuditLog(title = "新增租户")
     @PostMapping
-    public boolean saveTenant(TenantForm tenantForm){
+    public boolean saveTenant(@RequestBody TenantForm tenantForm){
         return sysTenantService.saveTenant(tenantForm);
     }
 
