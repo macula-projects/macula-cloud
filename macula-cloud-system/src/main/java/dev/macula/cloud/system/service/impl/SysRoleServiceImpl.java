@@ -273,26 +273,4 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
                 .collect(Collectors.toList());
     }
 
-    @Override
-    public List<Long> getRolePermIds(Long roleId) {
-        return sysRolePermissionService.listPermIdsByRoleId(roleId);
-    }
-
-    @Override
-    public boolean updateRolePerms(Long roleId, Map<String,List<Long>> mapPermIds) {
-        //删除当前页的路径权限信息
-        sysRolePermissionService.remove(new LambdaQueryWrapper<SysRolePermission>()
-                .eq(SysRolePermission::getRoleId, roleId)
-                .in(Objects.nonNull(mapPermIds.get("curPage")), SysRolePermission::getPermissionId, mapPermIds.get("curPage")));
-        List<Long> permIds = mapPermIds.get("curSel");
-        // 新增角色权限关系
-        if (CollectionUtil.isNotEmpty(permIds)) {
-            List<SysRolePermission> roleMenus = permIds.stream()
-                    .map(permId -> new SysRolePermission(roleId, permId))
-                    .collect(Collectors.toList());
-            sysRolePermissionService.saveBatch(roleMenus);
-        }
-        return true;
-    }
-
 }

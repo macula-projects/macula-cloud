@@ -10,7 +10,6 @@
         t.id,
         t.name,
         t.code,
-        t.tenant_id,
         t.description,
         t.supervisor,
         t.create_time

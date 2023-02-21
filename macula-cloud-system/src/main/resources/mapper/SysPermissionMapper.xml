@@ -71,30 +71,4 @@
                  LEFT JOIN sys_role t3 ON t2.role_id = t3.id
     </select>
 
-    <!-- 根据pageWrapper查询权限菜单信息，分配的角色的权限排序优先返回 -->
-    <select id="pagesResourcePerm" resultType="dev.macula.cloud.system.vo.perm.ResourcePermPageVO">
-        select
-            id,
-            url_perm,
-            name as code,
-            getFromMenuInfoStr(menu_id) as fromMenu,
-            (select 1 from sys_role_permission where permission_id = id and role_id in
-                (select id from sys_role
-                 <where>
-                     <choose>
-                         <when test="roles!=null and roles.size>0">
-                             AND code IN
-                             <foreach collection="roles" item="role" separator="," open="(" close=")">
-                                 #{role}
-                             </foreach>
-                         </when>
-                         <otherwise>
-                             id = -1
-                         </otherwise>
-                     </choose>
-                 </where>
-                 )) as hasPerm
-        from sys_permission ${ew.customSqlSegment}
-        order  by hasPerm desc
-    </select>
 </mapper>

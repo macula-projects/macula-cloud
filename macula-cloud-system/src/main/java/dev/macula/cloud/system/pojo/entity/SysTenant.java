@@ -6,7 +6,6 @@ import lombok.Data;
 @Data
 public class SysTenant extends BaseEntity {
 
-    private Long tenantId;
     private String name;
 
     private String code;

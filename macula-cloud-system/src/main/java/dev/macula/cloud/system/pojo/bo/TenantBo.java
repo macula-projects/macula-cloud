@@ -12,8 +12,6 @@ public class TenantBo {
 
     private Long id;
 
-    private Long tenantId;
-
     /**
      * 租户名称
      */

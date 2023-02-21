@@ -13,8 +13,6 @@ public class TenantPageVO implements Serializable {
     @Schema(description = "租户ID")
     private Long id;
 
-    private Long tenantId;
-
     @Schema(description = "租户名称")
     private String name;
 

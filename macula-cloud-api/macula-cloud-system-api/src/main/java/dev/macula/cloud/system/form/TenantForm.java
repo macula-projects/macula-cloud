@@ -11,8 +11,6 @@ import lombok.Data;
 @Data
 public class TenantForm {
 
-    private Long tenantId;
-
     private String name;
 
     private String code;

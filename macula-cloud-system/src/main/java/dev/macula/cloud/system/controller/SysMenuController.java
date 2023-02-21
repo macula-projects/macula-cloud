@@ -60,9 +60,9 @@ public class SysMenuController {
 
     @Operation(summary = "获取当前登录用户的菜单列表")
     @GetMapping("/my")
-    public Result getUserMenu(MenuQuery menuQuery) {
+    public JSONObject getUserMenu(MenuQuery menuQuery) {
         JSONObject data = menuService.getMyMenu(menuQuery);
-        return Result.success(data);
+        return data;
     }
 
     @Operation(summary = "菜单列表")
@@ -75,15 +75,15 @@ public class SysMenuController {
     @Operation(summary = "添加更新菜单及权限信息")
     @AuditLog(title = "添加更新菜单及权限信息")
     @PostMapping("/add")
-    public Result addMenu(@RequestBody MenuDTO menuDTO) {
-        return Result.success(menuService.add(menuDTO));
+    public JSONObject addMenu(@RequestBody MenuDTO menuDTO) {
+        return menuService.add(menuDTO);
     }
 
     @Operation(summary = "删除菜单")
     @AuditLog(title = "删除菜单")
     @DeleteMapping("/delete")
-    public Result delMenu(@RequestBody List<Long> menuIds) {
-        return Result.success(menuService.del(menuIds));
+    public List<Long> delMenu(@RequestBody List<Long> menuIds) {
+        return menuService.del(menuIds);
     }
 
     @Operation(summary = "获取请求方法下拉列表")
