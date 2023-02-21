@@ -47,13 +47,6 @@ public class SysPermissionController {
 
     private final SysRolePermissionService sysRolePermissionService;
 
-    @Operation(summary = "角色权限分页列表")
-    @GetMapping("/role/permPages")
-    public Page<ResourcePermPageVO> pagesResourcePerm(PermPageQuery permPageQuery){
-        Page<ResourcePermPageVO> result = sysPermissionService.pagesResourcePerm(permPageQuery);
-        return result;
-    }
-
     @Operation(summary = "权限分页列表")
     @GetMapping("/page")
     public Page<PermPageVO> listPermPages(PermPageQuery permPageQuery) {

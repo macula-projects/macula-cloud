@@ -171,37 +171,4 @@ public class SysRoleController {
         return roleService.optionsByDataScope();
     }
 
-    @Operation(summary = "获取角色的权限id集合")
-    @Parameter(name = "角色ID")
-    @GetMapping("/{roleId}/permIds")
-    public List<Long> getRolePermIds(@PathVariable("roleId") Long roleId){
-        List<Long> resourcePermIds = roleService.getRolePermIds(roleId);
-        return resourcePermIds;
-    }
-
-    @Operation(summary = "分配角色的路径权限")
-    @AuditLog(title = "分配角色的路径权限")
-    @io.swagger.v3.oas.annotations.parameters.RequestBody(
-            description = "更新角色权限的请求体对象,先删除当前分页【curPage】(没有则全部删除)该角色拥有的权限信息," +
-                    "后添加当前选择的权限信息," +
-                    "curPage(当前分页权限列表中所有权限id列表,可不传)," +
-                    "curSel（当前页选择添加给角色的权限id列表）",
-            content = {@Content(mediaType="application/json",
-                    schema = @Schema(implementation = Object.class, requiredProperties = "curSel"),
-                    schemaProperties = {
-                            @SchemaProperty(name = "curPage", array= @ArraySchema(arraySchema = @Schema(implementation = List.class), schema = @Schema(implementation = Long.class))),
-                            @SchemaProperty(name = "curSel", array= @ArraySchema(arraySchema = @Schema(implementation = List.class), schema = @Schema(implementation = Long.class)))}
-            )}
-    )
-    @PutMapping("/{roleId}/perms")
-    public boolean updateRolePerms(
-            @PathVariable Long roleId,
-            @RequestBody Map<String,List<Long>> permIds
-    ) {
-        boolean result = roleService.updateRolePerms(roleId, permIds);
-        if (result) {
-            sysPermissionService.refreshPermRolesRules();
-        }
-        return result;
-    }
 }

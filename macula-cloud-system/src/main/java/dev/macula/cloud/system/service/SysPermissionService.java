@@ -99,10 +99,4 @@ public interface SysPermissionService extends IService<SysPermission> {
      */
     boolean validtorUrlPerm(Long id, String url, RequestMethod requestMethod);
 
-    /**
-     * 获取角色权限列表分页对象
-     * @param permPageQuery
-     * @return
-     */
-    Page<ResourcePermPageVO> pagesResourcePerm(PermPageQuery permPageQuery);
 }

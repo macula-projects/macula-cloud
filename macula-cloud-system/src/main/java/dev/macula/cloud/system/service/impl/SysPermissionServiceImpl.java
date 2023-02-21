@@ -106,11 +106,15 @@ public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, S
                     .filter(item -> StrUtil.isNotBlank(item.getUrlPerm()))
                     .collect(Collectors.toList());
             if (CollectionUtil.isNotEmpty(urlPermList)) {
-                Map<String, List<String>> urlPermRoles = new HashMap<>();
+                Map<String, Set<String>> urlPermRoles = new HashMap<>();
                 urlPermList.stream().forEach(item -> {
                     String perm = item.getUrlPerm();
-                    List<String> roles = item.getRoles();
-                    urlPermRoles.put(perm, roles);
+                    Set<String> roles = CollectionUtil.newHashSet(item.getRoles());
+                    if(CollectionUtil.isEmpty(urlPermRoles.get(perm))){
+                        urlPermRoles.put(perm, roles);
+                    } else {
+                        urlPermRoles.get(perm).addAll(roles);
+                    }
                 });
                 redisTemplate.opsForHash().putAll(GlobalConstants.URL_PERM_ROLES_KEY, urlPermRoles);
             }
@@ -160,19 +164,6 @@ public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, S
                 .eq(SysPermission::getUrlPerm, stringBuffer.toString())
                 .and(Objects.nonNull(id), wrapper->wrapper.ne(SysPermission::getId, id)));
         return count == 0;
-    }
-
-    @Override
-    public Page<ResourcePermPageVO> pagesResourcePerm(PermPageQuery permPageQuery) {
-        Wrapper<SysPermission> pageWrapper = new LambdaQueryWrapper<SysPermission>()
-                .and(StringUtils.isNotBlank(permPageQuery.getName()),
-                        wrapper->wrapper.like(SysPermission::getUrlPerm, permPageQuery.getName()))
-                .and(StringUtils.isNotBlank(permPageQuery.getMenuName()),
-                        wrapper->wrapper.inSql(SysPermission::getMenuId,
-                                "select id from sys_menu where name like '%"+permPageQuery.getMenuName()+"%'"));
-        Page<ResourcePermPageVO> page = new Page<>(permPageQuery.getPageNum(),permPageQuery.getPageSize());
-        Page<ResourcePermPageVO> result = getBaseMapper().pagesResourcePerm(page, pageWrapper, SecurityUtils.getRoles());
-        return result;
     }
 
     private Map<String, PermDTO> handlerAddOrUpdateMenuPerms(List<PermDTO> permDTOList, Long menuId, List<Long> updatePermIds) {

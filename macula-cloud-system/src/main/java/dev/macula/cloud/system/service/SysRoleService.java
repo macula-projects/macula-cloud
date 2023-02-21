@@ -128,18 +128,4 @@ public interface SysRoleService extends IService<SysRole> {
      */
     List<Option> optionsByDataScope();
 
-    /**
-     * 获取角色的权限id列表
-     * @param roleId
-     * @return
-     */
-    List<Long> getRolePermIds(Long roleId);
-
-    /**
-     * 修改角色的路径权限信息
-     * @param roleId
-     * @param permIds
-     * @return
-     */
-    boolean updateRolePerms(Long roleId, Map<String,List<Long>> permIds);
 }
