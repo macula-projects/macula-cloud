@@ -7,8 +7,8 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import dev.macula.cloud.system.converter.TenantConverter;
 import dev.macula.cloud.system.form.TenantForm;
-import dev.macula.cloud.system.mapper.SysTenantMapper;
-import dev.macula.cloud.system.pojo.entity.SysTenant;
+import dev.macula.cloud.system.mapper.SysTenantInfoMapper;
+import dev.macula.cloud.system.pojo.entity.SysTenantInfo;
 import dev.macula.cloud.system.query.TenantPageQuery;
 import dev.macula.cloud.system.service.SysTenantService;
 import dev.macula.cloud.system.vo.tenant.TenantPageVO;
@@ -22,7 +22,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
-public class SysTenantServiceImpl extends ServiceImpl<SysTenantMapper, SysTenant> implements SysTenantService {
+public class SysTenantServiceImpl extends ServiceImpl<SysTenantInfoMapper, SysTenantInfo> implements SysTenantService {
 
     private final TenantConverter tenantConverter;
 
@@ -40,26 +40,27 @@ public class SysTenantServiceImpl extends ServiceImpl<SysTenantMapper, SysTenant
 
     @Override
     public boolean saveTenant(TenantForm tenantForm) {
-        long count = this.count(new LambdaQueryWrapper<SysTenant>().eq(SysTenant::getCode, tenantForm.getCode())
-                .or().eq(SysTenant::getName,tenantForm.getName())
+        long count = this.count(new LambdaQueryWrapper<SysTenantInfo>().eq(SysTenantInfo::getCode, tenantForm.getCode())
+                .or().eq(SysTenantInfo::getName,tenantForm.getName())
         );
         Assert.isTrue(count == 0, "租户已存在");
 
-        SysTenant sysTenant = tenantConverter.form2Entity(tenantForm);
+        SysTenantInfo sysTenant = tenantConverter.form2Entity(tenantForm);
         return this.save(sysTenant);
     }
 
     @Override
     public boolean updateTenant(Long id, TenantForm tenantForm) {
         String tenantName = tenantForm.getName();
-        long count = this.count(new LambdaQueryWrapper<SysTenant>()
-                .eq(SysTenant::getName, tenantName)
-                .ne(SysTenant::getId,id)
-                .or().eq(SysTenant::getCode,tenantForm.getCode())
+        long count = this.count(new LambdaQueryWrapper<SysTenantInfo>()
+                .eq(SysTenantInfo::getName, tenantName)
+                .ne(SysTenantInfo::getId,id)
+                .or().eq(SysTenantInfo::getCode,tenantForm.getCode())
         );
         Assert.isTrue(count == 0, "租户已存在");
 
-        SysTenant sysTenant = tenantConverter.form2Entity(tenantForm);
+        SysTenantInfo sysTenant = tenantConverter.form2Entity(tenantForm);
+        sysTenant.setId(id);
         return this.updateById(sysTenant);
     }
 
