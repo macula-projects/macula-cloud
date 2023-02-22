@@ -106,15 +106,11 @@ public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, S
                     .filter(item -> StrUtil.isNotBlank(item.getUrlPerm()))
                     .collect(Collectors.toList());
             if (CollectionUtil.isNotEmpty(urlPermList)) {
-                Map<String, Set<String>> urlPermRoles = new HashMap<>();
+                Map<String, List<String>> urlPermRoles = new HashMap<>();
                 urlPermList.stream().forEach(item -> {
                     String perm = item.getUrlPerm();
-                    Set<String> roles = CollectionUtil.newHashSet(item.getRoles());
-                    if(CollectionUtil.isEmpty(urlPermRoles.get(perm))){
-                        urlPermRoles.put(perm, roles);
-                    } else {
-                        urlPermRoles.get(perm).addAll(roles);
-                    }
+                    List<String> roles = item.getRoles();
+                    urlPermRoles.put(perm, roles);
                 });
                 redisTemplate.opsForHash().putAll(GlobalConstants.URL_PERM_ROLES_KEY, urlPermRoles);
             }
