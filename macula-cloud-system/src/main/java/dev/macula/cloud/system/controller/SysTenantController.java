@@ -6,6 +6,9 @@ import dev.macula.cloud.system.annotation.AuditLog;
 import dev.macula.cloud.system.form.TenantForm;
 import dev.macula.cloud.system.form.UserForm;
 import dev.macula.cloud.system.query.TenantPageQuery;
+import dev.macula.cloud.system.service.SysTenantApplicationService;
+import dev.macula.cloud.system.service.SysTenantDictService;
+import dev.macula.cloud.system.service.SysTenantMenuService;
 import dev.macula.cloud.system.service.SysTenantService;
 import dev.macula.cloud.system.vo.tenant.TenantPageVO;
 import io.swagger.v3.oas.annotations.Operation;
@@ -15,6 +18,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @Tag(name = "租户接口")
 @RestController
 @RequestMapping("/api/v1/tenants")
@@ -22,6 +27,12 @@ import org.springframework.web.bind.annotation.*;
 public class SysTenantController {
 
     private final SysTenantService sysTenantService;
+
+    private final SysTenantMenuService sysTenantMenuService;
+
+    private final SysTenantDictService sysTenantDictService;
+
+    private final SysTenantApplicationService sysTenantApplicationService;
 
 
     @Operation(summary = "租户分页列表")
@@ -58,5 +69,41 @@ public class SysTenantController {
     public boolean deleteTenants(@PathVariable String ids) {
         boolean result = sysTenantService.deleteTenants(ids);
         return result;
+    }
+
+    @Operation(summary = "获取租户菜单id列表")
+    @GetMapping("/menu/{tenantId}")
+    public List<Long> tenantMenus(@PathVariable("tenantId") Long tenantId){
+        return sysTenantMenuService.tenantMenus(tenantId);
+    }
+
+    @Operation(summary = "更新租户菜单列表")
+    @PutMapping("/menu/{tenantId}")
+    public boolean updateTenantMenus(@PathVariable("tenantId") Long tenantId, @RequestBody List<Long> menuIds){
+        return sysTenantMenuService.updateTenantMenus(tenantId, menuIds);
+    }
+
+    @Operation(summary = "获取租户应用id列表")
+    @GetMapping("/application/{tenantId}")
+    public List<Long> tenantApplications(@PathVariable("tenantId") Long tenantId){
+        return sysTenantApplicationService.tenantApplications(tenantId);
+    }
+
+    @Operation(summary = "更新租户应用列表")
+    @PutMapping("/application/{tenantId}")
+    public boolean updateApplications(@PathVariable("tenantId") Long tenantId, @RequestBody List<Long> applicationIds){
+        return sysTenantApplicationService.updateTenantApplications(tenantId, applicationIds);
+    }
+
+    @Operation(summary = "获取租户字典id列表")
+    @GetMapping("/dict/{tenantId}")
+    public List<Long> tenantDicts(@PathVariable("tenantId") Long tenantId){
+        return sysTenantDictService.tenantDicts(tenantId);
+    }
+
+    @Operation(summary = "更新租户菜单列表")
+    @PutMapping("/dict/{tenantId}")
+    public boolean updateTenantDicts(@PathVariable("tenantId") Long tenantId, @RequestBody List<Long> dictIds){
+        return sysTenantDictService.updateTenantDicts(tenantId, dictIds);
     }
 }
