@@ -24,6 +24,8 @@ import dev.macula.cloud.system.pojo.entity.SysApplication;
 import dev.macula.cloud.system.query.ApplicationPageQuery;
 import dev.macula.cloud.system.vo.app.ApplicationVO;
 
+import java.util.List;
+
 
 /**
  * 应用业务接口
@@ -36,6 +38,14 @@ public interface SysApplicationService extends IService<SysApplication> {
      * @return
      */
     Page<ApplicationVO> listApplicationPages(ApplicationPageQuery queryParams);
+
+
+    /**
+     * 应用列表
+     * @return
+     */
+    List<ApplicationVO> listAllApplication();
+
 
     /**
      * 新增应用
