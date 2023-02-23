@@ -23,6 +23,8 @@ import dev.macula.cloud.system.pojo.entity.SysDictType;
 import dev.macula.cloud.system.vo.dict.DictTypePageVO;
 import org.mapstruct.Mapper;
 
+import java.util.List;
+
 /**
  * 字典类型对象转换器
  *
@@ -33,6 +35,8 @@ import org.mapstruct.Mapper;
 public interface DictTypeConverter {
 
     Page<DictTypePageVO> entity2Page(Page<SysDictType> page);
+
+    List<DictTypePageVO> entity2Vo(List<SysDictType> list);
 
     DictTypeForm entity2Form(SysDictType entity);
 

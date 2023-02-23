@@ -43,6 +43,13 @@ public interface SysDictTypeService extends IService<SysDictType> {
      */
     Page<DictTypePageVO> listDictTypePages(DictTypePageQuery queryParams);
 
+    /**
+     * 字典类型列表
+     * @return
+     */
+    List<DictTypePageVO> listDictType();
+
+
 
     /**
      * 获取字典类型表单详情

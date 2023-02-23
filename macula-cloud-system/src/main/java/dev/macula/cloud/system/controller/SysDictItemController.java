@@ -22,6 +22,7 @@ import dev.macula.boot.result.Result;
 import dev.macula.cloud.system.annotation.AuditLog;
 import dev.macula.cloud.system.form.DictItemForm;
 import dev.macula.cloud.system.query.DictItemPageQuery;
+import dev.macula.cloud.system.query.DictItemQuery;
 import dev.macula.cloud.system.vo.dict.DictItemPageVO;
 import dev.macula.cloud.system.service.SysDictItemService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -29,6 +30,8 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @Tag(name = "字典数据接口")
 @RestController
@@ -44,6 +47,15 @@ public class SysDictItemController {
             DictItemPageQuery queryParams
     ) {
         IPage<DictItemPageVO> result = dictItemService.listDictItemPages(queryParams);
+        return result;
+    }
+
+    @Operation(summary = "字典数据列表")
+    @GetMapping("/list")
+    public List<DictItemPageVO> listDictItems(
+            DictItemQuery queryParams
+    ) {
+        List<DictItemPageVO> result = dictItemService.listDictItems(queryParams);
         return result;
     }
 

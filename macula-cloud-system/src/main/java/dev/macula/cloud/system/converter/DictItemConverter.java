@@ -24,6 +24,8 @@ import dev.macula.cloud.system.vo.dict.DictItemPageVO;
 import org.mapstruct.InheritInverseConfiguration;
 import org.mapstruct.Mapper;
 
+import java.util.List;
+
 /**
  * 字典数据项对象转换器
  *
@@ -34,6 +36,8 @@ import org.mapstruct.Mapper;
 public interface DictItemConverter {
 
     Page<DictItemPageVO> entity2Page(Page<SysDictItem> page);
+
+    List<DictItemPageVO> entity2Vo(List<SysDictItem> list);
 
     DictItemForm entity2Form(SysDictItem entity);
 
