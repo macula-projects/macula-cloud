@@ -19,6 +19,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @Tag(name = "租户接口")
 @RestController
@@ -101,15 +102,15 @@ public class SysTenantController {
 
     @Operation(summary = "获取租户字典id列表")
     @GetMapping("/dict/{tenantId}")
-    public List<Long> tenantDicts(@PathVariable("tenantId") Long tenantId){
-        return sysTenantDictService.tenantDicts(tenantId);
+    public List<Long> tenantDicts(@PathVariable("tenantId") Long tenantId, @RequestParam("type") Integer type){
+        return sysTenantDictService.tenantDicts(tenantId, type);
     }
 
     @Operation(summary = "更新租户菜单列表")
     @PutMapping("/dict/{tenantId}")
     public boolean updateTenantDicts(@PathVariable("tenantId") Long tenantId,
                                      @RequestParam(name="appCode") String appCode,
-                                     @RequestBody List<Long> dictIds){
-        return sysTenantDictService.updateTenantDicts(tenantId, dictIds);
+                                     @RequestBody Map<String, List<Long>> dictIdsMap){
+        return sysTenantDictService.updateTenantDicts(tenantId, dictIdsMap);
     }
 }

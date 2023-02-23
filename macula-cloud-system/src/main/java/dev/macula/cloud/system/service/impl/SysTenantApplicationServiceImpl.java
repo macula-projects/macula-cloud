@@ -41,6 +41,7 @@ public class SysTenantApplicationServiceImpl extends ServiceImpl<SysTenantApplic
     }
 
     @Override
+    @Transactional
     public boolean updateTenantApplications(Long tenantId, List<Long> applicationIds) {
         remove(new LambdaQueryWrapper<SysTenantApplication>().eq(SysTenantApplication::getTenantId, tenantId));
         List<SysApplication> sysApplications = applicationService.list();
@@ -53,12 +54,12 @@ public class SysTenantApplicationServiceImpl extends ServiceImpl<SysTenantApplic
         Set<Long> addApplicationIds = new HashSet<>(applicationIds);
         List<SysTenantApplication> sysTenantApplications = applicationIds.stream().map(item->new SysTenantApplication(item, tenantId)).collect(Collectors.toList());
         saveBatch(sysTenantApplications);
-        Set<SysApplicationTenant> sysMenuTenants = sysApplications.stream().filter(item->addApplicationIds.contains(item.getId()))
+        Set<SysApplicationTenant> sysApplicationTenants = sysApplications.stream().filter(item->addApplicationIds.contains(item.getId()))
                 .map(item->{
                     SysApplicationTenant sysApplicationTenant =applicationTenantConverter.application2Tenant(item);
                     sysApplicationTenant.setId(null);
                     return sysApplicationTenant;
                 }).collect(Collectors.toSet());
-        return applicationTenantService.saveBatch(sysMenuTenants);
+        return applicationTenantService.saveBatch(sysApplicationTenants);
     }
 }
