@@ -37,7 +37,7 @@ import java.util.List;
  * @author du_imba
  */
 @RestController
-@RequestMapping("/id/")
+@RequestMapping("/api/v1/id/")
 public class IdContronller {
 
     private static final Logger logger = LoggerFactory.getLogger(IdContronller.class);

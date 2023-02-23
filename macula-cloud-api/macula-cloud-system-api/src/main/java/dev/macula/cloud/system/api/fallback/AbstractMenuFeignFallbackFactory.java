@@ -15,24 +15,17 @@
  * limitations under the License.
  */
 
-package dev.macula.cloud.tinyid;
+package dev.macula.cloud.system.api.fallback;
 
-import org.springframework.boot.SpringApplication;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.boot.web.servlet.ServletComponentScan;
-import org.springframework.scheduling.annotation.EnableAsync;
-import org.springframework.scheduling.annotation.EnableScheduling;
+import dev.macula.cloud.system.api.MenuFeignClient;
+import org.springframework.cloud.openfeign.FallbackFactory;
 
 /**
- * @author du_imba
+ * 菜单远程调用降级工厂
+ *
+ * @author haoxr
+ * @since 2021/4/24
  */
-@EnableAsync
-@EnableScheduling
-@ServletComponentScan
-@SpringBootApplication
-public class MaculaTinyIdApplication {
+public abstract class AbstractMenuFeignFallbackFactory implements FallbackFactory<MenuFeignClient> {
 
-    public static void main(String[] args) {
-        SpringApplication.run(MaculaTinyIdApplication.class, args);
-    }
 }

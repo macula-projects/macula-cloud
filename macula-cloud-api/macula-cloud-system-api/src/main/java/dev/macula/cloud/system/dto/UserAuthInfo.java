@@ -56,11 +56,6 @@ public class UserAuthInfo {
     private Set<String> roles;
 
     /**
-     * 用户权限标识集合
-     */
-    private Set<String> perms;
-
-    /**
      * 部门ID
      */
     private Long deptId;

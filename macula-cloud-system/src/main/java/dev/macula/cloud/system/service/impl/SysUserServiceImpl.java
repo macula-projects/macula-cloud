@@ -79,9 +79,77 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
     private final SysUserRoleService userRoleService;
     private final UserImportListener userImportListener;
     private final UserConverter userConverter;
-    private final SysMenuService menuService;
     private final SysRoleService roleService;
+    private final SysMenuService menuService;
     private final RedisTemplate redisTemplate;
+
+    /**
+     * 根据给定的用户名获取登录信息，不含角色
+     *
+     * @param username 用户名
+     * @param roles    该用户的角色
+     * @return 登录用户信息
+     */
+    public UserLoginVO getUserInfo(String username, Set<String> roles) {
+        // 登录用户entity
+        SysUser user = this.getOne(new LambdaQueryWrapper<SysUser>()
+                .eq(SysUser::getUsername, username)
+                .select(
+                        SysUser::getId,
+                        SysUser::getUsername,
+                        SysUser::getNickname,
+                        SysUser::getAvatar
+                )
+        );
+        // entity->VO
+        UserLoginVO userLoginVO = userConverter.entity2LoginUser(user);
+
+        // 用户角色集合
+        userLoginVO.setRoles(roles);
+
+        // 用户权限集合
+        Set<String> perms = (Set<String>) redisTemplate.opsForValue().get(GlobalConstants.SECURITY_USER_BTN_PERMS_KEY + username);
+        if (perms == null) {
+            perms = menuService.listRolePerms(roles);
+            redisTemplate.opsForValue().set(GlobalConstants.SECURITY_USER_BTN_PERMS_KEY + username, perms);
+        }
+        userLoginVO.setPerms(perms);
+
+        return userLoginVO;
+    }
+
+    /**
+     * 获取当前登录用户信息
+     *
+     * @return 登录用户的角色和权限等信息
+     */
+    @Override
+    public UserLoginVO getCurrentUserInfo() {
+        return getUserInfo(SecurityUtils.getCurrentUser(), SecurityUtils.getRoles());
+    }
+
+    /**
+     * 根据用户名获取认证信息(给oauth2调用的，带了密码，不要给其他应用访问）
+     *
+     * @param username
+     * @return
+     */
+    @Override
+    public UserAuthInfo getUserAuthInfo(String username) {
+        UserAuthInfo userAuthInfo = this.baseMapper.getUserAuthInfo(username);
+
+        Set<String> roles = userAuthInfo.getRoles();
+        if (CollectionUtil.isNotEmpty(roles)) {
+            // 每次被调用也就是用户登录的时候，更新按钮权限缓存
+            Set<String> perms = menuService.listRolePerms(roles);
+            redisTemplate.opsForValue().set(GlobalConstants.SECURITY_USER_BTN_PERMS_KEY + username, perms);
+
+            // 获取最大范围的数据权限
+            Integer dataScope = roleService.getMaximumDataScope(roles);
+            userAuthInfo.setDataScope(dataScope);
+        }
+        return userAuthInfo;
+    }
 
     /**
      * 获取用户分页列表
@@ -218,28 +286,6 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
     }
 
     /**
-     * 根据用户名获取认证信息
-     *
-     * @param username
-     * @return
-     */
-    @Override
-    public UserAuthInfo getUserAuthInfo(String username) {
-        UserAuthInfo userAuthInfo = this.baseMapper.getUserAuthInfo(username);
-
-        Set<String> roles = userAuthInfo.getRoles();
-        if (CollectionUtil.isNotEmpty(roles)) {
-            Set<String> perms = menuService.listRolePerms(roles);
-            userAuthInfo.setPerms(perms);
-
-            // 获取最大范围的数据权限
-            Integer dataScope = roleService.getMaximumDataScope(roles);
-            userAuthInfo.setDataScope(dataScope);
-        }
-        return userAuthInfo;
-    }
-
-    /**
      * 导入用户
      *
      * @param userImportDTO
@@ -341,37 +387,4 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         List<UserExportVO> list = this.baseMapper.listExportUsers(queryParams);
         return list;
     }
-
-    /**
-     * 获取登录用户信息
-     *
-     * @return
-     */
-    @Override
-    public UserLoginVO getLoginUserInfo() {
-        // 登录用户entity
-        SysUser user = this.getOne(new LambdaQueryWrapper<SysUser>()
-                .eq(SysUser::getUsername, SecurityUtils.getCurrentUser())
-                .select(
-                        SysUser::getId,
-                        SysUser::getUsername,
-                        SysUser::getNickname,
-                        SysUser::getAvatar
-                )
-        );
-        // entity->VO
-        UserLoginVO userLoginVO = userConverter.entity2LoginUser(user);
-
-        // 用户角色集合
-        Set<String> roles = SecurityUtils.getRoles();
-        userLoginVO.setRoles(roles);
-
-        // 用户权限集合
-        Set<String> perms = (Set<String>) redisTemplate.opsForValue().get(GlobalConstants.AUTH_USER_PERMS_KEY + user.getUsername());
-        userLoginVO.setPerms(perms);
-
-        return userLoginVO;
-    }
-
-
 }

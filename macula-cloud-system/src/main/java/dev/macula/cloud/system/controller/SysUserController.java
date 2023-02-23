@@ -34,7 +34,6 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -70,19 +69,14 @@ public class SysUserController {
     @Operation(summary = "用户表单数据")
     @Parameter(name = "用户ID")
     @GetMapping("/{userId}/form")
-    public UserForm getUserDetail(
-            @PathVariable Long userId
-    ) {
+    public UserForm getUserDetail(@PathVariable Long userId) {
         UserForm formData = userService.getUserFormData(userId);
         return formData;
     }
 
     @Operation(summary = "新增用户")
     @PostMapping
-    @PreAuthorize("@pms.hasPermission('sys:user:add')")
-    public boolean saveUser(
-            @Validated @RequestBody UserForm userForm
-    ) {
+    public boolean saveUser(@Validated @RequestBody UserForm userForm) {
         boolean result = userService.saveUser(userForm);
         return result;
     }
@@ -90,10 +84,7 @@ public class SysUserController {
     @Operation(summary = "修改用户")
     @Parameter(name = "用户ID")
     @PutMapping(value = "/{userId}")
-    @PreAuthorize("@pms.hasPermission('sys:user:edit')")
-    public boolean updateUser(
-            @PathVariable Long userId,
-            @RequestBody @Validated UserForm userForm) {
+    public boolean updateUser(@PathVariable Long userId, @RequestBody @Validated UserForm userForm) {
         boolean result = userService.updateUser(userId, userForm);
         return result;
     }
@@ -101,21 +92,14 @@ public class SysUserController {
     @Operation(summary = "删除用户")
     @Parameter(name = "用户ID", description = "用户ID，多个以英文逗号(,)分割")
     @DeleteMapping("/{ids}")
-    @PreAuthorize("@pms.hasPermission('sys:user:del')")
-    public boolean deleteUsers(
-            @PathVariable String ids
-    ) {
+    public boolean deleteUsers(@PathVariable String ids) {
         boolean result = userService.deleteUsers(ids);
         return result;
     }
 
     @Operation(summary = "修改用户密码")
     @Parameter(name = "用户ID")
-    @PatchMapping(value = "/{userId}/password")
-    public boolean updatePassword(
-            @PathVariable Long userId,
-            @RequestParam String password
-    ) {
+    public boolean updatePassword(@PathVariable Long userId, @RequestParam String password) {
         boolean result = userService.updatePassword(userId, password);
         return result;
     }
@@ -124,22 +108,12 @@ public class SysUserController {
     @Parameter(name = "用户ID")
     @Parameter(name = "用户状态", description = "用户状态(1:启用;0:禁用)")
     @PatchMapping(value = "/{userId}/status")
-    public boolean updatePassword(
-            @PathVariable Long userId,
-            @RequestParam Integer status
-    ) {
+    public boolean updateStatus(@PathVariable Long userId, @RequestParam Integer status) {
         boolean result = userService.update(new LambdaUpdateWrapper<SysUser>()
                 .eq(SysUser::getId, userId)
                 .set(SysUser::getStatus, status)
         );
         return result;
-    }
-
-    @Operation(summary = "获取登录用户信息")
-    @GetMapping("/me")
-    public UserLoginVO getLoginUserInfo() {
-        UserLoginVO userLoginVO = userService.getLoginUserInfo();
-        return userLoginVO;
     }
 
     @Operation(summary = "用户导入模板下载")
@@ -178,13 +152,26 @@ public class SysUserController {
                 .doWrite(exportUserList);
     }
 
-    @Operation(summary = "根据用户名获取认证信息", hidden = true)
+    @Operation(summary = "获取认证信息", description = "根据用户名获取认证信息，给认证中心获取用户信息用，有密码")
     @Parameter(name = "用户名")
     @GetMapping("/{username}/authinfo")
-    public UserAuthInfo getUserAuthInfo(
-            @PathVariable String username
-    ) {
+    public UserAuthInfo getUserAuthInfo(@PathVariable String username) {
         UserAuthInfo user = userService.getUserAuthInfo(username);
         return user;
+    }
+
+    @Operation(summary = "获取用户信息", description = "根据用户名获取认证信息，给starter-system用，角色前端添加")
+    @Parameter(name = "用户名")
+    @GetMapping("/{username}/userinfo")
+    public UserLoginVO getUserInfoWithoutRoles(@PathVariable String username) {
+        UserLoginVO user = userService.getUserInfo(username, null);
+        return user;
+    }
+
+    @Operation(summary = "获取登录用户信息", description = "获取登录用户信息，给前端登录后用")
+    @GetMapping("/me")
+    public UserLoginVO getLoginUserInfo() {
+        UserLoginVO userLoginVO = userService.getCurrentUserInfo();
+        return userLoginVO;
     }
 }

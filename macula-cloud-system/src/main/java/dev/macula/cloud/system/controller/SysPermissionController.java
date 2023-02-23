@@ -22,7 +22,6 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import dev.macula.cloud.system.pojo.entity.SysPermission;
 import dev.macula.cloud.system.query.PermPageQuery;
 import dev.macula.cloud.system.service.SysPermissionService;
-import dev.macula.cloud.system.service.SysRolePermissionService;
 import dev.macula.cloud.system.vo.perm.PermPageVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -40,8 +39,6 @@ import java.util.List;
 public class SysPermissionController {
 
     private final SysPermissionService sysPermissionService;
-
-    private final SysRolePermissionService sysRolePermissionService;
 
     @Operation(summary = "权限分页列表")
     @GetMapping("/page")

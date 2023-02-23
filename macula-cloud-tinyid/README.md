@@ -84,3 +84,7 @@ JDK1.7+,maven,mysql
 - twitter snowflake
 - 百度uid-generator: 这是基于snowflake方案实现的开源组件，借用未来时间、缓存等手段，qps可达600w+
 - 美团leaf: 该篇文章详细的介绍了db号段和snowflake方案，近期也进行了Leaf开源
+
+## 部署说明
+
+tinyid是个独立的应用，不经过网关发布，k8s部署的话需要发布到集群外，获取负载均衡IP。

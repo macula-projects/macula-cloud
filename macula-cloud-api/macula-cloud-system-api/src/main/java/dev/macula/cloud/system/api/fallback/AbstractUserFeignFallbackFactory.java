@@ -17,25 +17,18 @@
 
 package dev.macula.cloud.system.api.fallback;
 
-import dev.macula.boot.result.ApiResultCode;
-import dev.macula.boot.result.Result;
 import dev.macula.cloud.system.api.UserFeignClient;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Component;
+import org.springframework.cloud.openfeign.FallbackFactory;
 
 /**
- * 用户调用回调
+ * 用户接口远程调用降级工厂
  *
  * @author haoxr
  * @since 2021/4/24
  */
-@Component
 @Slf4j
-public class UserFeignFallbackClient implements UserFeignClient {
+public abstract class AbstractUserFeignFallbackFactory implements FallbackFactory<UserFeignClient> {
 
-    @Override
-    public Result getUserAuthInfo(String username) {
-        log.error("feign远程调用系统用户服务异常后的降级方法");
-        return Result.failed(ApiResultCode.DEGRADATION);
-    }
+
 }

@@ -18,7 +18,6 @@
 package dev.macula.cloud.system.controller;
 
 import dev.macula.boot.result.Option;
-import dev.macula.boot.result.Result;
 import dev.macula.cloud.system.pojo.entity.SysMenu;
 import dev.macula.cloud.system.query.MenuQuery;
 import dev.macula.cloud.system.service.SysMenuService;
@@ -52,82 +51,82 @@ public class SysMenuController {
 
     @Operation(summary = "资源(菜单+权限)列表")
     @GetMapping("/resources")
-    public Result<List<ResourceVO>> listResources() {
+    public List<ResourceVO> listResources() {
         List<ResourceVO> resources = menuService.listResources();
-        return Result.success(resources);
+        return resources;
     }
 
     @Operation(summary = "菜单列表")
     @GetMapping
-    public Result listMenus(MenuQuery queryParams) {
+    public List<MenuVO> listMenus(MenuQuery queryParams) {
         List<MenuVO> menuList = menuService.listMenus(queryParams);
-        return Result.success(menuList);
+        return menuList;
     }
 
     @Operation(summary = "菜单下拉列表")
     @GetMapping("/options")
-    public Result listMenuOptions() {
+    public List<Option> listMenuOptions() {
         List<Option> menus = menuService.listMenuOptions();
-        return Result.success(menus);
+        return menus;
     }
 
     @Operation(summary = "路由列表")
     @GetMapping("/routes")
-    public Result listRoutes() {
+    public List<RouteVO> listRoutes() {
         List<RouteVO> routeList = menuService.listRoutes();
-        return Result.success(routeList);
+        return routeList;
     }
 
     @Operation(summary = "菜单详情")
     @Parameter(name = "菜单ID")
     @GetMapping("/{id}")
-    public Result detail(
+    public SysMenu detail(
             @PathVariable Long id
     ) {
         SysMenu menu = menuService.getById(id);
-        return Result.success(menu);
+        return menu;
     }
 
     @Operation(summary = "新增菜单")
     @PostMapping
     @CacheEvict(cacheNames = "system", key = "'routes'")
-    public Result addMenu(@RequestBody SysMenu menu) {
+    public boolean addMenu(@RequestBody SysMenu menu) {
         boolean result = menuService.saveMenu(menu);
-        return Result.judge(result);
+        return result;
     }
 
     @Operation(summary = "修改菜单")
     @PutMapping(value = "/{id}")
     @CacheEvict(cacheNames = "system", key = "'routes'")
-    public Result updateMenu(
+    public boolean updateMenu(
             @RequestBody SysMenu menu
     ) {
         boolean result = menuService.saveMenu(menu);
-        return Result.judge(result);
+        return result;
     }
 
     @Operation(summary = "删除菜单")
     @Parameter(name = "菜单ID", description = "菜单ID，多个以英文(,)分割")
     @DeleteMapping("/{ids}")
     @CacheEvict(cacheNames = "system", key = "'routes'")
-    public Result deleteMenus(
+    public boolean deleteMenus(
             @PathVariable("ids") String ids
     ) {
         boolean result = menuService.removeByIds(Arrays.asList(ids.split(",")));
-        return Result.judge(result);
+        return result;
     }
 
     @Operation(summary = "修改菜单显示状态")
     @Parameter(name = "菜单ID")
     @Parameter(name = "显示状态", description = "显示状态(1:显示;0:隐藏)")
     @PatchMapping("/{menuId}")
-    public Result updateMenuVisible(
+    public boolean updateMenuVisible(
             @PathVariable Long menuId,
             Integer visible
 
     ) {
         boolean result = menuService.updateMenuVisible(menuId, visible);
-        return Result.judge(result);
+        return result;
     }
 }
 

@@ -18,11 +18,10 @@
 package dev.macula.cloud.system.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
-import dev.macula.boot.result.Result;
 import dev.macula.cloud.system.form.DictItemForm;
 import dev.macula.cloud.system.query.DictItemPageQuery;
-import dev.macula.cloud.system.vo.dict.DictItemPageVO;
 import dev.macula.cloud.system.service.SysDictItemService;
+import dev.macula.cloud.system.vo.dict.DictItemPageVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -67,21 +66,21 @@ public class SysDictItemController {
 
     @Operation(summary = "修改字典数据")
     @PutMapping("/{id}")
-    public Result updateDictItem(
+    public boolean updateDictItem(
             @PathVariable Long id,
             @RequestBody DictItemForm DictItemForm
     ) {
         boolean status = dictItemService.updateDictItem(id, DictItemForm);
-        return Result.judge(status);
+        return status;
     }
 
     @Operation(summary = "删除字典")
     @Parameter(name = "字典ID", description = "字典ID，多个以英文逗号(,)拼接")
     @DeleteMapping("/{ids}")
-    public Result deleteDictItems(
+    public boolean deleteDictItems(
             @PathVariable String ids
     ) {
         boolean result = dictItemService.deleteDictItems(ids);
-        return Result.judge(result);
+        return result;
     }
 }

@@ -30,6 +30,7 @@ import dev.macula.cloud.system.vo.user.UserVO;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Set;
 
 /**
  * 用户业务接口
@@ -40,9 +41,25 @@ import java.util.List;
 public interface SysUserService extends IService<SysUser> {
 
     /**
+     * 根据给定的用户名获取登录信息，含角色和按钮权限
+     *
+     * @param username 用户名
+     * @param roles    该用户的角色
+     * @return 登录用户信息
+     */
+    UserLoginVO getUserInfo(String username, Set<String> roles);
+
+    /**
+     * 获取当前登录用户的信息
+     *
+     * @return 返回登录用户基本信息包含角色和按钮权限
+     */
+    UserLoginVO getCurrentUserInfo();
+
+    /**
      * 用户分页列表
      *
-     * @return
+     * @return 用户信息
      */
     Page<UserVO> listUserPages(UserPageQuery queryParams);
 
@@ -51,7 +68,7 @@ public interface SysUserService extends IService<SysUser> {
      * 获取用户详情
      *
      * @param userId
-     * @return
+     * @return 用户详情
      */
     UserForm getUserFormData(Long userId);
 
@@ -60,7 +77,7 @@ public interface SysUserService extends IService<SysUser> {
      * 新增用户
      *
      * @param userForm 用户表单对象
-     * @return
+     * @return 成功标识
      */
     boolean saveUser(UserForm userForm);
 
@@ -69,7 +86,7 @@ public interface SysUserService extends IService<SysUser> {
      *
      * @param userId   用户ID
      * @param userForm 用户表单对象
-     * @return
+     * @return 成功标识
      */
     boolean updateUser(Long userId, UserForm userForm);
 
@@ -78,7 +95,7 @@ public interface SysUserService extends IService<SysUser> {
      * 删除用户
      *
      * @param idsStr 用户ID，多个以英文逗号(,)分割
-     * @return
+     * @return 成功标识
      */
     boolean deleteUsers(String idsStr);
 
@@ -88,7 +105,7 @@ public interface SysUserService extends IService<SysUser> {
      *
      * @param userId   用户ID
      * @param password 用户密码
-     * @return
+     * @return 成功标识
      */
     boolean updatePassword(Long userId, String password);
 
@@ -96,7 +113,7 @@ public interface SysUserService extends IService<SysUser> {
      * 根据用户名获取认证信息
      *
      * @param username
-     * @return
+     * @return 认证信息
      */
     UserAuthInfo getUserAuthInfo(String username);
 
@@ -104,7 +121,7 @@ public interface SysUserService extends IService<SysUser> {
      * 导入用户
      *
      * @param userImportDTO
-     * @return
+     * @return 成功标识
      */
     String importUsers(UserImportDTO userImportDTO) throws IOException;
 
@@ -112,15 +129,8 @@ public interface SysUserService extends IService<SysUser> {
      * 获取导出用户列表
      *
      * @param queryParams
-     * @return
+     * @return 用户列表
      */
     List<UserExportVO> listExportUsers(UserPageQuery queryParams);
 
-
-    /**
-     * 获取登录用户信息
-     *
-     * @return
-     */
-    UserLoginVO getLoginUserInfo();
 }

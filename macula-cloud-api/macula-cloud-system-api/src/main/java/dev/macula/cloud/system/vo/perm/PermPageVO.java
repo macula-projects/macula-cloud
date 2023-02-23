@@ -33,15 +33,15 @@ public class PermPageVO {
     @Schema(description = "权限ID")
     private Long id;
 
+    @Schema(description = "菜单ID")
+    private Long menuId;
+
     @Schema(description = "权限名称")
     private String name;
 
-    @Schema(description = "URL权限标识-服务名称")
-    private String serviceName;
+    @Schema(description = "来源菜单名称")
+    private String menuName;
 
-    @Schema(description = "URL权限标识-请求标识")
-    private String requestMethod;
-
-    @Schema(description = "URL权限标识-请求方式")
-    private String requestPath;
+    @Schema(description = "URL权限路径表达式")
+    private String urlPerm;
 }

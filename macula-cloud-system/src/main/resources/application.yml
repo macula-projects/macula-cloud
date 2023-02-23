@@ -21,9 +21,6 @@ spring:
         # group:
     sentinel:
       enabled: false
-macula:
-  security:
-    ignore-urls: /api/**
 
 mybatis-plus:
   configuration:

@@ -38,10 +38,6 @@ ID生成服务
 
 基于RocketMQ Connect组件订阅数据库、Redis等变更日志发布到MQ中供订阅
 
-### macula-cloud-openapi
-
-macula-cloud对外开放的API聚合
-
 ### macula-cloud-api
 
 内部微服务之间的接口定义

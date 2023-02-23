@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Macula
+ * Copyright (c) 2023 Macula
  *   macula.dev, China
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,19 +17,21 @@
 
 package dev.macula.cloud.system.api;
 
-import dev.macula.cloud.system.api.fallback.AbstractUserFeignFallbackFactory;
-import dev.macula.cloud.system.dto.UserAuthInfo;
-import dev.macula.cloud.system.vo.user.UserLoginVO;
+import dev.macula.cloud.system.api.fallback.AbstractMenuFeignFallbackFactory;
+import dev.macula.cloud.system.vo.menu.RouteVO;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 
-@FeignClient(value = "macula-cloud-system", contextId = "userFeignClient", fallbackFactory = AbstractUserFeignFallbackFactory.class)
-public interface UserFeignClient {
+import java.util.List;
 
-    @GetMapping("/api/v1/users/{username}/authinfo")
-    UserAuthInfo getUserAuthInfo(@PathVariable String username);
-
-    @GetMapping("/api/v1/users/{username}/userinfo")
-    UserLoginVO getUserInfo(@PathVariable String username);
+/**
+ * {@code MenuFeignClient} 菜单服务接口
+ *
+ * @author rain
+ * @since 2023/2/22 10:29
+ */
+@FeignClient(value = "macula-cloud-system", contextId = "menuFeignClient", fallbackFactory = AbstractMenuFeignFallbackFactory.class)
+public interface MenuFeignClient {
+    @GetMapping("/api/v1/menus/routes")
+    List<RouteVO> listRoutes();
 }

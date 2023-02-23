@@ -11,4 +11,12 @@
 
     <artifactId>macula-cloud-oauth</artifactId>
 
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-oauth2-authorization-server</artifactId>
+            <version>0.4.0</version>
+        </dependency>
+    </dependencies>
+
 </project>

@@ -36,7 +36,7 @@
 
         <dependency>
             <groupId>dev.macula.boot</groupId>
-            <artifactId>macula-boot-starter-cloud-feign</artifactId>
+            <artifactId>macula-boot-starter-feign</artifactId>
         </dependency>
 
         <dependency>

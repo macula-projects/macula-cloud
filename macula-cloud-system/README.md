@@ -32,21 +32,22 @@
 
 ### 认证、鉴权记录
 
-- 在oauth2服务的UserDetailService的loadUserByName方法中读取用户信息，包括基本信息、角色、按钮权限等信息
+- 在oauth2服务的UserDetailService的loadUserByName方法中读取用户信息，包括基本信息、角色等信息
 
-  考虑到按钮权限数据量大（登录的时候按钮权限信息放到redis，不作为JWT或者introspect接口返回）
-  - 对于JWT，在Token生成的地方把按钮权限缓存到redis
-  - 对于Token，在introspect方法中，把按钮权限缓存到redis，不要直接返回
-  - **TODO** oauth2要在JWT或者introspect方法返回deptId、dataScope、nickname属性
-
-- 按钮权限在菜单表，前端有一个directive，调用/api/v1/users/me 接口，返回用户的角色、按钮权限数据，按钮权限数据来自redis
-
-- 在macula-boot-starter-security模块中的PermissionService也是给Controller的方法注解用于判定按钮权限，权限数据来自redis
-  - （这里依赖redis有问题，导致每个微服务都要依赖system的redis）
+- 我的菜单和按钮权限，前端有一个directive，调用/api/v1/users/me 接口，按钮权限。system-starter需要中转这个接口
 
 - URL权限通过定时任务后台缓存，在网关层获取URL权限信息，并检查URL访问权限
-  - **TODO** 监控数据表，触发更新
+    - 网关需要依赖system缓存URL角色关系的redis，可以考虑每个租户独立的redis
+    - **TODO** 监控数据表，触发更新
+- 通过AK/SK鉴权
+    - 网关支持AK/SK鉴权，基于KONG的HMAC AUTH协议
+    - **TODO** 需要把应用的sk，允许的url path缓存到redis供网关读取
+
+- macula-boot-start-system模块只需要给输出管理界面的应用依赖，比如xxx-admin，其他模块不需要依赖
+
+- 所以对于每个网关来说，需要通过redis获取URL角色对应关系、应用的配置（建议每个租户的redis可以隔离，system同步各个租户的redis）
 
 ### 租户、应用
 
 创建应用，设置应用的租户ID。具体某个应用的后端界面获取菜单时提供应用ID，获取该租户的菜单信息。（后面搞一个模版，默认就包含系统管理功能，租户隔离）
+需要租户隔离的包括：应用、菜单、字典

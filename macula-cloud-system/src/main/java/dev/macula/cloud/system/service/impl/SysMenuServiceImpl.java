@@ -57,52 +57,6 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
     private final MenuConverter menuConverter;
 
     /**
-     * 递归生成菜单下拉层级列表
-     *
-     * @param parentId 父级ID
-     * @param menuList 菜单列表
-     * @return
-     */
-    private static List<Option> recurMenuOptions(Long parentId, List<SysMenu> menuList) {
-        if (CollectionUtil.isEmpty(menuList)) {
-            return Collections.EMPTY_LIST;
-        }
-
-        List<Option> menus = menuList.stream()
-                .filter(menu -> menu.getParentId().equals(parentId))
-                .map(menu -> new Option(menu.getId(), menu.getName(), recurMenuOptions(menu.getId(), menuList)))
-                .collect(ArrayList::new, ArrayList::add, ArrayList::addAll);
-        return menus;
-    }
-
-    /**
-     * 递归生成资源（菜单+权限）树形列表
-     *
-     * @param parentId 父级ID
-     * @param menuList 菜单列表
-     * @return
-     */
-    private static List<ResourceVO> recurResources(Long parentId, List<SysMenu> menuList) {
-        if (CollectionUtil.isEmpty(menuList)) {
-            return Collections.EMPTY_LIST;
-        }
-
-        List<ResourceVO> menus = menuList.stream()
-                .filter(menu -> menu.getParentId().equals(parentId))
-                .map(menu -> {
-                    ResourceVO resourceVO = new ResourceVO();
-                    resourceVO.setValue(menu.getId());
-                    resourceVO.setLabel(menu.getName());
-
-                    List<ResourceVO> children = recurResources(menu.getId(), menuList);
-                    resourceVO.setChildren(children);
-
-                    return resourceVO;
-                }).collect(Collectors.toList());
-        return menus;
-    }
-
-    /**
      * 菜单表格树形列表
      */
     @Override
@@ -124,6 +78,25 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
             return new LinkedList<MenuVO>();
         }).collect(ArrayList::new, ArrayList::addAll, ArrayList::addAll);
         return list;
+    }
+
+    /**
+     * 递归生成菜单下拉层级列表
+     *
+     * @param parentId 父级ID
+     * @param menuList 菜单列表
+     * @return
+     */
+    private static List<Option> recurMenuOptions(Long parentId, List<SysMenu> menuList) {
+        if (CollectionUtil.isEmpty(menuList)) {
+            return Collections.EMPTY_LIST;
+        }
+
+        List<Option> menus = menuList.stream()
+                .filter(menu -> menu.getParentId().equals(parentId))
+                .map(menu -> new Option(menu.getId(), menu.getName(), recurMenuOptions(menu.getId(), menuList)))
+                .collect(ArrayList::new, ArrayList::add, ArrayList::addAll);
+        return menus;
     }
 
     /**
@@ -155,6 +128,33 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
     public List<Option> listMenuOptions() {
         List<SysMenu> menuList = this.list(new LambdaQueryWrapper<SysMenu>().orderByAsc(SysMenu::getSort));
         List<Option> menus = recurMenuOptions(GlobalConstants.ROOT_NODE_ID, menuList);
+        return menus;
+    }
+
+    /**
+     * 递归生成资源（菜单+权限）树形列表
+     *
+     * @param parentId 父级ID
+     * @param menuList 菜单列表
+     * @return
+     */
+    private static List<ResourceVO> recurResources(Long parentId, List<SysMenu> menuList) {
+        if (CollectionUtil.isEmpty(menuList)) {
+            return Collections.EMPTY_LIST;
+        }
+
+        List<ResourceVO> menus = menuList.stream()
+                .filter(menu -> menu.getParentId().equals(parentId))
+                .map(menu -> {
+                    ResourceVO resourceVO = new ResourceVO();
+                    resourceVO.setValue(menu.getId());
+                    resourceVO.setLabel(menu.getName());
+
+                    List<ResourceVO> children = recurResources(menu.getId(), menuList);
+                    resourceVO.setChildren(children);
+
+                    return resourceVO;
+                }).collect(Collectors.toList());
         return menus;
     }
 
@@ -225,28 +225,6 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
     }
 
     /**
-     * 修改菜单显示状态
-     *
-     * @param menuId  菜单ID
-     * @param visible 是否显示(1->显示；2->隐藏)
-     * @return
-     */
-    @Override
-    public boolean updateMenuVisible(Long menuId, Integer visible) {
-        boolean result = this.update(new LambdaUpdateWrapper<SysMenu>()
-                .eq(SysMenu::getId, menuId)
-                .set(SysMenu::getVisible, visible)
-        );
-        return result;
-    }
-
-    @Override
-    public Set<String> listRolePerms(Set<String> roles) {
-        Set<String> perms = this.baseMapper.listRolePerms(roles);
-        return perms;
-    }
-
-    /**
      * 递归生成菜单列表
      *
      * @param parentId 父级ID
@@ -267,6 +245,28 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
                     return menuVO;
                 }).collect(Collectors.toList());
         return menus;
+    }
+
+    /**
+     * 修改菜单显示状态
+     *
+     * @param menuId  菜单ID
+     * @param visible 是否显示(1->显示；2->隐藏)
+     * @return
+     */
+    @Override
+    public boolean updateMenuVisible(Long menuId, Integer visible) {
+        boolean result = this.update(new LambdaUpdateWrapper<SysMenu>()
+                .eq(SysMenu::getId, menuId)
+                .set(SysMenu::getVisible, visible)
+        );
+        return result;
+    }
+
+    @Override
+    public Set<String> listRolePerms(Set<String> roles) {
+        Set<String> perms = this.baseMapper.listRolePerms(roles);
+        return perms;
     }
 
     /**
