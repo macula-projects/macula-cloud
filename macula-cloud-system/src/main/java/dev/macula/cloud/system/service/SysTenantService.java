@@ -38,4 +38,8 @@ public interface SysTenantService extends IService<SysTenantInfo> {
      * @return
      */
     boolean deleteTenants(String ids);
+
+    Long getAppTenantId(String appCode);
+
+    Long getSystemTenantId();
 }

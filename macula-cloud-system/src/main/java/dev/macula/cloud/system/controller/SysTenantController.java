@@ -79,7 +79,9 @@ public class SysTenantController {
 
     @Operation(summary = "更新租户菜单列表")
     @PutMapping("/menu/{tenantId}")
-    public boolean updateTenantMenus(@PathVariable("tenantId") Long tenantId, @RequestBody List<Long> menuIds){
+    public boolean updateTenantMenus(@PathVariable("tenantId") Long tenantId,
+                                     @RequestParam(name="appCode") String appCode,
+                                     @RequestBody List<Long> menuIds){
         return sysTenantMenuService.updateTenantMenus(tenantId, menuIds);
     }
 
@@ -91,7 +93,9 @@ public class SysTenantController {
 
     @Operation(summary = "更新租户应用列表")
     @PutMapping("/application/{tenantId}")
-    public boolean updateApplications(@PathVariable("tenantId") Long tenantId, @RequestBody List<Long> applicationIds){
+    public boolean updateApplications(@PathVariable("tenantId") Long tenantId,
+                                      @RequestParam(name="appCode") String appCode,
+                                      @RequestBody List<Long> applicationIds){
         return sysTenantApplicationService.updateTenantApplications(tenantId, applicationIds);
     }
 
@@ -103,7 +107,9 @@ public class SysTenantController {
 
     @Operation(summary = "更新租户菜单列表")
     @PutMapping("/dict/{tenantId}")
-    public boolean updateTenantDicts(@PathVariable("tenantId") Long tenantId, @RequestBody List<Long> dictIds){
+    public boolean updateTenantDicts(@PathVariable("tenantId") Long tenantId,
+                                     @RequestParam(name="appCode") String appCode,
+                                     @RequestBody List<Long> dictIds){
         return sysTenantDictService.updateTenantDicts(tenantId, dictIds);
     }
 }
