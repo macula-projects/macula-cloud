@@ -8,8 +8,11 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import dev.macula.cloud.system.converter.TenantConverter;
 import dev.macula.cloud.system.form.TenantForm;
 import dev.macula.cloud.system.mapper.SysTenantInfoMapper;
+import dev.macula.cloud.system.pojo.entity.SysApplicationTenant;
+import dev.macula.cloud.system.pojo.entity.SysTenantApplication;
 import dev.macula.cloud.system.pojo.entity.SysTenantInfo;
 import dev.macula.cloud.system.query.TenantPageQuery;
+import dev.macula.cloud.system.service.SysTenantApplicationService;
 import dev.macula.cloud.system.service.SysTenantService;
 import dev.macula.cloud.system.vo.tenant.TenantPageVO;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +30,8 @@ import java.util.stream.Collectors;
 public class SysTenantServiceImpl extends ServiceImpl<SysTenantInfoMapper, SysTenantInfo> implements SysTenantService {
 
     private final TenantConverter tenantConverter;
+    private final SysApplicationTenantServiceImpl applicationTenantService;
+    private final SysTenantApplicationService tenantApplicationService;
 
     @Value("${spring.application.name}")
     private String systemCode;
@@ -80,8 +85,12 @@ public class SysTenantServiceImpl extends ServiceImpl<SysTenantInfoMapper, SysTe
 
     @Override
     public Long getAppTenantId(String appCode) {
-        SysTenantInfo tenantInfo = getOne(new LambdaQueryWrapper<SysTenantInfo>().eq(SysTenantInfo::getCode, appCode));
-        return Objects.isNull(tenantInfo)? null : tenantInfo.getId();
+        SysApplicationTenant applicationTenant = applicationTenantService.getOne(new LambdaQueryWrapper<SysApplicationTenant>().eq(SysApplicationTenant::getCode, appCode));
+        if(Objects.isNull(applicationTenant)){
+            return null;
+        }
+        SysTenantApplication tenantApplication = tenantApplicationService.getOne(new LambdaQueryWrapper<SysTenantApplication>().eq(SysTenantApplication::getApplicationId, applicationTenant.getSystemApplicationId()));
+        return Objects.isNull(tenantApplication)? null : tenantApplication.getTenantId();
     }
 
     @Override
