@@ -84,6 +84,15 @@ public class SysDictTypeServiceImpl extends ServiceImpl<SysDictTypeMapper, SysDi
         return pageResult;
     }
 
+    @Override
+    public List<DictTypePageVO> listDictType() {
+        List<SysDictType> list = this.list(new LambdaQueryWrapper<SysDictType>()
+                .select(SysDictType::getId, SysDictType::getName, SysDictType::getCode, SysDictType::getStatus)
+        );
+        List<DictTypePageVO> vos = dictTypeConverter.entity2Vo(list);
+        return vos;
+    }
+
     /**
      * 获取字典类型表单详情
      *

@@ -13,10 +13,12 @@ import dev.macula.cloud.system.query.TenantPageQuery;
 import dev.macula.cloud.system.service.SysTenantService;
 import dev.macula.cloud.system.vo.tenant.TenantPageVO;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 
@@ -26,6 +28,8 @@ public class SysTenantServiceImpl extends ServiceImpl<SysTenantInfoMapper, SysTe
 
     private final TenantConverter tenantConverter;
 
+    @Value("${spring.application.name}")
+    private String systemCode;
 
     @Override
     public Page<TenantPageVO> listTenantpages(TenantPageQuery queryParams) {
@@ -74,5 +78,14 @@ public class SysTenantServiceImpl extends ServiceImpl<SysTenantInfoMapper, SysTe
         return result;
     }
 
+    @Override
+    public Long getAppTenantId(String appCode) {
+        SysTenantInfo tenantInfo = getOne(new LambdaQueryWrapper<SysTenantInfo>().eq(SysTenantInfo::getCode, appCode));
+        return Objects.isNull(tenantInfo)? null : tenantInfo.getId();
+    }
 
+    @Override
+    public Long getSystemTenantId() {
+        return getAppTenantId(systemCode);
+    }
 }

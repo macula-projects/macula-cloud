@@ -26,4 +26,19 @@
         </where>
     </select>
 
+    <select id="listAllApplication" resultType="dev.macula.cloud.system.pojo.bo.ApplicationBO">
+        SELECT
+        id,
+        application_name,
+        ak,
+        sk,
+        homepage,
+        code,
+        manager,
+        maintainer,
+        mobile,
+        create_time
+        FROM
+        sys_application
+    </select>
 </mapper>

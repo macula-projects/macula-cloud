@@ -27,6 +27,7 @@ import dev.macula.cloud.system.form.DictItemForm;
 import dev.macula.cloud.system.mapper.SysDictItemMapper;
 import dev.macula.cloud.system.pojo.entity.SysDictItem;
 import dev.macula.cloud.system.query.DictItemPageQuery;
+import dev.macula.cloud.system.query.DictItemQuery;
 import dev.macula.cloud.system.service.SysDictItemService;
 import dev.macula.cloud.system.vo.dict.DictItemPageVO;
 import lombok.RequiredArgsConstructor;
@@ -74,6 +75,22 @@ public class SysDictItemServiceImpl extends ServiceImpl<SysDictItemMapper, SysDi
         // 实体转换
         Page<DictItemPageVO> pageResult = dictItemConverter.entity2Page(dictItemPage);
         return pageResult;
+    }
+
+    @Override
+    public List<DictItemPageVO> listDictItems(DictItemQuery queryParams) {
+        String typeCode = queryParams.getTypeCode();
+
+        // 查询数据
+        List<SysDictItem> dictItems = this.list(
+                new LambdaQueryWrapper<SysDictItem>()
+                        .eq(StrUtil.isNotBlank(typeCode), SysDictItem::getTypeCode, typeCode)
+                        .select(SysDictItem::getId, SysDictItem::getName, SysDictItem::getValue, SysDictItem::getStatus)
+        );
+
+        // 实体转换
+        List<DictItemPageVO> result = dictItemConverter.entity2Vo(dictItems);
+        return result;
     }
 
     /**

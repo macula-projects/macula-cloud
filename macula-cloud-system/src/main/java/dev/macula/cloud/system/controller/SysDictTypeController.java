@@ -47,6 +47,13 @@ public class SysDictTypeController {
         return result;
     }
 
+    @Operation(summary = "字典类型列表")
+    @GetMapping("/list")
+    public List<DictTypePageVO> listDictType() {
+        List<DictTypePageVO> result = dictTypeService.listDictType();
+        return result;
+    }
+
     @Operation(summary = "字典类型表单详情")
     @Parameter(name = "字典ID")
     @GetMapping("/{id}/form")

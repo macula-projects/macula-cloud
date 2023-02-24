@@ -24,9 +24,13 @@ import dev.macula.cloud.system.pojo.entity.SysApplication;
 import dev.macula.cloud.system.query.ApplicationPageQuery;
 import org.apache.ibatis.annotations.Mapper;
 
+import java.util.List;
+
 @Mapper
 public interface SysApplicationMapper extends BaseMapper<SysApplication> {
 
     Page<ApplicationBO> listApplicationPages(Page<SysApplication> page, ApplicationPageQuery queryParams);
+
+    List<ApplicationBO> listAllApplication();
 
 }

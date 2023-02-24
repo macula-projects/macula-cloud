@@ -30,6 +30,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import javax.validation.Valid;
+import java.util.List;
 
 /**
  * 应用控制器
@@ -42,10 +43,17 @@ public class SysApplicationController {
 
     private final SysApplicationService applicationService;
 
-    @Operation(summary = "获取应用列表")
+    @Operation(summary = "获取应用列表分页")
     @GetMapping
     public IPage<ApplicationVO> listApplications(ApplicationPageQuery queryParams) {
         IPage<ApplicationVO> list = applicationService.listApplicationPages(queryParams);
+        return list;
+    }
+
+    @Operation(summary = "获取应用列表")
+    @GetMapping(value = "/list")
+    public List<ApplicationVO> listAllApplications() {
+        List<ApplicationVO> list = applicationService.listAllApplication();
         return list;
     }
 

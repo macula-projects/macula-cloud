@@ -24,6 +24,8 @@ import dev.macula.cloud.system.pojo.entity.SysApplication;
 import dev.macula.cloud.system.vo.app.ApplicationVO;
 import org.mapstruct.Mapper;
 
+import java.util.List;
+
 /**
  * 应用对象转换器
  *
@@ -34,5 +36,7 @@ public interface ApplicationConverter {
     SysApplication form2Entity(ApplicationForm appForm);
 
     Page<ApplicationVO> bo2Vo(Page<ApplicationBO> bo);
+
+    List<ApplicationVO> bo2Vo(List<ApplicationBO> bo);
 
 }
