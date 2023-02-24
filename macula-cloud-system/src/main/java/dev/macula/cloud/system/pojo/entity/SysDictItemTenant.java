@@ -5,6 +5,6 @@ import lombok.Data;
 
 @Data
 @JsonInclude(JsonInclude.Include.NON_EMPTY)
-public class SysDictItemTenant extends SysMenu {
+public class SysDictItemTenant extends SysDictItem {
     private Long systemDictItemId;
 }
