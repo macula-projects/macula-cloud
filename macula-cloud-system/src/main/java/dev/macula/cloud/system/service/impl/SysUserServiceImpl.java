@@ -367,7 +367,7 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         userLoginVO.setRoles(roles);
 
         // 用户权限集合
-        Set<String> perms = (Set<String>) redisTemplate.opsForValue().get(GlobalConstants.AUTH_USER_PERMS_KEY + user.getUsername());
+        Set<String> perms = (Set<String>) redisTemplate.opsForValue().get(GlobalConstants.SECURITY_USER_BTN_PERMS_KEY + user.getUsername());
         userLoginVO.setPerms(perms);
 
         return userLoginVO;

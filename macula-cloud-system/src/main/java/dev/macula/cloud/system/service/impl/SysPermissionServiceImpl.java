@@ -98,7 +98,7 @@ public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, S
     @Override
     @Async
     public void refreshPermRolesRules() {
-        redisTemplate.delete(GlobalConstants.URL_PERM_ROLES_KEY);
+        redisTemplate.delete(GlobalConstants.SECURITY_URL_PERM_ROLES_KEY);
         List<SysPermission> permissions = this.listPermRoles();
         if (CollectionUtil.isNotEmpty(permissions)) {
             // 初始化URL【权限->角色(集合)】规则
@@ -112,7 +112,7 @@ public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, S
                     List<String> roles = item.getRoles();
                     urlPermRoles.put(perm, roles);
                 });
-                redisTemplate.opsForHash().putAll(GlobalConstants.URL_PERM_ROLES_KEY, urlPermRoles);
+                redisTemplate.opsForHash().putAll(GlobalConstants.SECURITY_URL_PERM_ROLES_KEY, urlPermRoles);
             }
         }
     }

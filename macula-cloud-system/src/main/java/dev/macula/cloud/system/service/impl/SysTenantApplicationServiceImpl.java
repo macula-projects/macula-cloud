@@ -1,5 +1,6 @@
 package dev.macula.cloud.system.service.impl;
 
+import cn.hutool.core.lang.Assert;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import dev.macula.cloud.system.converter.SysApplicationTenantConverter;
@@ -43,6 +44,11 @@ public class SysTenantApplicationServiceImpl extends ServiceImpl<SysTenantApplic
     @Override
     @Transactional
     public boolean updateTenantApplications(Long tenantId, List<Long> applicationIds) {
+        // TODO 简单处理， 一个应用只能分配给一个租户
+        long count = count(new LambdaQueryWrapper<SysTenantApplication>().ne(SysTenantApplication::getTenantId, tenantId)
+                .in(!applicationIds.isEmpty(), SysTenantApplication::getApplicationId, applicationIds));
+        Assert.isTrue(count == 0, "一个应用只能分配给一个租户");
+
         remove(new LambdaQueryWrapper<SysTenantApplication>().eq(SysTenantApplication::getTenantId, tenantId));
         List<SysApplication> sysApplications = applicationService.list();
         Set<Long> systemApplicationIds = sysApplications.stream().map(SysApplication::getId).collect(Collectors.toSet());
