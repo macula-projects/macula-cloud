@@ -16,6 +16,7 @@ import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
 
@@ -26,7 +27,8 @@ import java.util.Set;
 @Configuration
 @Slf4j
 public class CustomSystemMybatisPlusInterceptor implements BeanPostProcessor {
-    private static final Set<String> CONTAINS_TENANT_TABLE = CollectionUtils.set("sys_application", "sys_dept", "sys_dict_item", "sys_menu");
+//    private static final Set<String> CONTAINS_TENANT_TABLE = CollectionUtils.set("sys_application", "sys_dept", "sys_dict_item", "sys_menu");
+    private static final Set<String> CONTAINS_TENANT_TABLE = new HashSet<>();//CollectionUtils.set("sys_application", "sys_dept", "sys_dict_item", "sys_menu");
 
     @Override
     public Object postProcessAfterInitialization(Object bean, String beanName) throws BeansException {
