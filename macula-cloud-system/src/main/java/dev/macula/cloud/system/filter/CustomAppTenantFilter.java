@@ -20,14 +20,11 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @Deprecated
 public class CustomAppTenantFilter extends OncePerRequestFilter {
-    /**
-     * 应用id与租户id映射关系
-     */
-    private static final Map<String, Long> APP_TENANT_ID_MAP = new ConcurrentHashMap<>();
+    private static final String TENANT_Id = "tenantId";
 
     private static SysTenantService sysTenantService;
 
-    private static final ThreadLocal<String> APP_NAME_THREAD_COCAL = new NamedInheritableThreadLocal<>("appCode");
+    private static final ThreadLocal<Long> TENANT_ID_THREAD_COCAL = new NamedInheritableThreadLocal<>(TENANT_Id);
 
     public CustomAppTenantFilter(SysTenantService sysTenantService){
         CustomAppTenantFilter.sysTenantService = sysTenantService;
@@ -36,34 +33,19 @@ public class CustomAppTenantFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
         try{
-            String appCode = request.getParameter("appCode");
-            if(StringUtils.isNotBlank(appCode)){
-                APP_NAME_THREAD_COCAL.set(appCode);
+            if(Objects.nonNull(request.getParameter(TENANT_Id))){
+                Long tenantId = Long.valueOf(request.getParameter(TENANT_Id));
+                TENANT_ID_THREAD_COCAL.set(tenantId);
             }
             filterChain.doFilter(request,response);
         } finally {
-            APP_NAME_THREAD_COCAL.remove();
+            TENANT_ID_THREAD_COCAL.remove();
         }
-    }
-
-    public static Long getAppCodeTenantId(String appCode){
-        Long tenantId = APP_TENANT_ID_MAP.get(appCode);
-        if(Objects.isNull(tenantId)){
-            tenantId = sysTenantService.getAppTenantId(appCode);
-            APP_TENANT_ID_MAP.put(appCode, tenantId);
-        }
-        return tenantId;
     }
 
     public static Long getCurTenantId(){
-        return StringUtils.isNotBlank(APP_NAME_THREAD_COCAL.get()) ? getAppCodeTenantId(APP_NAME_THREAD_COCAL.get()) : getSystemTenantId();
+        // TODO 验证tenantId准确性及数据库是否存在相关数据， 临时类不做精细工作
+        return Objects.nonNull(TENANT_ID_THREAD_COCAL.get()) ? TENANT_ID_THREAD_COCAL.get() : null;
     }
 
-    public static Long getSystemTenantId(){
-        return sysTenantService.getSystemTenantId();
-    }
-
-    public static void clearMap(){
-        APP_TENANT_ID_MAP.clear();
-    }
 }

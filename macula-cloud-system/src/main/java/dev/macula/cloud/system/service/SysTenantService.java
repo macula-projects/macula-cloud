@@ -3,10 +3,13 @@ package dev.macula.cloud.system.service;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
+import dev.macula.boot.result.Option;
 import dev.macula.cloud.system.form.TenantForm;
 import dev.macula.cloud.system.pojo.entity.SysTenantInfo;
 import dev.macula.cloud.system.query.TenantPageQuery;
 import dev.macula.cloud.system.vo.tenant.TenantPageVO;
+
+import java.util.List;
 
 public interface SysTenantService extends IService<SysTenantInfo> {
 
@@ -39,7 +42,11 @@ public interface SysTenantService extends IService<SysTenantInfo> {
      */
     boolean deleteTenants(String ids);
 
-    Long getAppTenantId(String appCode);
+    /**
+     * 根据filterMe属性获取租户下拉列表
+     * @param filterMe 1: 获取我的租户下拉选项; 0: 获取所有租户下拉选项
+     * @return
+     */
+    List<Option> listTenantOptions(Integer filterMe);
 
-    Long getSystemTenantId();
 }

@@ -5,15 +5,14 @@ import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import dev.macula.boot.result.Option;
 import dev.macula.cloud.system.converter.TenantConverter;
 import dev.macula.cloud.system.form.TenantForm;
 import dev.macula.cloud.system.mapper.SysTenantInfoMapper;
-import dev.macula.cloud.system.pojo.entity.SysApplicationTenant;
-import dev.macula.cloud.system.pojo.entity.SysTenantApplication;
 import dev.macula.cloud.system.pojo.entity.SysTenantInfo;
 import dev.macula.cloud.system.query.TenantPageQuery;
-import dev.macula.cloud.system.service.SysTenantApplicationService;
 import dev.macula.cloud.system.service.SysTenantService;
+import dev.macula.cloud.system.service.SysUserTenantService;
 import dev.macula.cloud.system.vo.tenant.TenantPageVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -22,6 +21,7 @@ import org.springframework.stereotype.Service;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 
@@ -30,8 +30,8 @@ import java.util.stream.Collectors;
 public class SysTenantServiceImpl extends ServiceImpl<SysTenantInfoMapper, SysTenantInfo> implements SysTenantService {
 
     private final TenantConverter tenantConverter;
-    private final SysApplicationTenantServiceImpl applicationTenantService;
-    private final SysTenantApplicationService tenantApplicationService;
+
+    private final SysUserTenantService userTenantService;
 
     @Value("${spring.application.name}")
     private String systemCode;
@@ -84,17 +84,14 @@ public class SysTenantServiceImpl extends ServiceImpl<SysTenantInfoMapper, SysTe
     }
 
     @Override
-    public Long getAppTenantId(String appCode) {
-        SysApplicationTenant applicationTenant = applicationTenantService.getOne(new LambdaQueryWrapper<SysApplicationTenant>().eq(SysApplicationTenant::getCode, appCode));
-        if(Objects.isNull(applicationTenant)){
-            return null;
-        }
-        SysTenantApplication tenantApplication = tenantApplicationService.getOne(new LambdaQueryWrapper<SysTenantApplication>().eq(SysTenantApplication::getApplicationId, applicationTenant.getSystemApplicationId()));
-        return Objects.isNull(tenantApplication)? null : tenantApplication.getTenantId();
+    public List<Option> listTenantOptions(Integer filterMe) {
+        List<SysTenantInfo> sysTenantInfoList = list(new LambdaQueryWrapper<SysTenantInfo>()
+                .in(filterMe.equals(1), SysTenantInfo::getId, userTenantService.getMeTenantIds()));
+        List<Option> result = sysTenantInfoList.stream().map(tenantInfo -> {
+            Option option = new Option(tenantInfo.getId(), tenantInfo.getName());
+            return option;
+        }).collect(Collectors.toList());
+        return result;
     }
 
-    @Override
-    public Long getSystemTenantId() {
-        return getAppTenantId(systemCode);
-    }
 }

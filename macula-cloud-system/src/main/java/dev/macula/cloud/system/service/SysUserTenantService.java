@@ -15,13 +15,18 @@
  * limitations under the License.
  */
 
-package dev.macula.cloud.system.pojo.entity;
+package dev.macula.cloud.system.service;
 
-import lombok.Data;
-import lombok.experimental.Accessors;
+import com.baomidou.mybatisplus.extension.service.IService;
+import dev.macula.cloud.system.pojo.entity.SysUserTenant;
 
-@Data
-@Accessors(chain = true)
-public class SysPermissionTenant extends SysPermission {
-    private Long systemPermissionId;
+import java.util.Set;
+
+public interface SysUserTenantService extends IService<SysUserTenant> {
+
+    /**
+     * 获取我负责的租户id列表
+     * @return
+     */
+    Set<Long> getMeTenantIds();
 }
