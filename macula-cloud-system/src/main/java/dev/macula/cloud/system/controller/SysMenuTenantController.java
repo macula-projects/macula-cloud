@@ -53,21 +53,21 @@ import java.util.List;
  */
 @Tag(name = "菜单接口")
 @RestController
-@RequestMapping("/api/v1/menus")
+//@RequestMapping("/api/v1/menus")
 @RequiredArgsConstructor
 @Slf4j
 public class SysMenuTenantController {
     private final SysMenuTenantService menuService;
 
     @Operation(summary = "获取当前登录用户的菜单列表")
-    @GetMapping("/my")
+    //@GetMapping("/my")
     public JSONObject getUserMenu(MenuQuery menuQuery) {
         JSONObject data = menuService.getMyMenu(menuQuery);
         return data;
     }
 
     @Operation(summary = "菜单列表")
-    @GetMapping("/pages")
+    //@GetMapping("/pages")
     public IPage<MenuBO> pagesMenus(MenuPageQuery menuPageQuery) {
         IPage<MenuBO> data = menuService.pagesMenus(menuPageQuery);
         return data;
@@ -75,14 +75,14 @@ public class SysMenuTenantController {
 
     @Operation(summary = "添加更新菜单及权限信息")
     @AuditLog(title = "添加更新菜单及权限信息")
-    @PostMapping("/add")
+    //@PostMapping("/add")
     public JSONObject addMenu(@RequestBody MenuDTO menuDTO) {
         return menuService.add(menuDTO);
     }
 
     @Operation(summary = "删除菜单")
     @AuditLog(title = "删除菜单")
-    @DeleteMapping("/delete")
+    //@DeleteMapping("/delete")
     public List<Long> delMenu(@RequestBody List<Long> menuIds) {
         return menuService.del(menuIds);
     }
