@@ -36,12 +36,13 @@ spring:
     port: 6380
     password: maculaV5@2023
 macula:
-  security:
-    ignore-urls:
-      - /tinyid/**
-      - /system/api/token
-      - /system/api/token/introspect
-    only-auth-urls: /mall/api/**
+  gateway:
+    security:
+      ignore-urls:
+        - /tinyid/**
+        - /system/api/token
+        - /system/api/token/introspect
+      only-auth-urls: /mall/api/**
 
 logging:
   level:
