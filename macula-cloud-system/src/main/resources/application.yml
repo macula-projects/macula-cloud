@@ -28,6 +28,14 @@ macula:
       - /api/**
       - /swagger-ui/index.html
       - /v3/api-docs/swagger-config
+system:
+  tenant:
+    table:
+      containsTenantTables:
+        - sys_application
+        - sys_dept
+        - sys_dict_item
+        - sys_menu
 
 mybatis-plus:
   configuration:

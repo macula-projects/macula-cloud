@@ -5,7 +5,7 @@
 <mapper namespace="dev.macula.cloud.system.mapper.SysTenantInfoMapper">
 
     <!-- 租户映射 -->
-    <resultMap id="TenantMap" type="dev.macula.cloud.system.pojo.bo.TenantBo">
+    <resultMap id="TenantMap" type="dev.macula.cloud.system.pojo.bo.TenantBO">
         <id property="id" column="id" jdbcType="BIGINT"/>
         <result property="name" column="name" jdbcType="VARCHAR"/>
         <result property="code" column="code" jdbcType="VARCHAR"/>

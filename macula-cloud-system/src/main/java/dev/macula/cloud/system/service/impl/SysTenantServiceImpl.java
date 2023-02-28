@@ -7,9 +7,11 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import dev.macula.boot.result.Option;
+import dev.macula.boot.starter.security.utils.SecurityUtils;
 import dev.macula.cloud.system.converter.TenantConverter;
 import dev.macula.cloud.system.form.TenantForm;
 import dev.macula.cloud.system.mapper.SysTenantInfoMapper;
+import dev.macula.cloud.system.pojo.bo.TenantBO;
 import dev.macula.cloud.system.pojo.entity.SysTenantInfo;
 import dev.macula.cloud.system.pojo.entity.SysTenantUser;
 import dev.macula.cloud.system.query.TenantPageQuery;
@@ -17,8 +19,8 @@ import dev.macula.cloud.system.service.SysTenantService;
 import dev.macula.cloud.system.service.SysTenantUserService;
 import dev.macula.cloud.system.vo.tenant.TenantPageVO;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Arrays;
 import java.util.List;
@@ -28,6 +30,7 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class SysTenantServiceImpl extends ServiceImpl<SysTenantInfoMapper, SysTenantInfo> implements SysTenantService {
+    private static final String TENANT_ROOT_USERNAME = "admin";
 
     private final TenantConverter tenantConverter;
 
@@ -36,15 +39,17 @@ public class SysTenantServiceImpl extends ServiceImpl<SysTenantInfoMapper, SysTe
     @Override
     public IPage<TenantPageVO> listTenantpages(TenantPageQuery queryParams) {
         // 查询数据
-        Page<TenantPageVO> tenantpages = this.baseMapper.listTenantpages(
+        Page<TenantBO> tenantpages = this.baseMapper.listTenantpages(
                 new Page<>(queryParams.getPageNum(),
                         queryParams.getPageSize()),
                 queryParams
         );
-        return tenantpages;
+        Page<TenantPageVO> result = tenantConverter.bo2Page(tenantpages);
+        return result;
     }
 
     @Override
+    @Transactional
     public boolean saveTenant(TenantForm tenantForm) {
         long count = this.count(new LambdaQueryWrapper<SysTenantInfo>().eq(SysTenantInfo::getCode, tenantForm.getCode())
                 .or().eq(SysTenantInfo::getName, tenantForm.getName())
@@ -61,6 +66,7 @@ public class SysTenantServiceImpl extends ServiceImpl<SysTenantInfoMapper, SysTe
     }
 
     @Override
+    @Transactional
     public boolean updateTenant(Long id, TenantForm tenantForm) {
         String tenantName = tenantForm.getName();
         long count = this.count(new LambdaQueryWrapper<SysTenantInfo>()
@@ -84,6 +90,7 @@ public class SysTenantServiceImpl extends ServiceImpl<SysTenantInfoMapper, SysTe
     }
 
     @Override
+    @Transactional
     public boolean deleteTenants(String idsStr) {
         Assert.isTrue(StrUtil.isNotBlank(idsStr), "删除的租户数据为空");
         // 逻辑删除
@@ -95,8 +102,9 @@ public class SysTenantServiceImpl extends ServiceImpl<SysTenantInfoMapper, SysTe
 
     @Override
     public List<Option> listTenantOptions(Integer filterMe) {
+        boolean filterMeFlag = filterMe.equals(1) && !TENANT_ROOT_USERNAME.equals(SecurityUtils.getCurrentUser());
         List<SysTenantInfo> sysTenantInfoList = list(new LambdaQueryWrapper<SysTenantInfo>()
-                .in(filterMe.equals(1), SysTenantInfo::getId, tenantUserService.getMeTenantIds()));
+                .in(filterMeFlag, SysTenantInfo::getId, tenantUserService.getMeTenantIds()));
         List<Option> result = sysTenantInfoList.stream().map(tenantInfo -> {
             Option option = new Option(tenantInfo.getId(), tenantInfo.getName());
             return option;

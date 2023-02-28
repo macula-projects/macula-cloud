@@ -7,7 +7,7 @@ import java.util.Date;
 import java.util.List;
 
 @Data
-public class TenantBo {
+public class TenantBO {
 
     private Long id;
 
