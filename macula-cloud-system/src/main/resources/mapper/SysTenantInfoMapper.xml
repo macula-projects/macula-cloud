@@ -4,17 +4,39 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="dev.macula.cloud.system.mapper.SysTenantInfoMapper">
 
+    <!-- 租户映射 -->
+    <resultMap id="TenantMap" type="dev.macula.cloud.system.pojo.bo.TenantBO">
+        <id property="id" column="id" jdbcType="BIGINT"/>
+        <result property="name" column="name" jdbcType="VARCHAR"/>
+        <result property="code" column="code" jdbcType="VARCHAR"/>
+        <result property="description" column="description" jdbcType="VARCHAR"/>
+        <result property="createTime" column="create_time" jdbcType="DATE"/>
+        <collection property="supervisor" ofType="dev.macula.cloud.system.pojo.bo.TenantUserBO" javaType="list">
+            <id property="id" column="userId" jdbcType="BIGINT" />
+            <result property="username" column="username"/>
+        </collection>
+    </resultMap>
+
     <!-- 租户分页列表 -->
-    <select id="listTenantpages" resultType="dev.macula.cloud.system.pojo.bo.TenantBo">
+    <select id="listTenantpages" resultMap="TenantMap">
         SELECT
         t.id,
         t.name,
         t.code,
         t.description,
-        t.supervisor,
-        t.create_time
+        t.create_time,
+        u.id as userId,
+        u.username
         FROM
         sys_tenant_info t
+        LEFT JOIN
+        sys_tenant_user tu
+        ON
+        t.id = tu.tenant_id
+        LEFT JOIN
+        sys_user u
+        ON
+        tu.user_id = u.id
         <where>
             <if test='queryParams.keywords!=null and queryParams.keywords.trim() neq ""'>
                 AND (

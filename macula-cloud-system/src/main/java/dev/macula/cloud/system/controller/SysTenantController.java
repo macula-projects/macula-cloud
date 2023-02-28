@@ -1,14 +1,12 @@
 package dev.macula.cloud.system.controller;
 
 
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import dev.macula.boot.result.Option;
 import dev.macula.cloud.system.annotation.AuditLog;
 import dev.macula.cloud.system.form.TenantForm;
-import dev.macula.cloud.system.form.UserForm;
+import dev.macula.cloud.system.pojo.bo.TenantBO;
 import dev.macula.cloud.system.query.TenantPageQuery;
-import dev.macula.cloud.system.service.SysTenantApplicationService;
-import dev.macula.cloud.system.service.SysTenantDictService;
-import dev.macula.cloud.system.service.SysTenantMenuService;
 import dev.macula.cloud.system.service.SysTenantService;
 import dev.macula.cloud.system.vo.tenant.TenantPageVO;
 import io.swagger.v3.oas.annotations.Operation;
@@ -19,7 +17,6 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 
 @Tag(name = "租户接口")
 @RestController
@@ -29,17 +26,10 @@ public class SysTenantController {
 
     private final SysTenantService sysTenantService;
 
-    private final SysTenantMenuService sysTenantMenuService;
-
-    private final SysTenantDictService sysTenantDictService;
-
-    private final SysTenantApplicationService sysTenantApplicationService;
-
-
     @Operation(summary = "租户分页列表")
     @GetMapping
-    public Page<TenantPageVO> listTenantpages(TenantPageQuery tenantPageQuery){
-        Page<TenantPageVO> result = sysTenantService.listTenantpages(tenantPageQuery);
+    public IPage<TenantPageVO> listTenantPages(TenantPageQuery tenantPageQuery){
+        IPage<TenantPageVO> result = sysTenantService.listTenantpages(tenantPageQuery);
         return result;
     }
 
@@ -62,7 +52,6 @@ public class SysTenantController {
         return result;
     }
 
-
     @Operation(summary = "删除租户")
     @AuditLog(title = "删除租户")
     @Parameter(name = "租户ID", description = "租户ID，多个以英文逗号(,)分割")
@@ -72,45 +61,11 @@ public class SysTenantController {
         return result;
     }
 
-    @Operation(summary = "获取租户菜单id列表")
-    @GetMapping("/menu/{tenantId}")
-    public List<Long> tenantMenus(@PathVariable("tenantId") Long tenantId){
-        return sysTenantMenuService.tenantMenus(tenantId);
-    }
-
-    @Operation(summary = "更新租户菜单列表")
-    @PutMapping("/menu/{tenantId}")
-    public boolean updateTenantMenus(@PathVariable("tenantId") Long tenantId,
-                                     @RequestParam(name="appCode") String appCode,
-                                     @RequestBody List<Long> menuIds){
-        return sysTenantMenuService.updateTenantMenus(tenantId, menuIds);
-    }
-
-    @Operation(summary = "获取租户应用id列表")
-    @GetMapping("/application/{tenantId}")
-    public List<Long> tenantApplications(@PathVariable("tenantId") Long tenantId){
-        return sysTenantApplicationService.tenantApplications(tenantId);
-    }
-
-    @Operation(summary = "更新租户应用列表")
-    @PutMapping("/application/{tenantId}")
-    public boolean updateApplications(@PathVariable("tenantId") Long tenantId,
-                                      @RequestParam(name="appCode") String appCode,
-                                      @RequestBody List<Long> applicationIds){
-        return sysTenantApplicationService.updateTenantApplications(tenantId, applicationIds);
-    }
-
-    @Operation(summary = "获取租户字典id列表")
-    @GetMapping("/dict/{tenantId}")
-    public List<Long> tenantDicts(@PathVariable("tenantId") Long tenantId, @RequestParam("type") Integer type){
-        return sysTenantDictService.tenantDicts(tenantId, type);
-    }
-
-    @Operation(summary = "更新租户菜单列表")
-    @PutMapping("/dict/{tenantId}")
-    public boolean updateTenantDicts(@PathVariable("tenantId") Long tenantId,
-                                     @RequestParam(name="appCode") String appCode,
-                                     @RequestBody Map<String, List<Long>> dictIdsMap){
-        return sysTenantDictService.updateTenantDicts(tenantId, dictIdsMap);
+    @Operation(summary = "获取租户下拉选项")
+    @Parameter(name = "过滤出我的租户下拉选项", description = "1: 获取我的租户下拉选项; 0: 获取所有租户下拉选项")
+    @GetMapping("/options")
+    public List<Option> listTenantOptions(@RequestParam(name = "filterMe", defaultValue = "1") Integer filterMe){
+        List<Option> result = sysTenantService.listTenantOptions(filterMe);
+        return result;
     }
 }

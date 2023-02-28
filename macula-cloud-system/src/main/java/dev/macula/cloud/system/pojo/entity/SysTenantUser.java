@@ -5,7 +5,7 @@ import lombok.Data;
 
 @Data
 @AllArgsConstructor
-public class SysTenantApplication {
-    private Long applicationId;
+public class SysTenantUser {
+    private Long userId;
     private Long tenantId;
 }
