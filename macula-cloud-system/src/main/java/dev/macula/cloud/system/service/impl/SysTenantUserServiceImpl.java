@@ -20,11 +20,11 @@ package dev.macula.cloud.system.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import dev.macula.boot.starter.security.utils.SecurityUtils;
-import dev.macula.cloud.system.mapper.SysUserTenantMapper;
+import dev.macula.cloud.system.mapper.SysTenantUserMapper;
 import dev.macula.cloud.system.pojo.entity.SysUser;
-import dev.macula.cloud.system.pojo.entity.SysUserTenant;
+import dev.macula.cloud.system.pojo.entity.SysTenantUser;
 import dev.macula.cloud.system.service.SysUserService;
-import dev.macula.cloud.system.service.SysUserTenantService;
+import dev.macula.cloud.system.service.SysTenantUserService;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
@@ -35,7 +35,7 @@ import java.util.stream.Collectors;
 
 @Service
 @AllArgsConstructor
-public class SysUserTenantServiceImpl extends ServiceImpl<SysUserTenantMapper, SysUserTenant> implements SysUserTenantService {
+public class SysTenantUserServiceImpl extends ServiceImpl<SysTenantUserMapper, SysTenantUser> implements SysTenantUserService {
 
     private final SysUserService userService;
 
@@ -44,9 +44,9 @@ public class SysUserTenantServiceImpl extends ServiceImpl<SysUserTenantMapper, S
         SysUser sysUser = userService.getOne(new LambdaQueryWrapper<SysUser>()
                 .eq(SysUser::getUsername, SecurityUtils.getCurrentUser()));
         Assert.notNull(sysUser, "登录已过期，请重新登录！");
-        List<SysUserTenant> userTenantList = list(new LambdaQueryWrapper<SysUserTenant>()
-                .eq(SysUserTenant::getUserId, sysUser.getId()));
-        Set<Long> result = userTenantList.stream().map(SysUserTenant::getTenantId).collect(Collectors.toSet());
+        List<SysTenantUser> userTenantList = list(new LambdaQueryWrapper<SysTenantUser>()
+                .eq(SysTenantUser::getUserId, sysUser.getId()));
+        Set<Long> result = userTenantList.stream().map(SysTenantUser::getTenantId).collect(Collectors.toSet());
         return result;
     }
 }

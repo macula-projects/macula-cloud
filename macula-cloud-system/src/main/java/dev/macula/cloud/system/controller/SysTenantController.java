@@ -1,7 +1,7 @@
 package dev.macula.cloud.system.controller;
 
 
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import dev.macula.boot.result.Option;
 import dev.macula.cloud.system.annotation.AuditLog;
 import dev.macula.cloud.system.form.TenantForm;
@@ -27,8 +27,8 @@ public class SysTenantController {
 
     @Operation(summary = "租户分页列表")
     @GetMapping
-    public Page<TenantPageVO> listTenantpages(TenantPageQuery tenantPageQuery){
-        Page<TenantPageVO> result = sysTenantService.listTenantpages(tenantPageQuery);
+    public IPage<TenantPageVO> listTenantPages(TenantPageQuery tenantPageQuery){
+        IPage<TenantPageVO> result = sysTenantService.listTenantpages(tenantPageQuery);
         return result;
     }
 

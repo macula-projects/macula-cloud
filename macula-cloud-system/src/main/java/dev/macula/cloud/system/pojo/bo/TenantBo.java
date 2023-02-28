@@ -1,11 +1,10 @@
 package dev.macula.cloud.system.pojo.bo;
 
-
-import cn.hutool.db.DaoTemplate;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Data;
 
 import java.util.Date;
+import java.util.List;
 
 @Data
 public class TenantBo {
@@ -30,7 +29,7 @@ public class TenantBo {
     /**
      * 负责人
      */
-    private String supervisor;
+    private List<TenantUserBO> supervisor;
 
     /**
      * 创建时间

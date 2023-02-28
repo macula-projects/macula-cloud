@@ -12,6 +12,4 @@ public class SysTenantInfo extends BaseEntity {
 
     private String description;
 
-    private String supervisor;
-
 }

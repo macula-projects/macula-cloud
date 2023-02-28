@@ -1,7 +1,7 @@
 package dev.macula.cloud.system.service;
 
 
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
 import dev.macula.boot.result.Option;
 import dev.macula.cloud.system.form.TenantForm;
@@ -18,7 +18,7 @@ public interface SysTenantService extends IService<SysTenantInfo> {
      * @param tenantPageQuery
      * @return
      */
-    Page<TenantPageVO> listTenantpages(TenantPageQuery tenantPageQuery);
+    IPage<TenantPageVO> listTenantpages(TenantPageQuery tenantPageQuery);
 
     /**
      *  新增租户

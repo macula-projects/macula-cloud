@@ -18,11 +18,11 @@
 package dev.macula.cloud.system.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
-import dev.macula.cloud.system.pojo.entity.SysUserTenant;
+import dev.macula.cloud.system.pojo.entity.SysTenantUser;
 
 import java.util.Set;
 
-public interface SysUserTenantService extends IService<SysUserTenant> {
+public interface SysTenantUserService extends IService<SysTenantUser> {
 
     /**
      * 获取我负责的租户id列表
