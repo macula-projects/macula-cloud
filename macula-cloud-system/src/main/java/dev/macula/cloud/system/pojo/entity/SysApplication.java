@@ -22,4 +22,6 @@ public class SysApplication extends BaseEntity {
     private String mobile;
 
     private String code;
+
+    private String accessPath;
 }
