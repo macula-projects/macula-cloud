@@ -12,6 +12,7 @@
             sk,
             homepage,
             code,
+            access_path,
             manager,
             maintainer,
             mobile,

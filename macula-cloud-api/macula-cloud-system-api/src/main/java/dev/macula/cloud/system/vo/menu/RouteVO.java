@@ -18,6 +18,7 @@
 package dev.macula.cloud.system.vo.menu;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import dev.macula.cloud.system.enums.MenuTypeEnum;
 import lombok.Data;
 
 import java.util.List;
@@ -32,6 +33,12 @@ import java.util.List;
 @JsonInclude(JsonInclude.Include.NON_EMPTY)
 public class RouteVO {
 
+    private long id;
+
+    private Integer sort;
+
+    private long parentId;
+
     private String path;
 
     private String component;
@@ -45,6 +52,10 @@ public class RouteVO {
 
     @Data
     public static class Meta {
+
+        private Boolean visible;
+
+        private MenuTypeEnum type;
 
         private String title;
 
