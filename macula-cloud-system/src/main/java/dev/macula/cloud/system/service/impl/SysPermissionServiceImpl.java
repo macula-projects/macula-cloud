@@ -27,9 +27,11 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.google.common.base.Joiner;
 import dev.macula.boot.constants.GlobalConstants;
+import dev.macula.boot.result.Option;
 import dev.macula.boot.starter.security.utils.SecurityUtils;
 import dev.macula.cloud.system.converter.PermissionConverter;
 import dev.macula.cloud.system.dto.PermDTO;
+import dev.macula.cloud.system.form.PermissionValidtorForm;
 import dev.macula.cloud.system.mapper.SysPermissionMapper;
 import dev.macula.cloud.system.pojo.entity.SysPermission;
 import dev.macula.cloud.system.pojo.entity.SysRole;
@@ -65,6 +67,9 @@ public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, S
     private final PermissionConverter permissionConverter;
 
     private final SysRolePermissionService rolePermissionService;
+
+    private static final String VALIDTOR_PERM_ID_SPLITOR = "::";
+    private static final String VALIDTOR_PERM_JOIN = ":";
 
     /**
      * 获取权限分页列表
@@ -153,13 +158,32 @@ public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, S
     }
 
     @Override
-    public boolean validtorUrlPerm(Long id, String url, RequestMethod requestMethod) {
-        StringBuffer stringBuffer = new StringBuffer();
-        stringBuffer.append(requestMethod.toString()).append(":").append(url);
-        long count = count(new LambdaQueryWrapper<SysPermission>()
-                .eq(SysPermission::getUrlPerm, stringBuffer.toString())
-                .and(Objects.nonNull(id), wrapper->wrapper.ne(SysPermission::getId, id)));
-        return count == 0;
+    public List<Option> validtorUrlPerm(List<PermissionValidtorForm> validtorForms) {
+        if(validtorForms.isEmpty()){
+            return new ArrayList<>();
+        }
+        Map<String, String> validtorFormMap = validtorForms.stream().collect(Collectors.toMap(form->{
+            StringBuffer sb = new StringBuffer();
+            sb.append(Objects.isNull(form.getId())? "" : form.getId())
+                    .append(VALIDTOR_PERM_ID_SPLITOR).append(form.getCode())
+                    .append(VALIDTOR_PERM_JOIN).append(form.getUrl())
+                    .append(VALIDTOR_PERM_JOIN).append(form.getMethod().toString());
+            return sb.toString();
+        }, form -> {
+            StringBuffer sb = new StringBuffer();
+            sb.append(form.getMethod().toString())
+                    .append(VALIDTOR_PERM_JOIN).append(form.getUrl());
+            return sb.toString();
+        }, (oldValue, newValue) -> newValue));
+
+        List<Option> result = validtorFormMap.keySet().stream().map(item->{
+            String[] keyIdArr = item.split(VALIDTOR_PERM_ID_SPLITOR);
+            long count = count(new LambdaQueryWrapper<SysPermission>()
+                .eq(SysPermission::getUrlPerm, validtorFormMap.get(item))
+                .and(StringUtils.isNotBlank(keyIdArr[0]), wrapper->wrapper.ne(SysPermission::getId, keyIdArr[0])));
+            return new Option(count == 0, item);
+        }).collect(Collectors.toList());
+        return result;
     }
 
     private Map<String, PermDTO> handlerAddOrUpdateMenuPerms(List<PermDTO> permDTOList, Long menuId, List<Long> updatePermIds) {

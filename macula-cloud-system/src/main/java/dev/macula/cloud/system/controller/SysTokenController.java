@@ -18,6 +18,7 @@ import org.apache.http.client.config.RequestConfig;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.hibernate.validator.constraints.Length;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -58,6 +59,7 @@ public class SysTokenController {
   private static final HttpHeaders DEFAULT_HEADERS;
   private final SysUserService userService;
   private final PasswordEncoder passwordEncoder;
+  private final RedisTemplate redisTemplate;
   static {
     DEFAULT_HEADERS = new HttpHeaders();
     DEFAULT_HEADERS.set("Authorization", getBaseAuthHeader("client", "secret"));
@@ -78,6 +80,7 @@ public class SysTokenController {
     jsonObject.put("scope", "all");
     jsonObject.put("sub", userAuthInfo.getUsername());
     jsonObject.put("authorities", userAuthInfo.getRoles());
+    log.error("introspect: {}", userAuthInfo);
     return jsonObject;
   }
 
@@ -96,6 +99,7 @@ public class SysTokenController {
       jsonObject.put("scope", "all");
       jsonObject.put("real_username", userDto.getUsername());
       jsonObject.put("is_show_user_agreement", "false");
+      redisTemplate.delete("gateway:jwt:" + userDto.getUsername());
       return Result.success(jsonObject);
     }
     jsonObject.put("msg", "用户名或密码错误");

@@ -388,6 +388,9 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
                 .orderByAsc(SysMenu::getSort);
         List<SysMenu> entities = list(queryWrapper);
         Set<Long> handlerMenuIds = innerHandlerLoopMenu(entities, showParentIds, menuBOS, handlerMenu, null);
+        if(handlerMenuIds.isEmpty()){
+            return;
+        }
         List<SysPermission> sysPermissionList = permissionService.list(new LambdaQueryWrapper<SysPermission>()
                 .in(SysPermission::getMenuId, handlerMenuIds));
         sysPermissionList.forEach(sysPerm -> handlerMenu.get(sysPerm.getMenuId()).getApiList().add(permissionService.toDTO(sysPerm)));
