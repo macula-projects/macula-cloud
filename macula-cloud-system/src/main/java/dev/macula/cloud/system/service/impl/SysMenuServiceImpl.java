@@ -212,6 +212,9 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
                     routeVO.setPath(menu.getPath()); // 根据path路由跳转 this.$router.push({path:xxx})
                     routeVO.setRedirect(menu.getRedirect());
                     routeVO.setComponent(menu.getComponent());
+                    routeVO.setId(menu.getId());
+                    routeVO.setParentId(menu.getParentId());
+                    routeVO.setSort(menu.getSort());
 
                     RouteVO.Meta meta = new RouteVO.Meta();
                     meta.setTitle(menu.getName());
@@ -219,6 +222,8 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
                     meta.setRoles(menu.getRoles());
                     meta.setHidden(StatusEnum.DISABLE.getValue().equals(menu.getVisible()));
                     meta.setKeepAlive(true);
+                    meta.setType(menu.getType());
+                    meta.setVisible(menu.getVisible() == 1);
 
                     routeVO.setMeta(meta);
                     List<RouteVO> children = recurRoutes(menu.getId(), menuList);

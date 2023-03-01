@@ -128,10 +128,12 @@ public class SysTokenController {
   @Operation(summary = "验证登录token是否有效")
   @GetMapping("/userInfo")
   public Result userInfo(){
+    UserAuthInfo userAuthInfo = userService.getUserAuthInfo(SecurityUtils.getCurrentUser());
     JSONObject jsonObject = new JSONObject();
     jsonObject.put("userName", SecurityUtils.getCurrentUser());
     jsonObject.put("dashboard", 0);
     jsonObject.put("role", SecurityUtils.getRoles());
+    jsonObject.put("perm", userAuthInfo.getPerms());
     return Result.success(jsonObject);
   }
 

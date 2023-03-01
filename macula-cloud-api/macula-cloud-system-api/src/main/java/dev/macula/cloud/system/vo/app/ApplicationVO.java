@@ -55,6 +55,9 @@ public class ApplicationVO {
     @Schema(description = "应用编码")
     private String code;
 
+    @Schema(description = "可访问url")
+    private String accessPath;
+
     @Schema(description = "创建时间")
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDateTime createTime;

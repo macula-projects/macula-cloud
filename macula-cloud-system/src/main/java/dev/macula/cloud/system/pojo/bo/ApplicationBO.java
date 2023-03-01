@@ -67,6 +67,12 @@ public class ApplicationBO {
     private String code;
 
     /**
+     * 可访问url
+     */
+    private String accessPath;
+
+
+    /**
      * 创建时间
      */
     @JsonFormat(pattern = "yyyy-MM-dd")
