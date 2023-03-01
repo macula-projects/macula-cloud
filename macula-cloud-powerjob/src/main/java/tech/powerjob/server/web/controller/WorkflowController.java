@@ -66,13 +66,6 @@ public class WorkflowController {
         return ResultDTO.success(null);
     }
 
-    private static PageResult<WorkflowInfoVO> convertPage(Page<WorkflowInfoDO> originPage) {
-
-        PageResult<WorkflowInfoVO> newPage = new PageResult<>(originPage);
-        newPage.setData(originPage.getContent().stream().map(WorkflowInfoVO::from).collect(Collectors.toList()));
-        return newPage;
-    }
-
     @PostMapping("/list")
     public ResultDTO<PageResult<WorkflowInfoVO>> list(@RequestBody QueryWorkflowInfoRequest req) {
 
@@ -93,6 +86,13 @@ public class WorkflowController {
                 pageRequest);
         }
         return ResultDTO.success(convertPage(wfPage));
+    }
+
+    private static PageResult<WorkflowInfoVO> convertPage(Page<WorkflowInfoDO> originPage) {
+
+        PageResult<WorkflowInfoVO> newPage = new PageResult<>(originPage);
+        newPage.setData(originPage.getContent().stream().map(WorkflowInfoVO::from).collect(Collectors.toList()));
+        return newPage;
     }
 
     @GetMapping("/fetch")

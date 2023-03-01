@@ -29,6 +29,10 @@ public class WorkerLogReportEvent implements Event {
 
     private Status status;
 
+    public enum Status {
+        SUCCESS, REJECTED, EXCEPTION
+    }
+
     @Override
     public String type() {
         return "MONITOR_LOGGER_WORKER_LOG_REPORT";
@@ -37,9 +41,5 @@ public class WorkerLogReportEvent implements Event {
     @Override
     public String message() {
         return SJ.MONITOR_JOINER.join(workerAddress, logNum, logSize, status);
-    }
-
-    public enum Status {
-        SUCCESS, REJECTED, EXCEPTION
     }
 }

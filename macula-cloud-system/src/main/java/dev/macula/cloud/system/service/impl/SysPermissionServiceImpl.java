@@ -21,7 +21,7 @@ import cn.hutool.core.collection.CollectionUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import dev.macula.boot.constants.GlobalConstants;
+import dev.macula.boot.constants.SecurityConstants;
 import dev.macula.cloud.system.mapper.SysPermissionMapper;
 import dev.macula.cloud.system.pojo.entity.SysPermission;
 import dev.macula.cloud.system.query.PermPageQuery;
@@ -82,7 +82,7 @@ public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, S
     @Override
     @Async
     public void refreshPermRolesRules() {
-        redisTemplate.delete(GlobalConstants.SECURITY_URL_PERM_ROLES_KEY);
+        redisTemplate.delete(SecurityConstants.SECURITY_URL_PERM_ROLES_KEY);
         List<SysPermission> permissions = this.listPermRoles();
         if (CollectionUtil.isNotEmpty(permissions)) {
             // 初始化URL【权限->角色(集合)】规则
@@ -95,7 +95,7 @@ public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, S
                     List<String> roles = item.getRoles();
                     urlPermRoles.put(perm, roles);
                 });
-                redisTemplate.opsForHash().putAll(GlobalConstants.SECURITY_URL_PERM_ROLES_KEY, urlPermRoles);
+                redisTemplate.opsForHash().putAll(SecurityConstants.SECURITY_URL_PERM_ROLES_KEY, urlPermRoles);
             }
         }
     }

@@ -23,7 +23,7 @@ import cn.hutool.core.lang.Validator;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import dev.macula.boot.constants.GlobalConstants;
+import dev.macula.boot.constants.SecurityConstants;
 import dev.macula.boot.enums.StatusEnum;
 import dev.macula.boot.result.Option;
 import dev.macula.cloud.system.converter.DeptConverter;
@@ -282,7 +282,7 @@ public class SysDeptServiceImpl extends ServiceImpl<SysDeptMapper, SysDept> impl
      */
     private String generateDeptTreePath(Long parentId) {
         String treePath = null;
-        if (GlobalConstants.ROOT_NODE_ID.equals(parentId)) {
+        if (SecurityConstants.ROOT_NODE_ID.equals(parentId)) {
             treePath = parentId + "";
         } else {
             SysDept parent = this.getById(parentId);

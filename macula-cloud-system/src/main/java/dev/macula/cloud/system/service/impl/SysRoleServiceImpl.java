@@ -24,7 +24,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import dev.macula.boot.constants.GlobalConstants;
+import dev.macula.boot.constants.SecurityConstants;
 import dev.macula.boot.result.Option;
 import dev.macula.boot.starter.security.utils.SecurityUtils;
 import dev.macula.cloud.system.converter.RoleConverter;
@@ -77,7 +77,7 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
             new LambdaQueryWrapper<SysRole>().and(StrUtil.isNotBlank(keywords),
                     wrapper -> wrapper.like(StrUtil.isNotBlank(keywords), SysRole::getName, keywords).or()
                         .like(StrUtil.isNotBlank(keywords), SysRole::getCode, keywords))
-                .ne(!SecurityUtils.isRoot(), SysRole::getCode, GlobalConstants.ROOT_ROLE_CODE) // 非超级管理员不显示超级管理员角色
+                .ne(!SecurityUtils.isRoot(), SysRole::getCode, SecurityConstants.ROOT_ROLE_CODE) // 非超级管理员不显示超级管理员角色
         );
 
         // Page<SysRole> rolePage = this.baseMapper.listRolePages( new Page<>(pageNum, pageSize), queryParams,UserUtils.isRoot(),GlobalConstants.ROOT_ROLE_CODE);
@@ -96,7 +96,8 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
         // 查询数据
         List<SysRole> roleList = this.list(
             new LambdaQueryWrapper<SysRole>().ne(!SecurityUtils.isRoot(), SysRole::getCode,
-                GlobalConstants.ROOT_ROLE_CODE).select(SysRole::getId, SysRole::getName).orderByAsc(SysRole::getSort));
+                    SecurityConstants.ROOT_ROLE_CODE).select(SysRole::getId, SysRole::getName)
+                .orderByAsc(SysRole::getSort));
 
         // List<SysRole> roleList = this.baseMapper.listDeptOptions(UserUtils.isRoot(),GlobalConstants.ROOT_ROLE_CODE);
         // 实体转换

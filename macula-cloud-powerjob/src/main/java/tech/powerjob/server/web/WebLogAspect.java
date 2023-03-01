@@ -63,13 +63,6 @@ public class WebLogAspect {
     public void webLog() {
     }
 
-    /**
-     * 定义切入点 第一个*：标识所有返回类型 字母路径：包路径 两个点..：当前包以及子包 第二个*：所有的类 第三个*：所有的方法 最后的两个点：所有类型的参数
-     */
-    @Pointcut("execution(public * tech.powerjob.server.web.controller..*.*(..))")
-    public void include() {
-    }
-
     @Before("webLog()")
     public void doBefore(JoinPoint joinPoint) {
         try {
@@ -93,5 +86,12 @@ public class WebLogAspect {
             // just for safe
             log.error("[WebLogAspect] aop occur exception, please concat @KFCFans to fix the bug!", e);
         }
+    }
+
+    /**
+     * 定义切入点 第一个*：标识所有返回类型 字母路径：包路径 两个点..：当前包以及子包 第二个*：所有的类 第三个*：所有的方法 最后的两个点：所有类型的参数
+     */
+    @Pointcut("execution(public * tech.powerjob.server.web.controller..*.*(..))")
+    public void include() {
     }
 }

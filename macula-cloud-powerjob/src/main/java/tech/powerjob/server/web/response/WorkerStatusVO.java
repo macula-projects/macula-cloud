@@ -27,6 +27,19 @@ public class WorkerStatusVO {
     private String tag;
     private String lastActiveTime;
 
+    private Integer lightTaskTrackerNum;
+
+    private Integer heavyTaskTrackerNum;
+
+    private long lastOverloadTime;
+
+    private boolean overloading;
+
+    /**
+     * 1 -> 健康，绿色，2 -> 一般，橙色，3 -> 糟糕，红色，9999 -> 非在线机器
+     */
+    private int status;
+
     /**
      * 12.3%(4 cores)
      */
@@ -36,15 +49,8 @@ public class WorkerStatusVO {
      */
     private static final String OTHER_FORMAT = "%s%%（%s / %s GB）";
     private static final DecimalFormat df = new DecimalFormat("#.#");
+
     private static final double THRESHOLD = 0.8;
-    private Integer lightTaskTrackerNum;
-    private Integer heavyTaskTrackerNum;
-    private long lastOverloadTime;
-    private boolean overloading;
-    /**
-     * 1 -> 健康，绿色，2 -> 一般，橙色，3 -> 糟糕，红色，9999 -> 非在线机器
-     */
-    private int status;
 
     public WorkerStatusVO(WorkerInfo workerInfo) {
 

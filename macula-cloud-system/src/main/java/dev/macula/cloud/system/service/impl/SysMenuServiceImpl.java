@@ -23,7 +23,7 @@ import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import dev.macula.boot.constants.GlobalConstants;
+import dev.macula.boot.constants.SecurityConstants;
 import dev.macula.boot.enums.StatusEnum;
 import dev.macula.boot.result.Option;
 import dev.macula.cloud.system.converter.MenuConverter;
@@ -56,24 +56,6 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
     private final MenuConverter menuConverter;
 
     /**
-     * 递归生成菜单下拉层级列表
-     *
-     * @param parentId 父级ID
-     * @param menuList 菜单列表
-     * @return
-     */
-    private static List<Option> recurMenuOptions(Long parentId, List<SysMenu> menuList) {
-        if (CollectionUtil.isEmpty(menuList)) {
-            return Collections.EMPTY_LIST;
-        }
-
-        List<Option> menus = menuList.stream().filter(menu -> menu.getParentId().equals(parentId))
-            .map(menu -> new Option(menu.getId(), menu.getName(), recurMenuOptions(menu.getId(), menuList)))
-            .collect(ArrayList::new, ArrayList::add, ArrayList::addAll);
-        return menus;
-    }
-
-    /**
      * 递归生成资源（菜单+权限）树形列表
      *
      * @param parentId 父级ID
@@ -95,6 +77,24 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
 
             return resourceVO;
         }).collect(Collectors.toList());
+        return menus;
+    }
+
+    /**
+     * 递归生成菜单下拉层级列表
+     *
+     * @param parentId 父级ID
+     * @param menuList 菜单列表
+     * @return
+     */
+    private static List<Option> recurMenuOptions(Long parentId, List<SysMenu> menuList) {
+        if (CollectionUtil.isEmpty(menuList)) {
+            return Collections.EMPTY_LIST;
+        }
+
+        List<Option> menus = menuList.stream().filter(menu -> menu.getParentId().equals(parentId))
+            .map(menu -> new Option(menu.getId(), menu.getName(), recurMenuOptions(menu.getId(), menuList)))
+            .collect(ArrayList::new, ArrayList::add, ArrayList::addAll);
         return menus;
     }
 
@@ -121,16 +121,6 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
     }
 
     /**
-     * 菜单下拉数据
-     */
-    @Override
-    public List<Option> listMenuOptions() {
-        List<SysMenu> menuList = this.list(new LambdaQueryWrapper<SysMenu>().orderByAsc(SysMenu::getSort));
-        List<Option> menus = recurMenuOptions(GlobalConstants.ROOT_NODE_ID, menuList);
-        return menus;
-    }
-
-    /**
      * 菜单表格树形列表
      */
     @Override
@@ -154,13 +144,23 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
     }
 
     /**
+     * 菜单下拉数据
+     */
+    @Override
+    public List<Option> listMenuOptions() {
+        List<SysMenu> menuList = this.list(new LambdaQueryWrapper<SysMenu>().orderByAsc(SysMenu::getSort));
+        List<Option> menus = recurMenuOptions(SecurityConstants.ROOT_NODE_ID, menuList);
+        return menus;
+    }
+
+    /**
      * 路由列表
      */
     @Override
     @Cacheable(cacheNames = "system", key = "'routes'")
     public List<RouteVO> listRoutes() {
         List<RouteBO> menuList = this.baseMapper.listRoutes();
-        List<RouteVO> routeList = recurRoutes(GlobalConstants.ROOT_NODE_ID, menuList);
+        List<RouteVO> routeList = recurRoutes(SecurityConstants.ROOT_NODE_ID, menuList);
         return routeList;
     }
 
@@ -214,7 +214,7 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
     @Override
     public List<ResourceVO> listResources() {
         List<SysMenu> menuList = this.list(new LambdaQueryWrapper<SysMenu>().orderByAsc(SysMenu::getSort));
-        List<ResourceVO> resources = recurResources(GlobalConstants.ROOT_NODE_ID, menuList);
+        List<ResourceVO> resources = recurResources(SecurityConstants.ROOT_NODE_ID, menuList);
         return resources;
     }
 

@@ -28,10 +28,13 @@ public class WorkerInfo {
 
     private String tag;
 
-    private static final long WORKER_TIMEOUT_MS = 60000;
     private int lightTaskTrackerNum;
+
     private int heavyTaskTrackerNum;
+
     private long lastOverloadTime;
+
+    private static final long WORKER_TIMEOUT_MS = 60000;
 
     private SystemMetrics systemMetrics;
 

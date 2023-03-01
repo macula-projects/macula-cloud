@@ -42,12 +42,22 @@ public class WorkflowDAG {
     @NoArgsConstructor
     public static final class Node {
 
+        public Node(PEWorkflowDAG.Node node) {
+            this.nodeId = node.getNodeId();
+            this.holder = node;
+            this.dependencies = Lists.newLinkedList();
+            this.dependenceEdgeMap = Maps.newHashMap();
+            this.successors = Lists.newLinkedList();
+            this.successorEdgeMap = Maps.newHashMap();
+        }
+
         /**
          * node id
          *
          * @since 20210128
          */
         private Long nodeId;
+
         private PEWorkflowDAG.Node holder;
         /**
          * 依赖的上游节点
@@ -65,14 +75,6 @@ public class WorkflowDAG {
          * 连接后继节点的边
          */
         private Map<Node, PEWorkflowDAG.Edge> successorEdgeMap;
-        public Node(PEWorkflowDAG.Node node) {
-            this.nodeId = node.getNodeId();
-            this.holder = node;
-            this.dependencies = Lists.newLinkedList();
-            this.dependenceEdgeMap = Maps.newHashMap();
-            this.successors = Lists.newLinkedList();
-            this.successorEdgeMap = Maps.newHashMap();
-        }
 
     }
 }

@@ -30,7 +30,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.google.common.collect.Lists;
 import dev.macula.boot.base.IBaseEnum;
-import dev.macula.boot.constants.GlobalConstants;
+import dev.macula.boot.constants.SecurityConstants;
 import dev.macula.boot.enums.GenderEnum;
 import dev.macula.boot.starter.security.utils.SecurityUtils;
 import dev.macula.cloud.system.converter.UserConverter;
@@ -102,10 +102,10 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
 
         // 用户权限集合
         Set<String> perms =
-            (Set<String>)redisTemplate.opsForValue().get(GlobalConstants.SECURITY_USER_BTN_PERMS_KEY + username);
+            (Set<String>)redisTemplate.opsForValue().get(SecurityConstants.SECURITY_USER_BTN_PERMS_KEY + username);
         if (perms == null) {
             perms = menuService.listRolePerms(roles);
-            redisTemplate.opsForValue().set(GlobalConstants.SECURITY_USER_BTN_PERMS_KEY + username, perms);
+            redisTemplate.opsForValue().set(SecurityConstants.SECURITY_USER_BTN_PERMS_KEY + username, perms);
         }
         userLoginVO.setPerms(perms);
 
@@ -136,7 +136,7 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         if (CollectionUtil.isNotEmpty(roles)) {
             // 每次被调用也就是用户登录的时候，更新按钮权限缓存
             Set<String> perms = menuService.listRolePerms(roles);
-            redisTemplate.opsForValue().set(GlobalConstants.SECURITY_USER_BTN_PERMS_KEY + username, perms);
+            redisTemplate.opsForValue().set(SecurityConstants.SECURITY_USER_BTN_PERMS_KEY + username, perms);
 
             // 获取最大范围的数据权限
             Integer dataScope = roleService.getMaximumDataScope(roles);
@@ -196,7 +196,7 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         SysUser entity = userConverter.form2Entity(userForm);
 
         // 设置默认加密密码
-        String defaultEncryptPwd = passwordEncoder.encode(GlobalConstants.DEFAULT_USER_PASSWORD);
+        String defaultEncryptPwd = passwordEncoder.encode(SecurityConstants.DEFAULT_USER_PASSWORD);
         entity.setPassword(defaultEncryptPwd);
 
         // 新增用户
@@ -328,7 +328,7 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
             user.setEmail(userItem.getEmail());
             user.setDeptId(deptId);
             // 默认密码
-            user.setPassword(passwordEncoder.encode(GlobalConstants.DEFAULT_USER_PASSWORD));
+            user.setPassword(passwordEncoder.encode(SecurityConstants.DEFAULT_USER_PASSWORD));
             // 性别转换
             Integer gender = (Integer)IBaseEnum.getValueByLabel(userItem.getGender(), GenderEnum.class);
             user.setGender(gender);
