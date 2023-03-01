@@ -38,9 +38,7 @@ public class SysDictItemController {
 
     @Operation(summary = "字典数据分页列表")
     @GetMapping("/pages")
-    public IPage<DictItemPageVO> listDictItemPages(
-            DictItemPageQuery queryParams
-    ) {
+    public IPage<DictItemPageVO> listDictItemPages(DictItemPageQuery queryParams) {
         IPage<DictItemPageVO> result = dictItemService.listDictItemPages(queryParams);
         return result;
     }
@@ -48,28 +46,21 @@ public class SysDictItemController {
     @Operation(summary = "字典数据表单数据")
     @Parameter(name = "字典ID")
     @GetMapping("/{id}/form")
-    public DictItemForm getDictItemForm(
-            @PathVariable Long id
-    ) {
+    public DictItemForm getDictItemForm(@PathVariable Long id) {
         DictItemForm formData = dictItemService.getDictItemForm(id);
         return formData;
     }
 
     @Operation(summary = "新增字典数据")
     @PostMapping
-    public boolean saveDictItem(
-            @RequestBody DictItemForm DictItemForm
-    ) {
+    public boolean saveDictItem(@RequestBody DictItemForm DictItemForm) {
         boolean result = dictItemService.saveDictItem(DictItemForm);
         return result;
     }
 
     @Operation(summary = "修改字典数据")
     @PutMapping("/{id}")
-    public boolean updateDictItem(
-            @PathVariable Long id,
-            @RequestBody DictItemForm DictItemForm
-    ) {
+    public boolean updateDictItem(@PathVariable Long id, @RequestBody DictItemForm DictItemForm) {
         boolean status = dictItemService.updateDictItem(id, DictItemForm);
         return status;
     }
@@ -77,9 +68,7 @@ public class SysDictItemController {
     @Operation(summary = "删除字典")
     @Parameter(name = "字典ID", description = "字典ID，多个以英文逗号(,)拼接")
     @DeleteMapping("/{ids}")
-    public boolean deleteDictItems(
-            @PathVariable String ids
-    ) {
+    public boolean deleteDictItems(@PathVariable String ids) {
         boolean result = dictItemService.deleteDictItems(ids);
         return result;
     }

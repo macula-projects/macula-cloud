@@ -35,14 +35,14 @@ public class CanalListener {
 
     private final SysMenuService menuService;
 
-//    @RabbitListener(queues = "canal.queue")
-//    public void handleDataChange(@Payload CanalMessage message) {
-//        String tableName = message.getTable();
-//
-//        log.info("Canal 监听 {} 发生变化；明细：{}", tableName, message);
-//        if (Arrays.asList("sys_menu", "sys_role", "sys_role_menu").contains(tableName)) {
-//            log.info("======== 清理菜单路由缓存 ========");
-//            menuService.cleanCache();
-//        }
-//    }
+    //    @RabbitListener(queues = "canal.queue")
+    //    public void handleDataChange(@Payload CanalMessage message) {
+    //        String tableName = message.getTable();
+    //
+    //        log.info("Canal 监听 {} 发生变化；明细：{}", tableName, message);
+    //        if (Arrays.asList("sys_menu", "sys_role", "sys_role_menu").contains(tableName)) {
+    //            log.info("======== 清理菜单路由缓存 ========");
+    //            menuService.cleanCache();
+    //        }
+    //    }
 }

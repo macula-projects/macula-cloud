@@ -74,14 +74,10 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
 
         // 查询数据
         Page<SysRole> rolePage = this.page(new Page<>(pageNum, pageSize),
-                new LambdaQueryWrapper<SysRole>()
-                        .and(StrUtil.isNotBlank(keywords),
-                                wrapper ->
-                                        wrapper.like(StrUtil.isNotBlank(keywords), SysRole::getName, keywords)
-                                                .or()
-                                                .like(StrUtil.isNotBlank(keywords), SysRole::getCode, keywords)
-                        )
-                        .ne(!SecurityUtils.isRoot(), SysRole::getCode, GlobalConstants.ROOT_ROLE_CODE) // 非超级管理员不显示超级管理员角色
+            new LambdaQueryWrapper<SysRole>().and(StrUtil.isNotBlank(keywords),
+                    wrapper -> wrapper.like(StrUtil.isNotBlank(keywords), SysRole::getName, keywords).or()
+                        .like(StrUtil.isNotBlank(keywords), SysRole::getCode, keywords))
+                .ne(!SecurityUtils.isRoot(), SysRole::getCode, GlobalConstants.ROOT_ROLE_CODE) // 非超级管理员不显示超级管理员角色
         );
 
         // Page<SysRole> rolePage = this.baseMapper.listRolePages( new Page<>(pageNum, pageSize), queryParams,UserUtils.isRoot(),GlobalConstants.ROOT_ROLE_CODE);
@@ -98,11 +94,9 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
     @Override
     public List<Option> listRoleOptions() {
         // 查询数据
-        List<SysRole> roleList = this.list(new LambdaQueryWrapper<SysRole>()
-                .ne(!SecurityUtils.isRoot(), SysRole::getCode, GlobalConstants.ROOT_ROLE_CODE)
-                .select(SysRole::getId, SysRole::getName)
-                .orderByAsc(SysRole::getSort)
-        );
+        List<SysRole> roleList = this.list(
+            new LambdaQueryWrapper<SysRole>().ne(!SecurityUtils.isRoot(), SysRole::getCode,
+                GlobalConstants.ROOT_ROLE_CODE).select(SysRole::getId, SysRole::getName).orderByAsc(SysRole::getSort));
 
         // List<SysRole> roleList = this.baseMapper.listDeptOptions(UserUtils.isRoot(),GlobalConstants.ROOT_ROLE_CODE);
         // 实体转换
@@ -120,11 +114,8 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
         Long roleId = roleForm.getId();
         String roleCode = roleForm.getCode();
 
-        long count = this.count(new LambdaQueryWrapper<SysRole>()
-                .ne(roleId != null, SysRole::getId, roleId)
-                .and(wrapper ->
-                        wrapper.eq(SysRole::getCode, roleCode).or().eq(SysRole::getName, roleCode)
-                ));
+        long count = this.count(new LambdaQueryWrapper<SysRole>().ne(roleId != null, SysRole::getId, roleId)
+            .and(wrapper -> wrapper.eq(SysRole::getCode, roleCode).or().eq(SysRole::getName, roleCode)));
         Assert.isTrue(count == 0, "角色名称或角色编码重复，请检查！");
 
         // 实体转换
@@ -144,9 +135,8 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
      */
     @Override
     public boolean updateRoleStatus(Long roleId, Integer status) {
-        boolean result = this.update(new LambdaUpdateWrapper<SysRole>()
-                .eq(SysRole::getId, roleId)
-                .set(SysRole::getStatus, status));
+        boolean result =
+            this.update(new LambdaUpdateWrapper<SysRole>().eq(SysRole::getId, roleId).set(SysRole::getStatus, status));
         return result;
     }
 
@@ -158,15 +148,13 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
      */
     @Override
     public boolean deleteRoles(String ids) {
-        List<Long> roleIds = Arrays.asList(ids.split(",")).stream().map(id -> Long.parseLong(id)).collect(Collectors.toList());
-        Optional.ofNullable(roleIds)
-                .orElse(new ArrayList<>())
-                .forEach(id -> {
-                    long count = sysUserRoleService.count(new LambdaQueryWrapper<SysUserRole>().eq(SysUserRole::getRoleId, id));
-                    Assert.isTrue(count <= 0, "该角色已分配用户，无法删除");
-                    sysRoleMenuService.remove(new LambdaQueryWrapper<SysRoleMenu>().eq(SysRoleMenu::getRoleId, id));
-                });
-
+        List<Long> roleIds =
+            Arrays.asList(ids.split(",")).stream().map(id -> Long.parseLong(id)).collect(Collectors.toList());
+        Optional.ofNullable(roleIds).orElse(new ArrayList<>()).forEach(id -> {
+            long count = sysUserRoleService.count(new LambdaQueryWrapper<SysUserRole>().eq(SysUserRole::getRoleId, id));
+            Assert.isTrue(count <= 0, "该角色已分配用户，无法删除");
+            sysRoleMenuService.remove(new LambdaQueryWrapper<SysRoleMenu>().eq(SysRoleMenu::getRoleId, id));
+        });
 
         boolean result = this.removeByIds(roleIds);
         return result;
@@ -200,20 +188,20 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
         sysRoleMenuService.remove(new LambdaQueryWrapper<SysRoleMenu>().eq(SysRoleMenu::getRoleId, roleId));
         // 新增角色菜单关系
         if (CollectionUtil.isNotEmpty(menuIds)) {
-            List<SysRoleMenu> roleMenus = menuIds.stream()
-                    .map(menuId -> new SysRoleMenu(roleId, menuId))
-                    .collect(Collectors.toList());
+            List<SysRoleMenu> roleMenus =
+                menuIds.stream().map(menuId -> new SysRoleMenu(roleId, menuId)).collect(Collectors.toList());
             sysRoleMenuService.saveBatch(roleMenus);
         }
 
         // 删除角色权限
-        sysRolePermissionService.remove(new LambdaQueryWrapper<SysRolePermission>().eq(SysRolePermission::getRoleId, roleId));
+        sysRolePermissionService.remove(
+            new LambdaQueryWrapper<SysRolePermission>().eq(SysRolePermission::getRoleId, roleId));
         // 新增角色权限关系（用勾选的菜单ID获取权限，用权限ID和角色ID组装sys_role_permission表)
         List<SysPermission> permList = sysPermissionService.list(
-                new LambdaQueryWrapper<SysPermission>()
-                        .in(menuIds != null, SysPermission::getMenuId, menuIds));
+            new LambdaQueryWrapper<SysPermission>().in(menuIds != null, SysPermission::getMenuId, menuIds));
         if (CollectionUtil.isNotEmpty(permList)) {
-            List<SysRolePermission> rolePerms = permList.stream().map(perm -> new SysRolePermission(roleId, perm.getId())).collect(Collectors.toList());
+            List<SysRolePermission> rolePerms =
+                permList.stream().map(perm -> new SysRolePermission(roleId, perm.getId())).collect(Collectors.toList());
             sysRolePermissionService.saveBatch(rolePerms);
         }
 

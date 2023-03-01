@@ -45,7 +45,8 @@ import java.util.stream.Collectors;
  */
 @Service
 @RequiredArgsConstructor
-public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, SysPermission> implements SysPermissionService {
+public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, SysPermission>
+    implements SysPermissionService {
 
     private final RedisTemplate redisTemplate;
 
@@ -85,9 +86,8 @@ public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, S
         List<SysPermission> permissions = this.listPermRoles();
         if (CollectionUtil.isNotEmpty(permissions)) {
             // 初始化URL【权限->角色(集合)】规则
-            List<SysPermission> urlPermList = permissions.stream()
-                    .filter(item -> StrUtil.isNotBlank(item.getUrlPerm()))
-                    .collect(Collectors.toList());
+            List<SysPermission> urlPermList =
+                permissions.stream().filter(item -> StrUtil.isNotBlank(item.getUrlPerm())).collect(Collectors.toList());
             if (CollectionUtil.isNotEmpty(urlPermList)) {
                 Map<String, List<String>> urlPermRoles = new HashMap<>();
                 urlPermList.stream().forEach(item -> {

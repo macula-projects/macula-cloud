@@ -21,7 +21,6 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import dev.macula.cloud.system.pojo.entity.SysUserRole;
 import org.apache.ibatis.annotations.Mapper;
 
-
 /**
  * 用户角色持久层
  *

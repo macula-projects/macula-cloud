@@ -29,7 +29,8 @@ import java.util.List;
  * 角色权限实现类
  */
 @Service
-public class SysRolePermissionServiceImpl extends ServiceImpl<SysRolePermissionMapper, SysRolePermission> implements SysRolePermissionService {
+public class SysRolePermissionServiceImpl extends ServiceImpl<SysRolePermissionMapper, SysRolePermission>
+    implements SysRolePermissionService {
 
     /**
      * 获取角色拥有的权限ID集合

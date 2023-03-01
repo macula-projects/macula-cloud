@@ -60,9 +60,7 @@ public class SysRoleController {
     @Operation(summary = "角色详情")
     @Parameter(name = "角色ID")
     @GetMapping("/{roleId}")
-    public SysRole getRoleDetail(
-            @PathVariable Long roleId
-    ) {
+    public SysRole getRoleDetail(@PathVariable Long roleId) {
         SysRole role = roleService.getById(roleId);
         return role;
     }
@@ -87,9 +85,7 @@ public class SysRoleController {
     @Operation(summary = "删除角色")
     @Parameter(description = "删除角色，多个以英文逗号(,)分割")
     @DeleteMapping("/{ids}")
-    public boolean deleteRoles(
-            @PathVariable String ids
-    ) {
+    public boolean deleteRoles(@PathVariable String ids) {
         boolean result = roleService.deleteRoles(ids);
         return result;
     }
@@ -98,10 +94,7 @@ public class SysRoleController {
     @Parameter(name = "角色ID")
     @Parameter(name = "角色状态", description = "角色状态:1-启用；0-禁用")
     @PutMapping(value = "/{roleId}/status")
-    public boolean updateRoleStatus(
-            @PathVariable Long roleId,
-            @RequestParam Integer status
-    ) {
+    public boolean updateRoleStatus(@PathVariable Long roleId, @RequestParam Integer status) {
         boolean result = roleService.updateRoleStatus(roleId, status);
         return result;
     }
@@ -109,19 +102,14 @@ public class SysRoleController {
     @Operation(summary = "获取角色的菜单ID集合")
     @Parameter(name = "角色ID")
     @GetMapping("/{roleId}/menuIds")
-    public List<Long> getRoleMenuIds(
-            @PathVariable Long roleId
-    ) {
+    public List<Long> getRoleMenuIds(@PathVariable Long roleId) {
         List<Long> resourceIds = roleService.getRoleMenuIds(roleId);
         return resourceIds;
     }
 
     @Operation(summary = "分配角色的资源权限")
     @PutMapping("/{roleId}/menus")
-    public boolean updateRoleMenus(
-            @PathVariable Long roleId,
-            @RequestBody List<Long> menuIds
-    ) {
+    public boolean updateRoleMenus(@PathVariable Long roleId, @RequestBody List<Long> menuIds) {
         boolean result = roleService.updateRoleMenus(roleId, menuIds);
         if (result) {
             sysPermissionService.refreshPermRolesRules();

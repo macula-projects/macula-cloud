@@ -17,7 +17,6 @@
 
 package dev.macula.cloud.system.service;
 
-
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
 import dev.macula.boot.result.Option;
@@ -44,7 +43,6 @@ public interface SysRoleService extends IService<SysRole> {
      * @return
      */
     Page<RolePageVO> listRolePages(RolePageQuery queryParams);
-
 
     /**
      * 角色下拉列表
@@ -76,7 +74,6 @@ public interface SysRoleService extends IService<SysRole> {
      */
     boolean deleteRoles(String ids);
 
-
     /**
      * 获取角色的资源ID集合,资源包括菜单和权限
      *
@@ -84,7 +81,6 @@ public interface SysRoleService extends IService<SysRole> {
      * @return
      */
     List<Long> getRoleMenuIds(Long roleId);
-
 
     /**
      * 修改角色的资源权限

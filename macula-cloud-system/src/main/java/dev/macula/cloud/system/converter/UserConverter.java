@@ -38,9 +38,8 @@ import org.mapstruct.Mappings;
 @Mapper(componentModel = "spring")
 public interface UserConverter {
 
-    @Mappings({
-            @Mapping(target = "genderLabel", expression = "java(dev.macula.boot.base.IBaseEnum.getLabelByValue(po.getGender(), dev.macula.boot.enums.GenderEnum.class))")
-    })
+    @Mappings({@Mapping(target = "genderLabel",
+        expression = "java(dev.macula.boot.base.IBaseEnum.getLabelByValue(po.getGender(), dev.macula.boot.enums.GenderEnum.class))")})
     UserVO po2Vo(UserBO po);
 
     Page<UserVO> bo2Vo(Page<UserBO> po);
@@ -50,8 +49,6 @@ public interface UserConverter {
     @InheritInverseConfiguration(name = "entity2Form")
     SysUser form2Entity(UserForm entity);
 
-    @Mappings({
-            @Mapping(target = "userId", source = "id")
-    })
+    @Mappings({@Mapping(target = "userId", source = "id")})
     UserLoginVO entity2LoginUser(SysUser entity);
 }

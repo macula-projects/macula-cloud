@@ -22,8 +22,8 @@ import com.alibaba.csp.sentinel.slots.block.BlockException;
 import com.alibaba.csp.sentinel.slots.block.degrade.DegradeException;
 import com.alibaba.csp.sentinel.slots.block.flow.FlowException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import dev.macula.boot.result.Result;
 import dev.macula.boot.result.ApiResultCode;
+import dev.macula.boot.result.Result;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 

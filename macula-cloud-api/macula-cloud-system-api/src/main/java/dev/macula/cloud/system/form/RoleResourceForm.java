@@ -22,7 +22,6 @@ import lombok.Data;
 
 import java.util.List;
 
-
 @Schema(description = "菜单资源表单")
 @Data
 public class RoleResourceForm {

@@ -63,13 +63,10 @@ public class SysDictItemServiceImpl extends ServiceImpl<SysDictItemMapper, SysDi
         String typeCode = queryParams.getTypeCode();
 
         // 查询数据
-        Page<SysDictItem> dictItemPage = this.page(
-                new Page<>(pageNum, pageSize),
-                new LambdaQueryWrapper<SysDictItem>()
-                        .like(StrUtil.isNotBlank(keywords), SysDictItem::getName, keywords)
-                        .eq(StrUtil.isNotBlank(typeCode), SysDictItem::getTypeCode, typeCode)
-                        .select(SysDictItem::getId, SysDictItem::getName, SysDictItem::getValue, SysDictItem::getStatus)
-        );
+        Page<SysDictItem> dictItemPage = this.page(new Page<>(pageNum, pageSize),
+            new LambdaQueryWrapper<SysDictItem>().like(StrUtil.isNotBlank(keywords), SysDictItem::getName, keywords)
+                .eq(StrUtil.isNotBlank(typeCode), SysDictItem::getTypeCode, typeCode)
+                .select(SysDictItem::getId, SysDictItem::getName, SysDictItem::getValue, SysDictItem::getStatus));
 
         // 实体转换
         Page<DictItemPageVO> pageResult = dictItemConverter.entity2Page(dictItemPage);
@@ -85,17 +82,9 @@ public class SysDictItemServiceImpl extends ServiceImpl<SysDictItemMapper, SysDi
     @Override
     public DictItemForm getDictItemForm(Long id) {
         // 获取entity
-        SysDictItem entity = this.getOne(new LambdaQueryWrapper<SysDictItem>()
-                .eq(SysDictItem::getId, id)
-                .select(
-                        SysDictItem::getId,
-                        SysDictItem::getTypeCode,
-                        SysDictItem::getName,
-                        SysDictItem::getValue,
-                        SysDictItem::getStatus,
-                        SysDictItem::getSort,
-                        SysDictItem::getRemark
-                ));
+        SysDictItem entity = this.getOne(new LambdaQueryWrapper<SysDictItem>().eq(SysDictItem::getId, id)
+            .select(SysDictItem::getId, SysDictItem::getTypeCode, SysDictItem::getName, SysDictItem::getValue,
+                SysDictItem::getStatus, SysDictItem::getSort, SysDictItem::getRemark));
         Assert.isTrue(entity != null, "字典数据项不存在");
 
         // 实体转换
@@ -142,10 +131,8 @@ public class SysDictItemServiceImpl extends ServiceImpl<SysDictItemMapper, SysDi
     public boolean deleteDictItems(String idsStr) {
         Assert.isTrue(StrUtil.isNotBlank(idsStr), "删除数据为空");
         //
-        List<Long> ids = Arrays.asList(idsStr.split(","))
-                .stream()
-                .map(id -> Long.parseLong(id))
-                .collect(Collectors.toList());
+        List<Long> ids =
+            Arrays.asList(idsStr.split(",")).stream().map(id -> Long.parseLong(id)).collect(Collectors.toList());
 
         // 删除字典数据项
         boolean result = this.removeByIds(ids);

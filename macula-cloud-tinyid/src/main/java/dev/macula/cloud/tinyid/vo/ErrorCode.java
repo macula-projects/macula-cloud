@@ -17,9 +17,9 @@
 
 package dev.macula.cloud.tinyid.vo;
 
+import dev.macula.boot.result.ResultCode;
 import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
-import dev.macula.boot.result.ResultCode;
 
 import java.io.Serializable;
 
@@ -38,7 +38,6 @@ public enum ErrorCode implements ResultCode, Serializable {
      * server internal error
      */
     SYS_ERR("ID502", "sys error");
-
 
     private String code;
 

@@ -17,9 +17,9 @@
 
 package dev.macula.cloud.tinyid;
 
-import org.junit.jupiter.api.Test;
 import dev.macula.boot.starter.tinyid.base.factory.IdGeneratorFactory;
 import dev.macula.boot.starter.tinyid.base.generator.IdGenerator;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 

@@ -69,19 +69,14 @@ public class SysDeptController {
 
     @Operation(summary = "新增部门")
     @PostMapping
-    public Long saveDept(
-            @Valid @RequestBody DeptForm formData
-    ) {
+    public Long saveDept(@Valid @RequestBody DeptForm formData) {
         Long id = deptService.saveDept(formData);
         return id;
     }
 
     @Operation(summary = "修改部门")
     @PutMapping(value = "/{deptId}")
-    public Long updateDept(
-            @PathVariable Long deptId,
-            @Valid @RequestBody DeptForm formData
-    ) {
+    public Long updateDept(@PathVariable Long deptId, @Valid @RequestBody DeptForm formData) {
         deptId = deptService.updateDept(deptId, formData);
         return deptId;
     }
@@ -89,9 +84,7 @@ public class SysDeptController {
     @Operation(summary = "删除部门")
     @Parameter(name = "部门ID，多个以英文逗号(,)分割")
     @DeleteMapping("/{ids}")
-    public boolean deleteDepartments(
-            @PathVariable("ids") String ids
-    ) {
+    public boolean deleteDepartments(@PathVariable("ids") String ids) {
         boolean result = deptService.deleteByIds(ids);
         return result;
     }

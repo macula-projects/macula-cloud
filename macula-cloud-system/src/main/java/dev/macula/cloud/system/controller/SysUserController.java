@@ -109,10 +109,8 @@ public class SysUserController {
     @Parameter(name = "用户状态", description = "用户状态(1:启用;0:禁用)")
     @PatchMapping(value = "/{userId}/status")
     public boolean updateStatus(@PathVariable Long userId, @RequestParam Integer status) {
-        boolean result = userService.update(new LambdaUpdateWrapper<SysUser>()
-                .eq(SysUser::getId, userId)
-                .set(SysUser::getStatus, status)
-        );
+        boolean result = userService.update(
+            new LambdaUpdateWrapper<SysUser>().eq(SysUser::getId, userId).set(SysUser::getStatus, status));
         return result;
     }
 
@@ -147,9 +145,7 @@ public class SysUserController {
         response.setHeader("Content-Disposition", "attachment; filename=" + URLEncoder.encode(fileName, "UTF-8"));
 
         List<UserExportVO> exportUserList = userService.listExportUsers(queryParams);
-        EasyExcel.write(response.getOutputStream(), UserExportVO.class)
-                .sheet("用户列表")
-                .doWrite(exportUserList);
+        EasyExcel.write(response.getOutputStream(), UserExportVO.class).sheet("用户列表").doWrite(exportUserList);
     }
 
     @Operation(summary = "获取认证信息", description = "根据用户名获取认证信息，给认证中心获取用户信息用，有密码")

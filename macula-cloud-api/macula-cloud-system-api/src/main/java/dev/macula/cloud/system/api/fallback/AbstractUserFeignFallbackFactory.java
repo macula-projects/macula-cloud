@@ -30,5 +30,4 @@ import org.springframework.cloud.openfeign.FallbackFactory;
 @Slf4j
 public abstract class AbstractUserFeignFallbackFactory implements FallbackFactory<UserFeignClient> {
 
-
 }

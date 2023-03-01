@@ -50,31 +50,23 @@ public class SysPermissionController {
     @Operation(summary = "权限列表")
     @Parameter(name = "菜单ID")
     @GetMapping
-    public List<SysPermission> listPermissions(
-            @RequestParam(required = false) Long menuId
-    ) {
+    public List<SysPermission> listPermissions(@RequestParam(required = false) Long menuId) {
         List<SysPermission> list = sysPermissionService.list(
-                new LambdaQueryWrapper<SysPermission>()
-                        .eq(menuId != null, SysPermission::getMenuId, menuId)
-        );
+            new LambdaQueryWrapper<SysPermission>().eq(menuId != null, SysPermission::getMenuId, menuId));
         return list;
     }
 
     @Operation(summary = "权限详情")
     @Parameter(name = "权限ID")
     @GetMapping("/{permissionId}")
-    public SysPermission getPermissionDetail(
-            @PathVariable Long permissionId
-    ) {
+    public SysPermission getPermissionDetail(@PathVariable Long permissionId) {
         SysPermission permission = sysPermissionService.getById(permissionId);
         return permission;
     }
 
     @Operation(summary = "新增权限")
     @PostMapping
-    public boolean addPerm(
-            @RequestBody SysPermission permission
-    ) {
+    public boolean addPerm(@RequestBody SysPermission permission) {
         boolean result = sysPermissionService.save(permission);
         return result;
     }
@@ -82,10 +74,7 @@ public class SysPermissionController {
     @Operation(summary = "修改权限")
     @Parameter(name = "权限ID")
     @PutMapping(value = "/{permissionId}")
-    public boolean updatePerm(
-            @PathVariable Long permissionId,
-            @RequestBody SysPermission permission
-    ) {
+    public boolean updatePerm(@PathVariable Long permissionId, @RequestBody SysPermission permission) {
         boolean result = sysPermissionService.updateById(permission);
         if (result) {
             sysPermissionService.refreshPermRolesRules();
@@ -96,9 +85,7 @@ public class SysPermissionController {
     @Operation(summary = "删除权限")
     @Parameter(name = "权限ID", description = "权限ID，多个以英文逗号(,)分割")
     @DeleteMapping("/{ids}")
-    public boolean deletePermissions(
-            @PathVariable String ids
-    ) {
+    public boolean deletePermissions(@PathVariable String ids) {
         boolean result = sysPermissionService.removeByIds(Arrays.asList(ids.split(",")));
         if (result) {
             sysPermissionService.refreshPermRolesRules();

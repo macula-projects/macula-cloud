@@ -46,7 +46,6 @@ public class DataSourceConfig {
         return DruidDataSourceBuilder.create().build();
     }
 
-
     @Bean
     @Primary
     public DataSource getDynamicDataSource(List<DataSource> dataSources) {
@@ -58,7 +57,7 @@ public class DataSourceConfig {
         // 添加多个数据源
         for (DataSource dataSource : dataSources) {
             if (dataSource instanceof DruidDataSource) {
-                String name = ((DruidDataSource) dataSource).getName();
+                String name = ((DruidDataSource)dataSource).getName();
                 targetDataSources.put(name, dataSource);
                 dataSourceKeys.add(name);
             }

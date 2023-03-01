@@ -17,9 +17,9 @@
 
 package dev.macula.cloud.tinyid.service.impl;
 
-import dev.macula.cloud.tinyid.service.TinyIdTokenService;
 import dev.macula.cloud.tinyid.dao.TinyIdTokenDAO;
 import dev.macula.cloud.tinyid.dao.entity.TinyIdToken;
+import dev.macula.cloud.tinyid.service.TinyIdTokenService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;

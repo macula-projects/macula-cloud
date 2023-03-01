@@ -3,7 +3,8 @@
 ## 简介
 
 macula-cloud-tinyid是基于滴滴[Tinyid](https://github.com/didi/tinyid)
-开发的一款分布式id生成系统，基于数据库号段算法实现，关于这个算法可以参考美团leaf或者tinyid原理介绍。Tinyid扩展了leaf-segment算法，支持了多db(master)
+开发的一款分布式id生成系统，基于数据库号段算法实现，关于这个算法可以参考美团leaf或者tinyid原理介绍。Tinyid扩展了leaf-segment算法，支持了多db(
+master)
 ，同时提供了starter使id生成本地化，获得了更好的性能与可用性。
 
 ## 性能与可用性
@@ -47,7 +48,8 @@ JDK1.7+,maven,mysql
     - id为本地生成(调用AtomicLong.addAndGet方法)，性能大大增加
     - client对server访问变的低频，减轻了server的压力
     - 因为低频，即便client使用方和server不在一个机房，也无须担心延迟
-    - 即便所有server挂掉，因为client预加载了号段，依然可以继续使用一段时间 注:使用tinyid-client方式，如果client机器较多频繁重启，可能会浪费较多的id，这时可以考虑使用http方式
+    - 即便所有server挂掉，因为client预加载了号段，依然可以继续使用一段时间 注:
+      使用tinyid-client方式，如果client机器较多频繁重启，可能会浪费较多的id，这时可以考虑使用http方式
 - 推荐db配置两个或更多:
     - db配置多个时，只要有1个db存活，则服务可用 多db配置，如配置了两个db，则每次新增业务需在两个db中都写入相关数据
 
@@ -55,7 +57,8 @@ JDK1.7+,maven,mysql
 
 - tinyid是基于数据库发号算法实现的，简单来说是数据库中保存了可用的id号段，tinyid会将可用号段加载到内存中，之后生成id会直接内存中产生。
 - 可用号段在第一次获取id时加载，如当前号段使用达到一定量时，会异步加载下一可用号段，保证内存中始终有可用号段。
-- (如可用号段1~1000被加载到内存，则获取id时，会从1开始递增获取，当使用到一定百分比时，如20%(默认)，即200时，会异步加载下一可用号段到内存，假设新加载的号段是1001~2000,则此时内存中可用号段为200~
+- (如可用号段1~1000被加载到内存，则获取id时，会从1开始递增获取，当使用到一定百分比时，如20%(默认)
+  ，即200时，会异步加载下一可用号段到内存，假设新加载的号段是1001~2000,则此时内存中可用号段为200~
   1000,1001~2000)，当id递增到1000时，当前号段使用完毕，下一号段会替换为当前号段。依次类推。
 
 ## tinyid系统架构图
@@ -69,8 +72,12 @@ JDK1.7+,maven,mysql
 - getNextSegmentId是获取下一个可用号段，tinyid-client会通过此接口来获取可用号段
 - IdGenerator是id生成的接口
 - IdGeneratorFactory是生产具体IdGenerator的工厂，每个biz_type生成一个IdGenerator实例。通过工厂，我们可以随时在db中新增biz_type，而不用重启服务
-- CachedIdGenerator则是具体的id生成器对象，持有currentSegmentId和nextSegmentId对象，负责nextId的核心流程。nextId最终通过AtomicLong.andAndGet(delta)
-  方法产生。
+-
+
+CachedIdGenerator则是具体的id生成器对象，持有currentSegmentId和nextSegmentId对象，负责nextId的核心流程。nextId最终通过AtomicLong.andAndGet(
+delta)
+方法产生。
+
 - SegmentIdService是生成SegmentId对象的服务，在服务端通过Db生成，在client端通过Http访问服务端生成
 
 ## 多数据库的配置

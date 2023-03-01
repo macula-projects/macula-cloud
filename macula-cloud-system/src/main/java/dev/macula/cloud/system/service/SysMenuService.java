@@ -43,7 +43,6 @@ public interface SysMenuService extends IService<SysMenu> {
      */
     List<MenuVO> listMenus(MenuQuery queryParams);
 
-
     /**
      * 获取菜单下拉列表
      *

@@ -43,7 +43,6 @@ public interface SysDictTypeService extends IService<SysDictType> {
      */
     Page<DictTypePageVO> listDictTypePages(DictTypePageQuery queryParams);
 
-
     /**
      * 获取字典类型表单详情
      *
@@ -52,7 +51,6 @@ public interface SysDictTypeService extends IService<SysDictType> {
      */
     DictTypeForm getDictTypeFormData(Long id);
 
-
     /**
      * 新增字典类型
      *
@@ -60,7 +58,6 @@ public interface SysDictTypeService extends IService<SysDictType> {
      * @return
      */
     boolean saveDictType(DictTypeForm dictTypeForm);
-
 
     /**
      * 修改字典类型
@@ -78,7 +75,6 @@ public interface SysDictTypeService extends IService<SysDictType> {
      * @return
      */
     boolean deleteDictTypes(String idsStr);
-
 
     /**
      * 获取字典类型的数据项

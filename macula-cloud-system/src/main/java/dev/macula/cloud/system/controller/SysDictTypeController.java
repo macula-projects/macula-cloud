@@ -21,8 +21,8 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import dev.macula.boot.result.Option;
 import dev.macula.cloud.system.form.DictTypeForm;
 import dev.macula.cloud.system.query.DictTypePageQuery;
-import dev.macula.cloud.system.vo.dict.DictTypePageVO;
 import dev.macula.cloud.system.service.SysDictTypeService;
+import dev.macula.cloud.system.vo.dict.DictTypePageVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -49,9 +49,7 @@ public class SysDictTypeController {
     @Operation(summary = "字典类型表单详情")
     @Parameter(name = "字典ID")
     @GetMapping("/{id}/form")
-    public DictTypeForm getDictTypeFormData(
-            @PathVariable Long id
-    ) {
+    public DictTypeForm getDictTypeFormData(@PathVariable Long id) {
         DictTypeForm dictTypeForm = dictTypeService.getDictTypeFormData(id);
         return dictTypeForm;
     }
@@ -73,9 +71,7 @@ public class SysDictTypeController {
     @Operation(summary = "删除字典类型")
     @Parameter(name = "字典ID", description = "字典类型ID，多个以英文逗号(,)分割")
     @DeleteMapping("/{ids}")
-    public boolean deleteDictTypes(
-            @PathVariable String ids
-    ) {
+    public boolean deleteDictTypes(@PathVariable String ids) {
         boolean result = dictTypeService.deleteDictTypes(ids);
         return result;
     }
@@ -83,9 +79,7 @@ public class SysDictTypeController {
     @Operation(summary = "获取字典类型的数据项")
     @Parameter(name = "字典类型编码")
     @GetMapping("/{typeCode}/items")
-    public List<Option> listDictItemsByTypeCode(
-            @PathVariable String typeCode
-    ) {
+    public List<Option> listDictItemsByTypeCode(@PathVariable String typeCode) {
         List<Option> list = dictTypeService.listDictItemsByTypeCode(typeCode);
         return list;
     }

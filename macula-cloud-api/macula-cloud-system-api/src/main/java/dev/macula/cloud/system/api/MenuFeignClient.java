@@ -30,7 +30,8 @@ import java.util.List;
  * @author rain
  * @since 2023/2/22 10:29
  */
-@FeignClient(value = "macula-cloud-system", contextId = "menuFeignClient", fallbackFactory = AbstractMenuFeignFallbackFactory.class)
+@FeignClient(value = "macula-cloud-system", contextId = "menuFeignClient",
+    fallbackFactory = AbstractMenuFeignFallbackFactory.class)
 public interface MenuFeignClient {
     @GetMapping("/api/v1/menus/routes")
     List<RouteVO> listRoutes();

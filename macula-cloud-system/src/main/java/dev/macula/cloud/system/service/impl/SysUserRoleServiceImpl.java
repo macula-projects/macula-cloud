@@ -46,39 +46,30 @@ public class SysUserRoleServiceImpl extends ServiceImpl<SysUserRoleMapper, SysUs
         }
 
         // 用户原角色ID集合
-        List<Long> userRoleIds = this.list(new LambdaQueryWrapper<SysUserRole>()
-                        .eq(SysUserRole::getUserId, userId))
-                .stream()
-                .map(item -> item.getRoleId())
-                .collect(Collectors.toList());
+        List<Long> userRoleIds =
+            this.list(new LambdaQueryWrapper<SysUserRole>().eq(SysUserRole::getUserId, userId)).stream()
+                .map(item -> item.getRoleId()).collect(Collectors.toList());
 
         // 新增用户角色
         List<Long> saveRoleIds;
         if (CollectionUtil.isEmpty(userRoleIds)) {
             saveRoleIds = roleIds;
         } else {
-            saveRoleIds = roleIds.stream()
-                    .filter(roleId -> !userRoleIds.contains(roleId))
-                    .collect(Collectors.toList());
+            saveRoleIds = roleIds.stream().filter(roleId -> !userRoleIds.contains(roleId)).collect(Collectors.toList());
         }
 
-        List<SysUserRole> saveUserRoles = saveRoleIds
-                .stream()
-                .map(roleId -> new SysUserRole(userId, roleId))
-                .collect(Collectors.toList());
+        List<SysUserRole> saveUserRoles =
+            saveRoleIds.stream().map(roleId -> new SysUserRole(userId, roleId)).collect(Collectors.toList());
         this.saveBatch(saveUserRoles);
 
         // 删除用户角色
         if (CollectionUtil.isNotEmpty(userRoleIds)) {
-            List<Long> removeRoleIds = userRoleIds.stream()
-                    .filter(roleId -> !roleIds.contains(roleId))
-                    .collect(Collectors.toList());
+            List<Long> removeRoleIds =
+                userRoleIds.stream().filter(roleId -> !roleIds.contains(roleId)).collect(Collectors.toList());
 
             if (CollectionUtil.isNotEmpty(removeRoleIds)) {
-                this.remove(new LambdaQueryWrapper<SysUserRole>()
-                        .eq(SysUserRole::getUserId, userId)
-                        .in(SysUserRole::getRoleId, removeRoleIds)
-                );
+                this.remove(new LambdaQueryWrapper<SysUserRole>().eq(SysUserRole::getUserId, userId)
+                    .in(SysUserRole::getRoleId, removeRoleIds));
             }
         }
         return true;

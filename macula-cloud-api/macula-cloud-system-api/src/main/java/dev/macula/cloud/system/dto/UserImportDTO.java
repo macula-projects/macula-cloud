@@ -44,7 +44,6 @@ public class UserImportDTO {
      */
     private String roleIds;
 
-
     private MultipartFile file;
 
     /**

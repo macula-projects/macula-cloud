@@ -92,15 +92,8 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
      */
     public UserLoginVO getUserInfo(String username, Set<String> roles) {
         // 登录用户entity
-        SysUser user = this.getOne(new LambdaQueryWrapper<SysUser>()
-                .eq(SysUser::getUsername, username)
-                .select(
-                        SysUser::getId,
-                        SysUser::getUsername,
-                        SysUser::getNickname,
-                        SysUser::getAvatar
-                )
-        );
+        SysUser user = this.getOne(new LambdaQueryWrapper<SysUser>().eq(SysUser::getUsername, username)
+            .select(SysUser::getId, SysUser::getUsername, SysUser::getNickname, SysUser::getAvatar));
         // entity->VO
         UserLoginVO userLoginVO = userConverter.entity2LoginUser(user);
 
@@ -108,7 +101,8 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         userLoginVO.setRoles(roles);
 
         // 用户权限集合
-        Set<String> perms = (Set<String>) redisTemplate.opsForValue().get(GlobalConstants.SECURITY_USER_BTN_PERMS_KEY + username);
+        Set<String> perms =
+            (Set<String>)redisTemplate.opsForValue().get(GlobalConstants.SECURITY_USER_BTN_PERMS_KEY + username);
         if (perms == null) {
             perms = menuService.listRolePerms(roles);
             redisTemplate.opsForValue().set(GlobalConstants.SECURITY_USER_BTN_PERMS_KEY + username, perms);
@@ -161,11 +155,8 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
     public Page<UserVO> listUserPages(UserPageQuery queryParams) {
 
         // 查询数据
-        Page<UserBO> userBoPage = this.baseMapper.listUserPages(
-                new Page<>(queryParams.getPageNum(),
-                        queryParams.getPageSize()),
-                queryParams
-        );
+        Page<UserBO> userBoPage =
+            this.baseMapper.listUserPages(new Page<>(queryParams.getPageNum(), queryParams.getPageSize()), queryParams);
 
         // 实体转换
         Page<UserVO> userVoPage = userConverter.bo2Vo(userBoPage);
@@ -231,10 +222,8 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
 
         String username = userForm.getUsername();
 
-        long count = this.count(new LambdaQueryWrapper<SysUser>()
-                .eq(SysUser::getUsername, username)
-                .ne(SysUser::getId, userId)
-        );
+        long count =
+            this.count(new LambdaQueryWrapper<SysUser>().eq(SysUser::getUsername, username).ne(SysUser::getId, userId));
         Assert.isTrue(count == 0, "用户名已存在");
 
         // form -> entity
@@ -260,8 +249,8 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
     public boolean deleteUsers(String idsStr) {
         Assert.isTrue(StrUtil.isNotBlank(idsStr), "删除的用户数据为空");
         // 逻辑删除
-        List<Long> ids = Arrays.asList(idsStr.split(",")).stream()
-                .map(idStr -> Long.parseLong(idStr)).collect(Collectors.toList());
+        List<Long> ids =
+            Arrays.asList(idsStr.split(",")).stream().map(idStr -> Long.parseLong(idStr)).collect(Collectors.toList());
         boolean result = this.removeByIds(ids);
         return result;
 
@@ -277,10 +266,8 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
     @Override
     public boolean updatePassword(Long userId, String password) {
         String encryptedPassword = passwordEncoder.encode(password);
-        boolean result = this.update(new LambdaUpdateWrapper<SysUser>()
-                .eq(SysUser::getId, userId)
-                .set(SysUser::getPassword, encryptedPassword)
-        );
+        boolean result = this.update(
+            new LambdaUpdateWrapper<SysUser>().eq(SysUser::getId, userId).set(SysUser::getPassword, encryptedPassword));
 
         return result;
     }
@@ -296,27 +283,24 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
     public String importUsers(UserImportDTO userImportDTO) throws IOException {
 
         Long deptId = userImportDTO.getDeptId();
-        List<Long> roleIds = Arrays.stream(userImportDTO.getRoleIds().split(","))
-                .map(roleId -> Convert.toLong(roleId)).collect(Collectors.toList());
+        List<Long> roleIds = Arrays.stream(userImportDTO.getRoleIds().split(",")).map(roleId -> Convert.toLong(roleId))
+            .collect(Collectors.toList());
         InputStream inputStream = userImportDTO.getFile().getInputStream();
 
-        ExcelReaderBuilder excelReaderBuilder = EasyExcel.read(inputStream, UserImportDTO.UserItem.class, userImportListener);
+        ExcelReaderBuilder excelReaderBuilder =
+            EasyExcel.read(inputStream, UserImportDTO.UserItem.class, userImportListener);
         ExcelReaderSheetBuilder sheet = excelReaderBuilder.sheet();
         List<UserImportDTO.UserItem> list = sheet.doReadSync();
 
         Assert.isTrue(CollectionUtil.isNotEmpty(list), "未检测到任何数据");
 
         // 有效数据集合
-        List<UserImportDTO.UserItem> validDataList = list.stream()
-                .filter(item -> StrUtil.isNotBlank(item.getUsername()))
-                .collect(Collectors.toList());
+        List<UserImportDTO.UserItem> validDataList =
+            list.stream().filter(item -> StrUtil.isNotBlank(item.getUsername())).collect(Collectors.toList());
 
         Assert.isTrue(CollectionUtil.isNotEmpty(validDataList), "未检测到有效数据");
 
-        long distinctCount = validDataList.stream()
-                .map(UserImportDTO.UserItem::getUsername)
-                .distinct()
-                .count();
+        long distinctCount = validDataList.stream().map(UserImportDTO.UserItem::getUsername).distinct().count();
         Assert.isTrue(validDataList.size() == distinctCount, "导入数据中有重复的用户名，请检查！");
 
         List<SysUser> saveUserList = Lists.newArrayList();
@@ -346,7 +330,7 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
             // 默认密码
             user.setPassword(passwordEncoder.encode(GlobalConstants.DEFAULT_USER_PASSWORD));
             // 性别转换
-            Integer gender = (Integer) IBaseEnum.getValueByLabel(userItem.getGender(), GenderEnum.class);
+            Integer gender = (Integer)IBaseEnum.getValueByLabel(userItem.getGender(), GenderEnum.class);
             user.setGender(gender);
 
             saveUserList.add(user);
@@ -361,17 +345,16 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
             if (CollectionUtil.isNotEmpty(roleIds)) {
 
                 roleIds.forEach(roleId -> {
-                    userRoleList.addAll(
-                            saveUserList.stream()
-                                    .map(user -> new SysUserRole(user.getId(), roleId)).
-                                    collect(Collectors.toList()));
+                    userRoleList.addAll(saveUserList.stream().map(user -> new SysUserRole(user.getId(), roleId))
+                        .collect(Collectors.toList()));
                 });
             }
 
             userRoleService.saveBatch(userRoleList);
         }
 
-        errMsg.append(StrUtil.format("一共{}条数据，成功导入{}条数据，导入失败数据{}条", list.size(), saveUserList.size(), list.size() - saveUserList.size()));
+        errMsg.append(StrUtil.format("一共{}条数据，成功导入{}条数据，导入失败数据{}条", list.size(), saveUserList.size(),
+            list.size() - saveUserList.size()));
         return errMsg.toString();
 
     }

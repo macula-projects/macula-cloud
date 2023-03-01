@@ -128,8 +128,8 @@ public class IdContronller {
         String response = "";
         try {
             SegmentId segmentId = segmentIdService.getNextSegmentId(bizType);
-            response = segmentId.getCurrentId() + "," + segmentId.getLoadingId() + "," + segmentId.getMaxId()
-                    + "," + segmentId.getDelta() + "," + segmentId.getRemainder();
+            response =
+                segmentId.getCurrentId() + "," + segmentId.getLoadingId() + "," + segmentId.getMaxId() + "," + segmentId.getDelta() + "," + segmentId.getRemainder();
         } catch (Exception e) {
             logger.error("nextSegmentIdSimple error", e);
         }

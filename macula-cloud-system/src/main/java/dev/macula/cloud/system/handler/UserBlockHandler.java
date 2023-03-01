@@ -42,7 +42,6 @@ public class UserBlockHandler {
         return Result.success(new UserLoginVO());
     }
 
-
     public static Result handleGetUserByUsernameBlock(String username, BlockException blockException) {
         log.info("降级了：{}", username);
         return Result.failed(ApiResultCode.DEGRADATION);

@@ -44,7 +44,6 @@ import org.springframework.stereotype.Service;
 import java.util.*;
 import java.util.stream.Collectors;
 
-
 /**
  * 菜单业务实现类
  *
@@ -55,30 +54,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> implements SysMenuService {
     private final MenuConverter menuConverter;
-
-    /**
-     * 菜单表格树形列表
-     */
-    @Override
-    public List<MenuVO> listMenus(MenuQuery queryParams) {
-        List<SysMenu> menus = this.list(new LambdaQueryWrapper<SysMenu>()
-                .like(StrUtil.isNotBlank(queryParams.getKeywords()), SysMenu::getName, queryParams.getKeywords())
-                .orderByAsc(SysMenu::getSort)
-        );
-
-        Set<Long> cacheMenuIds = menus.stream().map(menu -> menu.getId()).collect(Collectors.toSet());
-
-        List<MenuVO> list = menus.stream().map(menu -> {
-            Long parentId = menu.getParentId();
-            // parentId不在当前菜单ID的列表，说明为顶级菜单ID，根据此ID作为递归的开始条件节点
-            if (!cacheMenuIds.contains(parentId)) {
-                cacheMenuIds.add(parentId);
-                return recurMenus(parentId, menus);
-            }
-            return new LinkedList<MenuVO>();
-        }).collect(ArrayList::new, ArrayList::addAll, ArrayList::addAll);
-        return list;
-    }
 
     /**
      * 递归生成菜单下拉层级列表
@@ -92,10 +67,34 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
             return Collections.EMPTY_LIST;
         }
 
-        List<Option> menus = menuList.stream()
-                .filter(menu -> menu.getParentId().equals(parentId))
-                .map(menu -> new Option(menu.getId(), menu.getName(), recurMenuOptions(menu.getId(), menuList)))
-                .collect(ArrayList::new, ArrayList::add, ArrayList::addAll);
+        List<Option> menus = menuList.stream().filter(menu -> menu.getParentId().equals(parentId))
+            .map(menu -> new Option(menu.getId(), menu.getName(), recurMenuOptions(menu.getId(), menuList)))
+            .collect(ArrayList::new, ArrayList::add, ArrayList::addAll);
+        return menus;
+    }
+
+    /**
+     * 递归生成资源（菜单+权限）树形列表
+     *
+     * @param parentId 父级ID
+     * @param menuList 菜单列表
+     * @return
+     */
+    private static List<ResourceVO> recurResources(Long parentId, List<SysMenu> menuList) {
+        if (CollectionUtil.isEmpty(menuList)) {
+            return Collections.EMPTY_LIST;
+        }
+
+        List<ResourceVO> menus = menuList.stream().filter(menu -> menu.getParentId().equals(parentId)).map(menu -> {
+            ResourceVO resourceVO = new ResourceVO();
+            resourceVO.setValue(menu.getId());
+            resourceVO.setLabel(menu.getName());
+
+            List<ResourceVO> children = recurResources(menu.getId(), menuList);
+            resourceVO.setChildren(children);
+
+            return resourceVO;
+        }).collect(Collectors.toList());
         return menus;
     }
 
@@ -132,30 +131,26 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
     }
 
     /**
-     * 递归生成资源（菜单+权限）树形列表
-     *
-     * @param parentId 父级ID
-     * @param menuList 菜单列表
-     * @return
+     * 菜单表格树形列表
      */
-    private static List<ResourceVO> recurResources(Long parentId, List<SysMenu> menuList) {
-        if (CollectionUtil.isEmpty(menuList)) {
-            return Collections.EMPTY_LIST;
-        }
+    @Override
+    public List<MenuVO> listMenus(MenuQuery queryParams) {
+        List<SysMenu> menus = this.list(
+            new LambdaQueryWrapper<SysMenu>().like(StrUtil.isNotBlank(queryParams.getKeywords()), SysMenu::getName,
+                queryParams.getKeywords()).orderByAsc(SysMenu::getSort));
 
-        List<ResourceVO> menus = menuList.stream()
-                .filter(menu -> menu.getParentId().equals(parentId))
-                .map(menu -> {
-                    ResourceVO resourceVO = new ResourceVO();
-                    resourceVO.setValue(menu.getId());
-                    resourceVO.setLabel(menu.getName());
+        Set<Long> cacheMenuIds = menus.stream().map(menu -> menu.getId()).collect(Collectors.toSet());
 
-                    List<ResourceVO> children = recurResources(menu.getId(), menuList);
-                    resourceVO.setChildren(children);
-
-                    return resourceVO;
-                }).collect(Collectors.toList());
-        return menus;
+        List<MenuVO> list = menus.stream().map(menu -> {
+            Long parentId = menu.getParentId();
+            // parentId不在当前菜单ID的列表，说明为顶级菜单ID，根据此ID作为递归的开始条件节点
+            if (!cacheMenuIds.contains(parentId)) {
+                cacheMenuIds.add(parentId);
+                return recurMenus(parentId, menus);
+            }
+            return new LinkedList<MenuVO>();
+        }).collect(ArrayList::new, ArrayList::addAll, ArrayList::addAll);
+        return list;
     }
 
     /**
@@ -178,36 +173,36 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
      */
     private List<RouteVO> recurRoutes(Long parentId, List<RouteBO> menuList) {
         List<RouteVO> list = new ArrayList<>();
-        Optional.ofNullable(menuList).ifPresent(menus -> menus.stream()
-                .filter(menu -> menu.getParentId().equals(parentId))
-                .forEach(menu -> {
-                    RouteVO routeVO = new RouteVO();
+        Optional.ofNullable(menuList)
+            .ifPresent(menus -> menus.stream().filter(menu -> menu.getParentId().equals(parentId)).forEach(menu -> {
+                RouteVO routeVO = new RouteVO();
 
-                    MenuTypeEnum menuTypeEnum = menu.getType();
+                MenuTypeEnum menuTypeEnum = menu.getType();
 
-                    if (MenuTypeEnum.MENU.equals(menuTypeEnum)) {
-                        routeVO.setName(menu.getPath()); //  根据name路由跳转 this.$router.push({name:xxx})
-                    }
-                    routeVO.setPath(menu.getPath()); // 根据path路由跳转 this.$router.push({path:xxx})
-                    routeVO.setRedirect(menu.getRedirect());
-                    routeVO.setComponent(menu.getComponent());
+                if (MenuTypeEnum.MENU.equals(menuTypeEnum)) {
+                    routeVO.setName(menu.getPath()); //  根据name路由跳转 this.$router.push({name:xxx})
+                }
+                routeVO.setPath(menu.getPath()); // 根据path路由跳转 this.$router.push({path:xxx})
+                routeVO.setRedirect(menu.getRedirect());
+                routeVO.setComponent(menu.getComponent());
 
-                    RouteVO.Meta meta = new RouteVO.Meta();
-                    meta.setTitle(menu.getName());
-                    meta.setIcon(menu.getIcon());
-                    meta.setRoles(menu.getRoles());
-                    meta.setHidden(StatusEnum.DISABLE.getValue().equals(menu.getVisible()));
-                    meta.setKeepAlive(true);
+                RouteVO.Meta meta = new RouteVO.Meta();
+                meta.setTitle(menu.getName());
+                meta.setIcon(menu.getIcon());
+                meta.setRoles(menu.getRoles());
+                meta.setHidden(StatusEnum.DISABLE.getValue().equals(menu.getVisible()));
+                meta.setKeepAlive(true);
 
-                    routeVO.setMeta(meta);
-                    List<RouteVO> children = recurRoutes(menu.getId(), menuList);
-                    // 含有子节点的目录设置为可见
-                    boolean alwaysShow = CollectionUtil.isNotEmpty(children) && children.stream().anyMatch(item -> item.getMeta().getHidden().equals(false));
-                    meta.setAlwaysShow(alwaysShow);
-                    routeVO.setChildren(children);
+                routeVO.setMeta(meta);
+                List<RouteVO> children = recurRoutes(menu.getId(), menuList);
+                // 含有子节点的目录设置为可见
+                boolean alwaysShow = CollectionUtil.isNotEmpty(children) && children.stream()
+                    .anyMatch(item -> item.getMeta().getHidden().equals(false));
+                meta.setAlwaysShow(alwaysShow);
+                routeVO.setChildren(children);
 
-                    list.add(routeVO);
-                }));
+                list.add(routeVO);
+            }));
         return list;
     }
 
@@ -218,8 +213,7 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
      */
     @Override
     public List<ResourceVO> listResources() {
-        List<SysMenu> menuList = this.list(new LambdaQueryWrapper<SysMenu>()
-                .orderByAsc(SysMenu::getSort));
+        List<SysMenu> menuList = this.list(new LambdaQueryWrapper<SysMenu>().orderByAsc(SysMenu::getSort));
         List<ResourceVO> resources = recurResources(GlobalConstants.ROOT_NODE_ID, menuList);
         return resources;
     }
@@ -236,14 +230,12 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
             return Collections.EMPTY_LIST;
         }
 
-        List<MenuVO> menus = menuList.stream()
-                .filter(menu -> menu.getParentId().equals(parentId))
-                .map(entity -> {
-                    MenuVO menuVO = menuConverter.entity2VO(entity);
-                    List<MenuVO> children = recurMenus(entity.getId(), menuList);
-                    menuVO.setChildren(children);
-                    return menuVO;
-                }).collect(Collectors.toList());
+        List<MenuVO> menus = menuList.stream().filter(menu -> menu.getParentId().equals(parentId)).map(entity -> {
+            MenuVO menuVO = menuConverter.entity2VO(entity);
+            List<MenuVO> children = recurMenus(entity.getId(), menuList);
+            menuVO.setChildren(children);
+            return menuVO;
+        }).collect(Collectors.toList());
         return menus;
     }
 
@@ -256,10 +248,8 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
      */
     @Override
     public boolean updateMenuVisible(Long menuId, Integer visible) {
-        boolean result = this.update(new LambdaUpdateWrapper<SysMenu>()
-                .eq(SysMenu::getId, menuId)
-                .set(SysMenu::getVisible, visible)
-        );
+        boolean result = this.update(
+            new LambdaUpdateWrapper<SysMenu>().eq(SysMenu::getId, menuId).set(SysMenu::getVisible, visible));
         return result;
     }
 

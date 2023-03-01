@@ -41,5 +41,4 @@ public class ResourceVO {
     @JsonInclude(value = JsonInclude.Include.NON_NULL)
     private List<Option> perms;
 
-
 }

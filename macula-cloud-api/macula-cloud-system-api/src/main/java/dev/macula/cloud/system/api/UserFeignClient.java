@@ -24,7 +24,8 @@ import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 
-@FeignClient(value = "macula-cloud-system", contextId = "userFeignClient", fallbackFactory = AbstractUserFeignFallbackFactory.class)
+@FeignClient(value = "macula-cloud-system", contextId = "userFeignClient",
+    fallbackFactory = AbstractUserFeignFallbackFactory.class)
 public interface UserFeignClient {
 
     @GetMapping("/api/v1/users/{username}/authinfo")

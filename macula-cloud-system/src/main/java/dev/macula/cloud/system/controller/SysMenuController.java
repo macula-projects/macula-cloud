@@ -80,9 +80,7 @@ public class SysMenuController {
     @Operation(summary = "菜单详情")
     @Parameter(name = "菜单ID")
     @GetMapping("/{id}")
-    public SysMenu detail(
-            @PathVariable Long id
-    ) {
+    public SysMenu detail(@PathVariable Long id) {
         SysMenu menu = menuService.getById(id);
         return menu;
     }
@@ -98,9 +96,7 @@ public class SysMenuController {
     @Operation(summary = "修改菜单")
     @PutMapping(value = "/{id}")
     @CacheEvict(cacheNames = "system", key = "'routes'")
-    public boolean updateMenu(
-            @RequestBody SysMenu menu
-    ) {
+    public boolean updateMenu(@RequestBody SysMenu menu) {
         boolean result = menuService.saveMenu(menu);
         return result;
     }
@@ -109,9 +105,7 @@ public class SysMenuController {
     @Parameter(name = "菜单ID", description = "菜单ID，多个以英文(,)分割")
     @DeleteMapping("/{ids}")
     @CacheEvict(cacheNames = "system", key = "'routes'")
-    public boolean deleteMenus(
-            @PathVariable("ids") String ids
-    ) {
+    public boolean deleteMenus(@PathVariable("ids") String ids) {
         boolean result = menuService.removeByIds(Arrays.asList(ids.split(",")));
         return result;
     }
@@ -120,9 +114,7 @@ public class SysMenuController {
     @Parameter(name = "菜单ID")
     @Parameter(name = "显示状态", description = "显示状态(1:显示;0:隐藏)")
     @PatchMapping("/{menuId}")
-    public boolean updateMenuVisible(
-            @PathVariable Long menuId,
-            Integer visible
+    public boolean updateMenuVisible(@PathVariable Long menuId, Integer visible
 
     ) {
         boolean result = menuService.updateMenuVisible(menuId, visible);

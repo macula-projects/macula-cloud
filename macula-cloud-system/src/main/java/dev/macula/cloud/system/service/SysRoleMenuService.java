@@ -24,7 +24,6 @@ import java.util.List;
 
 public interface SysRoleMenuService extends IService<SysRoleMenu> {
 
-
     /**
      * 获取角色拥有的菜单ID集合
      *

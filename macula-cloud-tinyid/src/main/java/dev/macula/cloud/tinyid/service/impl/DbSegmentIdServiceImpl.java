@@ -31,7 +31,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.concurrent.atomic.AtomicLong;
 
-
 /**
  * @author du_imba
  */
@@ -68,7 +67,7 @@ public class DbSegmentIdServiceImpl implements SegmentIdService {
             Long newMaxId = tinyIdInfo.getMaxId() + tinyIdInfo.getStep();
             Long oldMaxId = tinyIdInfo.getMaxId();
             int row = tinyIdInfoDAO.updateMaxId(tinyIdInfo.getId(), newMaxId, oldMaxId, tinyIdInfo.getVersion(),
-                    tinyIdInfo.getBizType());
+                tinyIdInfo.getBizType());
             if (row == 1) {
                 tinyIdInfo.setMaxId(newMaxId);
                 SegmentId segmentId = convert(tinyIdInfo);

@@ -17,11 +17,8 @@
 
 package dev.macula.cloud.system.pojo.entity;
 
-import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableId;
 import dev.macula.boot.starter.mp.entity.BaseEntity;
 import lombok.Data;
-import lombok.EqualsAndHashCode;
 
 @Data
 public class SysDictType extends BaseEntity {

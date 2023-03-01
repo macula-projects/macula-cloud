@@ -17,7 +17,6 @@
 
 package dev.macula.cloud.system.pojo.bo;
 
-
 import lombok.Data;
 
 import java.util.List;

@@ -49,7 +49,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class SysDeptServiceImpl extends ServiceImpl<SysDeptMapper, SysDept> implements SysDeptService {
 
-
     private final DeptConverter deptConverter;
 
     /**
@@ -64,17 +63,14 @@ public class SysDeptServiceImpl extends ServiceImpl<SysDeptMapper, SysDept> impl
             return Collections.EMPTY_LIST;
         }
 
-        List<Option> list = deptList.stream()
-                .filter(dept -> dept.getParentId().equals(parentId))
-                .map(dept -> {
-                    Option option = new Option(dept.getId(), dept.getName());
-                    List<Option> children = recurDeptTreeOptions(dept.getId(), deptList);
-                    if (CollectionUtil.isNotEmpty(children)) {
-                        option.setChildren(children);
-                    }
-                    return option;
-                })
-                .collect(Collectors.toList());
+        List<Option> list = deptList.stream().filter(dept -> dept.getParentId().equals(parentId)).map(dept -> {
+            Option option = new Option(dept.getId(), dept.getName());
+            List<Option> children = recurDeptTreeOptions(dept.getId(), deptList);
+            if (CollectionUtil.isNotEmpty(children)) {
+                option.setChildren(children);
+            }
+            return option;
+        }).collect(Collectors.toList());
 
         return list;
     }
@@ -90,20 +86,14 @@ public class SysDeptServiceImpl extends ServiceImpl<SysDeptMapper, SysDept> impl
 
         // 查询数据
         List<SysDept> deptList = this.list(
-                new LambdaQueryWrapper<SysDept>()
-                        .like(StrUtil.isNotBlank(keywords), SysDept::getName, keywords)
-                        .eq(Validator.isNotNull(status), SysDept::getStatus, status)
-                        .orderByAsc(SysDept::getSort)
-        );
+            new LambdaQueryWrapper<SysDept>().like(StrUtil.isNotBlank(keywords), SysDept::getName, keywords)
+                .eq(Validator.isNotNull(status), SysDept::getStatus, status).orderByAsc(SysDept::getSort));
 
         List<DeptVO> list = new ArrayList<>();
 
         if (CollectionUtil.isNotEmpty(deptList)) {
 
-            Set<Long> cacheDeptIds = deptList.stream()
-                    .map(SysDept::getId)
-                    .collect(Collectors.toSet());
-
+            Set<Long> cacheDeptIds = deptList.stream().map(SysDept::getId).collect(Collectors.toSet());
 
             for (SysDept dept : deptList) {
                 Long parentId = dept.getParentId();
@@ -118,11 +108,10 @@ public class SysDeptServiceImpl extends ServiceImpl<SysDeptMapper, SysDept> impl
         //  列表为空说明所有的节点都是独立的
         if (list.isEmpty()) {
             return deptList.stream().map(item -> {
-                        DeptVO deptVO = new DeptVO();
-                        BeanUtil.copyProperties(item, deptVO);
-                        return deptVO;
-                    })
-                    .collect(Collectors.toList());
+                DeptVO deptVO = new DeptVO();
+                BeanUtil.copyProperties(item, deptVO);
+                return deptVO;
+            }).collect(Collectors.toList());
         }
 
         return list;
@@ -136,14 +125,12 @@ public class SysDeptServiceImpl extends ServiceImpl<SysDeptMapper, SysDept> impl
      * @return
      */
     public List<DeptVO> recurDepartments(Long parentId, List<SysDept> deptList) {
-        List<DeptVO> list = deptList.stream()
-                .filter(dept -> dept.getParentId().equals(parentId))
-                .map(dept -> {
-                    DeptVO deptVO = deptConverter.entity2Vo(dept);
-                    List<DeptVO> children = recurDepartments(dept.getId(), deptList);
-                    deptVO.setChildren(children);
-                    return deptVO;
-                }).collect(Collectors.toList());
+        List<DeptVO> list = deptList.stream().filter(dept -> dept.getParentId().equals(parentId)).map(dept -> {
+            DeptVO deptVO = deptConverter.entity2Vo(dept);
+            List<DeptVO> children = recurDepartments(dept.getId(), deptList);
+            deptVO.setChildren(children);
+            return deptVO;
+        }).collect(Collectors.toList());
         return list;
     }
 
@@ -154,11 +141,9 @@ public class SysDeptServiceImpl extends ServiceImpl<SysDeptMapper, SysDept> impl
      */
     @Override
     public List<Option> listDeptOptions() {
-        List<SysDept> deptList = this.list(new LambdaQueryWrapper<SysDept>()
-                .eq(SysDept::getStatus, StatusEnum.ENABLE.getValue())
-                .select(SysDept::getId, SysDept::getParentId, SysDept::getName)
-                .orderByAsc(SysDept::getSort)
-        );
+        List<SysDept> deptList = this.list(
+            new LambdaQueryWrapper<SysDept>().eq(SysDept::getStatus, StatusEnum.ENABLE.getValue())
+                .select(SysDept::getId, SysDept::getParentId, SysDept::getName).orderByAsc(SysDept::getSort));
 
         //   List<Option> options = recurDeptTreeOptions(SystemConstants.ROOT_NODE_ID, deptList);
         List<Option> options = buildDeptTree(deptList);
@@ -242,7 +227,7 @@ public class SysDeptServiceImpl extends ServiceImpl<SysDeptMapper, SysDept> impl
         List<Option> tlist = new ArrayList<Option>();
         Iterator<SysDept> it = list.iterator();
         while (it.hasNext()) {
-            SysDept n = (SysDept) it.next();
+            SysDept n = (SysDept)it.next();
             if (n.getParentId() != null && n.getParentId() == t.getValue()) {
                 Option option = new Option(n.getId(), n.getName());
                 tlist.add(option);
@@ -258,7 +243,6 @@ public class SysDeptServiceImpl extends ServiceImpl<SysDeptMapper, SysDept> impl
         return getChildList(list, t).size() > 0;
     }
 
-
     /**
      * 删除部门
      *
@@ -268,13 +252,9 @@ public class SysDeptServiceImpl extends ServiceImpl<SysDeptMapper, SysDept> impl
     @Override
     public boolean deleteByIds(String ids) {
         // 删除部门及子部门
-        Optional.ofNullable(Arrays.stream(ids.split(",")))
-                .ifPresent(deptIds -> deptIds.forEach(deptId ->
-                        this.remove(new LambdaQueryWrapper<SysDept>()
-                                .eq(SysDept::getId, deptId)
-                                .or()
-                                .apply("concat (',',tree_path,',') like concat('%,',{0},',%')", deptId))
-                ));
+        Optional.ofNullable(Arrays.stream(ids.split(","))).ifPresent(deptIds -> deptIds.forEach(deptId -> this.remove(
+            new LambdaQueryWrapper<SysDept>().eq(SysDept::getId, deptId).or()
+                .apply("concat (',',tree_path,',') like concat('%,',{0},',%')", deptId))));
         return true;
     }
 
@@ -287,20 +267,12 @@ public class SysDeptServiceImpl extends ServiceImpl<SysDeptMapper, SysDept> impl
     @Override
     public DeptForm getDeptForm(Long deptId) {
 
-        SysDept entity = this.getOne(new LambdaQueryWrapper<SysDept>()
-                .eq(SysDept::getId, deptId)
-                .select(
-                        SysDept::getId,
-                        SysDept::getName,
-                        SysDept::getParentId,
-                        SysDept::getStatus,
-                        SysDept::getSort
-                ));
+        SysDept entity = this.getOne(new LambdaQueryWrapper<SysDept>().eq(SysDept::getId, deptId)
+            .select(SysDept::getId, SysDept::getName, SysDept::getParentId, SysDept::getStatus, SysDept::getSort));
 
         DeptForm deptForm = deptConverter.entity2Form(entity);
         return deptForm;
     }
-
 
     /**
      * 部门路径生成
@@ -320,6 +292,5 @@ public class SysDeptServiceImpl extends ServiceImpl<SysDeptMapper, SysDept> impl
         }
         return treePath;
     }
-
 
 }

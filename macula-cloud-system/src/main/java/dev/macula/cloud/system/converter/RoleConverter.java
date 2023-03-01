@@ -39,10 +39,7 @@ public interface RoleConverter {
 
     Page<RolePageVO> entity2Page(Page<SysRole> page);
 
-    @Mappings({
-            @Mapping(target = "value", source = "id"),
-            @Mapping(target = "label", source = "name")
-    })
+    @Mappings({@Mapping(target = "value", source = "id"), @Mapping(target = "label", source = "name")})
     Option role2Option(SysRole role);
 
     List<Option> roles2Options(List<SysRole> roles);

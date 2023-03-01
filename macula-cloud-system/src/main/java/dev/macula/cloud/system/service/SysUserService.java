@@ -63,7 +63,6 @@ public interface SysUserService extends IService<SysUser> {
      */
     Page<UserVO> listUserPages(UserPageQuery queryParams);
 
-
     /**
      * 获取用户详情
      *
@@ -71,7 +70,6 @@ public interface SysUserService extends IService<SysUser> {
      * @return 用户详情
      */
     UserForm getUserFormData(Long userId);
-
 
     /**
      * 新增用户
@@ -90,7 +88,6 @@ public interface SysUserService extends IService<SysUser> {
      */
     boolean updateUser(Long userId, UserForm userForm);
 
-
     /**
      * 删除用户
      *
@@ -98,7 +95,6 @@ public interface SysUserService extends IService<SysUser> {
      * @return 成功标识
      */
     boolean deleteUsers(String idsStr);
-
 
     /**
      * 修改用户密码
