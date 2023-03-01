@@ -30,7 +30,6 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class SysTenantServiceImpl extends ServiceImpl<SysTenantInfoMapper, SysTenantInfo> implements SysTenantService {
-    private static final String TENANT_ROOT_USERNAME = "admin";
 
     private final TenantConverter tenantConverter;
 
@@ -102,7 +101,7 @@ public class SysTenantServiceImpl extends ServiceImpl<SysTenantInfoMapper, SysTe
 
     @Override
     public List<Option> listTenantOptions(Integer filterMe) {
-        boolean filterMeFlag = filterMe.equals(1) && !TENANT_ROOT_USERNAME.equals(SecurityUtils.getCurrentUser());
+        boolean filterMeFlag = filterMe.equals(1) && !SecurityUtils.isRoot();
         List<SysTenantInfo> sysTenantInfoList = list(new LambdaQueryWrapper<SysTenantInfo>()
                 .in(filterMeFlag, SysTenantInfo::getId, tenantUserService.getMeTenantIds()));
         List<Option> result = sysTenantInfoList.stream().map(tenantInfo -> {

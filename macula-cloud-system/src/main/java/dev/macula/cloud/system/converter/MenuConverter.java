@@ -34,6 +34,7 @@ import org.mapstruct.Mappings;
 @Mapper(componentModel = "spring")
 public interface MenuConverter {
 
+    @Mapping(source = "path", target = "routePath")
     MenuVO entity2VO(SysMenu entity);
 
     @Mappings({

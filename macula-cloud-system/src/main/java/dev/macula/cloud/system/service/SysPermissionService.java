@@ -20,7 +20,9 @@ package dev.macula.cloud.system.service;
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
+import dev.macula.boot.result.Option;
 import dev.macula.cloud.system.dto.PermDTO;
+import dev.macula.cloud.system.form.PermissionValidtorForm;
 import dev.macula.cloud.system.pojo.entity.SysPermission;
 import dev.macula.cloud.system.query.PermPageQuery;
 import dev.macula.cloud.system.vo.perm.PermPageVO;
@@ -91,12 +93,9 @@ public interface SysPermissionService extends IService<SysPermission> {
 
     /**
      * 接口权限路径验证器
-     *
-     * @param id
-     * @param url
-     * @param requestMethod
+     * @param validtorForms
      * @return
      */
-    boolean validtorUrlPerm(Long id, String url, RequestMethod requestMethod);
+    List<Option> validtorUrlPerm(List<PermissionValidtorForm> validtorForms);
 
 }
