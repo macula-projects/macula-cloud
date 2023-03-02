@@ -18,20 +18,14 @@
 package dev.macula.cloud.system.pojo.entity;
 
 import com.baomidou.mybatisplus.annotation.TableField;
-import com.baomidou.mybatisplus.annotation.TableName;
 import dev.macula.boot.starter.mp.entity.BaseEntity;
 import dev.macula.cloud.system.enums.DataScopeEnum;
-import dev.macula.cloud.system.handler.MybatisListToStringHandler;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
-import org.apache.ibatis.type.JdbcType;
 
 import java.util.List;
 
-import static com.baomidou.mybatisplus.annotation.FieldStrategy.NOT_NULL;
-
 @Data
-@TableName(value = "sys_role", autoResultMap = true)
 public class SysRole extends BaseEntity {
 
     private String name;
@@ -54,11 +48,4 @@ public class SysRole extends BaseEntity {
 
     @TableField(exist = false)
     private List<Long> permissionIds;
-
-    @Schema(description = "自定义部门数据权限拓展字段")
-    @TableField(value = "custom_depts", jdbcType = JdbcType.VARCHAR, insertStrategy = NOT_NULL, typeHandler = MybatisListToStringHandler.class)
-    private List<Long> customDepts;
-
-    @Schema(description = "自定义数据权限规则拓展字段")
-    private String custom;
 }

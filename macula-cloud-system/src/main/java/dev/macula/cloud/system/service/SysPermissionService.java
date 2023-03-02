@@ -17,20 +17,15 @@
 
 package dev.macula.cloud.system.service;
 
-import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
 import dev.macula.boot.result.Option;
-import dev.macula.cloud.system.dto.PermDTO;
 import dev.macula.cloud.system.form.PermissionValidtorForm;
 import dev.macula.cloud.system.pojo.entity.SysPermission;
 import dev.macula.cloud.system.query.PermPageQuery;
 import dev.macula.cloud.system.vo.perm.PermPageVO;
-import dev.macula.cloud.system.vo.perm.ResourcePermPageVO;
-import org.springframework.web.bind.annotation.RequestMethod;
 
 import java.util.List;
-import java.util.Map;
 
 /**
  * 权限业务接口
@@ -59,37 +54,6 @@ public interface SysPermissionService extends IService<SysPermission> {
      * 刷新Redis缓存中角色菜单的权限规则，角色和菜单信息变更调用
      */
     void refreshPermRolesRules();
-
-    /**
-     * 处理添加菜单的权限信息更新
-     *
-     * @param apiList 权限信息DTO对象
-     * @param menuId  菜单id
-     * @return
-     */
-    Map<String, PermDTO> handlerAddMenuPerms(List<PermDTO> apiList, Long menuId);
-
-    /**
-     * 根据菜单id删除该菜单下的权限信息
-     *
-     * @param menuId
-     */
-    void deleteByMenuId(Long menuId);
-
-    /**
-     * 查询权限列表，然后转换成权限信息DTO对象
-     *
-     * @param queryWrapper
-     * @return
-     */
-    List<PermDTO> listDTO(Wrapper queryWrapper);
-
-    /**
-     * 实体类转换成DTO对象
-     * @param entity
-     * @return
-     */
-    PermDTO toDTO(SysPermission entity);
 
     /**
      * 接口权限路径验证器

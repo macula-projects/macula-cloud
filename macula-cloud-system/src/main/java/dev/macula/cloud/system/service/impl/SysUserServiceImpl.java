@@ -30,7 +30,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.google.common.collect.Lists;
 import dev.macula.boot.base.IBaseEnum;
-import dev.macula.boot.constants.GlobalConstants;
+import dev.macula.boot.constants.SecurityConstants;
 import dev.macula.boot.enums.GenderEnum;
 import dev.macula.boot.starter.security.utils.SecurityUtils;
 import dev.macula.cloud.system.converter.UserConverter;
@@ -298,7 +298,7 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
             user.setEmail(userItem.getEmail());
             user.setDeptId(deptId);
             // 默认密码
-            user.setPassword(passwordEncoder.encode(GlobalConstants.DEFAULT_USER_PASSWORD));
+            user.setPassword(passwordEncoder.encode(SecurityConstants.DEFAULT_USER_PASSWORD));
             // 性别转换
             Integer gender = (Integer) IBaseEnum.getValueByLabel(userItem.getGender(), GenderEnum.class);
             user.setGender(gender);
@@ -367,7 +367,7 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         userLoginVO.setRoles(roles);
 
         // 用户权限集合
-        Set<String> perms = (Set<String>) redisTemplate.opsForValue().get(GlobalConstants.SECURITY_USER_BTN_PERMS_KEY + user.getUsername());
+        Set<String> perms = (Set<String>) redisTemplate.opsForValue().get(SecurityConstants.SECURITY_USER_BTN_PERMS_KEY + user.getUsername());
         userLoginVO.setPerms(perms);
 
         return userLoginVO;

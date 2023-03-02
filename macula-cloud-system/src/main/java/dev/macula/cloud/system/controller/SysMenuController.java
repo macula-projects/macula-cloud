@@ -17,15 +17,10 @@
 
 package dev.macula.cloud.system.controller;
 
-import com.alibaba.fastjson.JSONObject;
-import com.baomidou.mybatisplus.core.metadata.IPage;
 import dev.macula.boot.result.Option;
 import dev.macula.boot.result.Result;
 import dev.macula.cloud.system.annotation.AuditLog;
-import dev.macula.cloud.system.dto.MenuDTO;
-import dev.macula.cloud.system.pojo.bo.MenuBO;
 import dev.macula.cloud.system.pojo.entity.SysMenu;
-import dev.macula.cloud.system.query.MenuPageQuery;
 import dev.macula.cloud.system.query.MenuQuery;
 import dev.macula.cloud.system.service.SysMenuService;
 import dev.macula.cloud.system.vo.menu.MenuVO;
@@ -57,34 +52,6 @@ import java.util.List;
 @Slf4j
 public class SysMenuController {
     private final SysMenuService menuService;
-
-    @Operation(summary = "获取当前登录用户的菜单列表")
-    @GetMapping("/my")
-    public JSONObject getUserMenu(MenuQuery menuQuery) {
-        JSONObject data = menuService.getMyMenu(menuQuery);
-        return data;
-    }
-
-    @Operation(summary = "菜单列表")
-    @GetMapping("/pages")
-    public IPage<MenuBO> pagesMenus(MenuPageQuery menuPageQuery) {
-        IPage<MenuBO> data = menuService.pagesMenus(menuPageQuery);
-        return data;
-    }
-
-    @Operation(summary = "添加更新菜单及权限信息")
-    @AuditLog(title = "添加更新菜单及权限信息")
-    @PostMapping("/add")
-    public JSONObject addMenu(@RequestBody MenuDTO menuDTO) {
-        return menuService.add(menuDTO);
-    }
-
-    @Operation(summary = "删除菜单")
-    @AuditLog(title = "删除菜单")
-    @DeleteMapping("/delete")
-    public List<Long> delMenu(@RequestBody List<Long> menuIds) {
-        return menuService.del(menuIds);
-    }
 
     @Operation(summary = "获取请求方法下拉列表")
     @GetMapping("/methodOption")
@@ -174,12 +141,6 @@ public class SysMenuController {
     ) {
         boolean result = menuService.updateMenuVisible(menuId, visible);
         return Result.judge(result);
-    }
-
-    @Schema(description = "查询我的菜单对象")
-    @Data
-    public static class MyMenuQueryDto {
-
     }
 }
 

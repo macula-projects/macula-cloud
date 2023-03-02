@@ -34,7 +34,7 @@
                t1.redirect,
                t1.type,
                t3.code
-        FROM sys_menu t1
+        FROM sys_menu_tenant t1
                  LEFT JOIN sys_role_menu t2 ON t1.id = t2.menu_id
                  LEFT JOIN sys_role t3 ON t2.role_id = t3.id
         WHERE t1.type != '${@dev.macula.cloud.system.enums.MenuTypeEnum@BUTTON.getValue()}'
@@ -46,7 +46,7 @@
         SELECT
         DISTINCT t1.perm
         FROM
-        sys_menu t1
+        sys_menu_tenant t1
         INNER JOIN sys_role_menu t2 ON t2.menu_id = t1.id
         INNER JOIN sys_role t3 ON t2.role_id=t3.id
         WHERE
@@ -65,12 +65,4 @@
         </choose>
     </select>
 
-    <!-- 根据菜单名字获取可显示的顶级菜单id集合 -->
-    <select id="listShowMenuParentIdByName" resultType="java.lang.Long">
-        SELECT DISTINCT (getSystemMenuShowParentId(id,parent_id))
-        FROM
-        sys_menu t1
-        WHERE
-        t1.name like concat('%', #{keywords}, '%')
-    </select>
 </mapper>

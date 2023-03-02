@@ -18,7 +18,7 @@
             mobile,
             create_time
         FROM
-            sys_application
+            sys_application_tenant
         <where>
             <if test ='queryParams.keywords !=null  and queryParams.keywords.trim() neq ""' >
                 AND (application_name like  concat('%',#{queryParams.keywords},'%')) OR
@@ -40,6 +40,6 @@
         mobile,
         create_time
         FROM
-        sys_application
+        sys_application_tenant
     </select>
 </mapper>
