@@ -17,14 +17,9 @@
 
 package dev.macula.cloud.system.service;
 
-import com.alibaba.fastjson.JSONObject;
-import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
 import dev.macula.boot.result.Option;
-import dev.macula.cloud.system.dto.MenuDTO;
-import dev.macula.cloud.system.pojo.bo.MenuBO;
 import dev.macula.cloud.system.pojo.entity.SysMenu;
-import dev.macula.cloud.system.query.MenuPageQuery;
 import dev.macula.cloud.system.query.MenuQuery;
 import dev.macula.cloud.system.vo.menu.MenuVO;
 import dev.macula.cloud.system.vo.menu.ResourceVO;
@@ -40,16 +35,6 @@ import java.util.Set;
  * @since 2020/11/06
  */
 public interface SysMenuService extends IService<SysMenu> {
-    /**
-     * 根菜单id
-     */
-    Long ROOT_ID = 0L;
-
-    /**
-     * 菜单可见
-     */
-    Integer VISIBLED = 1;
-
     /**
      * 获取菜单表格列表
      *
@@ -108,38 +93,6 @@ public interface SysMenuService extends IService<SysMenu> {
      * @return
      */
     Set<String> listRolePerms(Set<String> roles);
-
-    /**
-     * 获取我的菜单列表
-     *
-     * @param menuQuery
-     * @return
-     */
-    JSONObject getMyMenu(MenuQuery menuQuery);
-
-    /**
-     * 获取菜单管理列表
-     *
-     * @param menuPageQuery
-     * @return
-     */
-    IPage<MenuBO> pagesMenus(MenuPageQuery menuPageQuery);
-
-    /**
-     * 添加或更新菜单，返回添加或更新的id
-     *
-     * @param menuDTO
-     * @return DTO对象的菜单id
-     */
-    JSONObject add(MenuDTO menuDTO);
-
-    /**
-     * 根据id列表删除指定id菜单
-     *
-     * @param menuIds 菜单id列表
-     * @return
-     */
-    List<Long> del(List<Long> menuIds);
 
     /**
      * 请求方法下拉列表

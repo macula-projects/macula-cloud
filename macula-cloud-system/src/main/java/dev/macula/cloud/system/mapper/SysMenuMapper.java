@@ -50,11 +50,4 @@ public interface SysMenuMapper extends BaseMapper<SysMenu> {
      */
     Set<String> listRolePerms(Set<String> roles);
 
-    /**
-     * 根据菜单名字获取可显示的顶级菜单id列表
-     *
-     * @param keywords
-     * @return
-     */
-    Set<Long> listShowMenuParentIdByName(String keywords);
 }

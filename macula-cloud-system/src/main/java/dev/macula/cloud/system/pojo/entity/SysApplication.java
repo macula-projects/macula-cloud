@@ -1,10 +1,11 @@
 package dev.macula.cloud.system.pojo.entity;
 
+import com.baomidou.mybatisplus.annotation.TableName;
 import dev.macula.boot.starter.mp.entity.BaseEntity;
-import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
 @Data
+@TableName("sys_application_tenant")
 public class SysApplication extends BaseEntity {
 
     private String applicationName;
