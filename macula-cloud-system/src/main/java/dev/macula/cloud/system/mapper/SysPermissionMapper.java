@@ -17,19 +17,14 @@
 
 package dev.macula.cloud.system.mapper;
 
-import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.baomidou.mybatisplus.core.toolkit.Constants;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import dev.macula.cloud.system.pojo.entity.SysPermission;
 import dev.macula.cloud.system.query.PermPageQuery;
 import dev.macula.cloud.system.vo.perm.PermPageVO;
-import dev.macula.cloud.system.vo.perm.ResourcePermPageVO;
 import org.apache.ibatis.annotations.Mapper;
-import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
-import java.util.Set;
 
 @Mapper
 public interface SysPermissionMapper extends BaseMapper<SysPermission> {

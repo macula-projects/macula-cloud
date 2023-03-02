@@ -8,7 +8,7 @@
     <select id="listMenuIdsByRoleId" resultType="java.lang.Long">
         SELECT rm.menu_id
         FROM sys_role_menu rm
-                 INNER JOIN sys_menu m ON rm.menu_id = m.id
+                 INNER JOIN sys_menu_tenant m ON rm.menu_id = m.id
         WHERE rm.role_id = #{roleId}
     </select>
 </mapper>

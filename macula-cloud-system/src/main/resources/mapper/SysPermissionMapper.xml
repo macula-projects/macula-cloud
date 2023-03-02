@@ -45,9 +45,9 @@
         FROM
         sys_permission
         ) t1
-        LEFT JOIN sys_menu t2 ON t1.menu_id = t2.id
-        LEFT JOIN sys_dict_item t3 ON t3.`value` = t1.requestMethod
-        LEFT JOIN sys_dict_item t4 ON t4.`value` = t1.serviceName
+        LEFT JOIN sys_menu_tenant t2 ON t1.menu_id = t2.id
+        LEFT JOIN sys_dict_item_tenant t3 ON t3.`value` = t1.requestMethod
+        LEFT JOIN sys_dict_item_tenant t4 ON t4.`value` = t1.serviceName
         <where>
             <if test='queryParams.name != null and queryParams.name.trim() neq ""'>
                 and t1.name like concat('%',#{queryParams.name},'%')
