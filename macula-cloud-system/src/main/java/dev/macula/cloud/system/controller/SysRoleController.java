@@ -28,14 +28,12 @@ import dev.macula.cloud.system.service.SysRoleService;
 import dev.macula.cloud.system.vo.role.RolePageVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.media.*;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import javax.validation.Valid;
 import java.util.List;
-import java.util.Map;
 
 @Tag(name = "角色接口")
 @RestController
@@ -124,23 +122,11 @@ public class SysRoleController {
     }
 
     @Operation(summary = "分配角色的资源权限")
-    @io.swagger.v3.oas.annotations.parameters.RequestBody(
-            description = "更新角色菜单的请求体对象,先删除当前分页【curPage】(没有则全部删除)该角色拥有的菜单信息," +
-                    "后添加当前选择的菜单信息," +
-                    "curPage(当前分页菜单列表中所有菜单id列表,可不传)," +
-                    "curSel（当前页选择添加给角色的菜单id列表）",
-            content = {@Content(mediaType="application/json",
-                    schema = @Schema(implementation = Object.class, requiredProperties = "curSel"),
-                    schemaProperties = {
-                            @SchemaProperty(name = "curPage", array= @ArraySchema(arraySchema = @Schema(implementation = List.class), schema = @Schema(implementation = Long.class))),
-                            @SchemaProperty(name = "curSel", array= @ArraySchema(arraySchema = @Schema(implementation = List.class), schema = @Schema(implementation = Long.class)))}
-            )}
-    )
     @AuditLog(title = "分配角色的资源权限")
     @PutMapping("/{roleId}/menus")
     public boolean updateRoleMenus(
             @PathVariable Long roleId,
-            @RequestBody Map<String,List<Long>> menuIds
+            @RequestBody List<Long> menuIds
     ) {
         boolean result = roleService.updateRoleMenus(roleId, menuIds);
         if (result) {
