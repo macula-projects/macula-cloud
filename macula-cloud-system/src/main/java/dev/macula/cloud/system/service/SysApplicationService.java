@@ -39,14 +39,6 @@ public interface SysApplicationService extends IService<SysApplication> {
      */
     Page<ApplicationVO> listApplicationPages(ApplicationPageQuery queryParams);
 
-
-    /**
-     * 应用列表
-     * @return
-     */
-    List<ApplicationVO> listAllApplication();
-
-
     /**
      * 新增应用
      *

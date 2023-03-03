@@ -50,13 +50,6 @@ public class SysApplicationController {
         return list;
     }
 
-    @Operation(summary = "获取应用列表")
-    @GetMapping(value = "/list")
-    public List<ApplicationVO> listAllApplications() {
-        List<ApplicationVO> list = applicationService.listAllApplication();
-        return list;
-    }
-
     @Operation(summary = "新增应用")
     @AuditLog(title = "新增应用")
     @PostMapping

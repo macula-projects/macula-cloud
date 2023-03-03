@@ -22,10 +22,7 @@ import com.baomidou.mybatisplus.extension.service.IService;
 import dev.macula.cloud.system.form.DictItemForm;
 import dev.macula.cloud.system.pojo.entity.SysDictItem;
 import dev.macula.cloud.system.query.DictItemPageQuery;
-import dev.macula.cloud.system.query.DictItemQuery;
 import dev.macula.cloud.system.vo.dict.DictItemPageVO;
-
-import java.util.List;
 
 /**
  *
@@ -38,14 +35,6 @@ public interface SysDictItemService extends IService<SysDictItem> {
      * @return
      */
     Page<DictItemPageVO> listDictItemPages(DictItemPageQuery queryParams);
-
-
-    /**
-     *  字典数据项列表
-     * @param queryParams
-     * @return
-     */
-    List<DictItemPageVO> listDictItems(DictItemQuery queryParams);
 
     /**
      * 字典数据项表单详情

@@ -31,6 +31,4 @@ public interface SysApplicationMapper extends BaseMapper<SysApplication> {
 
     Page<ApplicationBO> listApplicationPages(Page<SysApplication> page, ApplicationPageQuery queryParams);
 
-    List<ApplicationBO> listAllApplication();
-
 }

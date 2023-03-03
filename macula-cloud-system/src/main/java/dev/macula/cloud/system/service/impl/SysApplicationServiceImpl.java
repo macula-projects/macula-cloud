@@ -34,13 +34,6 @@ public class SysApplicationServiceImpl extends ServiceImpl<SysApplicationMapper,
     }
 
     @Override
-    public List<ApplicationVO> listAllApplication() {
-        List<ApplicationBO> boList = this.baseMapper.listAllApplication();
-        List<ApplicationVO> list = applicationConverter.bo2Vo(boList);
-        return list;
-    }
-
-    @Override
     public boolean saveApplication(ApplicationForm appForm) {
         SysApplication sysApplication = applicationConverter.form2Entity(appForm);
         boolean result = this.save(sysApplication);
