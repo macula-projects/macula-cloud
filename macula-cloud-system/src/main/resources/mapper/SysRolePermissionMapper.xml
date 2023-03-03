@@ -7,7 +7,7 @@
     <!-- 获取角色拥有的权限ID集合 -->
     <select id="listPermIdsByRoleId" resultType="java.lang.Long">
         SELECT rp.permission_id
-        FROM sys_role_permission rp
+        FROM sys_role_permission_tenant rp
                  INNER JOIN sys_permission p ON rp.permission_id = p.id
         WHERE rp.role_id = #{roleId}
     </select>
