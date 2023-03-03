@@ -5,7 +5,6 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import dev.macula.boot.result.Option;
 import dev.macula.cloud.system.annotation.AuditLog;
 import dev.macula.cloud.system.form.TenantForm;
-import dev.macula.cloud.system.pojo.bo.TenantBO;
 import dev.macula.cloud.system.query.TenantPageQuery;
 import dev.macula.cloud.system.service.SysTenantService;
 import dev.macula.cloud.system.vo.tenant.TenantPageVO;

@@ -18,7 +18,6 @@
 package dev.macula.cloud.system.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import dev.macula.cloud.system.annotation.AuditLog;
 import dev.macula.cloud.system.query.LogPageQuery;
 import dev.macula.cloud.system.service.SysLogService;
 import dev.macula.cloud.system.vo.log.AuditLogVO;

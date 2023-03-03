@@ -21,7 +21,6 @@ import com.alibaba.excel.EasyExcel;
 import com.alibaba.excel.ExcelWriter;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import dev.macula.cloud.system.annotation.AuditLog;
 import dev.macula.cloud.system.dto.UserAuthInfo;
 import dev.macula.cloud.system.dto.UserImportDTO;
@@ -64,8 +63,8 @@ public class SysUserController {
 
     @Operation(summary = "用户分页列表")
     @GetMapping
-    public Page<UserVO> listUserPages(UserPageQuery queryParams) {
-        Page<UserVO> result = userService.listUserPages(queryParams);
+    public IPage<UserVO> listUserPages(UserPageQuery queryParams) {
+        IPage<UserVO> result = userService.listUserPages(queryParams);
         return result;
     }
 
@@ -199,10 +198,10 @@ public class SysUserController {
 
     @Operation(summary = "根据id查询单个/多个用户", hidden = true)
     @GetMapping("/getUsers")
-    public Page<UserVO> getUsers(
+    public IPage<UserVO> getUsers(
             UserPageQuery queryParams
     ) {
-        Page<UserVO> result = userService.listUserPagesByIds(queryParams);
+        IPage<UserVO> result = userService.listUserPagesByIds(queryParams);
         return result;
     }
 }
