@@ -26,6 +26,7 @@ import com.alibaba.excel.read.builder.ExcelReaderBuilder;
 import com.alibaba.excel.read.builder.ExcelReaderSheetBuilder;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.google.common.collect.Lists;
@@ -90,7 +91,7 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
      * @return
      */
     @Override
-    public Page<UserVO> listUserPages(UserPageQuery queryParams) {
+    public IPage<UserVO> listUserPages(UserPageQuery queryParams) {
 
         // 查询数据
         Page<UserBO> userBoPage = this.baseMapper.listUserPages(
@@ -374,7 +375,7 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
     }
 
     @Override
-    public Page<UserVO> listUserPagesByIds(UserPageQuery queryParams) {
+    public IPage<UserVO> listUserPagesByIds(UserPageQuery queryParams) {
 
 
         // 查询数据
