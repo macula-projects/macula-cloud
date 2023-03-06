@@ -37,7 +37,4 @@ public class PermPageQuery extends BasePageQuery {
     @Schema(description = "菜单ID")
     private Long menuId;
 
-    @Schema(description = "菜单名称")
-    private String menuName;
-
 }

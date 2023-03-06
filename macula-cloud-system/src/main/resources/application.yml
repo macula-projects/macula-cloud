@@ -25,6 +25,8 @@ spring:
 macula:
   security:
     ignore-urls:
+      - /api/token
+      - /api/token/introspect
       - /swagger-ui/index.html
       - /v3/api-docs/swagger-config
 

@@ -104,6 +104,7 @@ public class SysUserController {
     @Operation(summary = "修改用户密码")
     @AuditLog(title = "修改用户密码")
     @Parameter(name = "用户ID")
+    @PatchMapping(value = "/{userId}/password")
     public boolean updatePassword(@PathVariable Long userId, @RequestParam String password) {
         boolean result = userService.updatePassword(userId, password);
         return result;

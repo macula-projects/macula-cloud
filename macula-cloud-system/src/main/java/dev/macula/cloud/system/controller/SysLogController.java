@@ -17,7 +17,7 @@
 
 package dev.macula.cloud.system.controller;
 
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import dev.macula.cloud.system.query.LogPageQuery;
 import dev.macula.cloud.system.service.SysLogService;
 import dev.macula.cloud.system.vo.log.AuditLogVO;
@@ -38,8 +38,8 @@ public class SysLogController {
 
     @Operation(summary = "审计日志分页列表")
     @GetMapping("/page")
-    public Page<AuditLogVO> listAuditLogPages(LogPageQuery pageQuery) {
-        Page<AuditLogVO> result = sysLogService.listUserPages(pageQuery);
+    public IPage<AuditLogVO> listAuditLogPages(LogPageQuery pageQuery) {
+        IPage<AuditLogVO> result = sysLogService.listUserPages(pageQuery);
         return result;
     }
 
