@@ -37,6 +37,4 @@ public interface ApplicationConverter {
 
     Page<ApplicationVO> bo2Vo(Page<ApplicationBO> bo);
 
-    List<ApplicationVO> bo2Vo(List<ApplicationBO> bo);
-
 }
