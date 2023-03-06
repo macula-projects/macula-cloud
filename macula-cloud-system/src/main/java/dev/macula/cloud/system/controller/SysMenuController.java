@@ -18,6 +18,7 @@
 package dev.macula.cloud.system.controller;
 
 import dev.macula.boot.result.Option;
+import dev.macula.cloud.system.annotation.AuditLog;
 import dev.macula.cloud.system.pojo.entity.SysMenu;
 import dev.macula.cloud.system.query.MenuQuery;
 import dev.macula.cloud.system.service.SysMenuService;
@@ -48,6 +49,12 @@ import java.util.List;
 @Slf4j
 public class SysMenuController {
     private final SysMenuService menuService;
+
+    @Operation(summary = "获取请求方法下拉列表")
+    @GetMapping("/methodOption")
+    public List<Option> requestMethodOption(){
+        return menuService.requestMethodOption();
+    }
 
     @Operation(summary = "资源(菜单+权限)列表")
     @GetMapping("/resources")
@@ -86,6 +93,7 @@ public class SysMenuController {
     }
 
     @Operation(summary = "新增菜单")
+    @AuditLog(title = "新增菜单")
     @PostMapping
     @CacheEvict(cacheNames = "system", key = "'routes'")
     public boolean addMenu(@RequestBody SysMenu menu) {
@@ -94,6 +102,7 @@ public class SysMenuController {
     }
 
     @Operation(summary = "修改菜单")
+    @AuditLog(title = "修改菜单")
     @PutMapping(value = "/{id}")
     @CacheEvict(cacheNames = "system", key = "'routes'")
     public boolean updateMenu(@RequestBody SysMenu menu) {
@@ -102,6 +111,7 @@ public class SysMenuController {
     }
 
     @Operation(summary = "删除菜单")
+    @AuditLog(title = "删除菜单")
     @Parameter(name = "菜单ID", description = "菜单ID，多个以英文(,)分割")
     @DeleteMapping("/{ids}")
     @CacheEvict(cacheNames = "system", key = "'routes'")
@@ -111,6 +121,7 @@ public class SysMenuController {
     }
 
     @Operation(summary = "修改菜单显示状态")
+    @AuditLog(title = "修改菜单显示状态")
     @Parameter(name = "菜单ID")
     @Parameter(name = "显示状态", description = "显示状态(1:显示;0:隐藏)")
     @PatchMapping("/{menuId}")

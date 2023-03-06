@@ -20,6 +20,7 @@ package dev.macula.cloud.system.converter;
 import dev.macula.cloud.system.pojo.entity.SysMenu;
 import dev.macula.cloud.system.vo.menu.MenuVO;
 import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 
 /**
  * 菜单对象转换器
@@ -30,6 +31,7 @@ import org.mapstruct.Mapper;
 @Mapper(componentModel = "spring")
 public interface MenuConverter {
 
+    @Mapping(source = "path", target = "routePath")
     MenuVO entity2VO(SysMenu entity);
 
 }

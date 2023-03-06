@@ -35,7 +35,6 @@ import java.util.Set;
  * @since 2020/11/06
  */
 public interface SysMenuService extends IService<SysMenu> {
-
     /**
      * 获取菜单表格列表
      *
@@ -93,4 +92,10 @@ public interface SysMenuService extends IService<SysMenu> {
      * @return
      */
     Set<String> listRolePerms(Set<String> roles);
+
+    /**
+     * 请求方法下拉列表
+     * @return
+     */
+    List<Option> requestMethodOption();
 }

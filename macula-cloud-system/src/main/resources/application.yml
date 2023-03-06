@@ -2,13 +2,14 @@ spring:
   datasource:
     type: com.alibaba.druid.pool.DruidDataSource
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/macula-system?zeroDateTimeBehavior=convertToNull&useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&autoReconnect=true
-    username: root
-    password:
+    url: jdbc:mysql://10.94.108.56:3306/macula_system?zeroDateTimeBehavior=convertToNull&useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&autoReconnect=true
+    username: maculav5
+    password: maculaV5@2023
   redis:
     database: 0
-    host: localhost
-    port: 6379
+    host: 10.94.108.61
+    port: 6380
+    password: maculaV5@2023
   cache:
     # 缓存类型 redis、none(不使用缓存)
     type: redis
@@ -16,11 +17,16 @@ spring:
     nacos:
       discovery:
         enabled: true
-        server-addr: 127.0.0.1:8848
-        # namespace:
+        server-addr: 10.94.108.55:8848
+        namespace: MACULA5_DEV
         # group:
     sentinel:
       enabled: false
+macula:
+  security:
+    ignore-urls:
+      - /swagger-ui/index.html
+      - /v3/api-docs/swagger-config
 
 mybatis-plus:
   configuration:

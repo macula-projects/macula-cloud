@@ -23,6 +23,8 @@ import dev.macula.cloud.system.pojo.entity.SysDictType;
 import dev.macula.cloud.system.vo.dict.DictTypePageVO;
 import org.mapstruct.Mapper;
 
+import java.util.List;
+
 /**
  * 字典类型对象转换器
  *

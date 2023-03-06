@@ -17,11 +17,13 @@
 
 package dev.macula.cloud.system.pojo.entity;
 
+import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
 @Data
 @AllArgsConstructor
+@TableName("sys_role_permission_tenant")
 public class SysRolePermission {
     private Long roleId;
     private Long permissionId;

@@ -19,6 +19,7 @@ package dev.macula.cloud.system.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import dev.macula.boot.result.Option;
+import dev.macula.cloud.system.annotation.AuditLog;
 import dev.macula.cloud.system.form.RoleForm;
 import dev.macula.cloud.system.pojo.entity.SysRole;
 import dev.macula.cloud.system.query.RolePageQuery;
@@ -66,6 +67,7 @@ public class SysRoleController {
     }
 
     @Operation(summary = "新增角色")
+    @AuditLog(title = "新增角色")
     @PostMapping
     public boolean addRole(@Valid @RequestBody RoleForm roleForm) {
         boolean result = roleService.saveRole(roleForm);
@@ -73,6 +75,7 @@ public class SysRoleController {
     }
 
     @Operation(summary = "修改角色")
+    @AuditLog(title = "修改角色")
     @PutMapping(value = "/{id}")
     public boolean updateRole(@Valid @RequestBody RoleForm roleForm) {
         boolean result = roleService.saveRole(roleForm);
@@ -83,6 +86,7 @@ public class SysRoleController {
     }
 
     @Operation(summary = "删除角色")
+    @AuditLog(title = "删除角色")
     @Parameter(description = "删除角色，多个以英文逗号(,)分割")
     @DeleteMapping("/{ids}")
     public boolean deleteRoles(@PathVariable String ids) {
@@ -91,6 +95,7 @@ public class SysRoleController {
     }
 
     @Operation(summary = "修改角色状态")
+    @AuditLog(title = "修改角色状态")
     @Parameter(name = "角色ID")
     @Parameter(name = "角色状态", description = "角色状态:1-启用；0-禁用")
     @PutMapping(value = "/{roleId}/status")
@@ -108,6 +113,7 @@ public class SysRoleController {
     }
 
     @Operation(summary = "分配角色的资源权限")
+    @AuditLog(title = "分配角色的资源权限")
     @PutMapping("/{roleId}/menus")
     public boolean updateRoleMenus(@PathVariable Long roleId, @RequestBody List<Long> menuIds) {
         boolean result = roleService.updateRoleMenus(roleId, menuIds);
@@ -116,4 +122,27 @@ public class SysRoleController {
         }
         return result;
     }
+
+    @Operation(summary = "角色编码值验证器")
+    @Parameter(name = "角色id", description = "允许为空，新增时为空，编辑时携带")
+    @Parameter(name = "角色编码")
+    @GetMapping("/validtor/code")
+    public boolean validtorForCode(@RequestParam(required = false) Long id, @RequestParam String code) {
+        return roleService.validtorForCode(id, code);
+    }
+
+    @Operation(summary = "角色名称值验证器")
+    @Parameter(name = "角色id", description = "允许为空，新增时为空，编辑时携带")
+    @Parameter(name = "角色名称")
+    @GetMapping("/validtor/name")
+    public boolean validtorForName(@RequestParam(required = false) Long id, @RequestParam String name){
+        return roleService.validtorForName(id, name);
+    }
+
+    @Operation(summary = "获取数据权限的下拉列表")
+    @GetMapping("/optionsByDataScope")
+    public List<Option> optionsByDataScope() {
+        return roleService.optionsByDataScope();
+    }
+
 }

@@ -40,4 +40,6 @@ public class UserPageQuery extends BasePageQuery {
     @Schema(description = "部门ID")
     private Long deptId;
 
+    @Schema(description = "用户ID")
+    private String ids;
 }

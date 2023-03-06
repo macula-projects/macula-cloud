@@ -26,6 +26,7 @@ import com.alibaba.excel.read.builder.ExcelReaderBuilder;
 import com.alibaba.excel.read.builder.ExcelReaderSheetBuilder;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.google.common.collect.Lists;
@@ -152,7 +153,7 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
      * @return
      */
     @Override
-    public Page<UserVO> listUserPages(UserPageQuery queryParams) {
+    public IPage<UserVO> listUserPages(UserPageQuery queryParams) {
 
         // 查询数据
         Page<UserBO> userBoPage =
@@ -195,9 +196,9 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         // 实体转换 form->entity
         SysUser entity = userConverter.form2Entity(userForm);
 
-        // 设置默认加密密码
-        String defaultEncryptPwd = passwordEncoder.encode(SecurityConstants.DEFAULT_USER_PASSWORD);
-        entity.setPassword(defaultEncryptPwd);
+        // 加密密码
+        String encryptPwd = passwordEncoder.encode(userForm.getPassword());
+        entity.setPassword(encryptPwd);
 
         // 新增用户
         boolean result = this.save(entity);
@@ -369,5 +370,18 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
     public List<UserExportVO> listExportUsers(UserPageQuery queryParams) {
         List<UserExportVO> list = this.baseMapper.listExportUsers(queryParams);
         return list;
+    }
+
+    @Override
+    public IPage<UserVO> listUserPagesByIds(UserPageQuery queryParams) {
+
+        // 查询数据
+        Page<UserBO> userBoPage = this.baseMapper.listUserPagesByIds(
+                new Page<>(queryParams.getPageNum(), queryParams.getPageSize()), queryParams);
+
+        // 实体转换
+        Page<UserVO> userVoPage = userConverter.bo2Vo(userBoPage);
+
+        return userVoPage;
     }
 }

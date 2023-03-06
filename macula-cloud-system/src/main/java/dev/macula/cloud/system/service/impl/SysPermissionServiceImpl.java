@@ -19,22 +19,24 @@ package dev.macula.cloud.system.service.impl;
 
 import cn.hutool.core.collection.CollectionUtil;
 import cn.hutool.core.util.StrUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import dev.macula.boot.constants.SecurityConstants;
+import dev.macula.boot.result.Option;
+import dev.macula.cloud.system.form.PermissionValidtorForm;
 import dev.macula.cloud.system.mapper.SysPermissionMapper;
 import dev.macula.cloud.system.pojo.entity.SysPermission;
 import dev.macula.cloud.system.query.PermPageQuery;
 import dev.macula.cloud.system.service.SysPermissionService;
 import dev.macula.cloud.system.vo.perm.PermPageVO;
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -49,6 +51,10 @@ public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, S
     implements SysPermissionService {
 
     private final RedisTemplate redisTemplate;
+
+    private static final String VALIDTOR_PERM_ID_SPLITOR = "::";
+    private static final String VALIDTOR_PERM_JOIN = ":";
+    private static final String EMPTY_STR = "";
 
     /**
      * 获取权限分页列表
@@ -98,5 +104,34 @@ public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, S
                 redisTemplate.opsForHash().putAll(SecurityConstants.SECURITY_URL_PERM_ROLES_KEY, urlPermRoles);
             }
         }
+    }
+
+    @Override
+    public List<Option> validtorUrlPerm(List<PermissionValidtorForm> validtorForms) {
+        if(validtorForms.isEmpty()){
+            return new ArrayList<>();
+        }
+        Map<String, String> validtorFormMap = validtorForms.stream().collect(Collectors.toMap(form->{
+            StringBuffer sb = new StringBuffer();
+            sb.append(Objects.isNull(form.getId())? EMPTY_STR : form.getId())
+                    .append(VALIDTOR_PERM_ID_SPLITOR).append(form.getCode())
+                    .append(VALIDTOR_PERM_JOIN).append(form.getUrl())
+                    .append(VALIDTOR_PERM_JOIN).append(form.getMethod().toString());
+            return sb.toString();
+        }, form -> {
+            StringBuffer sb = new StringBuffer();
+            sb.append(form.getMethod().toString())
+                    .append(VALIDTOR_PERM_JOIN).append(form.getUrl());
+            return sb.toString();
+        }, (oldValue, newValue) -> newValue));
+
+        List<Option> result = validtorFormMap.keySet().stream().map(item->{
+            String[] keyIdArr = item.split(VALIDTOR_PERM_ID_SPLITOR);
+            long count = count(new LambdaQueryWrapper<SysPermission>()
+                .eq(SysPermission::getUrlPerm, validtorFormMap.get(item))
+                .and(StringUtils.isNotBlank(keyIdArr[0]), wrapper->wrapper.ne(SysPermission::getId, keyIdArr[0])));
+            return new Option(count == 0, item);
+        }).collect(Collectors.toList());
+        return result;
     }
 }
