@@ -36,8 +36,6 @@ public interface DictTypeConverter {
 
     Page<DictTypePageVO> entity2Page(Page<SysDictType> page);
 
-    List<DictTypePageVO> entity2Vo(List<SysDictType> list);
-
     DictTypeForm entity2Form(SysDictType entity);
 
     SysDictType form2Entity(DictTypeForm entity);
