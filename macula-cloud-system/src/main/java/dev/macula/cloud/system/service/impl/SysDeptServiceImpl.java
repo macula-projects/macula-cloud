@@ -145,8 +145,8 @@ public class SysDeptServiceImpl extends ServiceImpl<SysDeptMapper, SysDept> impl
             new LambdaQueryWrapper<SysDept>().eq(SysDept::getStatus, StatusEnum.ENABLE.getValue())
                 .select(SysDept::getId, SysDept::getParentId, SysDept::getName).orderByAsc(SysDept::getSort));
 
-        //   List<Option> options = recurDeptTreeOptions(SystemConstants.ROOT_NODE_ID, deptList);
-        List<Option> options = buildDeptTree(deptList);
+           List<Option> options = recurDeptTreeOptions(SecurityConstants.ROOT_NODE_ID, deptList);
+//        List<Option> options = buildDeptTree(deptList);
         return options;
     }
 

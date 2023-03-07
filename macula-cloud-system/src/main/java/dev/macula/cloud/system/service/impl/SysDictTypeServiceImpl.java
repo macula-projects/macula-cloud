@@ -79,6 +79,7 @@ public class SysDictTypeServiceImpl extends ServiceImpl<SysDictTypeMapper, SysDi
         return pageResult;
     }
 
+
     /**
      * 获取字典类型表单详情
      *

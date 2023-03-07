@@ -19,6 +19,8 @@ package dev.macula.cloud.system.service;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
+import dev.macula.boot.result.Option;
+import dev.macula.cloud.system.form.PermissionValidtorForm;
 import dev.macula.cloud.system.pojo.entity.SysPermission;
 import dev.macula.cloud.system.query.PermPageQuery;
 import dev.macula.cloud.system.vo.perm.PermPageVO;
@@ -52,4 +54,12 @@ public interface SysPermissionService extends IService<SysPermission> {
      * 刷新Redis缓存中角色菜单的权限规则，角色和菜单信息变更调用
      */
     void refreshPermRolesRules();
+
+    /**
+     * 接口权限路径验证器
+     * @param validtorForms
+     * @return
+     */
+    List<Option> validtorUrlPerm(List<PermissionValidtorForm> validtorForms);
+
 }

@@ -28,6 +28,7 @@ import dev.macula.boot.constants.SecurityConstants;
 import dev.macula.boot.result.Option;
 import dev.macula.boot.starter.security.utils.SecurityUtils;
 import dev.macula.cloud.system.converter.RoleConverter;
+import dev.macula.cloud.system.enums.DataScopeEnum;
 import dev.macula.cloud.system.form.RoleForm;
 import dev.macula.cloud.system.mapper.SysRoleMapper;
 import dev.macula.cloud.system.pojo.entity.*;
@@ -199,7 +200,7 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
             new LambdaQueryWrapper<SysRolePermission>().eq(SysRolePermission::getRoleId, roleId));
         // 新增角色权限关系（用勾选的菜单ID获取权限，用权限ID和角色ID组装sys_role_permission表)
         List<SysPermission> permList = sysPermissionService.list(
-            new LambdaQueryWrapper<SysPermission>().in(menuIds != null, SysPermission::getMenuId, menuIds));
+            new LambdaQueryWrapper<SysPermission>().in(CollectionUtil.isNotEmpty(menuIds), SysPermission::getMenuId, menuIds));
         if (CollectionUtil.isNotEmpty(permList)) {
             List<SysRolePermission> rolePerms =
                 permList.stream().map(perm -> new SysRolePermission(roleId, perm.getId())).collect(Collectors.toList());
@@ -219,6 +220,34 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
     public Integer getMaximumDataScope(Set<String> roles) {
         Integer dataScope = this.baseMapper.getMaximumDataScope(roles);
         return dataScope;
+    }
+
+    @Override
+    public boolean validtorForCode(Long id, String code) {
+        long count = this.count(new LambdaQueryWrapper<SysRole>()
+                .ne(id != null, SysRole::getId, id)
+                .and(wrapper ->
+                        wrapper.eq(SysRole::getCode, code)
+                ));
+        return count == 0;
+    }
+
+    @Override
+    public boolean validtorForName(Long id, String name) {
+        long count = this.count(new LambdaQueryWrapper<SysRole>()
+                .ne(id != null, SysRole::getId, id)
+                .and(wrapper ->
+                        wrapper.eq(SysRole::getName, name)
+                ));
+        return count == 0;
+    }
+
+    @Override
+    public List<Option> optionsByDataScope() {
+        return Arrays.asList(DataScopeEnum.values())
+                .stream()
+                .map(roleDataScopeEnum -> new Option<>(roleDataScopeEnum, roleDataScopeEnum.getLabel()))
+                .collect(Collectors.toList());
     }
 
 }

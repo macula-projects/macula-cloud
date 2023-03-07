@@ -18,6 +18,7 @@
 package dev.macula.cloud.system.vo.user;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
@@ -29,6 +30,7 @@ import java.time.LocalDateTime;
  * @author haoxr
  * @since 2022/1/15 9:41
  */
+@JsonInclude(JsonInclude.Include.NON_EMPTY)
 @Schema(description = "用户分页视图对象")
 @Data
 public class UserVO {

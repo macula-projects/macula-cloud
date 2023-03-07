@@ -45,7 +45,7 @@
         t1.url_btn
         FROM
         sys_permission t1
-        LEFT JOIN sys_menu t2 ON t1.menu_id = t2.id
+        LEFT JOIN sys_menu_tenant t2 ON t1.menu_id = t2.id
         <where>
             <if test='queryParams.name != null and queryParams.name.trim() neq ""'>
                 and t1.name like concat('%',#{queryParams.name},'%')
@@ -65,7 +65,7 @@
                t1.url_perm,
                t3.code
         FROM sys_permission t1
-                 LEFT JOIN sys_role_permission t2 ON t1.id = t2.permission_id
+                 LEFT JOIN sys_role_permission_tenant t2 ON t1.id = t2.permission_id
                  LEFT JOIN sys_role t3 ON t2.role_id = t3.id
     </select>
 </mapper>

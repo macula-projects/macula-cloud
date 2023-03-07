@@ -24,6 +24,8 @@ import dev.macula.cloud.system.vo.dict.DictItemPageVO;
 import org.mapstruct.InheritInverseConfiguration;
 import org.mapstruct.Mapper;
 
+import java.util.List;
+
 /**
  * 字典数据项对象转换器
  *

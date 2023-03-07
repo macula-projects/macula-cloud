@@ -17,7 +17,7 @@
 
 package dev.macula.cloud.system.service;
 
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
 import dev.macula.cloud.system.dto.UserAuthInfo;
 import dev.macula.cloud.system.dto.UserImportDTO;
@@ -61,7 +61,7 @@ public interface SysUserService extends IService<SysUser> {
      *
      * @return 用户信息
      */
-    Page<UserVO> listUserPages(UserPageQuery queryParams);
+    IPage<UserVO> listUserPages(UserPageQuery queryParams);
 
     /**
      * 获取用户详情
@@ -129,4 +129,10 @@ public interface SysUserService extends IService<SysUser> {
      */
     List<UserExportVO> listExportUsers(UserPageQuery queryParams);
 
+    /**
+     * 根据用户id获取用户分页列表
+     * @param queryParams
+     * @return
+     */
+    IPage<UserVO> listUserPagesByIds(UserPageQuery queryParams);
 }

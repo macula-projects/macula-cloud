@@ -17,10 +17,12 @@
 
 package dev.macula.cloud.system.pojo.entity;
 
+import com.baomidou.mybatisplus.annotation.TableName;
 import dev.macula.boot.starter.mp.entity.BaseEntity;
 import lombok.Data;
 
 @Data
+@TableName("sys_dict_type_tenant")
 public class SysDictType extends BaseEntity {
 
     private String code;

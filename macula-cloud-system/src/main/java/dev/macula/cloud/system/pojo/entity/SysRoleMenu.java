@@ -17,11 +17,13 @@
 
 package dev.macula.cloud.system.pojo.entity;
 
+import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
 @Data
 @AllArgsConstructor
+@TableName("sys_role_menu_tenant")
 public class SysRoleMenu {
 
     private Long roleId;

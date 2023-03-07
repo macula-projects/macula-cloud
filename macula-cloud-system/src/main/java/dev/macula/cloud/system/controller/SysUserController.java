@@ -21,6 +21,7 @@ import com.alibaba.excel.EasyExcel;
 import com.alibaba.excel.ExcelWriter;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import dev.macula.cloud.system.annotation.AuditLog;
 import dev.macula.cloud.system.dto.UserAuthInfo;
 import dev.macula.cloud.system.dto.UserImportDTO;
 import dev.macula.cloud.system.form.UserForm;
@@ -60,7 +61,7 @@ public class SysUserController {
     private final SysUserService userService;
 
     @Operation(summary = "用户分页列表")
-    @GetMapping("/pages")
+    @GetMapping
     public IPage<UserVO> listUserPages(UserPageQuery queryParams) {
         IPage<UserVO> result = userService.listUserPages(queryParams);
         return result;
@@ -75,6 +76,7 @@ public class SysUserController {
     }
 
     @Operation(summary = "新增用户")
+    @AuditLog(title = "新增用户")
     @PostMapping
     public boolean saveUser(@Validated @RequestBody UserForm userForm) {
         boolean result = userService.saveUser(userForm);
@@ -82,6 +84,7 @@ public class SysUserController {
     }
 
     @Operation(summary = "修改用户")
+    @AuditLog(title = "修改用户")
     @Parameter(name = "用户ID")
     @PutMapping(value = "/{userId}")
     public boolean updateUser(@PathVariable Long userId, @RequestBody @Validated UserForm userForm) {
@@ -90,6 +93,7 @@ public class SysUserController {
     }
 
     @Operation(summary = "删除用户")
+    @AuditLog(title = "删除用户")
     @Parameter(name = "用户ID", description = "用户ID，多个以英文逗号(,)分割")
     @DeleteMapping("/{ids}")
     public boolean deleteUsers(@PathVariable String ids) {
@@ -98,7 +102,9 @@ public class SysUserController {
     }
 
     @Operation(summary = "修改用户密码")
+    @AuditLog(title = "修改用户密码")
     @Parameter(name = "用户ID")
+    @PatchMapping(value = "/{userId}/password")
     public boolean updatePassword(@PathVariable Long userId, @RequestParam String password) {
         boolean result = userService.updatePassword(userId, password);
         return result;
@@ -106,6 +112,7 @@ public class SysUserController {
 
     @Operation(summary = "修改用户状态")
     @Parameter(name = "用户ID")
+    @AuditLog(title = "修改用户状态")
     @Parameter(name = "用户状态", description = "用户状态(1:启用;0:禁用)")
     @PatchMapping(value = "/{userId}/status")
     public boolean updateStatus(@PathVariable Long userId, @RequestParam Integer status) {
@@ -131,6 +138,7 @@ public class SysUserController {
     }
 
     @Operation(summary = "导入用户")
+    @AuditLog(title = "导入用户")
     @PostMapping("/_import")
     public String importUsers(UserImportDTO userImportDTO) throws IOException {
         String msg = userService.importUsers(userImportDTO);
@@ -169,5 +177,12 @@ public class SysUserController {
     public UserLoginVO getLoginUserInfo() {
         UserLoginVO userLoginVO = userService.getCurrentUserInfo();
         return userLoginVO;
+    }
+
+    @Operation(summary = "根据id查询单个/多个用户", hidden = true)
+    @GetMapping("/getUsers")
+    public IPage<UserVO> getUsers(UserPageQuery queryParams) {
+        IPage<UserVO> result = userService.listUserPagesByIds(queryParams);
+        return result;
     }
 }
