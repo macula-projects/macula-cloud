@@ -1,6 +1,4 @@
 spring:
-  profiles:
-    active: dev
   application:
     name: macula-cloud-system
   cloud:
