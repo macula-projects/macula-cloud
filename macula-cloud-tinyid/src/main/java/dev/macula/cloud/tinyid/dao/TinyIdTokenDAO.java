@@ -28,7 +28,7 @@ public interface TinyIdTokenDAO {
     /**
      * 查询db中所有的token信息
      *
-     * @return
+     * @return List
      */
     List<TinyIdToken> selectAll();
 }

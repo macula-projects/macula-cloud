@@ -29,7 +29,7 @@ import java.io.IOException;
 import java.util.Map;
 
 /**
- * @Author du_imba
+ * @author du_imba
  */
 @WebFilter(urlPatterns = "/*", filterName = "requestFilter")
 public class RequestFilter implements Filter {

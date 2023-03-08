@@ -24,9 +24,9 @@ public interface TinyIdTokenService {
     /**
      * 是否有权限
      *
-     * @param bizType
-     * @param token
-     * @return
+     * @param bizType 业务类型
+     * @param token   TOKEN
+     * @return boolean 权限
      */
     boolean canVisit(String bizType, String token);
 }

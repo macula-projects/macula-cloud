@@ -34,6 +34,7 @@
             <artifactId>macula-boot-starter-cloud-alibaba-scg</artifactId>
         </dependency>
     </dependencies>
+
     <build>
         <plugins>
             <plugin>

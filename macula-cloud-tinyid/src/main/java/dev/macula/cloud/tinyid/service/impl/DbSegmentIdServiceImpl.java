@@ -52,8 +52,8 @@ public class DbSegmentIdServiceImpl implements SegmentIdService {
      * 如果是REPEATABLE_READ，那么在本次事务中循环调用tinyIdInfoDAO.queryByBizType(bizType)获取的结果是没有变化的，也就是查询不到别的事务提交的内容
      * 所以多次调用tinyIdInfoDAO.updateMaxId也就不会成功
      *
-     * @param bizType
-     * @return
+     * @param bizType 业务类型
+     * @return SegmentId
      */
     @Override
     @Transactional(isolation = Isolation.READ_COMMITTED)

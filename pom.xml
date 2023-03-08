@@ -41,7 +41,7 @@
     <modules>
         <module>macula-cloud-gateway</module>
         <module>macula-cloud-api</module>
-        <module>macula-cloud-oauth</module>
+        <module>macula-cloud-iam</module>
         <module>macula-cloud-tinyid</module>
         <module>macula-cloud-powerjob</module>
         <module>macula-cloud-system</module>

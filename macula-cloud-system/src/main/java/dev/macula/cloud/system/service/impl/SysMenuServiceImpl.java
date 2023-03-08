@@ -112,7 +112,7 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
                 Assert.isTrue(path.startsWith("/"), "目录路由路径格式错误，必须以/开始");
                 menu.setComponent("Layout");
                 break;
-            case EXTLINK: // 外链
+            case LINK: // 外链
                 menu.setComponent(null);
                 break;
         }
