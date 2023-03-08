@@ -20,6 +20,8 @@ import org.apache.http.client.config.RequestConfig;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.hibernate.validator.constraints.Length;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -55,6 +57,7 @@ import java.util.concurrent.ConcurrentHashMap;
 @Slf4j
 @Deprecated
 @RequiredArgsConstructor
+@RefreshScope
 public class SysTokenController {
   private static final Map<String, UserAuthInfo> USER_TOKEN_MAP = new ConcurrentHashMap<>();
   private static final HttpHeaders DEFAULT_HEADERS;
@@ -63,19 +66,27 @@ public class SysTokenController {
   private final PasswordEncoder passwordEncoder;
   private final RedisTemplate redisTemplate;
 
+  @Value("${test.env}")
+  private String testEnv;
+
   static {
     DEFAULT_HEADERS = new HttpHeaders();
     DEFAULT_HEADERS.set("Authorization", getBaseAuthHeader("client", "secret"));
   }
 
+  @GetMapping("/testenv")
+  public String test() {
+    return testEnv;
+  }
+
   @Operation(summary = "MaculaV5获取用户权限信息")
   @PostMapping("/introspect")
   @NotControllerResponseAdvice
-  public JSONObject postIntrospect(@RequestParam("token") String token){
+  public JSONObject postIntrospect(@RequestParam("token") String token) {
     redisTemplate.opsForSet().members(SecurityConstants.SECURITY_USER_BTN_PERMS_KEY + "1");
     JSONObject jsonObject = new JSONObject();
     UserAuthInfo userAuthInfo = USER_TOKEN_MAP.get(token);
-    if(Objects.isNull(userAuthInfo)){
+    if (Objects.isNull(userAuthInfo)) {
       jsonObject.put("active", false);
       return jsonObject;
     }
