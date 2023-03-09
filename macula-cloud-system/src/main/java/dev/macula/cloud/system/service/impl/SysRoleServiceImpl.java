@@ -186,8 +186,10 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
     @Transactional
     @CacheEvict(cacheNames = "system", key = "'routes'")
     public boolean updateRoleMenus(Long roleId, List<Long> menuIds) {
+
         // 删除角色菜单
         sysRoleMenuService.remove(new LambdaQueryWrapper<SysRoleMenu>().eq(SysRoleMenu::getRoleId, roleId));
+
         // 新增角色菜单关系
         if (CollectionUtil.isNotEmpty(menuIds)) {
             List<SysRoleMenu> roleMenus =
@@ -198,13 +200,17 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
         // 删除角色权限
         sysRolePermissionService.remove(
             new LambdaQueryWrapper<SysRolePermission>().eq(SysRolePermission::getRoleId, roleId));
+
         // 新增角色权限关系（用勾选的菜单ID获取权限，用权限ID和角色ID组装sys_role_permission表)
-        List<SysPermission> permList = sysPermissionService.list(
-            new LambdaQueryWrapper<SysPermission>().in(CollectionUtil.isNotEmpty(menuIds), SysPermission::getMenuId, menuIds));
-        if (CollectionUtil.isNotEmpty(permList)) {
-            List<SysRolePermission> rolePerms =
-                permList.stream().map(perm -> new SysRolePermission(roleId, perm.getId())).collect(Collectors.toList());
-            sysRolePermissionService.saveBatch(rolePerms);
+        if (CollectionUtil.isNotEmpty(menuIds)) {
+            List<SysPermission> permList = sysPermissionService.list(
+                new LambdaQueryWrapper<SysPermission>().in(menuIds != null, SysPermission::getMenuId, menuIds));
+            if (CollectionUtil.isNotEmpty(permList)) {
+                List<SysRolePermission> rolePerms =
+                    permList.stream().map(perm -> new SysRolePermission(roleId, perm.getId()))
+                        .collect(Collectors.toList());
+                sysRolePermissionService.saveBatch(rolePerms);
+            }
         }
 
         return true;
