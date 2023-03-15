@@ -230,30 +230,23 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
 
     @Override
     public boolean validtorForCode(Long id, String code) {
-        long count = this.count(new LambdaQueryWrapper<SysRole>()
-                .ne(id != null, SysRole::getId, id)
-                .and(wrapper ->
-                        wrapper.eq(SysRole::getCode, code)
-                ));
+        long count = this.count(new LambdaQueryWrapper<SysRole>().ne(id != null, SysRole::getId, id)
+            .and(wrapper -> wrapper.eq(SysRole::getCode, code)));
         return count == 0;
     }
 
     @Override
     public boolean validtorForName(Long id, String name) {
-        long count = this.count(new LambdaQueryWrapper<SysRole>()
-                .ne(id != null, SysRole::getId, id)
-                .and(wrapper ->
-                        wrapper.eq(SysRole::getName, name)
-                ));
+        long count = this.count(new LambdaQueryWrapper<SysRole>().ne(id != null, SysRole::getId, id)
+            .and(wrapper -> wrapper.eq(SysRole::getName, name)));
         return count == 0;
     }
 
     @Override
     public List<Option> optionsByDataScope() {
-        return Arrays.asList(DataScopeEnum.values())
-                .stream()
-                .map(roleDataScopeEnum -> new Option<>(roleDataScopeEnum, roleDataScopeEnum.getLabel()))
-                .collect(Collectors.toList());
+        return Arrays.asList(DataScopeEnum.values()).stream()
+            .map(roleDataScopeEnum -> new Option<>(roleDataScopeEnum, roleDataScopeEnum.getLabel()))
+            .collect(Collectors.toList());
     }
 
 }

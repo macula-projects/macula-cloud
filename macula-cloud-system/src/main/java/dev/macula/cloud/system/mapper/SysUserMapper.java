@@ -51,6 +51,7 @@ public interface SysUserMapper extends BaseMapper<SysUser> {
 
     /**
      * 根据用户id获取用户分页列表
+     *
      * @param page
      * @param queryParams
      * @return

@@ -2,9 +2,9 @@
 
 基于macula-boot的微服务应用开发平台，提供多租户、应用管理、权限、工作流、低代码、报表、批处理、数据订阅、资源中心、API管理、表结构管理和SQL审计等通用技术平台能力。
 
-### macula-cloud-oauth
+### macula-cloud-iam
 
-提供基于OAUTH2.0协议的统一认证服务，所有服务经过网站认证
+提供基于OAUTH/CAS/OIDC/SAML协议的统一认证服务，所有服务经过网站认证
 
 ### macula-cloud-gateway
 

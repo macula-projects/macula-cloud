@@ -110,6 +110,7 @@ public interface SysRoleService extends IService<SysRole> {
 
     /**
      * 验证角色是否可配置该角色名称
+     *
      * @param id
      * @param name
      * @return

@@ -108,28 +108,27 @@ public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, S
 
     @Override
     public List<Option> validtorUrlPerm(List<PermissionValidtorForm> validtorForms) {
-        if(validtorForms.isEmpty()){
+        if (validtorForms.isEmpty()) {
             return new ArrayList<>();
         }
-        Map<String, String> validtorFormMap = validtorForms.stream().collect(Collectors.toMap(form->{
+        Map<String, String> validtorFormMap = validtorForms.stream().collect(Collectors.toMap(form -> {
             StringBuffer sb = new StringBuffer();
-            sb.append(Objects.isNull(form.getId())? EMPTY_STR : form.getId())
-                    .append(VALIDTOR_PERM_ID_SPLITOR).append(form.getCode())
-                    .append(VALIDTOR_PERM_JOIN).append(form.getUrl())
-                    .append(VALIDTOR_PERM_JOIN).append(form.getMethod().toString());
+            sb.append(Objects.isNull(form.getId()) ? EMPTY_STR : form.getId()).append(VALIDTOR_PERM_ID_SPLITOR)
+                .append(form.getCode()).append(VALIDTOR_PERM_JOIN).append(form.getUrl()).append(VALIDTOR_PERM_JOIN)
+                .append(form.getMethod().toString());
             return sb.toString();
         }, form -> {
             StringBuffer sb = new StringBuffer();
-            sb.append(form.getMethod().toString())
-                    .append(VALIDTOR_PERM_JOIN).append(form.getUrl());
+            sb.append(form.getMethod().toString()).append(VALIDTOR_PERM_JOIN).append(form.getUrl());
             return sb.toString();
         }, (oldValue, newValue) -> newValue));
 
-        List<Option> result = validtorFormMap.keySet().stream().map(item->{
+        List<Option> result = validtorFormMap.keySet().stream().map(item -> {
             String[] keyIdArr = item.split(VALIDTOR_PERM_ID_SPLITOR);
-            long count = count(new LambdaQueryWrapper<SysPermission>()
-                .eq(SysPermission::getUrlPerm, validtorFormMap.get(item))
-                .and(StringUtils.isNotBlank(keyIdArr[0]), wrapper->wrapper.ne(SysPermission::getId, keyIdArr[0])));
+            long count = count(
+                new LambdaQueryWrapper<SysPermission>().eq(SysPermission::getUrlPerm, validtorFormMap.get(item))
+                    .and(StringUtils.isNotBlank(keyIdArr[0]),
+                        wrapper -> wrapper.ne(SysPermission::getId, keyIdArr[0])));
             return new Option(count == 0, item);
         }).collect(Collectors.toList());
         return result;

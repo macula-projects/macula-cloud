@@ -1,6 +1,5 @@
 package dev.macula.cloud.system.vo.tenant;
 
-
 import dev.macula.cloud.system.vo.user.UserVO;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;

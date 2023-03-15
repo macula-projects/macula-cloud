@@ -27,11 +27,9 @@ import java.util.Collection;
 import java.util.Map;
 
 /**
- * 审计日志切面类
- * 使用方式：
- *  在需要审计的接口使用注解 @AuditLog
- *  例如：
- *  @AuditLog(title = "接口说明")
+ * 审计日志切面类 使用方式： 在需要审计的接口使用注解 @AuditLog 例如：
+ *
+ * @AuditLog(title = "接口说明")
  */
 @Aspect
 @Component
@@ -45,6 +43,7 @@ public class AuditLogAspect {
 
     /**
      * 处理完请求后执行
+     *
      * @param joinPoint 切点
      */
     @AfterReturning(pointcut = "@annotation(controllerLog)", returning = "jsonResult")
@@ -96,7 +95,8 @@ public class AuditLogAspect {
 
     /**
      * 获取注解中对方法的描述信息 用于Controller层注解
-     * @param log 日志
+     *
+     * @param log   日志
      * @param opLog 操作日志
      */
     public void getControllerMethodDescription(JoinPoint joinPoint, AuditLog log, SysLog opLog, Object jsonResult) {
@@ -116,20 +116,21 @@ public class AuditLogAspect {
 
     /**
      * 获取请求的参数，放到log中
+     *
      * @param opLog 操作日志
      */
     private void setRequestValue(JoinPoint joinPoint, SysLog opLog) {
         String requestMethod = opLog.getOpRequestMethod();
-        if (HttpMethod.PUT.equals(requestMethod) || HttpMethod.POST.equals(requestMethod) || HttpMethod.DELETE.equals(requestMethod)
-                || HttpMethod.PATCH.equals(requestMethod)) {
+        if (HttpMethod.PUT.equals(requestMethod) || HttpMethod.POST.equals(requestMethod) || HttpMethod.DELETE.equals(
+            requestMethod) || HttpMethod.PATCH.equals(requestMethod)) {
             String params = argsArrayToString(joinPoint.getArgs());
-            opLog.setOpParam(StringUtils.substring(params,0,2000));
+            opLog.setOpParam(StringUtils.substring(params, 0, 2000));
         } else {
-            Map<?,?> paramsMap = (Map<?,?>) ServletUtils.getRequest().getAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE);
-            opLog.setOpParam(StringUtils.substring(paramsMap.toString(),0,2000));
+            Map<?, ?> paramsMap =
+                (Map<?, ?>)ServletUtils.getRequest().getAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE);
+            opLog.setOpParam(StringUtils.substring(paramsMap.toString(), 0, 2000));
         }
     }
-
 
     /**
      * 参数拼装
@@ -150,6 +151,7 @@ public class AuditLogAspect {
 
     /**
      * 判断是否需要过滤的对象。
+     *
      * @param object 对象信息。
      * @return 如果是需要过滤的对象，则返回true；否则返回false。
      */
@@ -159,19 +161,18 @@ public class AuditLogAspect {
         if (clazz.isArray()) {
             return clazz.getComponentType().isAssignableFrom(MultipartFile.class);
         } else if (Collection.class.isAssignableFrom(clazz)) {
-            Collection collection = (Collection) object;
+            Collection collection = (Collection)object;
             for (Object value : collection) {
                 return value instanceof MultipartFile;
             }
         } else if (Map.class.isAssignableFrom(clazz)) {
-            Map map = (Map) object;
+            Map map = (Map)object;
             for (Object value : map.entrySet()) {
-                Map.Entry entry = (Map.Entry) value;
+                Map.Entry entry = (Map.Entry)value;
                 return entry.getValue() instanceof MultipartFile;
             }
         }
-        return object instanceof MultipartFile || object instanceof HttpServletRequest
-                || object instanceof HttpServletResponse || object instanceof BindingResult;
+        return object instanceof MultipartFile || object instanceof HttpServletRequest || object instanceof HttpServletResponse || object instanceof BindingResult;
     }
 
 }

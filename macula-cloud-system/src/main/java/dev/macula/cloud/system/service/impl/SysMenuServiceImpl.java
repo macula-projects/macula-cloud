@@ -268,8 +268,7 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
     @Override
     public List<Option> requestMethodOption() {
         return Arrays.asList(RequestMethod.values()).stream()
-                .map(method->new Option(method.toString(), method.toString()))
-                .collect(Collectors.toList());
+            .map(method -> new Option(method.toString(), method.toString())).collect(Collectors.toList());
     }
 
     /**

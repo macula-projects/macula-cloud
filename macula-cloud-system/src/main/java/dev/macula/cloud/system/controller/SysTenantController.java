@@ -1,6 +1,5 @@
 package dev.macula.cloud.system.controller;
 
-
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import dev.macula.boot.result.Option;
 import dev.macula.cloud.system.annotation.AuditLog;
@@ -27,16 +26,15 @@ public class SysTenantController {
 
     @Operation(summary = "租户分页列表")
     @GetMapping
-    public IPage<TenantPageVO> listTenantPages(TenantPageQuery tenantPageQuery){
+    public IPage<TenantPageVO> listTenantPages(TenantPageQuery tenantPageQuery) {
         IPage<TenantPageVO> result = sysTenantService.listTenantpages(tenantPageQuery);
         return result;
     }
 
-
     @Operation(summary = "新增租户")
     @AuditLog(title = "新增租户")
     @PostMapping
-    public boolean saveTenant(@RequestBody TenantForm tenantForm){
+    public boolean saveTenant(@RequestBody TenantForm tenantForm) {
         return sysTenantService.saveTenant(tenantForm);
     }
 
@@ -44,9 +42,7 @@ public class SysTenantController {
     @AuditLog(title = "修改租户")
     @Parameter(name = "租户ID")
     @PutMapping(value = "/{id}")
-    public boolean updateTenant(
-            @PathVariable Long id,
-            @RequestBody @Validated TenantForm tenantForm) {
+    public boolean updateTenant(@PathVariable Long id, @RequestBody @Validated TenantForm tenantForm) {
         boolean result = sysTenantService.updateTenant(id, tenantForm);
         return result;
     }
@@ -63,7 +59,7 @@ public class SysTenantController {
     @Operation(summary = "获取租户下拉选项")
     @Parameter(name = "过滤出我的租户下拉选项", description = "1: 获取我的租户下拉选项; 0: 获取所有租户下拉选项")
     @GetMapping("/options")
-    public List<Option> listTenantOptions(@RequestParam(name = "filterMe", defaultValue = "1") Integer filterMe){
+    public List<Option> listTenantOptions(@RequestParam(name = "filterMe", defaultValue = "1") Integer filterMe) {
         List<Option> result = sysTenantService.listTenantOptions(filterMe);
         return result;
     }

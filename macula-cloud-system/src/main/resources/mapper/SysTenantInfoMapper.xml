@@ -12,7 +12,7 @@
         <result property="description" column="description" jdbcType="VARCHAR"/>
         <result property="createTime" column="create_time" jdbcType="DATE"/>
         <collection property="supervisor" ofType="dev.macula.cloud.system.pojo.bo.TenantUserBO" javaType="list">
-            <id property="id" column="userId" jdbcType="BIGINT" />
+            <id property="id" column="userId" jdbcType="BIGINT"/>
             <result property="username" column="username"/>
         </collection>
     </resultMap>

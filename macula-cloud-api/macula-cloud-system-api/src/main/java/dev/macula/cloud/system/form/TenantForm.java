@@ -1,6 +1,5 @@
 package dev.macula.cloud.system.form;
 
-
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
@@ -10,7 +9,7 @@ import javax.validation.constraints.Size;
 import java.util.List;
 
 /**
- *  租户表单对象
+ * 租户表单对象
  */
 @Schema(description = "租户表单对象")
 @Data

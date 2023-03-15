@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Macula
+ * Copyright (c) 2023 Macula
  *   macula.dev, China
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,16 +15,13 @@
  * limitations under the License.
  */
 
-package dev.macula.cloud.system.converter;
+package dev.macula.cloud.iam;
 
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import dev.macula.cloud.system.pojo.bo.AuditLogBO;
-import dev.macula.cloud.system.vo.log.AuditLogVO;
-import org.mapstruct.Mapper;
-
-@Mapper(componentModel = "spring")
-public interface AuditLogConverter {
-
-    Page<AuditLogVO> bo2Vo(Page<AuditLogBO> bo);
-
+/**
+ * {@code dev.macula.cloud.iam.MaculaIamApplication} is
+ *
+ * @author rain
+ * @since 2023/3/11 22:22
+ */
+public class MaculaIamApplication {
 }

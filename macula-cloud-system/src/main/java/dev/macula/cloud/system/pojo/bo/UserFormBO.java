@@ -81,7 +81,7 @@ public class UserFormBO {
     private List<Long> roleIds;
 
     /**
-     *  密码
+     * 密码
      */
     private String password;
 

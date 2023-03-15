@@ -24,11 +24,8 @@ import dev.macula.cloud.system.pojo.entity.SysApplication;
 import dev.macula.cloud.system.vo.app.ApplicationVO;
 import org.mapstruct.Mapper;
 
-import java.util.List;
-
 /**
  * 应用对象转换器
- *
  */
 @Mapper(componentModel = "spring")
 public interface ApplicationConverter {

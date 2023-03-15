@@ -1,12 +1,7 @@
 package dev.macula.cloud.system.utils;
 
-
-import com.alibaba.fastjson.JSONObject;
-import dev.macula.cloud.system.vo.log.AuditLogVO;
-import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.http.MediaType;
 import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
@@ -14,13 +9,10 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
-import java.io.PrintWriter;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.time.LocalDateTime;
-import java.util.Objects;
 
 /**
  * 客户端响应工具类
@@ -41,7 +33,6 @@ public class ServletUtils {
     public static String getHeader(String name) {
         return getRequest().getHeader(name);
     }
-
 
     /**
      * 获取request
@@ -66,7 +57,7 @@ public class ServletUtils {
 
     public static ServletRequestAttributes getRequestAttributes() {
         RequestAttributes attributes = RequestContextHolder.getRequestAttributes();
-        return (ServletRequestAttributes) attributes;
+        return (ServletRequestAttributes)attributes;
     }
 
     /**

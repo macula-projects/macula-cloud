@@ -135,7 +135,7 @@ public class SysRoleController {
     @Parameter(name = "角色id", description = "允许为空，新增时为空，编辑时携带")
     @Parameter(name = "角色名称")
     @GetMapping("/validtor/name")
-    public boolean validtorForName(@RequestParam(required = false) Long id, @RequestParam String name){
+    public boolean validtorForName(@RequestParam(required = false) Long id, @RequestParam String name) {
         return roleService.validtorForName(id, name);
     }
 

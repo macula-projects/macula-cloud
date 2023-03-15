@@ -26,7 +26,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
-
 @Service
 @RequiredArgsConstructor
 public class SysTenantServiceImpl extends ServiceImpl<SysTenantInfoMapper, SysTenantInfo> implements SysTenantService {
@@ -37,11 +36,9 @@ public class SysTenantServiceImpl extends ServiceImpl<SysTenantInfoMapper, SysTe
     @Override
     public IPage<TenantPageVO> listTenantpages(TenantPageQuery queryParams) {
         // 查询数据
-        Page<TenantBO> tenantpages = this.baseMapper.listTenantpages(
-                new Page<>(queryParams.getPageNum(),
-                        queryParams.getPageSize()),
-                queryParams
-        );
+        Page<TenantBO> tenantpages =
+            this.baseMapper.listTenantpages(new Page<>(queryParams.getPageNum(), queryParams.getPageSize()),
+                queryParams);
         Page<TenantPageVO> result = tenantConverter.bo2Page(tenantpages);
         return result;
     }
@@ -49,16 +46,16 @@ public class SysTenantServiceImpl extends ServiceImpl<SysTenantInfoMapper, SysTe
     @Override
     @Transactional
     public boolean saveTenant(TenantForm tenantForm) {
-        long count = this.count(new LambdaQueryWrapper<SysTenantInfo>().eq(SysTenantInfo::getCode, tenantForm.getCode())
-                .or().eq(SysTenantInfo::getName, tenantForm.getName())
-        );
+        long count = this.count(
+            new LambdaQueryWrapper<SysTenantInfo>().eq(SysTenantInfo::getCode, tenantForm.getCode()).or()
+                .eq(SysTenantInfo::getName, tenantForm.getName()));
         Assert.isTrue(count == 0, "租户已存在");
 
         SysTenantInfo sysTenant = tenantConverter.form2Entity(tenantForm);
         boolean saveFlag = save(sysTenant);
         Assert.isTrue(saveFlag, "保存租户失败");
-        List<SysTenantUser> tenantUserList = tenantForm.getSupervisor().stream()
-                .map(userId -> new SysTenantUser(userId, sysTenant.getId()))
+        List<SysTenantUser> tenantUserList =
+            tenantForm.getSupervisor().stream().map(userId -> new SysTenantUser(userId, sysTenant.getId()))
                 .collect(Collectors.toList());
         return tenantUserService.saveBatch(tenantUserList);
     }
@@ -67,22 +64,19 @@ public class SysTenantServiceImpl extends ServiceImpl<SysTenantInfoMapper, SysTe
     @Transactional
     public boolean updateTenant(Long id, TenantForm tenantForm) {
         String tenantName = tenantForm.getName();
-        long count = this.count(new LambdaQueryWrapper<SysTenantInfo>()
-                .ne(SysTenantInfo::getId, id)
-                .and(wrapper -> {
-                    wrapper.eq(SysTenantInfo::getName, tenantName)
-                            .or().eq(SysTenantInfo::getCode, tenantForm.getCode());
-                })
-        );
+        long count = this.count(new LambdaQueryWrapper<SysTenantInfo>().ne(SysTenantInfo::getId, id).and(wrapper -> {
+            wrapper.eq(SysTenantInfo::getName, tenantName).or().eq(SysTenantInfo::getCode, tenantForm.getCode());
+        }));
         Assert.isTrue(count == 0, "租户已存在");
 
         SysTenantInfo sysTenant = tenantConverter.form2Entity(tenantForm);
         sysTenant.setId(id);
         boolean saveFlag = updateById(sysTenant);
         Assert.isTrue(saveFlag, "更新租户失败");
-        tenantUserService.remove(new LambdaQueryWrapper<SysTenantUser>().eq(SysTenantUser::getTenantId, sysTenant.getId()));
-        List<SysTenantUser> tenantUserList = tenantForm.getSupervisor().stream()
-                .map(userId -> new SysTenantUser(userId, sysTenant.getId()))
+        tenantUserService.remove(
+            new LambdaQueryWrapper<SysTenantUser>().eq(SysTenantUser::getTenantId, sysTenant.getId()));
+        List<SysTenantUser> tenantUserList =
+            tenantForm.getSupervisor().stream().map(userId -> new SysTenantUser(userId, sysTenant.getId()))
                 .collect(Collectors.toList());
         return tenantUserService.saveBatch(tenantUserList);
     }
@@ -92,8 +86,8 @@ public class SysTenantServiceImpl extends ServiceImpl<SysTenantInfoMapper, SysTe
     public boolean deleteTenants(String idsStr) {
         Assert.isTrue(StrUtil.isNotBlank(idsStr), "删除的租户数据为空");
         // 逻辑删除
-        List<Long> ids = Arrays.asList(idsStr.split(",")).stream()
-                .map(idStr -> Long.parseLong(idStr)).collect(Collectors.toList());
+        List<Long> ids =
+            Arrays.asList(idsStr.split(",")).stream().map(idStr -> Long.parseLong(idStr)).collect(Collectors.toList());
         boolean result = this.removeByIds(ids);
         return result;
     }
@@ -101,8 +95,9 @@ public class SysTenantServiceImpl extends ServiceImpl<SysTenantInfoMapper, SysTe
     @Override
     public List<Option> listTenantOptions(Integer filterMe) {
         boolean filterMeFlag = filterMe.equals(1) && !SecurityUtils.isRoot();
-        List<SysTenantInfo> sysTenantInfoList = list(new LambdaQueryWrapper<SysTenantInfo>()
-                .in(filterMeFlag, SysTenantInfo::getId, tenantUserService.getMeTenantIds()));
+        List<SysTenantInfo> sysTenantInfoList = list(
+            new LambdaQueryWrapper<SysTenantInfo>().in(filterMeFlag, SysTenantInfo::getId,
+                tenantUserService.getMeTenantIds()));
         List<Option> result = sysTenantInfoList.stream().map(tenantInfo -> {
             Option option = new Option(tenantInfo.getId(), tenantInfo.getName());
             return option;

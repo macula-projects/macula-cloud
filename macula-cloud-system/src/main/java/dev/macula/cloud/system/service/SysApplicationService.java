@@ -24,9 +24,6 @@ import dev.macula.cloud.system.pojo.entity.SysApplication;
 import dev.macula.cloud.system.query.ApplicationPageQuery;
 import dev.macula.cloud.system.vo.app.ApplicationVO;
 
-import java.util.List;
-
-
 /**
  * 应用业务接口
  */
@@ -56,7 +53,6 @@ public interface SysApplicationService extends IService<SysApplication> {
      */
     boolean updateApplication(Long appId, ApplicationForm appForm);
 
-
     /**
      * 删除应用
      *
@@ -67,6 +63,7 @@ public interface SysApplicationService extends IService<SysApplication> {
 
     /**
      * 管理维护人
+     *
      * @param appId
      * @param appForm
      * @return

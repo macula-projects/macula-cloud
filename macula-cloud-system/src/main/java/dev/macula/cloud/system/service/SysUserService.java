@@ -131,6 +131,7 @@ public interface SysUserService extends IService<SysUser> {
 
     /**
      * 根据用户id获取用户分页列表
+     *
      * @param queryParams
      * @return
      */

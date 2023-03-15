@@ -21,7 +21,8 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
-public class SysApplicationServiceImpl extends ServiceImpl<SysApplicationMapper, SysApplication> implements SysApplicationService {
+public class SysApplicationServiceImpl extends ServiceImpl<SysApplicationMapper, SysApplication>
+    implements SysApplicationService {
 
     private final ApplicationConverter applicationConverter;
 
@@ -52,8 +53,8 @@ public class SysApplicationServiceImpl extends ServiceImpl<SysApplicationMapper,
     public boolean deleteApplications(String idsStr) {
         Assert.isTrue(StrUtil.isNotBlank(idsStr), "删除的应用数据为空");
         // 逻辑删除
-        List<Long> ids = Arrays.asList(idsStr.split(",")).stream()
-                .map(idStr -> Long.parseLong(idStr)).collect(Collectors.toList());
+        List<Long> ids =
+            Arrays.asList(idsStr.split(",")).stream().map(idStr -> Long.parseLong(idStr)).collect(Collectors.toList());
         boolean result = this.removeByIds(ids);
         return result;
     }

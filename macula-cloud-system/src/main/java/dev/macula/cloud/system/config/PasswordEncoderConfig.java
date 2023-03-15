@@ -34,7 +34,7 @@ import java.security.MessageDigest;
  */
 @Configuration
 public class PasswordEncoderConfig {
-    private final MessageDigestPasswordEncoder md5Encoder = new MessageDigestPasswordEncoder("MD5"){
+    private final MessageDigestPasswordEncoder md5Encoder = new MessageDigestPasswordEncoder("MD5") {
         @Override
         public String encode(CharSequence rawPassword) {
             return md5(rawPassword);
@@ -77,13 +77,13 @@ public class PasswordEncoderConfig {
     }
 
     @Deprecated
-    public class CustomBCryptPasswordEncoder extends BCryptPasswordEncoder{
+    public class CustomBCryptPasswordEncoder extends BCryptPasswordEncoder {
         @Override
         public boolean matches(CharSequence rawPassword, String encodedPassword) {
-            if(StringUtils.isBlank(rawPassword)){
+            if (StringUtils.isBlank(rawPassword)) {
                 return false;
             }
-            if(md5Encoder.matches(rawPassword, encodedPassword)){
+            if (md5Encoder.matches(rawPassword, encodedPassword)) {
                 return true;
             }
             return StringUtils.equals(rawPassword, encodedPassword) || super.matches(rawPassword, encodedPassword);

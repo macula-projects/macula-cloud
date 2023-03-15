@@ -6,7 +6,6 @@ import org.apache.ibatis.annotations.Mapper;
 
 /**
  * 用户租户持久层
- *
  */
 @Mapper
 public interface SysTenantUserMapper extends BaseMapper<SysTenantUser> {

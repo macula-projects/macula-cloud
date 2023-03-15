@@ -90,7 +90,8 @@
             </if>
             <if test='queryParams.ids!=null and queryParams.ids.trim() neq ""'>
                 AND u.id IN
-                <foreach collection="queryParams.ids.split(',')" index="index" item="item" open="(" separator="," close=")">
+                <foreach collection="queryParams.ids.split(',')" index="index" item="item" open="(" separator=","
+                         close=")">
                     #{item}
                 </foreach>
             </if>

@@ -18,7 +18,6 @@
 package dev.macula.cloud.system.pojo.bo;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
-import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
 import java.util.Date;
@@ -60,7 +59,6 @@ public class ApplicationBO {
      */
     private String mobile;
 
-
     /**
      * 应用编码
      */
@@ -70,7 +68,6 @@ public class ApplicationBO {
      * 可访问url
      */
     private String accessPath;
-
 
     /**
      * 创建时间

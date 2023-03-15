@@ -52,7 +52,7 @@ public class SysMenuController {
 
     @Operation(summary = "获取请求方法下拉列表")
     @GetMapping("/methodOption")
-    public List<Option> requestMethodOption(){
+    public List<Option> requestMethodOption() {
         return menuService.requestMethodOption();
     }
 

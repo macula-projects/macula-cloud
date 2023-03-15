@@ -30,7 +30,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import javax.validation.Valid;
-import java.util.List;
 
 /**
  * 应用控制器
@@ -53,9 +52,7 @@ public class SysApplicationController {
     @Operation(summary = "新增应用")
     @AuditLog(title = "新增应用")
     @PostMapping
-    public boolean saveApplication(
-            @Valid @RequestBody ApplicationForm formData
-    ) {
+    public boolean saveApplication(@Valid @RequestBody ApplicationForm formData) {
         boolean result = applicationService.saveApplication(formData);
         return result;
     }
@@ -63,10 +60,7 @@ public class SysApplicationController {
     @Operation(summary = "修改应用")
     @AuditLog(title = "修改应用")
     @PutMapping(value = "/{appId}")
-    public boolean updateApplication(
-            @PathVariable Long appId,
-            @Valid @RequestBody ApplicationForm formData
-    ) {
+    public boolean updateApplication(@PathVariable Long appId, @Valid @RequestBody ApplicationForm formData) {
         boolean result = applicationService.updateApplication(appId, formData);
         return result;
     }
@@ -75,25 +69,18 @@ public class SysApplicationController {
     @AuditLog(title = "删除应用")
     @Parameter(name = "应用ID，多个以英文逗号(,)分割")
     @DeleteMapping("/{ids}")
-    public boolean deleteApplications(
-            @PathVariable("ids") String ids
-    ) {
+    public boolean deleteApplications(@PathVariable("ids") String ids) {
         boolean result = applicationService.deleteApplications(ids);
         return result;
     }
-
 
     @Operation(summary = "添加维护人")
     @AuditLog(title = "添加维护人")
     @Parameter(name = "userId，多个以英文逗号(,)分割")
     @PutMapping("/addMaintainer/{appId}")
-    public boolean addMaintainer(
-            @PathVariable Long appId,
-            @RequestBody ApplicationForm formData
-    ) {
+    public boolean addMaintainer(@PathVariable Long appId, @RequestBody ApplicationForm formData) {
         boolean result = applicationService.addMaintainer(appId, formData);
         return result;
     }
-
 
 }

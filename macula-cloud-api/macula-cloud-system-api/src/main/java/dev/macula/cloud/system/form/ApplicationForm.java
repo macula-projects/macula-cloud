@@ -50,7 +50,6 @@ public class ApplicationForm {
     @Schema(description = "可访问路径")
     private String accessPath;
 
-
     @Schema(description = "负责人")
     @NotBlank(message = "负责人不能为空")
     private String manager;

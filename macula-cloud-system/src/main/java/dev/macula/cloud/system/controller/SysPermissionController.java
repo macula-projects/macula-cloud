@@ -103,12 +103,10 @@ public class SysPermissionController {
 
     @Operation(summary = "接口权限路径验证器")
     @io.swagger.v3.oas.annotations.parameters.RequestBody(
-            description = "接口权限路径验证器， 返回下拉列表对象，label: code:url:method; value: true/false",
-            content = {@Content(mediaType="application/json",
-                    schema = @Schema(implementation = PermissionValidtorForm.class))}
-    )
+        description = "接口权限路径验证器， 返回下拉列表对象，label: code:url:method; value: true/false", content = {
+        @Content(mediaType = "application/json", schema = @Schema(implementation = PermissionValidtorForm.class))})
     @PostMapping("/validtor/urlPerm")
-    public List<Option> validtorUrlPerm(@RequestBody List<PermissionValidtorForm> validtorForms){
+    public List<Option> validtorUrlPerm(@RequestBody List<PermissionValidtorForm> validtorForms) {
         return sysPermissionService.validtorUrlPerm(validtorForms);
     }
 }

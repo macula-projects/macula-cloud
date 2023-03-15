@@ -376,8 +376,9 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
     public IPage<UserVO> listUserPagesByIds(UserPageQuery queryParams) {
 
         // 查询数据
-        Page<UserBO> userBoPage = this.baseMapper.listUserPagesByIds(
-                new Page<>(queryParams.getPageNum(), queryParams.getPageSize()), queryParams);
+        Page<UserBO> userBoPage =
+            this.baseMapper.listUserPagesByIds(new Page<>(queryParams.getPageNum(), queryParams.getPageSize()),
+                queryParams);
 
         // 实体转换
         Page<UserVO> userVoPage = userConverter.bo2Vo(userBoPage);
