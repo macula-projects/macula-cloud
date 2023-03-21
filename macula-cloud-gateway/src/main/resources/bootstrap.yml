@@ -1,3 +1,6 @@
+server:
+  port: 9000
+
 spring:
   application:
     name: macula-cloud-gateway

@@ -35,7 +35,7 @@ import org.mapstruct.Mappings;
  * @author haoxr
  * @since 2022/6/8
  */
-@Mapper(componentModel = "spring")
+@Mapper(componentModel = "META-INF/spring")
 public interface UserConverter {
 
     @Mappings({@Mapping(target = "genderLabel",

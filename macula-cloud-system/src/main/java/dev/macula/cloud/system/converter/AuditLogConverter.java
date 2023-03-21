@@ -22,7 +22,7 @@ import dev.macula.cloud.system.pojo.bo.AuditLogBO;
 import dev.macula.cloud.system.vo.log.AuditLogVO;
 import org.mapstruct.Mapper;
 
-@Mapper(componentModel = "spring")
+@Mapper(componentModel = "META-INF/spring")
 public interface AuditLogConverter {
 
     Page<AuditLogVO> bo2Vo(Page<AuditLogBO> bo);

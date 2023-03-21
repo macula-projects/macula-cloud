@@ -17,14 +17,19 @@
 
 package dev.macula.cloud.system.config;
 
+import cn.hutool.crypto.SmUtil;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.DelegatingPasswordEncoder;
 import org.springframework.security.crypto.password.MessageDigestPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.util.Assert;
 
 import java.security.MessageDigest;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * 密码编码器
@@ -34,6 +39,8 @@ import java.security.MessageDigest;
  */
 @Configuration
 public class PasswordEncoderConfig {
+    private final String encodingId = "bcrypt";
+
     private final MessageDigestPasswordEncoder md5Encoder = new MessageDigestPasswordEncoder("MD5") {
         @Override
         public String encode(CharSequence rawPassword) {
@@ -71,27 +78,50 @@ public class PasswordEncoderConfig {
         }
     };
 
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new CustomBCryptPasswordEncoder();
-    }
-
-    @Deprecated
-    public class CustomBCryptPasswordEncoder extends BCryptPasswordEncoder {
-        @Override
-        public boolean matches(CharSequence rawPassword, String encodedPassword) {
-            if (StringUtils.isBlank(rawPassword)) {
-                return false;
-            }
-            if (md5Encoder.matches(rawPassword, encodedPassword)) {
-                return true;
-            }
-            return StringUtils.equals(rawPassword, encodedPassword) || super.matches(rawPassword, encodedPassword);
-        }
-
+    private final PasswordEncoder sm3PasswordEncoder = new PasswordEncoder() {
         @Override
         public String encode(CharSequence rawPassword) {
-            return md5Encoder.encode(rawPassword);
+            return SmUtil.sm3(rawPassword.toString());
         }
+
+        @Override
+        public boolean matches(CharSequence rawPassword, String encodedPassword) {
+            if (rawPassword == null) {
+                throw new IllegalArgumentException("rawPassword cannot be null");
+            }
+            if (encodedPassword == null || encodedPassword.length() == 0) {
+                return false;
+            }
+            String rawPasswordEncoded = this.encode(rawPassword.toString());
+            return rawPasswordEncoded.equals(encodedPassword);
+        }
+    };
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        Map<String, PasswordEncoder> encoders = new HashMap<>();
+        encoders.put("bcrypt", new BCryptPasswordEncoder());
+        encoders.put("ldap", new org.springframework.security.crypto.password.LdapShaPasswordEncoder());
+        encoders.put("MD4", new org.springframework.security.crypto.password.Md4PasswordEncoder());
+        encoders.put("MD5", new org.springframework.security.crypto.password.MessageDigestPasswordEncoder("MD5"));
+        encoders.put("noop", org.springframework.security.crypto.password.NoOpPasswordEncoder.getInstance());
+        encoders.put("pbkdf2", new org.springframework.security.crypto.password.Pbkdf2PasswordEncoder());
+        encoders.put("scrypt", new org.springframework.security.crypto.scrypt.SCryptPasswordEncoder());
+        encoders.put("SHA-1", new org.springframework.security.crypto.password.MessageDigestPasswordEncoder("SHA-1"));
+        encoders.put("SHA-256",
+            new org.springframework.security.crypto.password.MessageDigestPasswordEncoder("SHA-256"));
+        encoders.put("sha256", new org.springframework.security.crypto.password.StandardPasswordEncoder());
+        encoders.put("argon2", new org.springframework.security.crypto.argon2.Argon2PasswordEncoder());
+        encoders.put("SM3", sm3PasswordEncoder);
+
+        Assert.isTrue(encoders.containsKey(encodingId), encodingId + " is not found in idToPasswordEncoder");
+
+        // 密码默认加密方法是bcrypt
+        DelegatingPasswordEncoder delegatingPasswordEncoder = new DelegatingPasswordEncoder(encodingId, encoders);
+
+        // 默认匹配是纯md5
+        delegatingPasswordEncoder.setDefaultPasswordEncoderForMatches(md5Encoder);
+
+        return delegatingPasswordEncoder;
     }
 }

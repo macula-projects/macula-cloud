@@ -28,7 +28,7 @@ import org.mapstruct.Mapping;
  * @author haoxr
  * @since 2022/7/29
  */
-@Mapper(componentModel = "spring")
+@Mapper(componentModel = "META-INF/spring")
 public interface MenuConverter {
 
     @Mapping(source = "path", target = "routePath")

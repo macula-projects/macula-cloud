@@ -17,11 +17,18 @@
 
 package dev.macula.cloud.iam;
 
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
 /**
- * {@code dev.macula.cloud.iam.MaculaIamApplication} is
+ * {@code dev.macula.cloud.iam.MaculaIamApplication} IAM启动类
  *
  * @author rain
  * @since 2023/3/11 22:22
  */
+@SpringBootApplication
 public class MaculaIamApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(MaculaIamApplication.class, args);
+    }
 }

@@ -34,7 +34,7 @@ import java.util.List;
  * @author haoxr
  * @since 2022/5/29
  */
-@Mapper(componentModel = "spring")
+@Mapper(componentModel = "META-INF/spring")
 public interface RoleConverter {
 
     Page<RolePageVO> entity2Page(Page<SysRole> page);

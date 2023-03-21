@@ -27,7 +27,7 @@ import org.mapstruct.Mapper;
 /**
  * 应用对象转换器
  */
-@Mapper(componentModel = "spring")
+@Mapper(componentModel = "META-INF/spring")
 public interface ApplicationConverter {
 
     SysApplication form2Entity(ApplicationForm appForm);

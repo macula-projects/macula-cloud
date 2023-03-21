@@ -29,21 +29,19 @@ import org.springframework.security.web.SecurityFilterChain;
 import static org.springframework.security.config.Customizer.withDefaults;
 
 /**
- * {@code SecurityConfiguration} 登录认证部分配置
+ * {@code DefaultSecurityConfiguration} 登录认证部分配置
  *
  * @author rain
  * @since 2023/3/11 22:25
  */
 @EnableWebSecurity
-public class SecurityConfiguration {
+public class DefaultSecurityConfiguration {
     // @formatter:off
 	@Bean
 	SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http) throws Exception {
-		http
-			.authorizeRequests(authorizeRequests ->
-				authorizeRequests.anyRequest().authenticated()
-			)
-			.formLogin(withDefaults());
+		http.authorizeRequests(
+			authorizeRequests -> authorizeRequests.anyRequest().authenticated()
+		).formLogin(withDefaults());
 		return http.build();
 	}
 	// @formatter:on

@@ -28,7 +28,7 @@ import org.mapstruct.Mapper;
  * @author haoxr
  * @since 2022/7/29
  */
-@Mapper(componentModel = "spring")
+@Mapper(componentModel = "META-INF/spring")
 public interface DeptConverter {
 
     DeptForm entity2Form(SysDept entity);
