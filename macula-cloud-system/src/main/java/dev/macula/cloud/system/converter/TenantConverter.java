@@ -8,7 +8,7 @@ import dev.macula.cloud.system.vo.tenant.TenantPageVO;
 import org.mapstruct.InheritInverseConfiguration;
 import org.mapstruct.Mapper;
 
-@Mapper(componentModel = "META-INF/spring")
+@Mapper
 public interface TenantConverter {
 
     @InheritInverseConfiguration(name = "entity2Form")

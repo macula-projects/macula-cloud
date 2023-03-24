@@ -30,7 +30,7 @@ import org.mapstruct.Mapper;
  * @author haoxr
  * @since 2022/6/8
  */
-@Mapper(componentModel = "META-INF/spring")
+@Mapper
 public interface DictItemConverter {
 
     Page<DictItemPageVO> entity2Page(Page<SysDictItem> page);
