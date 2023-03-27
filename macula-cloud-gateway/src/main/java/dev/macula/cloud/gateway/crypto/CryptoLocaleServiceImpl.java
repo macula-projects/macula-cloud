@@ -65,9 +65,10 @@ public class CryptoLocaleServiceImpl implements CryptoService, InitializingBean 
     public void afterPropertiesSet() throws Exception {
         KeyPair pair = SecureUtil.generateKeyPair("SM2");
         sm2 = SmUtil.sm2(pair.getPrivate(), pair.getPublic());
-        String sm4Key = sm2.encryptBase64("1234567890abcdef", KeyType.PublicKey);
-        log.debug("sm4 encrypted key: {}", sm4Key);
-        log.debug("sm2 public key: {}", HexUtil.encodeHexStr(sm2.getPublicKey().getEncoded()));
-        log.debug("sm2 private key: {}", HexUtil.encodeHexStr(sm2.getPrivateKey().getEncoded()));
+        if (log.isDebugEnabled()) {
+            log.debug("sm2 public key: {}", HexUtil.encodeHexStr(sm2.getPublicKey().getEncoded()));
+            log.debug("sm2 private key: {}", HexUtil.encodeHexStr(sm2.getPrivateKey().getEncoded()));
+            log.debug("sm4 encrypted key: {}", sm2.encryptBase64("1234567890abcdef", KeyType.PublicKey));
+        }
     }
 }
