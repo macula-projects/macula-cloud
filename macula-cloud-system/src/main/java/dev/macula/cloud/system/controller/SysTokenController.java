@@ -1,6 +1,7 @@
 package dev.macula.cloud.system.controller;
 
 import com.alibaba.fastjson.JSONObject;
+import dev.macula.boot.constants.CacheConstants;
 import dev.macula.boot.constants.SecurityConstants;
 import dev.macula.boot.result.ApiResultCode;
 import dev.macula.boot.result.Result;
@@ -84,7 +85,7 @@ public class SysTokenController {
     @PostMapping("/introspect")
     @NotControllerResponseAdvice
     public JSONObject postIntrospect(@RequestParam("token") String token) {
-        redisTemplate.opsForSet().members(SecurityConstants.SECURITY_USER_BTN_PERMS_KEY + "1");
+        redisTemplate.opsForSet().members(CacheConstants.SECURITY_USER_BTN_PERMS_KEY + "1");
         JSONObject jsonObject = new JSONObject();
         UserAuthInfo userAuthInfo = USER_TOKEN_MAP.get(token);
         if (Objects.isNull(userAuthInfo)) {

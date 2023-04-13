@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ~ Copyright (c) 2023 Macula
+  ~   macula.dev, China
+  ~
+  ~ Licensed under the Apache License, Version 2.0 (the "License");
+  ~ you may not use this file except in compliance with the License.
+  ~ You may obtain a copy of the License at
+  ~
+  ~    http://www.apache.org/licenses/LICENSE-2.0
+  ~
+  ~ Unless required by applicable law or agreed to in writing, software
+  ~ distributed under the License is distributed on an "AS IS" BASIS,
+  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  ~ See the License for the specific language governing permissions and
+  ~ limitations under the License.
+  -->
+
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="dev.macula.cloud.iam.mapper.SysUserMapper">
+
+    <!-- 用户认证信息映射 -->
+    <resultMap id="UserAuthMap" type="dev.macula.cloud.iam.pojo.dto.UserAuthInfo">
+        <id property="userId" column="userId" jdbcType="BIGINT"/>
+        <result property="username" column="username" jdbcType="VARCHAR"/>
+        <result property="password" column="password" jdbcType="VARCHAR"/>
+        <result property="status" column="status" jdbcType="BOOLEAN"/>
+        <result property="deptId" column="deptId" jdbcType="BIGINT"/>
+        <collection property="roles" ofType="string" javaType="java.util.Set">
+            <result column="roleCode"/>
+        </collection>
+    </resultMap>
+
+    <!-- 根据用户名获取认证信息, 过滤禁用的角色状态 -->
+    <select id="getUserAuthInfo" resultMap="UserAuthMap">
+        SELECT t1.id      userId,
+               t1.username,
+               t1.nickname,
+               t1.PASSWORD,
+               t1.STATUS,
+               t1.dept_id deptId,
+               t3.CODE    roleCode
+        FROM sys_user t1
+                 LEFT JOIN sys_user_role t2 ON t2.user_id = t1.id
+                 LEFT JOIN sys_role t3 ON t3.id = t2.role_id
+        WHERE t1.username = #{username}
+          and t1.deleted = 0
+          and t3.status = 1
+    </select>
+
+</mapper>

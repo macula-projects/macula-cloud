@@ -57,6 +57,14 @@ public interface SysUserService extends IService<SysUser> {
     UserLoginVO getCurrentUserInfo();
 
     /**
+     * 根据用户名获取认证信息
+     *
+     * @param username
+     * @return 认证信息
+     */
+    UserAuthInfo getUserAuthInfo(String username);
+
+    /**
      * 用户分页列表
      *
      * @return 用户信息
@@ -104,14 +112,6 @@ public interface SysUserService extends IService<SysUser> {
      * @return 成功标识
      */
     boolean updatePassword(Long userId, String password);
-
-    /**
-     * 根据用户名获取认证信息
-     *
-     * @param username
-     * @return 认证信息
-     */
-    UserAuthInfo getUserAuthInfo(String username);
 
     /**
      * 导入用户

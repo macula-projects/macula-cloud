@@ -22,7 +22,6 @@ import com.alibaba.excel.ExcelWriter;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import dev.macula.cloud.system.annotation.AuditLog;
-import dev.macula.cloud.system.dto.UserAuthInfo;
 import dev.macula.cloud.system.dto.UserImportDTO;
 import dev.macula.cloud.system.form.UserForm;
 import dev.macula.cloud.system.pojo.entity.SysUser;
@@ -63,24 +62,21 @@ public class SysUserController {
     @Operation(summary = "用户分页列表")
     @GetMapping
     public IPage<UserVO> listUserPages(UserPageQuery queryParams) {
-        IPage<UserVO> result = userService.listUserPages(queryParams);
-        return result;
+        return userService.listUserPages(queryParams);
     }
 
     @Operation(summary = "用户表单数据")
     @Parameter(name = "用户ID")
     @GetMapping("/{userId}/form")
     public UserForm getUserDetail(@PathVariable Long userId) {
-        UserForm formData = userService.getUserFormData(userId);
-        return formData;
+        return userService.getUserFormData(userId);
     }
 
     @Operation(summary = "新增用户")
     @AuditLog(title = "新增用户")
     @PostMapping
     public boolean saveUser(@Validated @RequestBody UserForm userForm) {
-        boolean result = userService.saveUser(userForm);
-        return result;
+        return userService.saveUser(userForm);
     }
 
     @Operation(summary = "修改用户")
@@ -88,8 +84,7 @@ public class SysUserController {
     @Parameter(name = "用户ID")
     @PutMapping(value = "/{userId}")
     public boolean updateUser(@PathVariable Long userId, @RequestBody @Validated UserForm userForm) {
-        boolean result = userService.updateUser(userId, userForm);
-        return result;
+        return userService.updateUser(userId, userForm);
     }
 
     @Operation(summary = "删除用户")
@@ -97,8 +92,7 @@ public class SysUserController {
     @Parameter(name = "用户ID", description = "用户ID，多个以英文逗号(,)分割")
     @DeleteMapping("/{ids}")
     public boolean deleteUsers(@PathVariable String ids) {
-        boolean result = userService.deleteUsers(ids);
-        return result;
+        return userService.deleteUsers(ids);
     }
 
     @Operation(summary = "修改用户密码")
@@ -106,8 +100,7 @@ public class SysUserController {
     @Parameter(name = "用户ID")
     @PatchMapping(value = "/{userId}/password")
     public boolean updatePassword(@PathVariable Long userId, @RequestParam String password) {
-        boolean result = userService.updatePassword(userId, password);
-        return result;
+        return userService.updatePassword(userId, password);
     }
 
     @Operation(summary = "修改用户状态")
@@ -116,9 +109,8 @@ public class SysUserController {
     @Parameter(name = "用户状态", description = "用户状态(1:启用;0:禁用)")
     @PatchMapping(value = "/{userId}/status")
     public boolean updateStatus(@PathVariable Long userId, @RequestParam Integer status) {
-        boolean result = userService.update(
+        return userService.update(
             new LambdaUpdateWrapper<SysUser>().eq(SysUser::getId, userId).set(SysUser::getStatus, status));
-        return result;
     }
 
     @Operation(summary = "用户导入模板下载")
@@ -141,8 +133,7 @@ public class SysUserController {
     @AuditLog(title = "导入用户")
     @PostMapping("/_import")
     public String importUsers(UserImportDTO userImportDTO) throws IOException {
-        String msg = userService.importUsers(userImportDTO);
-        return msg;
+        return userService.importUsers(userImportDTO);
     }
 
     @Operation(summary = "导出用户")
@@ -156,33 +147,22 @@ public class SysUserController {
         EasyExcel.write(response.getOutputStream(), UserExportVO.class).sheet("用户列表").doWrite(exportUserList);
     }
 
-    @Operation(summary = "获取认证信息", description = "根据用户名获取认证信息，给认证中心获取用户信息用，有密码")
-    @Parameter(name = "用户名")
-    @GetMapping("/{username}/authinfo")
-    public UserAuthInfo getUserAuthInfo(@PathVariable String username) {
-        UserAuthInfo user = userService.getUserAuthInfo(username);
-        return user;
-    }
-
     @Operation(summary = "获取用户信息", description = "根据用户名获取认证信息，给starter-system用，角色前端添加")
     @Parameter(name = "用户名")
     @GetMapping("/{username}/userinfo")
     public UserLoginVO getUserInfoWithoutRoles(@PathVariable String username) {
-        UserLoginVO user = userService.getUserInfo(username, null);
-        return user;
+        return userService.getUserInfo(username, null);
     }
 
     @Operation(summary = "获取登录用户信息", description = "获取登录用户信息，给前端登录后用")
     @GetMapping("/me")
     public UserLoginVO getLoginUserInfo() {
-        UserLoginVO userLoginVO = userService.getCurrentUserInfo();
-        return userLoginVO;
+        return userService.getCurrentUserInfo();
     }
 
     @Operation(summary = "根据id查询单个/多个用户", hidden = true)
     @GetMapping("/getUsers")
     public IPage<UserVO> getUsers(UserPageQuery queryParams) {
-        IPage<UserVO> result = userService.listUserPagesByIds(queryParams);
-        return result;
+        return userService.listUserPagesByIds(queryParams);
     }
 }

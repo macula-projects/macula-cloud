@@ -24,6 +24,7 @@ import dev.macula.cloud.system.mapper.SysUserRoleMapper;
 import dev.macula.cloud.system.pojo.entity.SysUserRole;
 import dev.macula.cloud.system.service.SysUserRoleService;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -34,11 +35,12 @@ public class SysUserRoleServiceImpl extends ServiceImpl<SysUserRoleMapper, SysUs
     /**
      * 保存用户角色
      *
-     * @param userId
-     * @param roleIds
-     * @return
+     * @param userId  用户ID
+     * @param roleIds 角色IDS
+     * @return 保存是否成功
      */
     @Override
+    @Transactional
     public boolean saveUserRoles(Long userId, List<Long> roleIds) {
 
         if (userId == null || CollectionUtil.isEmpty(roleIds)) {
@@ -48,7 +50,7 @@ public class SysUserRoleServiceImpl extends ServiceImpl<SysUserRoleMapper, SysUs
         // 用户原角色ID集合
         List<Long> userRoleIds =
             this.list(new LambdaQueryWrapper<SysUserRole>().eq(SysUserRole::getUserId, userId)).stream()
-                .map(item -> item.getRoleId()).collect(Collectors.toList());
+                .map(SysUserRole::getRoleId).collect(Collectors.toList());
 
         // 新增用户角色
         List<Long> saveRoleIds;

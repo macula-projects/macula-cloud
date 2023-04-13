@@ -1,0 +1,70 @@
+/*
+ * Copyright (c) 2023 Macula
+ *   macula.dev, China
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package dev.macula.cloud.iam.service.userdetails;
+
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import dev.macula.boot.enums.StatusEnum;
+import dev.macula.cloud.iam.pojo.dto.UserAuthInfo;
+import dev.macula.cloud.iam.pojo.entity.SysUser;
+import dev.macula.cloud.iam.service.support.SysUserService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.authentication.DisabledException;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsPasswordService;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.stereotype.Service;
+import org.springframework.util.Assert;
+
+/**
+ * 系统用户体系业务类
+ *
+ * @author <a href="mailto:xianrui0365@163.com">haoxr</a>
+ */
+@Slf4j
+@RequiredArgsConstructor
+public class SysUserDetailsServiceImpl implements UserDetailsService, UserDetailsPasswordService {
+
+    private final SysUserService sysUserService;
+
+    @Override
+    public UserDetails loadUserByUsername(String username) {
+        UserAuthInfo userAuthInfo = sysUserService.getUserAuthInfo(username);
+
+        Assert.isTrue(userAuthInfo != null, "用户不存在");
+
+        if (!StatusEnum.ENABLE.getValue().equals(userAuthInfo.getStatus())) {
+            throw new DisabledException("该账户已被禁用!");
+        }
+
+        return new SysUserDetails(userAuthInfo);
+    }
+
+    @Override
+    public UserDetails updatePassword(UserDetails user, String newPassword) {
+        boolean result = sysUserService.update(
+            new LambdaUpdateWrapper<SysUser>().eq(SysUser::getUsername, user.getUsername())
+                .set(SysUser::getPassword, newPassword));
+
+        if (result && user instanceof SysUserDetails) {
+            ((SysUserDetails)user).setPassword(newPassword);
+        }
+
+        return user;
+    }
+}

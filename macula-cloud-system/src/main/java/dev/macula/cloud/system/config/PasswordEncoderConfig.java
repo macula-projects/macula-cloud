@@ -39,7 +39,6 @@ import java.util.Map;
  */
 @Configuration
 public class PasswordEncoderConfig {
-    private final String encodingId = "bcrypt";
 
     private final MessageDigestPasswordEncoder md5Encoder = new MessageDigestPasswordEncoder("MD5") {
         @Override
@@ -100,7 +99,10 @@ public class PasswordEncoderConfig {
     @Bean
     public PasswordEncoder passwordEncoder() {
         Map<String, PasswordEncoder> encoders = new HashMap<>();
-        encoders.put("bcrypt", new BCryptPasswordEncoder());
+
+        String encodingId = "bcrypt";
+
+        encoders.put(encodingId, new BCryptPasswordEncoder());
         encoders.put("ldap", new org.springframework.security.crypto.password.LdapShaPasswordEncoder());
         encoders.put("MD4", new org.springframework.security.crypto.password.Md4PasswordEncoder());
         encoders.put("MD5", new org.springframework.security.crypto.password.MessageDigestPasswordEncoder("MD5"));
