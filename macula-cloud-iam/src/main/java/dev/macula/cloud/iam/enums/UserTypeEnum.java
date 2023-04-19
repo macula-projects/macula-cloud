@@ -17,26 +17,26 @@
 
 package dev.macula.cloud.iam.enums;
 
+import com.baomidou.mybatisplus.annotation.EnumValue;
 import lombok.Getter;
 
 /**
- * {@code PasswordEncoderTypeEnum} 密码编码类型枚举
+ * {@code UserTypeEnum} is
  *
- * @author haoxr
- * @since 2021/6/5 17:57
+ * @author rain
+ * @since 2023/4/15 20:25
  */
-
-public enum PasswordEncoderTypeEnum {
-
-    BCRYPT("{bcrypt}", "BCRYPT加密"), NOOP("{noop}", "无加密明文");
+public enum UserTypeEnum {
+    MEMBER("member", "会员"), EMPLOYEE("employee", "行政员工"), ODC("odc", "外包人员"), SUPPLIER("supplier", "供应商");
 
     @Getter
-    private final String prefix;
+    @EnumValue
+    private final String type;
     @Getter
     private final String desc;
 
-    PasswordEncoderTypeEnum(String prefix, String desc) {
-        this.prefix = prefix;
+    UserTypeEnum(String type, String desc) {
+        this.type = type;
         this.desc = desc;
     }
 }

@@ -55,18 +55,21 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
     public UserAuthInfo getUserAuthInfo(String username) {
         UserAuthInfo userAuthInfo = this.baseMapper.getUserAuthInfo(username);
 
-        Set<String> roles = userAuthInfo.getRoles();
-        if (CollectionUtil.isNotEmpty(roles)) {
-            // 每次被调用也就是用户登录的时候，更新按钮权限缓存
-            Set<String> keys = redisTemplate.keys(CacheConstants.SECURITY_USER_BTN_PERMS_KEY + username + "*");
-            if (keys != null) {
-                redisTemplate.delete(keys);
-            }
+        if (userAuthInfo != null) {
+            Set<String> roles = userAuthInfo.getRoles();
+            if (CollectionUtil.isNotEmpty(roles)) {
+                // 每次被调用也就是用户登录的时候，更新按钮权限缓存
+                Set<String> keys = redisTemplate.keys(CacheConstants.SECURITY_USER_BTN_PERMS_KEY + username + "*");
+                if (keys != null) {
+                    redisTemplate.delete(keys);
+                }
 
-            // 获取最大范围的数据权限
-            Integer dataScope = roleService.getMaximumDataScope(roles);
-            userAuthInfo.setDataScope(dataScope);
+                // 获取最大范围的数据权限
+                Integer dataScope = roleService.getMaximumDataScope(roles);
+                userAuthInfo.setDataScope(dataScope);
+            }
         }
+
         return userAuthInfo;
     }
 }

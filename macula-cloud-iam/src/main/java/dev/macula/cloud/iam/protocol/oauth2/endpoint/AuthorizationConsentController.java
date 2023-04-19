@@ -99,6 +99,6 @@ public class AuthorizationConsentController {
         model.addAttribute("previouslyApprovedScopes", previouslyApprovedScopesSet);
         model.addAttribute("principalName", principal.getName());
 
-        return "consent";
+        return "/oauth2/consent";
     }
 }

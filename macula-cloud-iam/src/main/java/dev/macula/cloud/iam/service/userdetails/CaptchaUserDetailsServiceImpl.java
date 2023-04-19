@@ -18,7 +18,10 @@
 package dev.macula.cloud.iam.service.userdetails;
 
 import dev.macula.cloud.iam.authentication.captcha.CaptchaUserDetailsService;
+import dev.macula.cloud.iam.service.support.SysUserService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Component;
 
@@ -28,10 +31,15 @@ import org.springframework.stereotype.Component;
  * @author rain
  * @since 2023/4/12 19:28
  */
+@RequiredArgsConstructor
 public class CaptchaUserDetailsServiceImpl implements CaptchaUserDetailsService {
+
+    private final UserDetailsService userDetailsService;
+
     @Override
     public UserDetails loadUserByPhone(String phone) throws UsernameNotFoundException {
-        // TODO 获取用户
-        return null;
+        // TODO 从手机号获取用户名
+        String username = "";
+        return userDetailsService.loadUserByUsername(username);
     }
 }

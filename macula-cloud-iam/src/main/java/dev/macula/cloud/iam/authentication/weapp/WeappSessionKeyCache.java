@@ -15,7 +15,7 @@ public interface WeappSessionKeyCache {
      * @param sessionKey the session key
      * @return sessionKey
      */
-    String put(String cacheKey, String sessionKey);
+    void put(String cacheKey, String sessionKey);
 
     /**
      * Get sessionKey.

@@ -21,6 +21,7 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import dev.macula.boot.starter.mp.entity.BaseEntity;
 import dev.macula.boot.starter.mp.handler.DurationTypeHandler;
+import dev.macula.cloud.iam.enums.UserTypeEnum;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.springframework.data.convert.Jsr310Converters;
@@ -82,4 +83,6 @@ public class SysOAuth2Client extends BaseEntity {
     private Duration refreshTokenTimeToLive;
     /** IDToken 签名算法 */
     private String idTokenSignatureAlgorithm;
+    /** 用户类型 */
+    private UserTypeEnum userType;
 }

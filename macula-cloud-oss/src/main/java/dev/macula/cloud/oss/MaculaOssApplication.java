@@ -17,10 +17,10 @@
 
 package dev.macula.cloud.oss;
 
-import dev.macula.cloud.oss.config.OssProperty;
-import dev.macula.cloud.oss.core.IFileStorage;
-import dev.macula.cloud.oss.model.StoragePlatform;
-import dev.macula.cloud.oss.platform.Minio;
+import dev.macula.boot.starter.oss.config.OssProperty;
+import dev.macula.boot.starter.oss.core.IFileStorage;
+import dev.macula.boot.starter.oss.model.StoragePlatform;
+import dev.macula.boot.starter.oss.platform.Minio;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;

@@ -17,7 +17,11 @@
 
 package dev.macula.cloud.iam.service.userdetails;
 
+import cn.hutool.core.util.StrUtil;
+import dev.macula.boot.constants.CacheConstants;
 import dev.macula.cloud.iam.authentication.weapp.WeappSessionKeyCache;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.redis.core.RedisTemplate;
 
 /**
  * {@code WeappSessionKeyCacheImpl} SESSION KEY 缓存实现
@@ -25,15 +29,21 @@ import dev.macula.cloud.iam.authentication.weapp.WeappSessionKeyCache;
  * @author rain
  * @since 2023/4/12 19:48
  */
+@RequiredArgsConstructor
 public class WeappSessionKeyCacheImpl implements WeappSessionKeyCache {
+    private final RedisTemplate<String, Object> redisTemplate;
+
     @Override
-    public String put(String cacheKey, String sessionKey) {
-        // TODO 缓存实现
-        return null;
+    public void put(String cacheKey, String sessionKey) {
+        redisTemplate.opsForValue().set(getKey(cacheKey), sessionKey);
     }
 
     @Override
     public String get(String cacheKey) {
-        return null;
+        return (String)redisTemplate.opsForValue().get(getKey(cacheKey));
+    }
+
+    private String getKey(String cacheKey) {
+        return StrUtil.format("{}:{}", CacheConstants.OAUTH2_TOKEN_WEAPP_SESSION_KEY, cacheKey);
     }
 }

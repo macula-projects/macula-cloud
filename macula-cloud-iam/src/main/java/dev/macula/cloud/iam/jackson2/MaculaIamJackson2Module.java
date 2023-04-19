@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.module.SimpleModule;
 import dev.macula.cloud.iam.authentication.captcha.CaptchaAuthenticationToken;
 import dev.macula.cloud.iam.authentication.weapp.WeappAuthenticationToken;
 import org.springframework.security.jackson2.SecurityJackson2Modules;
+import org.springframework.security.oauth2.core.AuthorizationGrantType;
 
 /**
  * @author felord.cn

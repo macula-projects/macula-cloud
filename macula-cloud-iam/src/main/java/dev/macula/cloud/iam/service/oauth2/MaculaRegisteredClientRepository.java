@@ -93,8 +93,9 @@ public class MaculaRegisteredClientRepository implements RegisteredClientReposit
      * @return the {@link RegisteredClient} if found, otherwise {@code null}
      */
     @Override
+    @Cacheable(value = CacheConstants.OAUTH2_CLIENT_KEY, key = "#id", unless = "#result == null")
     public RegisteredClient findById(String id) {
-        throw new UnsupportedOperationException();
+        return this.findByClientId(id);
     }
 
     /**

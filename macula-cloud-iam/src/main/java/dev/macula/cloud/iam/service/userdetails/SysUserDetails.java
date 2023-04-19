@@ -18,6 +18,7 @@
 package dev.macula.cloud.iam.service.userdetails;
 
 import cn.hutool.core.collection.CollectionUtil;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import dev.macula.boot.enums.StatusEnum;
 import dev.macula.cloud.iam.enums.PasswordEncoderTypeEnum;
 import dev.macula.cloud.iam.pojo.dto.UserAuthInfo;
@@ -36,6 +37,7 @@ import java.util.stream.Collectors;
  * @date 2021/9/27
  */
 @Data
+@JsonDeserialize
 public class SysUserDetails implements UserDetails {
 
     /** 扩展字段：用户ID */
@@ -49,9 +51,17 @@ public class SysUserDetails implements UserDetails {
 
     /** 默认字段 */
     private String username;
+    private String nickname;
     private String password;
     private Boolean enabled;
     private Collection<SimpleGrantedAuthority> authorities;
+
+    private boolean accountNonExpired = true;
+    private boolean accountNonLocked = true;
+    private boolean credentialsNonExpired = true;
+
+    public SysUserDetails() {
+    }
 
     /**
      * 系统管理用户
@@ -59,6 +69,7 @@ public class SysUserDetails implements UserDetails {
     public SysUserDetails(UserAuthInfo user) {
         this.setUserId(user.getUserId());
         this.setUsername(user.getUsername());
+        this.setNickname(user.getNickname());
         this.setDeptId(user.getDeptId());
         this.setDataScope(user.getDataScope());
         this.setPassword(user.getPassword());
@@ -85,17 +96,17 @@ public class SysUserDetails implements UserDetails {
 
     @Override
     public boolean isAccountNonExpired() {
-        return true;
+        return accountNonExpired;
     }
 
     @Override
     public boolean isAccountNonLocked() {
-        return true;
+        return accountNonLocked;
     }
 
     @Override
     public boolean isCredentialsNonExpired() {
-        return true;
+        return credentialsNonExpired;
     }
 
     @Override

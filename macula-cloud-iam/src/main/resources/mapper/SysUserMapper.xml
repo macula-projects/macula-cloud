@@ -25,6 +25,7 @@
     <resultMap id="UserAuthMap" type="dev.macula.cloud.iam.pojo.dto.UserAuthInfo">
         <id property="userId" column="userId" jdbcType="BIGINT"/>
         <result property="username" column="username" jdbcType="VARCHAR"/>
+        <result property="nickname" column="nickname" jdbcType="VARCHAR"/>
         <result property="password" column="password" jdbcType="VARCHAR"/>
         <result property="status" column="status" jdbcType="BOOLEAN"/>
         <result property="deptId" column="deptId" jdbcType="BIGINT"/>

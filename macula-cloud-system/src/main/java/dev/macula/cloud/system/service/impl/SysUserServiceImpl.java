@@ -84,7 +84,7 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
     private final UserConverter userConverter;
     private final SysMenuService menuService;
     private final SysRoleService roleService;
-    private final RedisTemplate<String, Set<String>> redisTemplate;
+    private final RedisTemplate<String, Object> redisTemplate;
 
     /**
      * 根据给定的用户名获取登录信息
@@ -105,8 +105,8 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         userLoginVO.setRoles(roles);
         // 用户权限集合
         Long tenantId = SecurityUtils.getTenantId();
-        Set<String> perms =
-            redisTemplate.opsForValue().get(CacheConstants.SECURITY_USER_BTN_PERMS_KEY + username + ":" + tenantId);
+        Set<String> perms = (Set<String>)redisTemplate.opsForValue()
+            .get(CacheConstants.SECURITY_USER_BTN_PERMS_KEY + username + ":" + tenantId);
         if (perms == null) {
             perms = menuService.listRolePerms(roles);
             redisTemplate.opsForValue()

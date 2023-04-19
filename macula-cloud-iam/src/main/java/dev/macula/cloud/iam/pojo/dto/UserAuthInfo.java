@@ -36,6 +36,9 @@ public class UserAuthInfo {
     /** 用户名 */
     private String username;
 
+    /** 别名，真实姓名 */
+    private String nickname;
+
     /** 用户密码 */
     private String password;
 

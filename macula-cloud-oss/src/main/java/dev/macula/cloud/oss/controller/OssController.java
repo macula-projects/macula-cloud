@@ -18,9 +18,9 @@
 package dev.macula.cloud.oss.controller;
 
 import cn.hutool.core.io.IoUtil;
-import dev.macula.cloud.oss.core.IFileStorage;
-import dev.macula.cloud.oss.core.OSS;
-import dev.macula.cloud.oss.model.OssResult;
+import dev.macula.boot.starter.oss.core.IFileStorage;
+import dev.macula.boot.starter.oss.core.OSS;
+import dev.macula.boot.starter.oss.model.OssResult;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;

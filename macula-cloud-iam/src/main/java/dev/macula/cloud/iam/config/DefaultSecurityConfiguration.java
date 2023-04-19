@@ -24,26 +24,24 @@ import dev.macula.cloud.iam.authentication.weapp.WeappClientService;
 import dev.macula.cloud.iam.authentication.weapp.WeappLoginFilterConfigurer;
 import dev.macula.cloud.iam.authentication.weapp.WeappSessionKeyCache;
 import dev.macula.cloud.iam.authentication.weapp.WeappUserDetailsService;
+import dev.macula.cloud.iam.handler.JsonAuthenticationEntryPoint;
 import dev.macula.cloud.iam.handler.RedirectLoginAuthenticationSuccessHandler;
-import dev.macula.cloud.iam.handler.SimpleAuthenticationEntryPoint;
+import dev.macula.cloud.iam.service.support.SysOAuth2ClientService;
 import dev.macula.cloud.iam.service.support.SysUserService;
+import dev.macula.cloud.iam.service.support.UserAuthInfoService;
 import dev.macula.cloud.iam.service.userdetails.*;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.lang.Nullable;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configuration.WebSecurityCustomizer;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.web.DefaultSecurityFilterChain;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AuthenticationEntryPointFailureHandler;
-import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
-import org.springframework.security.web.util.matcher.AndRequestMatcher;
-import org.springframework.security.web.util.matcher.NegatedRequestMatcher;
 
 /**
  * {@code AuthenticationDefaultConfiguration} 默认的登录认证配置
@@ -58,7 +56,7 @@ public class DefaultSecurityConfiguration {
     SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http,
         @Qualifier("sysUserDetailsService") UserDetailsService userDetailsService) throws Exception {
         // @formatter:off
-        SimpleAuthenticationEntryPoint authenticationEntryPoint = new SimpleAuthenticationEntryPoint();
+        JsonAuthenticationEntryPoint authenticationEntryPoint = new JsonAuthenticationEntryPoint();
         AuthenticationEntryPointFailureHandler authenticationFailureHandler = new AuthenticationEntryPointFailureHandler(authenticationEntryPoint);
         RedirectLoginAuthenticationSuccessHandler loginAuthenticationSuccessHandler = new RedirectLoginAuthenticationSuccessHandler();
 
@@ -86,17 +84,12 @@ public class DefaultSecurityConfiguration {
 
         // 短信验证码登录
         http.apply(new CaptchaLoginFilterConfigurer<>())
-            .captchaService(captchaService())
-            .captchaUserDetailsService(captchaUserDetailsService())
             .successHandler(loginAuthenticationSuccessHandler)
             .failureHandler(authenticationFailureHandler)
             .permitAll();
 
         // 微信小程序登录
         http.apply(new WeappLoginFilterConfigurer<>())
-            .weappUserDetailsService(weappUserDetailsService())
-            .weappClientService(weappClientService())
-            .weappSessionKeyCache(weappSessionKeyCache())
             .successHandler(loginAuthenticationSuccessHandler)
             .failureHandler(authenticationFailureHandler)
             .permitAll();
@@ -106,8 +99,9 @@ public class DefaultSecurityConfiguration {
 
     @Bean
     @Qualifier("sysUserDetailsService")
-    public UserDetailsService sysUserDetailsService(SysUserService sysUserService) {
-        return new SysUserDetailsServiceImpl(sysUserService);
+    public UserDetailsService sysUserDetailsService(SysUserService sysUserService, SysOAuth2ClientService clientService,
+        @Nullable UserAuthInfoService authInfoService) {
+        return new SysUserDetailsServiceImpl(sysUserService, clientService, authInfoService);
     }
 
     @Bean
@@ -116,8 +110,9 @@ public class DefaultSecurityConfiguration {
     }
 
     @Bean
-    public CaptchaUserDetailsService captchaUserDetailsService() {
-        return new CaptchaUserDetailsServiceImpl();
+    public CaptchaUserDetailsService captchaUserDetailsService(
+        @Qualifier("sysUserDetailsService") UserDetailsService userDetailsService) {
+        return new CaptchaUserDetailsServiceImpl(userDetailsService);
     }
 
     @Bean
@@ -126,8 +121,8 @@ public class DefaultSecurityConfiguration {
     }
 
     @Bean
-    WeappSessionKeyCache weappSessionKeyCache() {
-        return new WeappSessionKeyCacheImpl();
+    WeappSessionKeyCache weappSessionKeyCache(RedisTemplate<String, Object> redisTemplate) {
+        return new WeappSessionKeyCacheImpl(redisTemplate);
     }
 
     @Bean
