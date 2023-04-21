@@ -19,14 +19,12 @@ package dev.macula.cloud.iam.service.support.impl;
 
 import cn.hutool.core.collection.CollectionUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import dev.macula.boot.constants.CacheConstants;
 import dev.macula.cloud.iam.mapper.SysUserMapper;
 import dev.macula.cloud.iam.pojo.dto.UserAuthInfo;
 import dev.macula.cloud.iam.pojo.entity.SysUser;
 import dev.macula.cloud.iam.service.support.SysRoleService;
 import dev.macula.cloud.iam.service.support.SysUserService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.Set;
@@ -41,8 +39,6 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> implements SysUserService {
 
-    private final RedisTemplate<String, ?> redisTemplate;
-
     private final SysRoleService roleService;
 
     /**
@@ -54,22 +50,14 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
     @Override
     public UserAuthInfo getUserAuthInfo(String username) {
         UserAuthInfo userAuthInfo = this.baseMapper.getUserAuthInfo(username);
-
         if (userAuthInfo != null) {
             Set<String> roles = userAuthInfo.getRoles();
             if (CollectionUtil.isNotEmpty(roles)) {
-                // 每次被调用也就是用户登录的时候，更新按钮权限缓存
-                Set<String> keys = redisTemplate.keys(CacheConstants.SECURITY_USER_BTN_PERMS_KEY + username + "*");
-                if (keys != null) {
-                    redisTemplate.delete(keys);
-                }
-
                 // 获取最大范围的数据权限
                 Integer dataScope = roleService.getMaximumDataScope(roles);
                 userAuthInfo.setDataScope(dataScope);
             }
         }
-
         return userAuthInfo;
     }
 }

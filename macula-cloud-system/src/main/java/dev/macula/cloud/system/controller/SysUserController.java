@@ -147,22 +147,27 @@ public class SysUserController {
         EasyExcel.write(response.getOutputStream(), UserExportVO.class).sheet("用户列表").doWrite(exportUserList);
     }
 
-    @Operation(summary = "获取用户信息", description = "根据用户名获取认证信息，给starter-system用，角色前端添加")
+    @Operation(summary = "获取登录后用户信息", description = "根据用户名获取认证信息，给starter-system用，角色前端添加")
     @Parameter(name = "用户名")
-    @GetMapping("/{username}/userinfo")
-    public UserLoginVO getUserInfoWithoutRoles(@PathVariable String username) {
-        return userService.getUserInfo(username, null);
+    @GetMapping("/{username}/loginUserinfo")
+    public UserLoginVO getLoginUserInfoWithoutRoles(@PathVariable String username) {
+        return userService.getLoginUserInfo(username, null);
     }
 
-    @Operation(summary = "获取登录用户信息", description = "获取登录用户信息，给前端登录后用")
+    @Operation(summary = "获取当前登录用户信息", description = "获取登录用户信息，给前端登录后用")
     @GetMapping("/me")
     public UserLoginVO getLoginUserInfo() {
-        return userService.getCurrentUserInfo();
+        return userService.getLoginUserInfo();
     }
 
     @Operation(summary = "根据id查询单个/多个用户", hidden = true)
     @GetMapping("/getUsers")
     public IPage<UserVO> getUsers(UserPageQuery queryParams) {
         return userService.listUserPagesByIds(queryParams);
+    }
+
+    @PostMapping("/{username}/btnperms/clear")
+    public boolean clearBtnPerms(@PathVariable String username) {
+        return userService.clearBtnPerms(username);
     }
 }

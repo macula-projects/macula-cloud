@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package dev.macula.cloud.iam.grant.base;
+package dev.macula.cloud.iam.protocol.oauth2;
 
 /**
  * {@code CustomOAuth2TokenCustomizer} Token增强
@@ -56,8 +56,12 @@ public class CustomOAuth2TokenCustomizer implements OAuth2TokenCustomizer<OAuth2
         String clientId = context.getAuthorizationGrant().getName();
         claims.claim(OAuth2ParameterNames.CLIENT_ID, clientId);
         if (OAuth2TokenType.ACCESS_TOKEN.equals(context.getTokenType()) && context.getPrincipal() != null) {
-            claims.claim("username", context.getPrincipal().getName());
-            claims.claim("nickname", ((SysUserDetails)context.getPrincipal().getPrincipal()).getNickname());
+            if (context.getPrincipal().getPrincipal() instanceof SysUserDetails) {
+                SysUserDetails userDetails = (SysUserDetails)context.getPrincipal().getPrincipal();
+                claims.claim(SecurityConstants.JWT_NICKNAME_KEY, userDetails.getNickname());
+                claims.claim(SecurityConstants.JWT_DATASCOPE_KEY, userDetails.getDataScope());
+                claims.claim(SecurityConstants.JWT_DEPTID_KEY, userDetails.getDeptId());
+            }
             if (context.getPrincipal().getAuthorities() != null) {
                 List<String> authorities =
                     context.getPrincipal().getAuthorities().stream().map(GrantedAuthority::getAuthority)

@@ -18,12 +18,10 @@
 package dev.macula.cloud.iam.service.userdetails;
 
 import dev.macula.cloud.iam.authentication.captcha.CaptchaUserDetailsService;
-import dev.macula.cloud.iam.service.support.SysUserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
-import org.springframework.stereotype.Component;
 
 /**
  * {@code CaptchaUserDetailsServiceImpl} 通过手机号获取用户
@@ -40,6 +38,10 @@ public class CaptchaUserDetailsServiceImpl implements CaptchaUserDetailsService 
     public UserDetails loadUserByPhone(String phone) throws UsernameNotFoundException {
         // TODO 从手机号获取用户名
         String username = "";
-        return userDetailsService.loadUserByUsername(username);
+        UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+        if (userDetails instanceof SysUserDetails) {
+            ((SysUserDetails)userDetails).setMobile(phone);
+        }
+        return userDetails;
     }
 }

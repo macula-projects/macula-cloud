@@ -15,28 +15,7 @@
  * limitations under the License.
  */
 
-package dev.macula.cloud.iam.enums;
-
-import com.baomidou.mybatisplus.annotation.EnumValue;
-import lombok.Getter;
-
 /**
- * {@code UserTypeEnum} 用户类型枚举
- *
- * @author rain
- * @since 2023/4/15 20:25
+ * 短信模式
  */
-public enum UserTypeEnum {
-    MEMBER("member", "会员"), EMPLOYEE("employee", "行政员工"), ODC("odc", "外包人员"), SUPPLIER("supplier", "供应商");
-
-    @Getter
-    @EnumValue
-    private final String type;
-    @Getter
-    private final String desc;
-
-    UserTypeEnum(String type, String desc) {
-        this.type = type;
-        this.desc = desc;
-    }
-}
+package dev.macula.cloud.iam.protocol.oauth2.grant.sms;

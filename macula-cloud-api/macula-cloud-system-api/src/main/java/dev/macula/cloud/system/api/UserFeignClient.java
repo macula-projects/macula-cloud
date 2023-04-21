@@ -27,6 +27,6 @@ import org.springframework.web.bind.annotation.PathVariable;
     fallbackFactory = AbstractUserFeignFallbackFactory.class)
 public interface UserFeignClient {
 
-    @GetMapping("/api/v1/users/{username}/userinfo")
-    UserLoginVO getUserInfo(@PathVariable String username);
+    @GetMapping("/api/v1/users/{username}/loginUserinfo")
+    UserLoginVO getLoginUserInfoWithoutRoles(@PathVariable String username);
 }

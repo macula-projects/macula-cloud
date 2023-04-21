@@ -15,8 +15,11 @@
  * limitations under the License.
  */
 
-package dev.macula.cloud.iam.grant;
+package dev.macula.cloud.iam.protocol.oauth2.grant;
 
+import cn.hutool.core.codec.Base64;
+import cn.hutool.core.util.StrUtil;
+import dev.macula.cloud.iam.service.userdetails.SysUserDetails;
 import org.springframework.lang.Nullable;
 import org.springframework.security.oauth2.core.ClaimAccessor;
 import org.springframework.security.oauth2.core.OAuth2AccessToken;
@@ -42,7 +45,6 @@ import java.util.UUID;
  * @since 2023/4/17 14:21
  */
 public class CustomeOAuth2AccessTokenGenerator implements OAuth2TokenGenerator<OAuth2AccessToken> {
-
     private OAuth2TokenCustomizer<OAuth2TokenClaimsContext> accessTokenCustomizer;
 
     @Nullable
@@ -104,7 +106,7 @@ public class CustomeOAuth2AccessTokenGenerator implements OAuth2TokenGenerator<O
 
         // 如果要扩展tokenValue，这里修改UUID
         return new CustomeOAuth2AccessTokenGenerator.OAuth2AccessTokenClaims(OAuth2AccessToken.TokenType.BEARER,
-            UUID.randomUUID().toString(), accessTokenClaimsSet.getIssuedAt(), accessTokenClaimsSet.getExpiresAt(),
+            generateTokenKey(context), accessTokenClaimsSet.getIssuedAt(), accessTokenClaimsSet.getExpiresAt(),
             context.getAuthorizedScopes(), accessTokenClaimsSet.getClaims());
     }
 
@@ -134,5 +136,25 @@ public class CustomeOAuth2AccessTokenGenerator implements OAuth2TokenGenerator<O
         public Map<String, Object> getClaims() {
             return this.claims;
         }
+    }
+
+    /**
+     * 为了兼容，未来会废弃
+     *
+     * @param context Token上下文
+     * @return Base64后的token串
+     */
+    protected String generateTokenKey(OAuth2TokenContext context) {
+        String clientId = context.getAuthorizationGrant().getName();
+        String username = context.getPrincipal().getName();
+        String openId = null;
+        if (context.getPrincipal() != null && context.getPrincipal().getPrincipal() instanceof SysUserDetails) {
+            openId = ((SysUserDetails)context.getPrincipal().getPrincipal()).getOpenId();
+        }
+        if (StrUtil.isNotBlank(openId)) {
+            return Base64.encode(
+                StrUtil.format("{}##{}##{}##{}", UUID.randomUUID().toString(), username, openId, clientId));
+        }
+        return Base64.encode(StrUtil.format("{}##{}##{}", UUID.randomUUID().toString(), username, clientId));
     }
 }

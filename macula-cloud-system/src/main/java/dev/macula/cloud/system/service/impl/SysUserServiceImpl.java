@@ -87,14 +87,15 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
     private final RedisTemplate<String, Object> redisTemplate;
 
     /**
-     * 根据给定的用户名获取登录信息
+     * 给已登录用户获取用户信息用
      *
      * @param username 用户名
      * @param roles    该用户的角色
      * @return 登录用户信息
      */
     @Override
-    public UserLoginVO getUserInfo(String username, Set<String> roles) {
+    @SuppressWarnings("unchecked")
+    public UserLoginVO getLoginUserInfo(String username, Set<String> roles) {
         // 登录用户entity
         SysUser user = this.getOne(new LambdaQueryWrapper<SysUser>().eq(SysUser::getUsername, username)
             .select(SysUser::getId, SysUser::getUsername, SysUser::getNickname, SysUser::getAvatar));
@@ -103,16 +104,22 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
 
         // 用户角色集合
         userLoginVO.setRoles(roles);
+
+        // @formatter:off
         // 用户权限集合
         Long tenantId = SecurityUtils.getTenantId();
-        Set<String> perms = (Set<String>)redisTemplate.opsForValue()
-            .get(CacheConstants.SECURITY_USER_BTN_PERMS_KEY + username + ":" + tenantId);
-        if (perms == null) {
-            perms = menuService.listRolePerms(roles);
-            redisTemplate.opsForValue()
-                .set(CacheConstants.SECURITY_USER_BTN_PERMS_KEY + username + ":" + tenantId, perms, 8, TimeUnit.HOURS);
+        String tokenId = SecurityUtils.getTokenId();
+        if (StrUtil.isNotBlank(tokenId)) {
+            Set<String> perms = (Set<String>)redisTemplate.opsForValue().get(buildBtnPermKey(username, tokenId, tenantId));
+            if (perms == null) {
+                perms = menuService.listRolePerms(roles);
+                redisTemplate.opsForValue().set(buildBtnPermKey(username, tokenId, tenantId), perms, 30, TimeUnit.MINUTES);
+            }
+            userLoginVO.setPerms(perms);
+        } else {
+            userLoginVO.setPerms(menuService.listRolePerms(roles));
         }
-        userLoginVO.setPerms(perms);
+        // @formatter:on
 
         return userLoginVO;
     }
@@ -123,8 +130,8 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
      * @return 登录用户的角色和权限等信息
      */
     @Override
-    public UserLoginVO getCurrentUserInfo() {
-        return getUserInfo(SecurityUtils.getCurrentUser(), SecurityUtils.getRoles());
+    public UserLoginVO getLoginUserInfo() {
+        return getLoginUserInfo(SecurityUtils.getCurrentUser(), SecurityUtils.getRoles());
     }
 
     /**
@@ -139,17 +146,26 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
 
         Set<String> roles = userAuthInfo.getRoles();
         if (CollectionUtil.isNotEmpty(roles)) {
-            // 每次被调用也就是用户登录的时候，更新按钮权限缓存
-            Set<String> keys = redisTemplate.keys(CacheConstants.SECURITY_USER_BTN_PERMS_KEY + username + "*");
-            if (keys != null) {
-                redisTemplate.delete(keys);
-            }
-
             // 获取最大范围的数据权限
             Integer dataScope = roleService.getMaximumDataScope(roles);
             userAuthInfo.setDataScope(dataScope);
         }
         return userAuthInfo;
+    }
+
+    /**
+     * 清除指定用户缓存的按钮权限数据
+     *
+     * @param username 用户名
+     * @return 清除成功返回ture，否则返回false
+     */
+    @Override
+    public boolean clearBtnPerms(String username) {
+        Set<String> keys = redisTemplate.keys(CacheConstants.SECURITY_USER_BTN_PERMS_KEY + username + "*");
+        if (keys != null) {
+            redisTemplate.delete(keys);
+        }
+        return true;
     }
 
     /**
@@ -383,5 +399,9 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
 
         // 实体转换
         return userConverter.bo2Vo(userBoPage);
+    }
+
+    private String buildBtnPermKey(String username, String tokenId, Long tenantId) {
+        return StrUtil.format("{}{}:{}:{}", CacheConstants.SECURITY_USER_BTN_PERMS_KEY, username, tokenId, tenantId);
     }
 }

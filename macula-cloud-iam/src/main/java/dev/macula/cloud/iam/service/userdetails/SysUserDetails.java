@@ -20,7 +20,6 @@ package dev.macula.cloud.iam.service.userdetails;
 import cn.hutool.core.collection.CollectionUtil;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import dev.macula.boot.enums.StatusEnum;
-import dev.macula.cloud.iam.enums.PasswordEncoderTypeEnum;
 import dev.macula.cloud.iam.pojo.dto.UserAuthInfo;
 import lombok.Data;
 import org.springframework.security.core.GrantedAuthority;
@@ -40,20 +39,20 @@ import java.util.stream.Collectors;
 @JsonDeserialize
 public class SysUserDetails implements UserDetails {
 
-    /** 扩展字段：用户ID */
-    private Long userId;
-
     /** 扩展字段：部门ID */
     private Long deptId;
 
     /** 用户角色数据权限集合 */
-    private Integer dataScope;
+    private int dataScope;
 
     /** 默认字段 */
     private String username;
     private String nickname;
     private String password;
     private Boolean enabled;
+    private String mobile;
+    private String openId;
+    private String unionId;
     private Collection<SimpleGrantedAuthority> authorities;
 
     private boolean accountNonExpired = true;
@@ -67,7 +66,6 @@ public class SysUserDetails implements UserDetails {
      * 系统管理用户
      */
     public SysUserDetails(UserAuthInfo user) {
-        this.setUserId(user.getUserId());
         this.setUsername(user.getUsername());
         this.setNickname(user.getNickname());
         this.setDeptId(user.getDeptId());

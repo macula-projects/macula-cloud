@@ -19,13 +19,11 @@ package dev.macula.cloud.iam.service.oauth2;
 
 import cn.hutool.core.util.StrUtil;
 import dev.macula.boot.constants.CacheConstants;
-import dev.macula.boot.constants.SecurityConstants;
 import dev.macula.cloud.iam.pojo.entity.SysOAuth2Client;
 import dev.macula.cloud.iam.service.support.SysOAuth2ClientService;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.core.OAuth2Error;
@@ -93,7 +91,7 @@ public class MaculaRegisteredClientRepository implements RegisteredClientReposit
      * @return the {@link RegisteredClient} if found, otherwise {@code null}
      */
     @Override
-    @Cacheable(value = CacheConstants.OAUTH2_CLIENT_KEY, key = "#id", unless = "#result == null")
+    @Cacheable(value = CacheConstants.OAUTH2_CLIENT_CACHE_KEY, key = "#id", unless = "#result == null")
     public RegisteredClient findById(String id) {
         return this.findByClientId(id);
     }
@@ -106,7 +104,7 @@ public class MaculaRegisteredClientRepository implements RegisteredClientReposit
      */
     @Override
     @SneakyThrows
-    @Cacheable(value = CacheConstants.OAUTH2_CLIENT_KEY, key = "#clientId", unless = "#result == null")
+    @Cacheable(value = CacheConstants.OAUTH2_CLIENT_CACHE_KEY, key = "#clientId", unless = "#result == null")
     public RegisteredClient findByClientId(String clientId) {
         // @formatter:off
         SysOAuth2Client oauth2Client =

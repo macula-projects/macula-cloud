@@ -17,22 +17,20 @@
 
 package dev.macula.cloud.iam.config;
 
-import com.nimbusds.jose.jwk.JWKSet;
-import com.nimbusds.jose.jwk.RSAKey;
-import com.nimbusds.jose.jwk.source.JWKSource;
-import com.nimbusds.jose.proc.SecurityContext;
-import dev.macula.cloud.iam.grant.CustomeOAuth2AccessTokenGenerator;
-import dev.macula.cloud.iam.grant.base.CustomOAuth2TokenCustomizer;
-import dev.macula.cloud.iam.grant.password.OAuth2ResourceOwnerPasswordAuthenticationConverter;
-import dev.macula.cloud.iam.grant.password.OAuth2ResourceOwnerPasswordAuthenticationProvider;
-import dev.macula.cloud.iam.grant.sms.OAuth2ResourceOwnerSmsAuthenticationConverter;
-import dev.macula.cloud.iam.grant.sms.OAuth2ResourceOwnerSmsAuthenticationProvider;
+import cn.hutool.core.lang.Assert;
 import dev.macula.cloud.iam.handler.OAuth2AuthenticationExceptionEntryPoint;
-import dev.macula.cloud.iam.jose.Jwks;
+import dev.macula.cloud.iam.protocol.oauth2.CustomOAuth2TokenCustomizer;
+import dev.macula.cloud.iam.protocol.oauth2.grant.CustomeOAuth2AccessTokenGenerator;
+import dev.macula.cloud.iam.protocol.oauth2.grant.password.OAuth2ResourceOwnerPasswordAuthenticationConverter;
+import dev.macula.cloud.iam.protocol.oauth2.grant.password.OAuth2ResourceOwnerPasswordAuthenticationProvider;
+import dev.macula.cloud.iam.protocol.oauth2.grant.sms.OAuth2ResourceOwnerSmsAuthenticationConverter;
+import dev.macula.cloud.iam.protocol.oauth2.grant.sms.OAuth2ResourceOwnerSmsAuthenticationProvider;
 import dev.macula.cloud.iam.service.oauth2.MaculaOAuth2AuthorizationConsentService;
 import dev.macula.cloud.iam.service.oauth2.MaculaOAuth2AuthorizationService;
 import dev.macula.cloud.iam.service.oauth2.MaculaRegisteredClientRepository;
 import dev.macula.cloud.iam.service.support.SysOAuth2ClientService;
+import lombok.Setter;
+import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
@@ -42,16 +40,12 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.oauth2.core.OAuth2Token;
-import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsentService;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
-import org.springframework.security.oauth2.server.authorization.config.annotation.web.configuration.OAuth2AuthorizationServerConfiguration;
 import org.springframework.security.oauth2.server.authorization.config.annotation.web.configurers.OAuth2AuthorizationServerConfigurer;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
-import org.springframework.security.oauth2.server.authorization.token.DelegatingOAuth2TokenGenerator;
-import org.springframework.security.oauth2.server.authorization.token.OAuth2RefreshTokenGenerator;
-import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenGenerator;
+import org.springframework.security.oauth2.server.authorization.token.*;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 
@@ -62,9 +56,12 @@ import org.springframework.security.web.util.matcher.RequestMatcher;
  * @since 2023/3/11 22:25
  */
 @Configuration(proxyBeanMethods = false)
+@ConfigurationProperties(prefix = "macula.cloud.iam")
 public class ProtocolOAuth2Configuration {
-
     private static final String CUSTOM_CONSENT_PAGE_URI = "/oauth2/consent";
+
+    @Setter
+    private String issuerUri;
 
     @Bean("authorizationServerSecurityFilterChain")
     @Order(Ordered.HIGHEST_PRECEDENCE)
@@ -108,7 +105,8 @@ public class ProtocolOAuth2Configuration {
 
     @Bean
     public AuthorizationServerSettings authorizationServerSettings() {
-        return AuthorizationServerSettings.builder().build();
+        Assert.notBlank(issuerUri, "OAuth2 Server Issuer Uri Cann't be Empty");
+        return AuthorizationServerSettings.builder().issuer(issuerUri).build();
     }
 
     @Bean
@@ -127,6 +125,11 @@ public class ProtocolOAuth2Configuration {
         return new MaculaRegisteredClientRepository(sysOAuth2ClientService);
     }
 
+    @Bean
+    OAuth2TokenCustomizer<OAuth2TokenClaimsContext> oAuth2TokenCustomizer() {
+        return new CustomOAuth2TokenCustomizer();
+    }
+
     /**
      * 注入授权模式实现提供方 1. 密码模式 </br> 2. 短信登录 </br>
      */
@@ -136,7 +139,11 @@ public class ProtocolOAuth2Configuration {
 
         // 注入Token 增加关联用户信息
         CustomeOAuth2AccessTokenGenerator accessTokenGenerator = new CustomeOAuth2AccessTokenGenerator();
-        accessTokenGenerator.setAccessTokenCustomizer(new CustomOAuth2TokenCustomizer());
+        OAuth2TokenCustomizer<OAuth2TokenClaimsContext> accessTokenCustomizer =
+            OAuth2ConfigurerUtils.getAccessTokenCustomizer(http);
+        if (accessTokenCustomizer != null) {
+            accessTokenGenerator.setAccessTokenCustomizer(accessTokenCustomizer);
+        }
         OAuth2TokenGenerator<OAuth2Token> oAuth2TokenGenerator =
             new DelegatingOAuth2TokenGenerator(accessTokenGenerator, new OAuth2RefreshTokenGenerator());
 

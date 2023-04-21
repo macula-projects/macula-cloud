@@ -47,14 +47,14 @@ public interface SysUserService extends IService<SysUser> {
      * @param roles    该用户的角色
      * @return 登录用户信息
      */
-    UserLoginVO getUserInfo(String username, Set<String> roles);
+    UserLoginVO getLoginUserInfo(String username, Set<String> roles);
 
     /**
      * 获取当前登录用户的信息
      *
      * @return 返回登录用户基本信息包含角色和按钮权限
      */
-    UserLoginVO getCurrentUserInfo();
+    UserLoginVO getLoginUserInfo();
 
     /**
      * 根据用户名获取认证信息
@@ -136,4 +136,12 @@ public interface SysUserService extends IService<SysUser> {
      * @return
      */
     IPage<UserVO> listUserPagesByIds(UserPageQuery queryParams);
+
+    /**
+     * 清除指定用户缓存的按钮权限数据
+     *
+     * @param username 用户名
+     * @return 清除成功返回ture，否则返回false
+     */
+    boolean clearBtnPerms(String username);
 }

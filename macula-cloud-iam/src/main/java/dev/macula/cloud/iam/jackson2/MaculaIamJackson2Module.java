@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.module.SimpleModule;
 import dev.macula.cloud.iam.authentication.captcha.CaptchaAuthenticationToken;
 import dev.macula.cloud.iam.authentication.weapp.WeappAuthenticationToken;
 import org.springframework.security.jackson2.SecurityJackson2Modules;
-import org.springframework.security.oauth2.core.AuthorizationGrantType;
 
 /**
  * @author felord.cn
@@ -22,5 +21,6 @@ public class MaculaIamJackson2Module extends SimpleModule {
         SecurityJackson2Modules.enableDefaultTyping(context.getOwner());
         context.setMixInAnnotations(CaptchaAuthenticationToken.class, CaptchaAuthenticationTokenMixin.class);
         context.setMixInAnnotations(WeappAuthenticationToken.class, WeappAuthenticationTokenMixin.class);
+        context.setMixInAnnotations(Long.class, LongMixin.class);
     }
 }
