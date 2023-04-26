@@ -1,20 +1,3 @@
-/*
- * Copyright (c) 2023 Macula
- *   macula.dev, China
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package tech.powerjob.server.remote.worker;
 
 import com.google.common.collect.Lists;
@@ -51,6 +34,7 @@ public class ClusterStatusHolder {
      */
     private Map<Long, Map<String, DeployedContainerInfo>> containerId2Infos;
 
+
     public ClusterStatusHolder(String appName) {
         this.appName = appName;
         address2WorkerInfo = Maps.newConcurrentMap();
@@ -59,7 +43,6 @@ public class ClusterStatusHolder {
 
     /**
      * 更新 worker 机器的状态
-     *
      * @param heartbeat 心跳请求
      */
     public void updateStatus(WorkerHeartbeat heartbeat) {
@@ -94,7 +77,6 @@ public class ClusterStatusHolder {
 
     /**
      * 获取该集群所有的机器信息
-     *
      * @return 地址: 机器信息
      */
     public Map<String, WorkerInfo> getAllWorkers() {
@@ -103,7 +85,6 @@ public class ClusterStatusHolder {
 
     /**
      * 获取当前该Worker集群容器的部署情况
-     *
      * @param containerId 容器ID
      * @return 该容器的部署情况
      */

@@ -1,4 +1,6 @@
-# macula-cloud-tinyid，ID生成服务
+# Macula Cloud ID ID中心
+
+统一的ID生成服务
 
 ## 简介
 

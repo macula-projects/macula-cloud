@@ -1,20 +1,3 @@
-/*
- * Copyright (c) 2023 Macula
- *   macula.dev, China
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package tech.powerjob.server.web.controller;
 
 import lombok.RequiredArgsConstructor;
@@ -65,6 +48,7 @@ public class OpenAPIController {
 
     private final CacheService cacheService;
 
+
     @PostMapping(OpenAPIConstant.ASSERT)
     public ResultDTO<Long> assertAppName(String appName, @RequestParam(required = false) String password) {
         return ResultDTO.success(appInfoService.assertApp(appName, password));
@@ -83,6 +67,12 @@ public class OpenAPIController {
     @PostMapping(OpenAPIConstant.COPY_JOB)
     public ResultDTO<Long> copyJob(Long jobId) {
         return ResultDTO.success(jobService.copyJob(jobId).getId());
+    }
+
+    @PostMapping(OpenAPIConstant.EXPORT_JOB)
+    public ResultDTO<SaveJobInfoRequest> exportJob(Long jobId, Long appId) {
+        checkJobIdValid(jobId, appId);
+        return ResultDTO.success(jobService.exportJob(jobId));
     }
 
     @PostMapping(OpenAPIConstant.FETCH_JOB)

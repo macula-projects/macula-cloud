@@ -1,20 +1,3 @@
-/*
- * Copyright (c) 2023 Macula
- *   macula.dev, China
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package tech.powerjob.server.common;
 
 import lombok.extern.slf4j.Slf4j;
@@ -36,7 +19,6 @@ public class RejectedExecutionHandlerFactory {
 
     /**
      * 拒绝执行，抛出 RejectedExecutionException
-     *
      * @param source name for log
      * @return A handler for tasks that cannot be executed by ThreadPool
      */
@@ -51,7 +33,6 @@ public class RejectedExecutionHandlerFactory {
 
     /**
      * 直接丢弃该任务
-     *
      * @param source log name
      * @return A handler for tasks that cannot be executed by ThreadPool
      */
@@ -65,7 +46,6 @@ public class RejectedExecutionHandlerFactory {
 
     /**
      * 调用线程运行
-     *
      * @param source log name
      * @return A handler for tasks that cannot be executed by ThreadPool
      */
@@ -82,7 +62,6 @@ public class RejectedExecutionHandlerFactory {
 
     /**
      * 新线程运行
-     *
      * @param source log name
      * @return A handler for tasks that cannot be executed by ThreadPool
      */

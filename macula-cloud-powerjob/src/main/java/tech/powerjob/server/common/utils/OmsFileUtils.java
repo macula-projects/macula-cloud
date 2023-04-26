@@ -1,20 +1,3 @@
-/*
- * Copyright (c) 2023 Macula
- *   macula.dev, China
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package tech.powerjob.server.common.utils;
 
 import org.apache.commons.lang3.exception.ExceptionUtils;
@@ -38,7 +21,6 @@ public class OmsFileUtils {
 
     /**
      * 获取在线日志的存放路径
-     *
      * @return 在线日志的存放路径
      */
     public static String genLogDirPath() {
@@ -47,7 +29,6 @@ public class OmsFileUtils {
 
     /**
      * 获取用于构建容器的 jar 文件存放路径
-     *
      * @return 路径
      */
     public static String genContainerJarPath() {
@@ -56,7 +37,6 @@ public class OmsFileUtils {
 
     /**
      * 获取临时目录（固定目录）
-     *
      * @return 目录
      */
     public static String genTemporaryPath() {
@@ -65,7 +45,6 @@ public class OmsFileUtils {
 
     /**
      * 获取临时目录（随机目录，不会重复），用完记得删除
-     *
      * @return 临时目录
      */
     public static String genTemporaryWorkPath() {
@@ -74,13 +53,11 @@ public class OmsFileUtils {
 
     /**
      * 获取 H2 数据库工作目录
-     *
      * @return H2 工作目录
      */
     public static String genH2BasePath() {
         return COMMON_PATH + "h2/";
     }
-
     public static String genH2WorkPath() {
         return genH2BasePath() + CommonUtils.genUUID() + "/";
     }
@@ -101,8 +78,7 @@ public class OmsFileUtils {
 
     /**
      * 输出文件（对外下载功能）
-     *
-     * @param file     文件
+     * @param file 文件
      * @param response HTTP响应
      * @throws IOException 异常
      */
@@ -123,7 +99,6 @@ public class OmsFileUtils {
 
     /**
      * 计算文件的 MD5
-     *
      * @param f 文件
      * @return md5
      * @throws IOException 异常

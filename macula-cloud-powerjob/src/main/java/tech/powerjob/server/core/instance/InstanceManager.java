@@ -1,20 +1,3 @@
-/*
- * Copyright (c) 2023 Macula
- *   macula.dev, China
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package tech.powerjob.server.core.instance;
 
 import lombok.RequiredArgsConstructor;
@@ -39,6 +22,7 @@ import tech.powerjob.server.persistence.remote.model.InstanceInfoDO;
 import tech.powerjob.server.persistence.remote.model.JobInfoDO;
 import tech.powerjob.server.persistence.remote.model.UserInfoDO;
 import tech.powerjob.server.persistence.remote.repository.InstanceInfoRepository;
+import tech.powerjob.server.remote.aware.TransportServiceAware;
 import tech.powerjob.server.remote.transporter.TransportService;
 import tech.powerjob.server.remote.transporter.impl.ServerURLFactory;
 import tech.powerjob.server.remote.worker.WorkerClusterQueryService;
@@ -58,7 +42,7 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class InstanceManager {
+public class InstanceManager implements TransportServiceAware {
 
     private final AlarmCenter alarmCenter;
 
@@ -70,9 +54,12 @@ public class InstanceManager {
 
     private final WorkflowInstanceManager workflowInstanceManager;
 
-    private final TransportService transportService;
-
     private final WorkerClusterQueryService workerClusterQueryService;
+
+    /**
+     * 基础组件通过 aware 注入，避免循环依赖
+     */
+    private TransportService transportService;
 
     /**
      * 更新任务状态 ******************************************** 2021-02-03 modify by Echo009 实例的执行次数统一在这里管理，对于非固定频率的任务 当 db
@@ -99,8 +86,7 @@ public class InstanceManager {
         }
         // 丢弃非目标 TaskTracker 的上报数据（脑裂情况）
         if (!req.getSourceAddress().equals(instanceInfo.getTaskTrackerAddress())) {
-            log.warn(
-                "[InstanceManager-{}] receive the other TaskTracker's report: {}, but current TaskTracker is {}, this report will be dropped.",
+            log.warn("[InstanceManager-{}] receive the other TaskTracker's report: {}, but current TaskTracker is {}, this report will be dropped.",
                 instanceId, req, instanceInfo.getTaskTrackerAddress());
             return;
         }
@@ -118,8 +104,7 @@ public class InstanceManager {
             // 如果实例处于失败状态，则说明该 worker 失联了一段时间，被 server 判定为宕机，而此时该秒级任务有可能已经重新派发了，故需要 Kill 掉该实例
             // fix issue 375
             if (instanceInfo.getStatus() == InstanceStatus.FAILED.getV()) {
-                log.warn(
-                    "[InstanceManager-{}] receive TaskTracker's report: {}, but current instance is already failed, this instance should be killed.",
+                log.warn("[InstanceManager-{}] receive TaskTracker's report: {}, but current instance is already failed, this instance should be killed.",
                     instanceId, req);
                 stopInstance(instanceId, instanceInfo);
                 return;
@@ -185,13 +170,11 @@ public class InstanceManager {
             return;
         }
         // 带条件更新
-        final int i =
-            instanceInfoRepository.updateStatusChangeInfoByInstanceIdAndStatus(instanceInfo.getLastReportTime(),
-                instanceInfo.getGmtModified(), instanceInfo.getRunningTimes(), instanceInfo.getStatus(),
-                instanceInfo.getInstanceId(), originStatus);
+        final int i = instanceInfoRepository.updateStatusChangeInfoByInstanceIdAndStatus(
+            instanceInfo.getLastReportTime(), instanceInfo.getGmtModified(), instanceInfo.getRunningTimes(),
+            instanceInfo.getStatus(), instanceInfo.getInstanceId(), originStatus);
         if (i == 0) {
-            log.warn(
-                "[InstanceManager-{}] update instance status failed, maybe the instance status has been changed by other thread. discard this status change,{}",
+            log.warn("[InstanceManager-{}] update instance status failed, maybe the instance status has been changed by other thread. discard this status change,{}",
                 instanceId, instanceInfo);
         }
     }
@@ -257,4 +240,8 @@ public class InstanceManager {
         alarmCenter.alarmFailed(content, userList);
     }
 
+    @Override
+    public void setTransportService(TransportService transportService) {
+        this.transportService = transportService;
+    }
 }

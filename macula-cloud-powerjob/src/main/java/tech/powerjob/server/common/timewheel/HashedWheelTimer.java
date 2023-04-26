@@ -1,20 +1,3 @@
-/*
- * Copyright (c) 2023 Macula
- *   macula.dev, China
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package tech.powerjob.server.common.timewheel;
 
 import com.google.common.collect.Queues;
@@ -59,9 +42,8 @@ public class HashedWheelTimer implements Timer {
 
     /**
      * 新建时间轮定时器
-     *
-     * @param tickDuration     时间间隔，单位毫秒（ms）
-     * @param ticksPerWheel    轮盘个数
+     * @param tickDuration 时间间隔，单位毫秒（ms）
+     * @param ticksPerWheel 轮盘个数
      * @param processThreadNum 处理任务的线程个数，0代表不启用新线程（如果定时任务需要耗时操作，请启用线程池）
      */
     public HashedWheelTimer(long tickDuration, int ticksPerWheel, int processThreadNum) {
@@ -127,57 +109,6 @@ public class HashedWheelTimer implements Timer {
         return indicator.getUnprocessedTasks();
     }
 
-    private void runTask(HashedWheelTimerFuture timerFuture) {
-        timerFuture.status = HashedWheelTimerFuture.RUNNING;
-        if (taskProcessPool == null) {
-            timerFuture.timerTask.run();
-        } else {
-            taskProcessPool.submit(timerFuture.timerTask);
-        }
-    }
-
-    /**
-     * 时间格（本质就是链表，维护了这个时刻可能需要执行的所有任务）
-     */
-    private final class HashedWheelBucket extends LinkedList<HashedWheelTimerFuture> {
-
-        public void expireTimerTasks(long currentTick) {
-
-            removeIf(timerFuture -> {
-
-                // processCanceledTasks 后外部操作取消任务会导致 BUCKET 中仍存在 CANCELED 任务的情况
-                if (timerFuture.status == HashedWheelTimerFuture.CANCELED) {
-                    return true;
-                }
-
-                if (timerFuture.status != HashedWheelTimerFuture.WAITING) {
-                    log.warn("[HashedWheelTimer] impossible, please fix the bug");
-                    return true;
-                }
-
-                // 本轮直接调度
-                if (timerFuture.totalTicks <= currentTick) {
-
-                    if (timerFuture.totalTicks < currentTick) {
-                        log.warn("[HashedWheelTimer] timerFuture.totalTicks < currentTick, please fix the bug");
-                    }
-
-                    try {
-                        // 提交执行
-                        runTask(timerFuture);
-                    } catch (Exception ignore) {
-                    } finally {
-                        timerFuture.status = HashedWheelTimerFuture.FINISHED;
-                    }
-                    return true;
-                }
-
-                return false;
-            });
-
-        }
-    }
-
     /**
      * 包装 TimerTask，维护预期执行时间、总圈数等数据
      */
@@ -233,6 +164,57 @@ public class HashedWheelTimer implements Timer {
         }
     }
 
+    private void runTask(HashedWheelTimerFuture timerFuture) {
+        timerFuture.status = HashedWheelTimerFuture.RUNNING;
+        if (taskProcessPool == null) {
+            timerFuture.timerTask.run();
+        } else {
+            taskProcessPool.submit(timerFuture.timerTask);
+        }
+    }
+
+    /**
+     * 时间格（本质就是链表，维护了这个时刻可能需要执行的所有任务）
+     */
+    private final class HashedWheelBucket extends LinkedList<HashedWheelTimerFuture> {
+
+        public void expireTimerTasks(long currentTick) {
+
+            removeIf(timerFuture -> {
+
+                // processCanceledTasks 后外部操作取消任务会导致 BUCKET 中仍存在 CANCELED 任务的情况
+                if (timerFuture.status == HashedWheelTimerFuture.CANCELED) {
+                    return true;
+                }
+
+                if (timerFuture.status != HashedWheelTimerFuture.WAITING) {
+                    log.warn("[HashedWheelTimer] impossible, please fix the bug");
+                    return true;
+                }
+
+                // 本轮直接调度
+                if (timerFuture.totalTicks <= currentTick) {
+
+                    if (timerFuture.totalTicks < currentTick) {
+                        log.warn("[HashedWheelTimer] timerFuture.totalTicks < currentTick, please fix the bug");
+                    }
+
+                    try {
+                        // 提交执行
+                        runTask(timerFuture);
+                    } catch (Exception ignore) {
+                    } finally {
+                        timerFuture.status = HashedWheelTimerFuture.FINISHED;
+                    }
+                    return true;
+                }
+
+                return false;
+            });
+
+        }
+    }
+
     /**
      * 模拟指针转动
      */
@@ -259,7 +241,7 @@ public class HashedWheelTimer implements Timer {
                 HashedWheelBucket bucket = wheel[currentIndex];
                 bucket.expireTimerTasks(tick);
 
-                tick++;
+                tick ++;
             }
             latch.countDown();
         }

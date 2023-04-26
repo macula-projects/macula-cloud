@@ -1,20 +1,3 @@
-/*
- * Copyright (c) 2023 Macula
- *   macula.dev, China
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package tech.powerjob.server.core.instance;
 
 import com.google.common.base.Stopwatch;
@@ -86,6 +69,17 @@ public class InstanceLogService {
     private LocalInstanceLogRepository localInstanceLogRepository;
 
     /**
+     * 本地维护了在线日志的任务实例ID
+     */
+    private final Map<Long, Long> instanceId2LastReportTime = Maps.newConcurrentMap();
+    /**
+     * 分段锁
+     */
+    private final SegmentLock segmentLock = new SegmentLock(8);
+    @Resource(name = PJThreadPool.BACKGROUND_POOL)
+    private AsyncTaskExecutor powerJobBackgroundPool;
+
+    /**
      * 格式化时间戳
      */
     private static final FastDateFormat DATE_FORMAT = FastDateFormat.getInstance(OmsConstant.TIME_PATTERN_PLUS);
@@ -97,16 +91,6 @@ public class InstanceLogService {
      * 过期时间
      */
     private static final long EXPIRE_INTERVAL_MS = 60000;
-    /**
-     * 本地维护了在线日志的任务实例ID
-     */
-    private final Map<Long, Long> instanceId2LastReportTime = Maps.newConcurrentMap();
-    /**
-     * 分段锁
-     */
-    private final SegmentLock segmentLock = new SegmentLock(8);
-    @Resource(name = PJThreadPool.BACKGROUND_POOL)
-    private AsyncTaskExecutor powerJobBackgroundPool;
 
     /**
      * 拼接日志 -> 2020-04-29 22:07:10.059 [192.168.1.1:2777] INFO XXX
@@ -133,22 +117,9 @@ public class InstanceLogService {
     }
 
     /**
-     * 下载全部的任务日志文件
-     *
-     * @param instanceId 任务实例ID
-     * @return 日志文件
-     * @throws Exception 异常
-     */
-    public File downloadInstanceLog(long instanceId) throws Exception {
-        Future<File> fileFuture = prepareLogFile(instanceId);
-        return fileFuture.get(1, TimeUnit.MINUTES);
-    }
-
-    /**
      * 提交日志记录，持久化到本地数据库中
-     *
      * @param workerAddress 上报机器地址
-     * @param logs          任务实例运行时日志
+     * @param logs 任务实例运行时日志
      */
     @Async(value = PJThreadPool.LOCAL_DB_POOL)
     public void submitLogs(String workerAddress, List<InstanceLogContent> logs) {
@@ -170,69 +141,6 @@ public class InstanceLogService {
     }
 
     /**
-     * 获取任务实例运行日志（默认存在本地数据，需要由生成完成请求的路由与转发）
-     *
-     * @param appId      appId，AOP 专用
-     * @param instanceId 任务实例ID
-     * @param index      页码，从0开始
-     * @return 文本字符串
-     */
-    @DesignateServer
-    public StringPage fetchInstanceLog(Long appId, Long instanceId, Long index) {
-        try {
-            Future<File> fileFuture = prepareLogFile(instanceId);
-            // 超时并不会打断正在执行的任务
-            File logFile = fileFuture.get(5, TimeUnit.SECONDS);
-
-            // 分页展示数据
-            long lines = 0;
-            StringBuilder sb = new StringBuilder();
-            String lineStr;
-            long left = index * MAX_LINE_COUNT;
-            long right = left + MAX_LINE_COUNT;
-            try (LineNumberReader lr = new LineNumberReader(new FileReader(logFile))) {
-                while ((lineStr = lr.readLine()) != null) {
-
-                    // 指定范围内，读出
-                    if (lines >= left && lines < right) {
-                        sb.append(lineStr).append(System.lineSeparator());
-                    }
-                    ++lines;
-                }
-            } catch (Exception e) {
-                log.warn("[InstanceLog-{}] read logFile from disk failed for app: {}.", instanceId, appId, e);
-                return StringPage.simple(
-                    "oms-server execution exception, caused by " + ExceptionUtils.getRootCauseMessage(e));
-            }
-
-            double totalPage = Math.ceil(1.0 * lines / MAX_LINE_COUNT);
-            return new StringPage(index, (long)totalPage, sb.toString());
-
-        } catch (TimeoutException te) {
-            return StringPage.simple("log file is being prepared, please try again later.");
-        } catch (Exception e) {
-            log.warn("[InstanceLog-{}] fetch instance log failed.", instanceId, e);
-            return StringPage.simple(
-                "oms-server execution exception, caused by " + ExceptionUtils.getRootCauseMessage(e));
-        }
-    }
-
-    /**
-     * 获取日志的下载链接
-     *
-     * @param appId      AOP 专用
-     * @param instanceId 任务实例 ID
-     * @return 下载链接
-     */
-    @DesignateServer
-    public String fetchDownloadUrl(Long appId, Long instanceId) {
-        String url =
-            "http://" + NetUtils.getLocalHost() + ":" + port + "/instance/downloadLog?instanceId=" + instanceId;
-        log.info("[InstanceLog-{}] downloadURL for appId[{}]: {}", instanceId, appId, url);
-        return url;
-    }
-
-    /**
      * 异步准备日志文件
      *
      * @param instanceId 任务实例ID
@@ -249,27 +157,7 @@ public class InstanceLogService {
     }
 
     /**
-     * 将数据库中存储的日志流转化为磁盘日志文件
-     *
-     * @param stream  流
-     * @param logFile 目标日志文件
-     */
-    private void stream2File(Stream<LocalInstanceLogDO> stream, File logFile) {
-        try (FileWriter fw = new FileWriter(logFile); BufferedWriter bfw = new BufferedWriter(fw)) {
-            stream.forEach(instanceLog -> {
-                try {
-                    bfw.write(convertLog(instanceLog) + System.lineSeparator());
-                } catch (Exception ignore) {
-                }
-            });
-        } catch (IOException ie) {
-            ExceptionUtils.rethrow(ie);
-        }
-    }
-
-    /**
      * 将本地的任务实例运行日志同步到 mongoDB 存储，在任务执行结束后异步执行
-     *
      * @param instanceId 任务实例ID
      */
     @Async(PJThreadPool.BACKGROUND_POOL)
@@ -387,6 +275,67 @@ public class InstanceLogService {
         }
     }
 
+    /**
+     * 获取任务实例运行日志（默认存在本地数据，需要由生成完成请求的路由与转发）
+     * @param appId appId，AOP 专用
+     * @param instanceId 任务实例ID
+     * @param index 页码，从0开始
+     * @return 文本字符串
+     */
+    @DesignateServer
+    public StringPage fetchInstanceLog(Long appId, Long instanceId, Long index) {
+        try {
+            Future<File> fileFuture = prepareLogFile(instanceId);
+            // 超时并不会打断正在执行的任务
+            File logFile = fileFuture.get(5, TimeUnit.SECONDS);
+
+            // 分页展示数据
+            long lines = 0;
+            StringBuilder sb = new StringBuilder();
+            String lineStr;
+            long left = index * MAX_LINE_COUNT;
+            long right = left + MAX_LINE_COUNT;
+            try (LineNumberReader lr = new LineNumberReader(new FileReader(logFile))) {
+                while ((lineStr = lr.readLine()) != null) {
+
+                    // 指定范围内，读出
+                    if (lines >= left && lines < right) {
+                        sb.append(lineStr).append(System.lineSeparator());
+                    }
+                    ++lines;
+                }
+            } catch (Exception e) {
+                log.warn("[InstanceLog-{}] read logFile from disk failed for app: {}.", instanceId, appId, e);
+                return StringPage.simple(
+                    "oms-server execution exception, caused by " + ExceptionUtils.getRootCauseMessage(e));
+            }
+
+            double totalPage = Math.ceil(1.0 * lines / MAX_LINE_COUNT);
+            return new StringPage(index, (long)totalPage, sb.toString());
+
+        } catch (TimeoutException te) {
+            return StringPage.simple("log file is being prepared, please try again later.");
+        } catch (Exception e) {
+            log.warn("[InstanceLog-{}] fetch instance log failed.", instanceId, e);
+            return StringPage.simple(
+                "oms-server execution exception, caused by " + ExceptionUtils.getRootCauseMessage(e));
+        }
+    }
+
+    /**
+     * 获取日志的下载链接
+     * @param appId AOP 专用
+     * @param instanceId 任务实例 ID
+     * @return 下载链接
+     */
+    @DesignateServer
+    public String fetchDownloadUrl(Long appId, Long instanceId) {
+        String url =
+            "http://" + NetUtils.getLocalHost() + ":" + port + "/instance/downloadLog?instanceId=" + instanceId;
+        log.info("[InstanceLog-{}] downloadURL for appId[{}]: {}", instanceId, appId, url);
+        return url;
+    }
+
     @Async(PJThreadPool.TIMING_POOL)
     @Scheduled(fixedDelay = 120000)
     public void timingCheck() {
@@ -416,6 +365,37 @@ public class InstanceLogService {
         }
 
         // 删除长时间未 REPORT 的日志（必要性考证中......）
+    }
+
+    /**
+     * 下载全部的任务日志文件
+     *
+     * @param instanceId 任务实例ID
+     * @return 日志文件
+     * @throws Exception 异常
+     */
+    public File downloadInstanceLog(long instanceId) throws Exception {
+        Future<File> fileFuture = prepareLogFile(instanceId);
+        return fileFuture.get(1, TimeUnit.MINUTES);
+    }
+
+    /**
+     * 将数据库中存储的日志流转化为磁盘日志文件
+     *
+     * @param stream  流
+     * @param logFile 目标日志文件
+     */
+    private void stream2File(Stream<LocalInstanceLogDO> stream, File logFile) {
+        try (FileWriter fw = new FileWriter(logFile); BufferedWriter bfw = new BufferedWriter(fw)) {
+            stream.forEach(instanceLog -> {
+                try {
+                    bfw.write(convertLog(instanceLog) + System.lineSeparator());
+                } catch (Exception ignore) {
+                }
+            });
+        } catch (IOException ie) {
+            ExceptionUtils.rethrow(ie);
+        }
     }
 
 }

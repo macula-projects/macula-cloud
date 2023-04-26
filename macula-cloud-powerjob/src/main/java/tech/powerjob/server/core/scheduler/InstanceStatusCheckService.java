@@ -1,20 +1,3 @@
-/*
- * Copyright (c) 2023 Macula
- *   macula.dev, China
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package tech.powerjob.server.core.scheduler;
 
 import com.google.common.base.Stopwatch;
@@ -55,7 +38,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class InstanceStatusCheckService {
 
-    public static final long CHECK_INTERVAL = 10000;
     private static final int MAX_BATCH_NUM_APP = 10;
     private static final int MAX_BATCH_NUM_INSTANCE = 3000;
     private static final int MAX_BATCH_UPDATE_NUM = 500;
@@ -63,6 +45,9 @@ public class InstanceStatusCheckService {
     private static final long RECEIVE_TIMEOUT_MS = 60000;
     private static final long RUNNING_TIMEOUT_MS = 60000;
     private static final long WORKFLOW_WAITING_TIMEOUT_MS = 60000;
+
+    public static final long CHECK_INTERVAL = 10000;
+
     private final TransportService transportService;
 
     private final DispatchService dispatchService;
@@ -120,7 +105,8 @@ public class InstanceStatusCheckService {
     }
 
     /**
-     * 检查等待 worker 接收的实例 WAITING_WORKER_RECEIVE 超时：由于网络错误导致 worker 未接受成功
+     * 检查等待 worker 接收的实例
+     * WAITING_WORKER_RECEIVE 超时：由于网络错误导致 worker 未接受成功
      */
     public void checkWaitingWorkerReceiveInstance() {
         Stopwatch stopwatch = Stopwatch.createStarted();
@@ -141,7 +127,8 @@ public class InstanceStatusCheckService {
     }
 
     /**
-     * 检查运行中的实例 RUNNING 超时：TaskTracker down，断开与 server 的心跳连接
+     * 检查运行中的实例
+     * RUNNING 超时：TaskTracker down，断开与 server 的心跳连接
      */
     public void checkRunningInstance() {
         Stopwatch stopwatch = Stopwatch.createStarted();
@@ -301,7 +288,8 @@ public class InstanceStatusCheckService {
     }
 
     /**
-     * 定期检查工作流实例状态 此处仅检查并重试长时间处于 WAITING 状态的工作流实例，工作流的其他可靠性由 Instance 支撑，即子任务失败会反馈会 WorkflowInstance
+     * 定期检查工作流实例状态
+     * 此处仅检查并重试长时间处于 WAITING 状态的工作流实例，工作流的其他可靠性由 Instance 支撑，即子任务失败会反馈会 WorkflowInstance
      *
      * @param allAppIds 本系统所承担的所有 appIds
      */

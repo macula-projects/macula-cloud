@@ -1,20 +1,3 @@
-/*
- * Copyright (c) 2023 Macula
- *   macula.dev, China
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package tech.powerjob.server.persistence.monitor;
 
 import lombok.RequiredArgsConstructor;
@@ -47,31 +30,6 @@ public class DatabaseMonitorAspect {
 
     private final MonitorService monitorService;
 
-    private static Integer parseEffectRows(Object ret) {
-
-        // 从性能角度考虑，最高频场景放在最前面判断
-
-        if (ret instanceof Number) {
-            return ((Number)ret).intValue();
-        }
-        if (ret instanceof Optional) {
-            return ((Optional<?>)ret).isPresent() ? 1 : 0;
-        }
-        if (ret instanceof Collection) {
-            return ((Collection<?>)ret).size();
-        }
-        if (ret instanceof Slice) {
-            return ((Slice<?>)ret).getSize();
-        }
-
-        if (ret instanceof Stream) {
-            return null;
-        }
-        // TODO: 直接返回对象的方法全部改成 Optional
-
-        return ret == null ? 0 : 1;
-    }
-
     @Around("execution(* tech.powerjob.server.persistence.remote.repository..*.*(..))")
     public Object monitorCoreDB(ProceedingJoinPoint joinPoint) throws Throwable {
         return wrapperMonitor(joinPoint, DatabaseType.CORE);
@@ -101,5 +59,30 @@ public class DatabaseMonitorAspect {
             long cost = System.currentTimeMillis() - startTs;
             monitorService.monitor(event.setCost(cost));
         }
+    }
+
+    private static Integer parseEffectRows(Object ret) {
+
+        // 从性能角度考虑，最高频场景放在最前面判断
+
+        if (ret instanceof Number) {
+            return ((Number)ret).intValue();
+        }
+        if (ret instanceof Optional) {
+            return ((Optional<?>)ret).isPresent() ? 1 : 0;
+        }
+        if (ret instanceof Collection) {
+            return ((Collection<?>)ret).size();
+        }
+        if (ret instanceof Slice) {
+            return ((Slice<?>)ret).getSize();
+        }
+
+        if (ret instanceof Stream) {
+            return null;
+        }
+        // TODO: 直接返回对象的方法全部改成 Optional
+
+        return ret == null ? 0 : 1;
     }
 }

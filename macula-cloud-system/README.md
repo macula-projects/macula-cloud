@@ -1,8 +1,8 @@
-# Macula系统管理
+# Macula Cloud System 管理中心
 
 本模块基于[youlai](https://gitee.com/youlaitech/youlai-mall) 代码定制整理。
 
-租户、应用、权限、用户、菜单、角色
+统一的租户、应用、用户、权限等管理
 
 ## 关于DTO的说明
 

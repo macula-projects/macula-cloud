@@ -1,20 +1,3 @@
-/*
- * Copyright (c) 2023 Macula
- *   macula.dev, China
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package tech.powerjob.server.persistence.config.dialect;
 
 import org.hibernate.dialect.PostgreSQL10Dialect;
@@ -35,7 +18,8 @@ public class PowerJobPGDialect extends PostgreSQL10Dialect {
     /**
      * 使用 {@link Types#LONGVARCHAR} 覆盖 {@link Types#CLOB} 类型
      *
-     * 注意，如果在 PG 库创建表时使用的列类型为 oid ，那么这样会导致没法正确读取数据 在 PowerJob 中能这样用是因为 PowerJob 的所有实体类中被 @Lob 注解标记的列对应数据库中的字段类型都是 text
+     * 注意，如果在 PG 库创建表时使用的列类型为 oid ，那么这样会导致没法正确读取数据
+     * 在 PowerJob 中能这样用是因为 PowerJob 的所有实体类中被 @Lob 注解标记的列对应数据库中的字段类型都是 text
      * 另外还需要注意数据库版本，如果是 10.x 以前的，需自行提供一个合适的 Dialect 类（选择合适的版本继承）
      *
      * 更多内容请关注该 issues：https://github.com/PowerJob/PowerJob/issues/153

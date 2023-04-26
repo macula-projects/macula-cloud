@@ -1,20 +1,3 @@
-/*
- * Copyright (c) 2023 Macula
- *   macula.dev, China
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package tech.powerjob.server.core.container;
 
 import com.google.common.collect.ArrayListMultimap;
@@ -98,14 +81,14 @@ public class ContainerService {
     @Resource
     private WorkerClusterQueryService workerClusterQueryService;
 
+    // 下载用的分段锁
+    private final SegmentLock segmentLock = new SegmentLock(4);
     // 并发部署的机器数量
     private static final int DEPLOY_BATCH_NUM = 50;
     // 部署间隔
     private static final long DEPLOY_MIN_INTERVAL = 10 * 60 * 1000L;
     // 最长部署时间
     private static final long DEPLOY_MAX_COST_TIME = 10 * 60 * 1000L;
-    // 下载用的分段锁
-    private final SegmentLock segmentLock = new SegmentLock(4);
 
     private static String genContainerJarName(String version) {
         return String.format("oms-container-%s.jar", version);
@@ -113,10 +96,10 @@ public class ContainerService {
 
     /**
      * 保存容器
-     *
      * @param container 容器保存请求
      */
     public void save(ContainerInfoDO container) {
+
 
         Long originId = container.getId();
         if (originId != null) {
@@ -181,7 +164,6 @@ public class ContainerService {
 
     /**
      * 获取构建容器所需要的 Jar 文件
-     *
      * @param version 版本
      * @return 本地Jar文件
      */
@@ -230,9 +212,8 @@ public class ContainerService {
 
     /**
      * 部署容器
-     *
      * @param containerId 容器ID
-     * @param session     WebSocket Session
+     * @param session WebSocket Session
      * @throws Exception 异常
      */
     public void deploy(Long containerId, Session session) throws Exception {
@@ -272,8 +253,7 @@ public class ContainerService {
 
             double sizeMB = 1.0 * jarFile.length() / FileUtils.ONE_MB;
             remote.sendText(
-                String.format("SYSTEM: the jarFile(size=%fMB) is prepared and ready to be deployed to the worker.",
-                    sizeMB));
+                String.format("SYSTEM: the jarFile(size=%fMB) is prepared and ready to be deployed to the worker.", sizeMB));
 
             // 修改数据库，更新 MD5和最新部署时间
             Date now = new Date();
@@ -317,90 +297,6 @@ public class ContainerService {
         } finally {
             lockService.unlock(deployLock);
         }
-    }
-
-    /**
-     * 获取部署信息
-     *
-     * @param appId       容器所属应用ID
-     * @param containerId 容器ID
-     * @return 拼接好的可阅读字符串
-     */
-    @DesignateServer
-    public String fetchDeployedInfo(Long appId, Long containerId) {
-        List<DeployedContainerInfo> infoList = workerClusterQueryService.getDeployedContainerInfos(appId, containerId);
-
-        Set<String> aliveWorkers =
-            workerClusterQueryService.getAllAliveWorkers(appId).stream().map(WorkerInfo::getAddress)
-                .collect(Collectors.toSet());
-
-        Set<String> deployedList = Sets.newLinkedHashSet();
-        List<String> unDeployedList = Lists.newLinkedList();
-        Multimap<String, String> version2Address = ArrayListMultimap.create();
-        infoList.forEach(info -> {
-            String targetWorkerAddress = info.getWorkerAddress();
-            if (aliveWorkers.contains(targetWorkerAddress)) {
-                deployedList.add(targetWorkerAddress);
-                version2Address.put(info.getVersion(), targetWorkerAddress);
-            } else {
-                unDeployedList.add(targetWorkerAddress);
-            }
-        });
-
-        StringBuilder sb = new StringBuilder("========== DeployedInfo ==========").append(System.lineSeparator());
-        // 集群分裂，各worker版本不统一，问题很大
-        if (version2Address.keySet().size() > 1) {
-            sb.append("WARN: there exists multi version container now, please redeploy to fix this problem")
-                .append(System.lineSeparator());
-            sb.append("divisive version ==> ").append(System.lineSeparator());
-            version2Address.forEach((v, addressList) -> {
-                sb.append("version: ").append(v).append(System.lineSeparator());
-                sb.append(addressList);
-            });
-            sb.append(System.lineSeparator());
-        }
-        // 当前在线未部署机器
-        if (!CollectionUtils.isEmpty(unDeployedList)) {
-            sb.append("WARN: there exists unDeployed worker(OhMyScheduler will auto fix when some job need to process)")
-                .append(System.lineSeparator());
-            sb.append("unDeployed worker list ==> ").append(System.lineSeparator());
-        }
-        // 当前部署机器
-        sb.append("deployed worker list ==> ").append(System.lineSeparator());
-        if (CollectionUtils.isEmpty(deployedList)) {
-            sb.append("no worker deployed now~");
-        } else {
-            sb.append(deployedList);
-        }
-
-        return sb.toString();
-    }
-
-    private void downloadJarFromGridFS(String mongoFileName, File targetFile) {
-
-        int lockId = mongoFileName.hashCode();
-        try {
-            segmentLock.lockInterruptibleSafe(lockId);
-
-            if (targetFile.exists()) {
-                return;
-            }
-            if (!gridFsManager.exists(GridFsManager.CONTAINER_BUCKET, mongoFileName)) {
-                log.warn("[ContainerService] can't find container's jar file({}) in gridFS.", mongoFileName);
-                return;
-            }
-            try {
-                FileUtils.forceMkdirParent(targetFile);
-                gridFsManager.download(targetFile, GridFsManager.CONTAINER_BUCKET, mongoFileName);
-            } catch (Exception e) {
-                CommonUtils.executeIgnoreException(() -> FileUtils.forceDelete(targetFile));
-                ExceptionUtils.rethrow(e);
-            }
-
-        } finally {
-            segmentLock.unlock(lockId);
-        }
-
     }
 
     private File prepareJarFile(ContainerInfoDO container, Session session) throws Exception {
@@ -513,6 +409,89 @@ public class ContainerService {
         downloadJarFromGridFS(jarFileName, localFile);
         remote.sendText("SYSTEM: download jar file from GridFS successfully~");
         return localFile;
+    }
+
+    /**
+     * 获取部署信息
+     * @param appId 容器所属应用ID
+     * @param containerId 容器ID
+     * @return 拼接好的可阅读字符串
+     */
+    @DesignateServer
+    public String fetchDeployedInfo(Long appId, Long containerId) {
+        List<DeployedContainerInfo> infoList = workerClusterQueryService.getDeployedContainerInfos(appId, containerId);
+
+        Set<String> aliveWorkers =
+            workerClusterQueryService.getAllAliveWorkers(appId).stream().map(WorkerInfo::getAddress)
+                .collect(Collectors.toSet());
+
+        Set<String> deployedList = Sets.newLinkedHashSet();
+        List<String> unDeployedList = Lists.newLinkedList();
+        Multimap<String, String> version2Address = ArrayListMultimap.create();
+        infoList.forEach(info -> {
+            String targetWorkerAddress = info.getWorkerAddress();
+            if (aliveWorkers.contains(targetWorkerAddress)) {
+                deployedList.add(targetWorkerAddress);
+                version2Address.put(info.getVersion(), targetWorkerAddress);
+            } else {
+                unDeployedList.add(targetWorkerAddress);
+            }
+        });
+
+        StringBuilder sb = new StringBuilder("========== DeployedInfo ==========").append(System.lineSeparator());
+        // 集群分裂，各worker版本不统一，问题很大
+        if (version2Address.keySet().size() > 1) {
+            sb.append("WARN: there exists multi version container now, please redeploy to fix this problem")
+                .append(System.lineSeparator());
+            sb.append("divisive version ==> ").append(System.lineSeparator());
+            version2Address.forEach((v, addressList) -> {
+                sb.append("version: ").append(v).append(System.lineSeparator());
+                sb.append(addressList);
+            });
+            sb.append(System.lineSeparator());
+        }
+        // 当前在线未部署机器
+        if (!CollectionUtils.isEmpty(unDeployedList)) {
+            sb.append("WARN: there exists unDeployed worker(OhMyScheduler will auto fix when some job need to process)")
+                .append(System.lineSeparator());
+            sb.append("unDeployed worker list ==> ").append(System.lineSeparator());
+        }
+        // 当前部署机器
+        sb.append("deployed worker list ==> ").append(System.lineSeparator());
+        if (CollectionUtils.isEmpty(deployedList)) {
+            sb.append("no worker deployed now~");
+        } else {
+            sb.append(deployedList);
+        }
+
+        return sb.toString();
+    }
+
+    private void downloadJarFromGridFS(String mongoFileName, File targetFile) {
+
+        int lockId = mongoFileName.hashCode();
+        try {
+            segmentLock.lockInterruptibleSafe(lockId);
+
+            if (targetFile.exists()) {
+                return;
+            }
+            if (!gridFsManager.exists(GridFsManager.CONTAINER_BUCKET, mongoFileName)) {
+                log.warn("[ContainerService] can't find container's jar file({}) in gridFS.", mongoFileName);
+                return;
+            }
+            try {
+                FileUtils.forceMkdirParent(targetFile);
+                gridFsManager.download(targetFile, GridFsManager.CONTAINER_BUCKET, mongoFileName);
+            } catch (Exception e) {
+                CommonUtils.executeIgnoreException(() -> FileUtils.forceDelete(targetFile));
+                ExceptionUtils.rethrow(e);
+            }
+
+        } finally {
+            segmentLock.unlock(lockId);
+        }
+
     }
 
     /**

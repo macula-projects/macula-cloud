@@ -1,20 +1,3 @@
-/*
- * Copyright (c) 2023 Macula
- *   macula.dev, China
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package tech.powerjob.server.persistence.mongodb;
 
 import com.google.common.base.Stopwatch;
@@ -55,8 +38,10 @@ public class GridFsManager implements InitializingBean {
     private final Environment environment;
 
     private final MongoDatabase db;
-    private final Map<String, GridFSBucket> bucketCache = Maps.newConcurrentMap();
+
     private boolean available;
+
+    private final Map<String, GridFSBucket> bucketCache = Maps.newConcurrentMap();
 
     public static final String LOG_BUCKET = "log";
 
@@ -73,7 +58,6 @@ public class GridFsManager implements InitializingBean {
 
     /**
      * 是否可用
-     *
      * @return true：可用；false：不可用
      */
     public boolean available() {
@@ -99,10 +83,9 @@ public class GridFsManager implements InitializingBean {
 
     /**
      * 从 GridFS 下载文件
-     *
      * @param targetFile 下载的目标文件（本地文件）
      * @param bucketName 桶名称
-     * @param fileName   GirdFS中的文件名称
+     * @param fileName GirdFS中的文件名称
      * @throws IOException 异常
      */
     public void download(File targetFile, String bucketName, String fileName) throws IOException {
@@ -122,9 +105,8 @@ public class GridFsManager implements InitializingBean {
 
     /**
      * 删除几天前的文件
-     *
      * @param bucketName 桶名称
-     * @param day        日期偏移量，单位 天
+     * @param day 日期偏移量，单位 天
      */
     public void deleteBefore(String bucketName, int day) {
 

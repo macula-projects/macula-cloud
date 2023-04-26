@@ -1,20 +1,3 @@
-/*
- * Copyright (c) 2023 Macula
- *   macula.dev, China
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package tech.powerjob.server.remote.transporter.impl;
 
 import com.google.common.collect.Lists;
@@ -61,21 +44,27 @@ import java.util.concurrent.CompletionStage;
 public class PowerTransportService
     implements TransportService, InitializingBean, DisposableBean, ApplicationContextAware {
 
-    private static final String PROTOCOL_PORT_CONFIG = "oms.%s.port";
-    private final Environment environment;
-    private final Map<String, ProtocolInfo> protocolName2Info = Maps.newHashMap();
-    private final List<RemoteEngine> engines = Lists.newArrayList();
     /**
      * server 需要激活的通讯协议，建议激活全部支持的协议
      */
     @Value("${oms.transporter.active.protocols}")
     private String activeProtocols;
+
     /**
      * 主要通讯协议，用于 server 与 server 之间的通讯，用户必须保证该协议可用（端口开放）！
      */
     @Value("${oms.transporter.main.protocol}")
     private String mainProtocol;
+
+    private static final String PROTOCOL_PORT_CONFIG = "oms.%s.port";
+
+    private final Environment environment;
+
     private ProtocolInfo defaultProtocol;
+    private final Map<String, ProtocolInfo> protocolName2Info = Maps.newHashMap();
+
+    private final List<RemoteEngine> engines = Lists.newArrayList();
+
     private ApplicationContext applicationContext;
 
     public PowerTransportService(Environment environment) {
@@ -164,7 +153,6 @@ public class PowerTransportService
 
     /**
      * 获取协议端口，考虑兼容性 & 用户仔细扩展的场景，选择动态从 env 获取 port
-     *
      * @return port
      */
     private int parseProtocolPort(String protocol) {

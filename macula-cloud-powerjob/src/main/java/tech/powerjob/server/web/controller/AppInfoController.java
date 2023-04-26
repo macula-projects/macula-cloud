@@ -1,20 +1,3 @@
-/*
- * Copyright (c) 2023 Macula
- *   macula.dev, China
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package tech.powerjob.server.web.controller;
 
 import com.google.common.collect.Lists;
@@ -56,6 +39,32 @@ public class AppInfoController {
 
     private static final int MAX_APP_NUM = 200;
 
+    @PostMapping("/save")
+    public ResultDTO<Void> saveAppInfo(@RequestBody ModifyAppInfoRequest req) {
+
+        req.valid();
+        AppInfoDO appInfoDO;
+
+        Long id = req.getId();
+        if (id == null) {
+            appInfoDO = new AppInfoDO();
+            appInfoDO.setGmtCreate(new Date());
+        } else {
+            appInfoDO = appInfoRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("can't find appInfo by id:" + id));
+
+            // 对比密码
+            if (!Objects.equals(req.getOldPassword(), appInfoDO.getPassword())) {
+                throw new PowerJobException("The password is incorrect.");
+            }
+        }
+        BeanUtils.copyProperties(req, appInfoDO);
+        appInfoDO.setGmtModified(new Date());
+
+        appInfoRepository.saveAndFlush(appInfoDO);
+        return ResultDTO.success(null);
+    }
+
     private static List<AppInfoVO> convert(List<AppInfoDO> data) {
         if (CollectionUtils.isEmpty(data)) {
             return Lists.newLinkedList();
@@ -88,32 +97,6 @@ public class AppInfoController {
             result = appInfoRepository.findByAppNameLike("%" + condition + "%", limit).getContent();
         }
         return ResultDTO.success(convert(result));
-    }
-
-    @PostMapping("/save")
-    public ResultDTO<Void> saveAppInfo(@RequestBody ModifyAppInfoRequest req) {
-
-        req.valid();
-        AppInfoDO appInfoDO;
-
-        Long id = req.getId();
-        if (id == null) {
-            appInfoDO = new AppInfoDO();
-            appInfoDO.setGmtCreate(new Date());
-        } else {
-            appInfoDO = appInfoRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("can't find appInfo by id:" + id));
-
-            // 对比密码
-            if (!Objects.equals(req.getOldPassword(), appInfoDO.getPassword())) {
-                throw new PowerJobException("The password is incorrect.");
-            }
-        }
-        BeanUtils.copyProperties(req, appInfoDO);
-        appInfoDO.setGmtModified(new Date());
-
-        appInfoRepository.saveAndFlush(appInfoDO);
-        return ResultDTO.success(null);
     }
 
     @Data

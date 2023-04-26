@@ -1,20 +1,3 @@
-/*
- * Copyright (c) 2023 Macula
- *   macula.dev, China
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package tech.powerjob.server.core;
 
 import com.google.common.collect.Lists;
@@ -51,6 +34,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 import static tech.powerjob.common.enums.InstanceStatus.*;
+
 
 /**
  * 派送服务（将任务从Server派发到Worker）
@@ -155,8 +139,8 @@ public class DispatchService {
                 Lists.newArrayList(WAITING_WORKER_RECEIVE.getV(), RUNNING.getV()));
             // 超出最大同时运行限制，不执行调度
             if (runningInstanceCount >= maxInstanceNum) {
-                String result =
-                    String.format(SystemInstanceResult.TOO_MANY_INSTANCES, runningInstanceCount, maxInstanceNum);
+                String result = String.format(SystemInstanceResult.TOO_MANY_INSTANCES, runningInstanceCount,
+                    maxInstanceNum);
                 log.warn("[Dispatcher-{}|{}] cancel dispatch job due to too much instance is running ({} > {}).", jobId,
                     instanceId, runningInstanceCount, maxInstanceNum);
                 instanceInfoRepository.update4TriggerFailed(instanceId, FAILED.getV(), current, current,
@@ -210,7 +194,7 @@ public class DispatchService {
 
         List<WorkerInfo> res = new ArrayList<>(suitableWorkers.size());
         for (WorkerInfo suitableWorker : suitableWorkers) {
-            if (suitableWorker.overload()) {
+            if (suitableWorker.overload()){
                 continue;
             }
             res.add(suitableWorker);

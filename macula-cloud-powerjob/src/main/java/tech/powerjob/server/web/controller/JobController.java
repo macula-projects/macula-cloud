@@ -1,20 +1,3 @@
-/*
- * Copyright (c) 2023 Macula
- *   macula.dev, China
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package tech.powerjob.server.web.controller;
 
 import com.google.common.collect.Lists;
@@ -69,6 +52,12 @@ public class JobController {
         return ResultDTO.success(JobInfoVO.from(jobService.copyJob(Long.valueOf(jobId))));
     }
 
+    @PostMapping("/save")
+    public ResultDTO<Void> saveJobInfo(@RequestBody SaveJobInfoRequest request) {
+        jobService.saveJob(request);
+        return ResultDTO.success(null);
+    }
+
     @GetMapping("/disable")
     public ResultDTO<Void> disableJob(String jobId) {
         jobService.disableJob(Long.valueOf(jobId));
@@ -81,16 +70,15 @@ public class JobController {
         return ResultDTO.success(null);
     }
 
-    @PostMapping("/save")
-    public ResultDTO<Void> saveJobInfo(@RequestBody SaveJobInfoRequest request) {
-        jobService.saveJob(request);
-        return ResultDTO.success(null);
-    }
-
     @GetMapping("/run")
     public ResultDTO<Long> runImmediately(String appId, String jobId,
         @RequestParam(required = false) String instanceParams) {
         return ResultDTO.success(jobService.runJob(Long.valueOf(appId), Long.valueOf(jobId), instanceParams, 0L));
+    }
+
+    @GetMapping("/export")
+    public ResultDTO<SaveJobInfoRequest> exportJob(String jobId) {
+        return ResultDTO.success(jobService.exportJob(Long.valueOf(jobId)));
     }
 
     @PostMapping("/list")
@@ -111,19 +99,26 @@ public class JobController {
         if (request.getJobId() != null) {
 
             Optional<JobInfoDO> jobInfoOpt = jobInfoRepository.findById(request.getJobId());
-            PageResult<JobInfoVO> result = new PageResult<>();
-            result.setIndex(0);
-            result.setPageSize(request.getPageSize());
 
-            if (jobInfoOpt.isPresent()) {
-                result.setTotalItems(1);
-                result.setTotalPages(1);
-                result.setData(Lists.newArrayList(JobInfoVO.from(jobInfoOpt.get())));
-            } else {
+            PageResult<JobInfoVO> result = new PageResult<>();
+
+            if (!jobInfoOpt.isPresent()) {
                 result.setTotalPages(0);
                 result.setTotalItems(0);
                 result.setData(Lists.newLinkedList());
+                return ResultDTO.success(result);
             }
+
+            if (!jobInfoOpt.get().getAppId().equals(request.getAppId())) {
+                return ResultDTO.failed("请输入该app下的jobId");
+            }
+
+            result.setIndex(0);
+            result.setPageSize(request.getPageSize());
+
+            result.setTotalItems(1);
+            result.setTotalPages(1);
+            result.setData(Lists.newArrayList(JobInfoVO.from(jobInfoOpt.get())));
 
             return ResultDTO.success(result);
         }

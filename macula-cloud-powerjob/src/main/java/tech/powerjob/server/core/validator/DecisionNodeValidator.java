@@ -1,20 +1,3 @@
-/*
- * Copyright (c) 2023 Macula
- *   macula.dev, China
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package tech.powerjob.server.core.validator;
 
 import lombok.extern.slf4j.Slf4j;
@@ -36,9 +19,6 @@ import java.util.Collection;
 @Slf4j
 public class DecisionNodeValidator implements NodeValidator {
 
-    public static boolean isValidBooleanStr(String str) {
-        return StringUtils.equalsIgnoreCase(str.trim(), "true") || StringUtils.equalsIgnoreCase(str.trim(), "false");
-    }
 
     @Override
     public void complexValidate(WorkflowNodeInfoDO node, WorkflowDAG dag) {
@@ -77,6 +57,10 @@ public class DecisionNodeValidator implements NodeValidator {
         if (StringUtils.isBlank(nodeParams)) {
             throw new PowerJobException("DecisionNode‘s param must be not null,node name : " + node.getNodeName());
         }
+    }
+
+    public static boolean isValidBooleanStr(String str) {
+        return StringUtils.equalsIgnoreCase(str.trim(), "true") || StringUtils.equalsIgnoreCase(str.trim(), "false");
     }
 
     @Override

@@ -1,20 +1,3 @@
-/*
- * Copyright (c) 2023 Macula
- *   macula.dev, China
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package tech.powerjob.server.core.workflow;
 
 import com.alibaba.fastjson.JSON;
@@ -113,8 +96,7 @@ public class WorkflowInstanceManager {
             dag = JSON.parseObject(wfInfo.getPeDAG(), PEWorkflowDAG.class);
             // 校验 DAG 信息
             if (!WorkflowDAGUtils.valid(dag)) {
-                log.error(
-                    "[Workflow-{}|{}] DAG of this workflow is illegal! maybe you has modified the DAG info directly in database!",
+                log.error("[Workflow-{}|{}] DAG of this workflow is illegal! maybe you has modified the DAG info directly in database!",
                     wfId, wfInstanceId);
                 throw new PowerJobException(SystemInstanceResult.INVALID_DAG);
             }
@@ -225,8 +207,13 @@ public class WorkflowInstanceManager {
     }
 
     /**
-     * 开始任务 ******************************************** 2021-02-03 modify by Echo009 1、工作流支持配置重复的任务节点 2、移除参数
-     * initParams，改为统一从工作流实例中获取 传递工作流实例的 wfContext 作为 初始启动参数 3、通过 {@link WorkflowDAGUtils#listReadyNodes} 兼容原地重试逻辑
+     * 开始任务
+     * ********************************************
+     * 2021-02-03 modify by Echo009
+     * 1、工作流支持配置重复的任务节点
+     * 2、移除参数 initParams，改为统一从工作流实例中获取
+     * 传递工作流实例的 wfContext 作为 初始启动参数
+     * 3、通过 {@link WorkflowDAGUtils#listReadyNodes} 兼容原地重试逻辑
      * ********************************************
      *
      * @param wfInfo       工作流任务信息
@@ -295,9 +282,15 @@ public class WorkflowInstanceManager {
         }
     }
 
+
     /**
-     * 下一步（当工作流的某个任务完成时调用该方法） ******************************************** 2021-02-03 modify by Echo009 1、工作流支持配置重复的任务节点
-     * 2、不再获取上游任务的结果作为实例参数而是传递工作流 实例的 wfContext 作为 实例参数 3、通过 {@link WorkflowDAGUtils#listReadyNodes} 支持跳过禁用的节点
+     * 下一步（当工作流的某个任务完成时调用该方法）
+     * ********************************************
+     * 2021-02-03 modify by Echo009
+     * 1、工作流支持配置重复的任务节点
+     * 2、不再获取上游任务的结果作为实例参数而是传递工作流
+     * 实例的 wfContext 作为 实例参数
+     * 3、通过 {@link WorkflowDAGUtils#listReadyNodes} 支持跳过禁用的节点
      * ********************************************
      *
      * @param wfInstanceId 工作流任务实例ID
@@ -425,7 +418,8 @@ public class WorkflowInstanceManager {
     }
 
     /**
-     * 更新工作流上下文 fix : 得和其他操作工作流实例的方法用同一把锁才行，不然有并发问题，会导致节点状态被覆盖
+     * 更新工作流上下文
+     * fix : 得和其他操作工作流实例的方法用同一把锁才行，不然有并发问题，会导致节点状态被覆盖
      *
      * @param wfInstanceId          工作流实例
      * @param appendedWfContextData 追加的上下文数据
@@ -502,6 +496,8 @@ public class WorkflowInstanceManager {
             }
         }
     }
+
+
 
     private List<PEWorkflowDAG.Node> findControlNodes(List<PEWorkflowDAG.Node> readyNodes) {
         return readyNodes.stream().filter(node -> {

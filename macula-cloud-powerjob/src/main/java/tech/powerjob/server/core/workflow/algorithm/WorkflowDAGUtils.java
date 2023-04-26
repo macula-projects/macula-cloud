@@ -1,20 +1,3 @@
-/*
- * Copyright (c) 2023 Macula
- *   macula.dev, China
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package tech.powerjob.server.core.workflow.algorithm;
 
 import com.google.common.collect.*;
@@ -115,7 +98,9 @@ public class WorkflowDAGUtils {
     }
 
     /**
-     * Add by Echo009 on 2021/02/08 获取准备好的节点（非完成状态的节点且，前置依赖节点为空或者均处于完成状态） 注意，这里会直接将当前 disable（enable = false）的节点的状态置为完成
+     * Add by Echo009 on 2021/02/08
+     * 获取准备好的节点（非完成状态的节点且，前置依赖节点为空或者均处于完成状态）
+     * 注意，这里会直接将当前 disable（enable = false）的节点的状态置为完成
      *
      * @param dag 点线表示法的DAG图
      * @return 当前可执行的节点
@@ -239,8 +224,10 @@ public class WorkflowDAGUtils {
     }
 
     /**
-     * 处理被 disable 掉的边 1. 将仅能通过被 disable 掉的边可达的节点标记为 disable（disableByControlNode），将状态更新为已取消 2. 将这些被 disable
-     * 掉的节点的出口边都标记为 disable 3. 递归调用自身，继续处理被 disable 的边
+     * 处理被 disable 掉的边
+     * 1. 将仅能通过被 disable 掉的边可达的节点标记为 disable（disableByControlNode），将状态更新为已取消
+     * 2. 将这些被 disable 掉的节点的出口边都标记为 disable
+     * 3. 递归调用自身，继续处理被 disable 的边
      */
     @SuppressWarnings("squid:S3776")
     public static void handleDisableEdges(List<PEWorkflowDAG.Edge> disableEdges, WorkflowDAG dag) {
@@ -332,6 +319,7 @@ public class WorkflowDAGUtils {
         rootIds.forEach(id -> roots.add(id2Node.get(id)));
         return new WorkflowDAG(roots, id2Node);
     }
+
 
     private static boolean invalidPath(WorkflowDAG.Node root, Set<Long> ids, Set<Long> nodeIdContainer) {
 

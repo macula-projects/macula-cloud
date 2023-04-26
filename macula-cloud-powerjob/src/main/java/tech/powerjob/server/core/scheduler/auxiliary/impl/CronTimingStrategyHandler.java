@@ -1,20 +1,3 @@
-/*
- * Copyright (c) 2023 Macula
- *   macula.dev, China
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package tech.powerjob.server.core.scheduler.auxiliary.impl;
 
 import com.cronutils.model.Cron;
@@ -42,9 +25,9 @@ public class CronTimingStrategyHandler implements TimingStrategyHandler {
 
     /**
      * @see CronDefinitionBuilder#instanceDefinitionFor
-     *     <p>
-     *     Enhanced quartz cron，Support for specifying both a day-of-week and a day-of-month parameter.
-     *     https://github.com/PowerJob/PowerJob/issues/382
+     * <p>
+     * Enhanced quartz cron，Support for specifying both a day-of-week and a day-of-month parameter.
+     * https://github.com/PowerJob/PowerJob/issues/382
      */
     public CronTimingStrategyHandler() {
         CronDefinition cronDefinition =
@@ -56,6 +39,7 @@ public class CronTimingStrategyHandler implements TimingStrategyHandler {
                 .optional().and().instance();
         this.cronParser = new CronParser(cronDefinition);
     }
+
 
     @Override
     public void validate(String timeExpression) {

@@ -1,20 +1,3 @@
-/*
- * Copyright (c) 2023 Macula
- *   macula.dev, China
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package tech.powerjob.server.core.scheduler;
 
 import lombok.RequiredArgsConstructor;
@@ -22,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.stereotype.Service;
+import tech.powerjob.common.enums.TimeExpressionType;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -35,6 +19,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class CoreScheduleTaskManager implements InitializingBean, DisposableBean {
 
+
     private final PowerScheduleService powerScheduleService;
 
     private final InstanceStatusCheckService instanceStatusCheckService;
@@ -46,7 +31,11 @@ public class CoreScheduleTaskManager implements InitializingBean, DisposableBean
     public void afterPropertiesSet() {
         // 定时调度
         coreThreadContainer.add(new Thread(new LoopRunnable("ScheduleCronJob", PowerScheduleService.SCHEDULE_RATE,
-            powerScheduleService::scheduleCronJob), "Thread-ScheduleCronJob"));
+            () -> powerScheduleService.scheduleNormalJob(TimeExpressionType.CRON)), "Thread-ScheduleCronJob"));
+        coreThreadContainer.add(new Thread(
+            new LoopRunnable("ScheduleDailyTimeIntervalJob", PowerScheduleService.SCHEDULE_RATE,
+                () -> powerScheduleService.scheduleNormalJob(TimeExpressionType.DAILY_TIME_INTERVAL)),
+            "Thread-ScheduleDailyTimeIntervalJob"));
         coreThreadContainer.add(new Thread(new LoopRunnable("ScheduleCronWorkflow", PowerScheduleService.SCHEDULE_RATE,
             powerScheduleService::scheduleCronWorkflow), "Thread-ScheduleCronWorkflow"));
         coreThreadContainer.add(new Thread(new LoopRunnable("ScheduleFrequentJob", PowerScheduleService.SCHEDULE_RATE,

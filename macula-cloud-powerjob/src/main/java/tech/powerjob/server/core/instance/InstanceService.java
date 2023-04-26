@@ -1,20 +1,3 @@
-/*
- * Copyright (c) 2023 Macula
- *   macula.dev, China
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package tech.powerjob.server.core.instance;
 
 import lombok.RequiredArgsConstructor;
@@ -81,12 +64,6 @@ public class InstanceService {
     private final InstanceInfoRepository instanceInfoRepository;
 
     private final WorkerClusterQueryService workerClusterQueryService;
-
-    private static InstanceInfoDTO directConvert(InstanceInfoDO instanceInfoDO) {
-        InstanceInfoDTO instanceInfoDTO = new InstanceInfoDTO();
-        BeanUtils.copyProperties(instanceInfoDO, instanceInfoDTO);
-        return instanceInfoDTO;
-    }
 
     /**
      * 创建任务实例（注意，该方法并不调用 saveAndFlush，如果有需要立即同步到DB的需求，请在方法结束后手动调用 flush） ********************************************
@@ -213,8 +190,15 @@ public class InstanceService {
         dispatchService.dispatch(jobInfo, instanceId, Optional.of(instanceInfo), Optional.empty());
     }
 
+    private static InstanceInfoDTO directConvert(InstanceInfoDO instanceInfoDO) {
+        InstanceInfoDTO instanceInfoDTO = new InstanceInfoDTO();
+        BeanUtils.copyProperties(instanceInfoDO, instanceInfoDTO);
+        return instanceInfoDTO;
+    }
+
     /**
-     * 取消任务实例的运行 接口使用条件：调用接口时间与待取消任务的预计执行时间有一定时间间隔，否则不保证可靠性！
+     * 取消任务实例的运行
+     * 接口使用条件：调用接口时间与待取消任务的预计执行时间有一定时间间隔，否则不保证可靠性！
      *
      * @param instanceId 任务实例
      */
@@ -275,20 +259,6 @@ public class InstanceService {
         return InstanceStatus.of(instanceInfoDO.getStatus());
     }
 
-    public List<InstanceInfoDTO> queryInstanceInfo(PowerQuery powerQuery) {
-        return instanceInfoRepository.findAll(QueryConvertUtils.toSpecification(powerQuery)).stream()
-            .map(InstanceService::directConvert).collect(Collectors.toList());
-    }
-
-    private InstanceInfoDO fetchInstanceInfo(Long instanceId) {
-        InstanceInfoDO instanceInfoDO = instanceInfoRepository.findByInstanceId(instanceId);
-        if (instanceInfoDO == null) {
-            log.warn("[Instance-{}] can't find InstanceInfo by instanceId", instanceId);
-            throw new IllegalArgumentException("invalid instanceId: " + instanceId);
-        }
-        return instanceInfoDO;
-    }
-
     /**
      * 获取任务实例的详细运行详细
      *
@@ -338,5 +308,19 @@ public class InstanceService {
         // 失败则返回基础版信息
         BeanUtils.copyProperties(instanceInfoDO, detail);
         return detail;
+    }
+
+    public List<InstanceInfoDTO> queryInstanceInfo(PowerQuery powerQuery) {
+        return instanceInfoRepository.findAll(QueryConvertUtils.toSpecification(powerQuery)).stream()
+            .map(InstanceService::directConvert).collect(Collectors.toList());
+    }
+
+    private InstanceInfoDO fetchInstanceInfo(Long instanceId) {
+        InstanceInfoDO instanceInfoDO = instanceInfoRepository.findByInstanceId(instanceId);
+        if (instanceInfoDO == null) {
+            log.warn("[Instance-{}] can't find InstanceInfo by instanceId", instanceId);
+            throw new IllegalArgumentException("invalid instanceId: " + instanceId);
+        }
+        return instanceInfoDO;
     }
 }

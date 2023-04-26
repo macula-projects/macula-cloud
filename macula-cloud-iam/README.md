@@ -1,4 +1,6 @@
-# Macula Cloud IAM 身份认证服务
+# Macula Cloud IAM 认证中心
+
+提供基于OAUTH/CAS/OIDC/SAML协议的统一认证服务，所有服务经过网站认证
 
 ## 认证方式
 

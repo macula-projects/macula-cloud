@@ -1,20 +1,3 @@
-/*
- * Copyright (c) 2023 Macula
- *   macula.dev, China
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package tech.powerjob.server.core.workflow;
 
 import com.alibaba.fastjson.JSON;
@@ -161,6 +144,7 @@ public class WorkflowService {
         return JSON.toJSONString(dag);
     }
 
+
     /**
      * 深度复制工作流
      *
@@ -223,6 +207,7 @@ public class WorkflowService {
         workflowInfoRepository.saveAndFlush(copyWorkflow);
         return copyWorkflow.getId();
     }
+
 
     /**
      * 获取工作流元信息，这里获取到的 DAG 包含节点的完整信息（是否启用、是否允许失败跳过）
@@ -341,6 +326,7 @@ public class WorkflowService {
         return res;
     }
 
+
     private void fillWorkflow(WorkflowInfoDO wfInfo) {
 
         PEWorkflowDAG dagInfo = null;
@@ -369,6 +355,7 @@ public class WorkflowService {
         }
         wfInfo.setPeDAG(JSON.toJSONString(dagInfo));
     }
+
 
     private WorkflowInfoDO permissionCheck(Long wfId, Long appId) {
         WorkflowInfoDO wfInfo = workflowInfoRepository.findById(wfId)

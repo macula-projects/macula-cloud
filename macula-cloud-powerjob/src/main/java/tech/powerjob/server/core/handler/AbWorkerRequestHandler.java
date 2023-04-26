@@ -1,20 +1,3 @@
-/*
- * Copyright (c) 2023 Macula
- *   macula.dev, China
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package tech.powerjob.server.core.handler;
 
 import lombok.RequiredArgsConstructor;
@@ -59,6 +42,7 @@ import static tech.powerjob.common.RemoteConstant.*;
 @Slf4j
 public abstract class AbWorkerRequestHandler implements IWorkerRequestHandler {
 
+
     protected final MonitorService monitorService;
 
     protected final Environment environment;
@@ -73,6 +57,7 @@ public abstract class AbWorkerRequestHandler implements IWorkerRequestHandler {
         TtReportInstanceStatusEvent event) throws Exception;
 
     protected abstract void processWorkerLogReport0(WorkerLogReportReq req, WorkerLogReportEvent event);
+
 
     @Override
     @Handler(path = S4W_HANDLER_WORKER_HEARTBEAT, processType = ProcessType.NO_BLOCKING)
