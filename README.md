@@ -6,29 +6,21 @@
 
 提供基于OAUTH/CAS/OIDC/SAML协议的统一认证服务，所有服务经过网站认证
 
-### Macula Cloud Gateway 网关中心
-
-平台对外统一入口，提供统一认证、鉴权、接口加解密等服务
-
 ### Macula Cloud ID ID中心
 
 统一的ID生成服务
 
+### Macula Cloud API 平台对外API SDK
+
+提供各微服务给外部访问的接口定义
+
+### Macula Cloud Gateway 网关中心
+
+平台对外统一入口，提供统一认证、鉴权、接口加解密等服务
+
 ### Macula Cloud System 管理中心
 
 统一的租户、应用、用户、权限等管理
-
-### Macula Cloud Channel 渠道中心
-
-移动生态应用的管理和微信能力对接服务
-
-### Macula Cloud Msg 消息中心
-
-消息发送服务
-
-### Macula Cloud OSS 资源中心
-
-资源管理服务
 
 ### Macula Cloud PowerJob 任务中心
 
@@ -38,9 +30,17 @@
 
 基于RocketMQ Connect连接万物
 
-### Macula Cloud API 平台对外API SDK
+### Macula Cloud Channel 渠道中心(TODO)
 
-提供各微服务给外部访问的接口定义
+移动生态应用的管理和微信能力对接服务
+
+### Macula Cloud Msg 消息中心(TODO)
+
+消息发送服务
+
+### Macula Cloud OSS 资源中心(TODO)
+
+资源管理服务
 
 ### Macula Cloud ...
 

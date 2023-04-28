@@ -22,7 +22,7 @@ public class PowerJobServerApplication {
 
     public static void main(String[] args) {
 
-        pre();
+        // pre();
 
         // Start SpringBoot application.
         try {
