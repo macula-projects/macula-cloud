@@ -2,7 +2,6 @@ package dev.macula.cloud.system.aspect;
 
 import cn.hutool.extra.servlet.ServletUtil;
 import com.alibaba.fastjson.JSONObject;
-import com.alibaba.nacos.common.utils.HttpMethod;
 import dev.macula.boot.starter.security.utils.SecurityUtils;
 import dev.macula.cloud.system.annotation.AuditLog;
 import dev.macula.cloud.system.pojo.entity.SysLog;
@@ -15,6 +14,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.annotation.AfterReturning;
 import org.aspectj.lang.annotation.Aspect;
+import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.multipart.MultipartFile;
@@ -121,8 +121,8 @@ public class AuditLogAspect {
      */
     private void setRequestValue(JoinPoint joinPoint, SysLog opLog) {
         String requestMethod = opLog.getOpRequestMethod();
-        if (HttpMethod.PUT.equals(requestMethod) || HttpMethod.POST.equals(requestMethod) || HttpMethod.DELETE.equals(
-            requestMethod) || HttpMethod.PATCH.equals(requestMethod)) {
+        if (HttpMethod.PUT.matches(requestMethod) || HttpMethod.POST.matches(
+            requestMethod) || HttpMethod.DELETE.matches(requestMethod) || HttpMethod.PATCH.matches(requestMethod)) {
             String params = argsArrayToString(joinPoint.getArgs());
             opLog.setOpParam(StringUtils.substring(params, 0, 2000));
         } else {
@@ -137,7 +137,7 @@ public class AuditLogAspect {
      */
     private String argsArrayToString(Object[] paramsArray) {
         StringBuilder params = new StringBuilder();
-        if (paramsArray != null && paramsArray.length > 0) {
+        if (paramsArray != null) {
             for (Object object : paramsArray) {
                 // 不为空 并且是不需要过滤的 对象
                 if (ObjectUtils.isNotEmpty(object) && !isFilterObject(object)) {

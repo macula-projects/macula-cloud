@@ -29,7 +29,6 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.google.common.collect.Lists;
 import dev.macula.boot.base.IBaseEnum;
 import dev.macula.boot.constants.CacheConstants;
 import dev.macula.boot.constants.SecurityConstants;
@@ -322,7 +321,7 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         long distinctCount = validDataList.stream().map(UserImportDTO.UserItem::getUsername).distinct().count();
         Assert.isTrue(validDataList.size() == distinctCount, "导入数据中有重复的用户名，请检查！");
 
-        List<SysUser> saveUserList = Lists.newArrayList();
+        List<SysUser> saveUserList = new ArrayList<>();
 
         StringBuilder errMsg = new StringBuilder();
         for (int i = 0; i < validDataList.size(); i++) {

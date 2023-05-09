@@ -45,6 +45,8 @@
         <module>macula-cloud-tinyid</module>
         <module>macula-cloud-powerjob</module>
         <module>macula-cloud-system</module>
+        <module>macula-cloud-retry</module>
+        <module>macula-cloud-sentinel</module>
         <module>macula-cloud-connect</module>
     </modules>
 
