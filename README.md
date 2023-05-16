@@ -26,9 +26,9 @@
 
 提供基于PowerJob的统一任务管理
 
-### Macula Cloud Connect 连接中心
+### Macula Cloud RocketMQ MQ管理
 
-基于RocketMQ Connect连接万物
+基于RocketMQ 和 RocketMQ Connect管理
 
 ### Macula Cloud Channel 渠道中心(TODO)
 
@@ -41,6 +41,14 @@
 ### Macula Cloud OSS 资源中心(TODO)
 
 资源管理服务
+
+### Macula Cloud Sentinel 服务治理
+
+服务治理
+
+### Macula Cloud Seata 分布式事务管理
+
+分布式事务管理
 
 ### Macula Cloud ...
 
