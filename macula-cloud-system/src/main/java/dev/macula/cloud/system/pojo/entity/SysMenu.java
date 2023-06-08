@@ -19,8 +19,8 @@ package dev.macula.cloud.system.pojo.entity;
 
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonInclude;
+import dev.macula.boot.enums.MenuTypeEnum;
 import dev.macula.boot.starter.mp.entity.BaseEntity;
-import dev.macula.cloud.system.enums.MenuTypeEnum;
 import lombok.Data;
 
 /**

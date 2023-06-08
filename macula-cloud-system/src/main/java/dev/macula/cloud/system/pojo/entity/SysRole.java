@@ -18,8 +18,8 @@
 package dev.macula.cloud.system.pojo.entity;
 
 import com.baomidou.mybatisplus.annotation.TableField;
+import dev.macula.boot.enums.DataScopeEnum;
 import dev.macula.boot.starter.mp.entity.BaseEntity;
-import dev.macula.cloud.system.enums.DataScopeEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 

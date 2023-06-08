@@ -17,7 +17,7 @@
 
 package dev.macula.cloud.system.pojo.bo;
 
-import dev.macula.cloud.system.enums.MenuTypeEnum;
+import dev.macula.boot.enums.MenuTypeEnum;
 import lombok.Data;
 
 import java.util.List;
