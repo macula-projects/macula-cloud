@@ -18,7 +18,7 @@
 package dev.macula.cloud.system.vo.menu;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import dev.macula.cloud.system.enums.MenuTypeEnum;
+import dev.macula.boot.enums.MenuTypeEnum;
 import lombok.Data;
 
 import java.util.List;

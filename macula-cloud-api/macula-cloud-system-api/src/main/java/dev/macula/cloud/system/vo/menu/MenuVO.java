@@ -19,7 +19,7 @@ package dev.macula.cloud.system.vo.menu;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonInclude;
-import dev.macula.cloud.system.enums.MenuTypeEnum;
+import dev.macula.boot.enums.MenuTypeEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 

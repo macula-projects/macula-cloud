@@ -48,7 +48,6 @@
         <module>macula-cloud-retry</module>
         <module>macula-cloud-rocketmq</module>
         <module>macula-cloud-sentinel</module>
-        <module>macula-cloud-seata</module>
     </modules>
 
     <dependencies>

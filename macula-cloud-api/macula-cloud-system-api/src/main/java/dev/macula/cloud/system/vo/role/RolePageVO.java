@@ -18,7 +18,7 @@
 package dev.macula.cloud.system.vo.role;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
-import dev.macula.cloud.system.enums.DataScopeEnum;
+import dev.macula.boot.enums.DataScopeEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
