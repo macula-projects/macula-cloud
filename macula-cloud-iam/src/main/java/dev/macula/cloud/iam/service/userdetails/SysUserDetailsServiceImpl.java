@@ -20,7 +20,6 @@ package dev.macula.cloud.iam.service.userdetails;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import dev.macula.boot.enums.StatusEnum;
-import dev.macula.cloud.iam.enums.UserTypeEnum;
 import dev.macula.cloud.iam.pojo.dto.UserAuthInfo;
 import dev.macula.cloud.iam.pojo.entity.SysOAuth2Client;
 import dev.macula.cloud.iam.pojo.entity.SysUser;
@@ -29,9 +28,6 @@ import dev.macula.cloud.iam.service.support.SysUserService;
 import dev.macula.cloud.iam.service.support.UserAuthInfoService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Required;
-import org.springframework.lang.Nullable;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsPasswordService;
@@ -44,7 +40,7 @@ import javax.servlet.http.HttpServletRequest;
 import java.util.Arrays;
 import java.util.Optional;
 
-import static dev.macula.boot.starter.web.utils.RequestUtil.getCurrentRequest;
+import static dev.macula.boot.starter.web.test.utils.RequestUtil.getCurrentRequest;
 
 /**
  * 系统用户体系业务类

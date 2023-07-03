@@ -2,11 +2,10 @@ package dev.macula.cloud.system.controller;
 
 import com.alibaba.fastjson.JSONObject;
 import dev.macula.boot.constants.CacheConstants;
-import dev.macula.boot.constants.SecurityConstants;
 import dev.macula.boot.result.ApiResultCode;
 import dev.macula.boot.result.Result;
 import dev.macula.boot.starter.security.utils.SecurityUtils;
-import dev.macula.boot.starter.web.annotation.NotControllerResponseAdvice;
+import dev.macula.boot.starter.web.test.annotation.NotControllerResponseAdvice;
 import dev.macula.cloud.system.dto.UserAuthInfo;
 import dev.macula.cloud.system.service.SysMenuService;
 import dev.macula.cloud.system.service.SysUserService;
