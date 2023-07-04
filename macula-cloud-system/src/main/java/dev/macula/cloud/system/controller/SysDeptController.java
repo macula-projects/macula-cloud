@@ -18,7 +18,6 @@
 package dev.macula.cloud.system.controller;
 
 import dev.macula.boot.result.Option;
-import dev.macula.boot.starter.security.annotation.Inner;
 import dev.macula.cloud.system.annotation.AuditLog;
 import dev.macula.cloud.system.form.DeptForm;
 import dev.macula.cloud.system.query.DeptQuery;
@@ -55,7 +54,6 @@ public class SysDeptController {
 
     @Operation(summary = "获取部门下拉选项")
     @GetMapping("/options")
-    @Inner
     public List<Option<Long>> listDeptOptions() {
         return deptService.listDeptOptions();
     }
