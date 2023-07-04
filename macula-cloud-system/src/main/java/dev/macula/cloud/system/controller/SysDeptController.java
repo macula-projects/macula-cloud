@@ -18,6 +18,7 @@
 package dev.macula.cloud.system.controller;
 
 import dev.macula.boot.result.Option;
+import dev.macula.boot.starter.security.annotation.Inner;
 import dev.macula.cloud.system.annotation.AuditLog;
 import dev.macula.cloud.system.form.DeptForm;
 import dev.macula.cloud.system.query.DeptQuery;
@@ -49,31 +50,28 @@ public class SysDeptController {
     @Operation(summary = "获取部门列表")
     @GetMapping
     public List<DeptVO> listDepartments(DeptQuery queryParams) {
-        List<DeptVO> list = deptService.listDepartments(queryParams);
-        return list;
+        return deptService.listDepartments(queryParams);
     }
 
     @Operation(summary = "获取部门下拉选项")
     @GetMapping("/options")
-    public List<Option> listDeptOptions() {
-        List<Option> list = deptService.listDeptOptions();
-        return list;
+    @Inner
+    public List<Option<Long>> listDeptOptions() {
+        return deptService.listDeptOptions();
     }
 
     @Operation(summary = "获取部门详情")
     @Parameter(name = "部门ID")
     @GetMapping("/{deptId}/form")
     public DeptForm getDeptForm(@PathVariable Long deptId) {
-        DeptForm deptForm = deptService.getDeptForm(deptId);
-        return deptForm;
+        return deptService.getDeptForm(deptId);
     }
 
     @Operation(summary = "新增部门")
     @AuditLog(title = "新增部门")
     @PostMapping
     public Long saveDept(@Valid @RequestBody DeptForm formData) {
-        Long id = deptService.saveDept(formData);
-        return id;
+        return deptService.saveDept(formData);
     }
 
     @Operation(summary = "修改部门")
@@ -89,8 +87,6 @@ public class SysDeptController {
     @Parameter(name = "部门ID，多个以英文逗号(,)分割")
     @DeleteMapping("/{ids}")
     public boolean deleteDepartments(@PathVariable("ids") String ids) {
-        boolean result = deptService.deleteByIds(ids);
-        return result;
+        return deptService.deleteByIds(ids);
     }
-
 }

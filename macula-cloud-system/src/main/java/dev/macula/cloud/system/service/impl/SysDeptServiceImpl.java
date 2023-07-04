@@ -54,25 +54,23 @@ public class SysDeptServiceImpl extends ServiceImpl<SysDeptMapper, SysDept> impl
     /**
      * 递归生成部门表格层级列表
      *
-     * @param parentId
-     * @param deptList
-     * @return
+     * @param parentId 父ID
+     * @param deptList 部门列表
+     * @return 部门层级
      */
-    public static List<Option> recurDeptTreeOptions(long parentId, List<SysDept> deptList) {
+    public static List<Option<Long>> recurDeptTreeOptions(long parentId, List<SysDept> deptList) {
         if (CollectionUtil.isEmpty(deptList)) {
-            return Collections.EMPTY_LIST;
+            return new ArrayList<>();
         }
 
-        List<Option> list = deptList.stream().filter(dept -> dept.getParentId().equals(parentId)).map(dept -> {
-            Option option = new Option(dept.getId(), dept.getName());
-            List<Option> children = recurDeptTreeOptions(dept.getId(), deptList);
+        return deptList.stream().filter(dept -> dept.getParentId().equals(parentId)).map(dept -> {
+            Option<Long> option = new Option<>(dept.getId(), dept.getName());
+            List<Option<Long>> children = recurDeptTreeOptions(dept.getId(), deptList);
             if (CollectionUtil.isNotEmpty(children)) {
                 option.setChildren(children);
             }
             return option;
         }).collect(Collectors.toList());
-
-        return list;
     }
 
     /**
@@ -98,7 +96,7 @@ public class SysDeptServiceImpl extends ServiceImpl<SysDeptMapper, SysDept> impl
             for (SysDept dept : deptList) {
                 Long parentId = dept.getParentId();
                 // 不在缓存ID列表的parentId是顶级节点ID，以此作为递归开始
-                if (cacheDeptIds.contains(parentId) == false) {
+                if (!cacheDeptIds.contains(parentId)) {
                     list.addAll(recurDepartments(parentId, deptList));
                     cacheDeptIds.add(parentId); // 避免重复递归
                 }
@@ -120,32 +118,31 @@ public class SysDeptServiceImpl extends ServiceImpl<SysDeptMapper, SysDept> impl
     /**
      * 递归生成部门层级列表
      *
-     * @param parentId
-     * @param deptList
-     * @return
+     * @param parentId 父ID
+     * @param deptList 部门列表
+     * @return 部门层级列表
      */
     public List<DeptVO> recurDepartments(Long parentId, List<SysDept> deptList) {
-        List<DeptVO> list = deptList.stream().filter(dept -> dept.getParentId().equals(parentId)).map(dept -> {
+        return deptList.stream().filter(dept -> dept.getParentId().equals(parentId)).map(dept -> {
             DeptVO deptVO = deptConverter.entity2Vo(dept);
             List<DeptVO> children = recurDepartments(dept.getId(), deptList);
             deptVO.setChildren(children);
             return deptVO;
         }).collect(Collectors.toList());
-        return list;
     }
 
     /**
      * 部门下拉选项
      *
-     * @return
+     * @return 部门下拉选项
      */
     @Override
-    public List<Option> listDeptOptions() {
+    public List<Option<Long>> listDeptOptions() {
         List<SysDept> deptList = this.list(
             new LambdaQueryWrapper<SysDept>().eq(SysDept::getStatus, StatusEnum.ENABLE.getValue())
                 .select(SysDept::getId, SysDept::getParentId, SysDept::getName).orderByAsc(SysDept::getSort));
 
-        List<Option> options = recurDeptTreeOptions(SecurityConstants.ROOT_NODE_ID, deptList);
+        List<Option<Long>> options = recurDeptTreeOptions(SecurityConstants.ROOT_NODE_ID, deptList);
         //        List<Option> options = buildDeptTree(deptList);
         return options;
     }
@@ -177,14 +174,14 @@ public class SysDeptServiceImpl extends ServiceImpl<SysDeptMapper, SysDept> impl
     /**
      * 递归生成部门表格层级列表
      *
-     * @param depts
-     * @return
+     * @param depts 部门列表
+     * @return 部门下拉选项
      */
-    public List<Option> buildDeptTree(List<SysDept> depts) {
+    public List<Option<Long>> buildDeptTree(List<SysDept> depts) {
         if (CollectionUtil.isEmpty(depts)) {
-            return Collections.EMPTY_LIST;
+            return new ArrayList<>();
         }
-        List<Option> returnList = new ArrayList<Option>();
+        List<Option<Long>> returnList = new ArrayList<>();
         List<Long> tempList = new ArrayList<Long>();
         for (SysDept dept : depts) {
             tempList.add(dept.getId());
@@ -192,14 +189,14 @@ public class SysDeptServiceImpl extends ServiceImpl<SysDeptMapper, SysDept> impl
         for (SysDept dept : depts) {
             // 如果是顶级节点, 遍历该父节点的所有子节点
             if (!tempList.contains(dept.getParentId())) {
-                Option option = new Option(dept.getId(), dept.getName());
+                Option<Long> option = new Option<>(dept.getId(), dept.getName());
                 recursionFn(depts, option);
                 returnList.add(option);
             }
         }
         if (returnList.isEmpty()) {
-            depts.stream().forEach(dept -> {
-                Option option = new Option(dept.getId(), dept.getName());
+            depts.forEach(dept -> {
+                Option<Long> option = new Option<>(dept.getId(), dept.getName());
                 returnList.add(option);
             });
         }
@@ -209,11 +206,11 @@ public class SysDeptServiceImpl extends ServiceImpl<SysDeptMapper, SysDept> impl
     /**
      * 递归列表
      */
-    private void recursionFn(List<SysDept> list, Option t) {
+    private void recursionFn(List<SysDept> list, Option<Long> t) {
         // 得到子节点列表
-        List<Option> childList = getChildList(list, t);
+        List<Option<Long>> childList = getChildList(list, t);
         t.setChildren(childList);
-        for (Option tChild : childList) {
+        for (Option<Long> tChild : childList) {
             if (hasChild(list, tChild)) {
                 recursionFn(list, tChild);
             }
@@ -223,13 +220,11 @@ public class SysDeptServiceImpl extends ServiceImpl<SysDeptMapper, SysDept> impl
     /**
      * 得到子节点列表
      */
-    private List<Option> getChildList(List<SysDept> list, Option t) {
-        List<Option> tlist = new ArrayList<Option>();
-        Iterator<SysDept> it = list.iterator();
-        while (it.hasNext()) {
-            SysDept n = (SysDept)it.next();
-            if (n.getParentId() != null && n.getParentId() == t.getValue()) {
-                Option option = new Option(n.getId(), n.getName());
+    private List<Option<Long>> getChildList(List<SysDept> list, Option<Long> t) {
+        List<Option<Long>> tlist = new ArrayList<>();
+        for (SysDept n : list) {
+            if (n.getParentId() != null && n.getParentId().equals(t.getValue())) {
+                Option<Long> option = new Option<>(n.getId(), n.getName());
                 tlist.add(option);
             }
         }
@@ -239,7 +234,7 @@ public class SysDeptServiceImpl extends ServiceImpl<SysDeptMapper, SysDept> impl
     /**
      * 判断是否有子节点
      */
-    private boolean hasChild(List<SysDept> list, Option t) {
+    private boolean hasChild(List<SysDept> list, Option<Long> t) {
         return getChildList(list, t).size() > 0;
     }
 
@@ -247,7 +242,7 @@ public class SysDeptServiceImpl extends ServiceImpl<SysDeptMapper, SysDept> impl
      * 删除部门
      *
      * @param ids 部门ID，多个以英文逗号,拼接字符串
-     * @return
+     * @return boolean
      */
     @Override
     public boolean deleteByIds(String ids) {
@@ -261,8 +256,8 @@ public class SysDeptServiceImpl extends ServiceImpl<SysDeptMapper, SysDept> impl
     /**
      * 获取部门详情
      *
-     * @param deptId
-     * @return
+     * @param deptId 部门ID
+     * @return 部门详情
      */
     @Override
     public DeptForm getDeptForm(Long deptId) {
@@ -270,15 +265,14 @@ public class SysDeptServiceImpl extends ServiceImpl<SysDeptMapper, SysDept> impl
         SysDept entity = this.getOne(new LambdaQueryWrapper<SysDept>().eq(SysDept::getId, deptId)
             .select(SysDept::getId, SysDept::getName, SysDept::getParentId, SysDept::getStatus, SysDept::getSort));
 
-        DeptForm deptForm = deptConverter.entity2Form(entity);
-        return deptForm;
+        return deptConverter.entity2Form(entity);
     }
 
     /**
      * 部门路径生成
      *
-     * @param parentId
-     * @return
+     * @param parentId 父ID
+     * @return 部门路径
      */
     private String generateDeptTreePath(Long parentId) {
         String treePath = null;
@@ -292,5 +286,4 @@ public class SysDeptServiceImpl extends ServiceImpl<SysDeptMapper, SysDept> impl
         }
         return treePath;
     }
-
 }
