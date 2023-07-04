@@ -40,7 +40,7 @@ import javax.servlet.http.HttpServletRequest;
 import java.util.Arrays;
 import java.util.Optional;
 
-import static dev.macula.boot.starter.web.test.utils.RequestUtil.getCurrentRequest;
+import static dev.macula.boot.starter.web.utils.RequestUtil.getCurrentRequest;
 
 /**
  * 系统用户体系业务类
