@@ -35,7 +35,7 @@ import java.util.stream.Collectors;
 
 /**
  * @author jumuning
- * @date 2022-06-02
+ * @since 2022-06-02
  *
  *     自定义模式认证转换器
  */

@@ -50,7 +50,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * 登录token的控制器 临时处理类
  *
  * @author qiuyuhao
- * @date 2023.01.16
+ * @since 2023.01.16
  */
 @Tag(name = "登录接口", description = "登录接口")
 @RequestMapping("/api/token")

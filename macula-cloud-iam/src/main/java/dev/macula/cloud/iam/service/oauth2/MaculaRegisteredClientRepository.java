@@ -47,7 +47,7 @@ import java.util.Optional;
  * {@code MaculaRegisteredClientRepository} 查询客户端相关信息实现
  *
  * @author lengleng
- * @date 2022/5/29
+ * @since 2022/5/29
  */
 @RequiredArgsConstructor
 public class MaculaRegisteredClientRepository implements RegisteredClientRepository {

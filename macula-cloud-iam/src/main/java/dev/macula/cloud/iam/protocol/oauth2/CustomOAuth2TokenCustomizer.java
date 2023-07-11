@@ -40,7 +40,7 @@ import java.util.stream.Collectors;
  * token 输出增强
  *
  * @author lengleng
- * @date 2022/6/3
+ * @since 2022/6/3
  */
 public class CustomOAuth2TokenCustomizer implements OAuth2TokenCustomizer<OAuth2TokenClaimsContext> {
 
