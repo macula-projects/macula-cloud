@@ -13,24 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.alibaba.csp.sentinel.dashboard.repository.rule;
+package com.alibaba.csp.sentinel.dashboard.config;
 
-import java.util.concurrent.atomic.AtomicLong;
+import org.springframework.boot.context.properties.ConfigurationProperties;
 
-import com.alibaba.csp.sentinel.dashboard.datasource.entity.rule.DegradeRuleEntity;
+@ConfigurationProperties(prefix = "auth")
+public class AuthProperties {
 
-import org.springframework.stereotype.Component;
+    private boolean enabled = true;
 
-/**
- * @author leyou
- */
-@Component
-public class InMemDegradeRuleStore extends InMemoryRuleRepositoryAdapter<DegradeRuleEntity> {
-
-    private static AtomicLong ids = new AtomicLong(0);
-
-    @Override
-    protected long nextId() {
-        return ids.incrementAndGet();
+    public boolean isEnabled() {
+        return enabled;
     }
+
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
+    }
+
 }

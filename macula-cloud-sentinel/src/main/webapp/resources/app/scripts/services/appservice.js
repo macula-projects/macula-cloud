@@ -1,3 +1,4 @@
+
 var app = angular.module('sentinelDashboardApp');
 
 app.service('AppService', ['$http', function ($http) {

@@ -35,11 +35,11 @@ public class GatewayFlowRuleEntity implements RuleEntity {
     /**间隔单位*/
     /** 0-秒 */
     public static final int INTERVAL_UNIT_SECOND = 0;
-    /** 1-分 */
+    /**1-分*/
     public static final int INTERVAL_UNIT_MINUTE = 1;
-    /** 2-时 */
+    /**2-时*/
     public static final int INTERVAL_UNIT_HOUR = 2;
-    /** 3-天 */
+    /**3-天*/
     public static final int INTERVAL_UNIT_DAY = 3;
 
     private Long id;

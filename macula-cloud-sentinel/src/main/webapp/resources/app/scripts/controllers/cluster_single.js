@@ -235,7 +235,6 @@ app.controller('SentinelClusterSingleController', ['$scope', '$stateParams', 'ng
                 }
             );
         }
-
         queryAppMachines();
 
         $scope.$watch('searchKey', function () {

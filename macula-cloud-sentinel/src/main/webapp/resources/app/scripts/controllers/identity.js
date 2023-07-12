@@ -95,7 +95,7 @@ app.controller('IdentityCtl', ['$scope', '$stateParams', 'IdentityService',
             FlowService.newRule(flowRuleDialogScope.currentRule).success(function (data) {
                 if (data.code === 0) {
                     flowRuleDialog.close();
-                    let url = '/dashboard/v2/flow/' + $scope.app;
+                    let url = '/dashboard/flow/' + $scope.app;
                     $location.path(url);
                 } else {
                     alert('失败：' + data.msg);
@@ -140,7 +140,7 @@ app.controller('IdentityCtl', ['$scope', '$stateParams', 'IdentityService',
             };
 
             degradeRuleDialogScope.degradeRuleDialog = {
-                title: '新增降级规则',
+                title: '新增熔断规则',
                 type: 'add',
                 confirmBtnText: '新增',
                 saveAndContinueBtnText: '新增并继续添加'

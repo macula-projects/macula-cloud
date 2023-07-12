@@ -39,7 +39,7 @@ public interface ClusterAssignService {
     /**
      * Unbind a set of cluster servers and its clients.
      *
-     * @param app          app name
+     * @param app app name
      * @param machineIdSet set of valid machine ID ({@code host@commandPort})
      * @return assign result
      */
@@ -53,6 +53,5 @@ public interface ClusterAssignService {
      * @param remainingSet unassigned set of machine ID
      * @return assign result
      */
-    ClusterAppAssignResultVO applyAssignToApp(String app, List<ClusterAppAssignMap> clusterMap,
-        Set<String> remainingSet);
+    ClusterAppAssignResultVO applyAssignToApp(String app, List<ClusterAppAssignMap> clusterMap, Set<String> remainingSet);
 }

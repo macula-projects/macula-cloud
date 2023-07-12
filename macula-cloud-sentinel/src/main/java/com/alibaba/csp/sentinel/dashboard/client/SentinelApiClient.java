@@ -71,6 +71,7 @@ import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.client.utils.URLEncodedUtils;
 import org.apache.http.concurrent.FutureCallback;
+import org.apache.http.conn.util.InetAddressUtils;
 import org.apache.http.entity.ContentType;
 import org.apache.http.impl.client.DefaultRedirectStrategy;
 import org.apache.http.impl.nio.client.CloseableHttpAsyncClient;
@@ -164,7 +165,7 @@ public class SentinelApiClient {
     }
 
     /**
-     * Check wheter target instance (identified by tuple of app-ip:port) supports the form of "xxxxx; xx=xx" in
+     * Check whether target instance (identified by tuple of app-ip:port) supports the form of "xxxxx; xx=xx" in
      * "Content-Type" header.
      *
      * @param app  target app name
@@ -174,8 +175,7 @@ public class SentinelApiClient {
     protected boolean isSupportEnhancedContentType(String app, String ip, int port) {
         return StringUtil.isNotEmpty(app) && Optional.ofNullable(appManagement.getDetailApp(app))
             .flatMap(e -> e.getMachine(ip, port))
-            .flatMap(m -> VersionUtils.parseVersion(m.getVersion()).map(v -> v.greaterOrEqual(version171)))
-            .orElse(false);
+            .flatMap(m -> VersionUtils.parseVersion(m.getVersion()).map(v -> v.greaterOrEqual(version171))).orElse(false);
     }
 
     private StringBuilder queryString(Map<String, String> params) {
@@ -283,6 +283,14 @@ public class SentinelApiClient {
         CompletableFuture<String> future = new CompletableFuture<>();
         if (StringUtil.isBlank(ip) || StringUtil.isBlank(api)) {
             future.completeExceptionally(new IllegalArgumentException("Bad URL or command name"));
+            return future;
+        }
+        if (!InetAddressUtils.isIPv4Address(ip) && !InetAddressUtils.isIPv6Address(ip)) {
+            future.completeExceptionally(new IllegalArgumentException("Bad IP"));
+            return future;
+        }
+        if (!StringUtil.isEmpty(app) && !appManagement.isValidMachineOfApp(app, ip)) {
+            future.completeExceptionally(new IllegalArgumentException("Given ip does not belong to given app"));
             return future;
         }
         StringBuilder urlBuilder = new StringBuilder();
@@ -503,7 +511,7 @@ public class SentinelApiClient {
             AssertUtil.notEmpty(ip, "Bad machine IP");
             AssertUtil.isTrue(port > 0, "Bad machine port");
             return fetchItemsAsync(ip, port, GET_PARAM_RULE_PATH, null, ParamFlowRule.class).thenApply(
-                rules -> rules.stream().map(e -> ParamFlowRuleEntity.fromAuthorityRule(app, ip, port, e))
+                rules -> rules.stream().map(e -> ParamFlowRuleEntity.fromParamFlowRule(app, ip, port, e))
                     .collect(Collectors.toList()));
         } catch (Exception e) {
             logger.error("Error when fetching parameter flow rules", e);
@@ -533,8 +541,8 @@ public class SentinelApiClient {
     }
 
     /**
-     * set rules of the machine. rules == null will return immediately; rules.isEmpty() means setting the rules to
-     * empty.
+     * set rules of the machine. rules == null will return immediately;
+     * rules.isEmpty() means setting the rules to empty.
      *
      * @param app
      * @param ip
@@ -552,8 +560,8 @@ public class SentinelApiClient {
     }
 
     /**
-     * set rules of the machine. rules == null will return immediately; rules.isEmpty() means setting the rules to
-     * empty.
+     * set rules of the machine. rules == null will return immediately;
+     * rules.isEmpty() means setting the rules to empty.
      *
      * @param app
      * @param ip
@@ -566,8 +574,8 @@ public class SentinelApiClient {
     }
 
     /**
-     * set rules of the machine. rules == null will return immediately; rules.isEmpty() means setting the rules to
-     * empty.
+     * set rules of the machine. rules == null will return immediately;
+     * rules.isEmpty() means setting the rules to empty.
      *
      * @param app
      * @param ip

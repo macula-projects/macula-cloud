@@ -458,7 +458,7 @@ app.controller('SentinelClusterAppServerListController', ['$scope', '$stateParam
 
         function generateRequestLimitDataStr(limitData) {
             if (limitData.length === 1 && limitData[0].namespace === DEFAULT_NAMESPACE) {
-                return 'default: ' + limitData[0].currentQps + ' / ' + limitData[0].maxAllowedQps;
+                 return 'default: ' + limitData[0].currentQps + ' / ' + limitData[0].maxAllowedQps;
             }
             for (let i = 0; i < limitData.length; i++) {
                 let crl = limitData[i];

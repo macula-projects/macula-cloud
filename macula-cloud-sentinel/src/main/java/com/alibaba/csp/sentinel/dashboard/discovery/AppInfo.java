@@ -95,6 +95,10 @@ public class AppInfo {
         return machines.stream().filter(e -> e.getIp().equals(ip) && e.getPort().equals(port)).findFirst();
     }
 
+    public Optional<MachineInfo> getMachine(String ip) {
+        return machines.stream().filter(e -> e.getIp().equals(ip)).findFirst();
+    }
+
     private boolean heartbeatJudge(final int threshold) {
         if (machines.size() == 0) {
             return false;

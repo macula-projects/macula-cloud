@@ -8,6 +8,9 @@
     "build": "gulp build",
     "start": "gulp"
   },
+  "overrides": {
+    "graceful-fs": "^4.2.11"
+  },
   "author": "x-cold <lxstart@outlook.com>",
   "license": "MIT",
   "dependencies": {

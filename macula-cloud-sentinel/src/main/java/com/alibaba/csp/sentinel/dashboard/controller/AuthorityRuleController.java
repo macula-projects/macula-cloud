@@ -20,6 +20,7 @@ import java.util.List;
 
 import com.alibaba.csp.sentinel.dashboard.auth.AuthAction;
 import com.alibaba.csp.sentinel.dashboard.client.SentinelApiClient;
+import com.alibaba.csp.sentinel.dashboard.discovery.AppManagement;
 import com.alibaba.csp.sentinel.dashboard.discovery.MachineInfo;
 import com.alibaba.csp.sentinel.dashboard.auth.AuthService.PrivilegeType;
 import com.alibaba.csp.sentinel.dashboard.rule.DynamicRuleProvider;
@@ -56,6 +57,8 @@ public class AuthorityRuleController {
     private final Logger logger = LoggerFactory.getLogger(AuthorityRuleController.class);
 
     @Autowired
+    private AppManagement appManagement;
+    @Autowired
     @Qualifier("authorityRuleNacosProvider")
     private DynamicRuleProvider<List<AuthorityRuleEntity>> ruleProvider;
     @Autowired
@@ -76,6 +79,9 @@ public class AuthorityRuleController {
         }
         if (port == null || port <= 0) {
             return Result.ofFail(-1, "Invalid parameter: port");
+        }
+        if (!appManagement.isValidMachineOfApp(app, ip)) {
+            return Result.ofFail(-1, "given ip does not belong to given app");
         }
         try {
             List<AuthorityRuleEntity> rules = ruleProvider.getRules(app);
@@ -176,7 +182,6 @@ public class AuthorityRuleController {
         }
         try {
             repository.delete(id);
-            publishRules(oldEntity.getApp());
         } catch (Exception e) {
             return Result.ofFail(-1, e.getMessage());
         }

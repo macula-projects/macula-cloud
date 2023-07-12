@@ -48,6 +48,7 @@ public class InMemoryMetricsRepository implements MetricsRepository<MetricEntity
 
     private final ReentrantReadWriteLock readWriteLock = new ReentrantReadWriteLock();
 
+
     @Override
     public void save(MetricEntity entity) {
         if (entity == null || StringUtil.isBlank(entity.getApp())) {

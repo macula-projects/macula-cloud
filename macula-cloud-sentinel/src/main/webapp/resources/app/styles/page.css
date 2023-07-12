@@ -20,16 +20,13 @@ dl dt,
 dl dd {
     line-height: 1.25rem;
 }
-
 dl dt {
     font-style: normal;
     font-weight: 700;
 }
-
 dl dd {
     margin-left: .9375rem;
 }
-
 dl.horizontal dt {
     float: left;
     width: 10rem;
@@ -39,7 +36,6 @@ dl.horizontal dt {
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-
 dl.horizontal dd {
     margin-left: 11.25rem;
 }
