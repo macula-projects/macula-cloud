@@ -21,7 +21,6 @@ package dev.macula.cloud.iam.utils;
  * {@code OAuth2ErrorCodesExpand } 错误码扩展
  *
  * @author jumuning
- * @description OAuth2 异常信息
  */
 public interface OAuth2ErrorCodesExpand {
 

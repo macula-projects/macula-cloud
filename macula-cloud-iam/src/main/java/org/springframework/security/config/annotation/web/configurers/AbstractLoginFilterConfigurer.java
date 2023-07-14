@@ -30,7 +30,6 @@ import org.springframework.security.web.authentication.logout.LogoutFilter;
 import org.springframework.security.web.authentication.session.SessionAuthenticationStrategy;
 import org.springframework.security.web.savedrequest.RequestCache;
 import org.springframework.security.web.util.matcher.*;
-import org.springframework.util.Assert;
 import org.springframework.web.accept.ContentNegotiationStrategy;
 import org.springframework.web.accept.HeaderContentNegotiationStrategy;
 
@@ -278,6 +277,8 @@ public abstract class AbstractLoginFilterConfigurer<H extends HttpSecurityBuilde
 
     /**
      * Updates the default values for access.
+     *
+     * @param http HTTP
      */
     protected final void updateAccessDefaults(H http) {
         if (this.permitAll) {

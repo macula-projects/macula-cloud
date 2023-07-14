@@ -13,7 +13,6 @@ public interface WeappSessionKeyCache {
      *
      * @param cacheKey   {@code clientId::openId}
      * @param sessionKey the session key
-     * @return sessionKey
      */
     void put(String cacheKey, String sessionKey);
 

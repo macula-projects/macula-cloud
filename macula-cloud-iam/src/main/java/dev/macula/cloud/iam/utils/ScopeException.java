@@ -24,7 +24,6 @@ import org.springframework.security.oauth2.core.OAuth2Error;
  * {@code ScopeException} SCOPE异常
  *
  * @author jumuning
- * @description ScopeException 异常信息
  */
 public class ScopeException extends OAuth2AuthenticationException {
 

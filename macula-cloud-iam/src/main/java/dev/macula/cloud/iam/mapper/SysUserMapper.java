@@ -34,8 +34,8 @@ public interface SysUserMapper extends BaseMapper<SysUser> {
     /**
      * 根据用户名获取认证信息
      *
-     * @param username
-     * @return
+     * @param username 用户名
+     * @return 用户认证信息
      */
     UserAuthInfo getUserAuthInfo(String username);
 

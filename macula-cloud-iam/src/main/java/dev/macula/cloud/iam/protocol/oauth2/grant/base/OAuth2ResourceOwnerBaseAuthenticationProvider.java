@@ -76,8 +76,9 @@ public abstract class OAuth2ResourceOwnerBaseAuthenticationProvider<T extends OA
     /**
      * Constructs an {@code OAuth2AuthorizationCodeAuthenticationProvider} using the provided parameters.
      *
-     * @param authorizationService the authorization service
-     * @param tokenGenerator       the token generator
+     * @param authenticationManager the authentication manager
+     * @param authorizationService  the authorization service
+     * @param tokenGenerator        the token generator
      * @since 0.2.3
      */
     public OAuth2ResourceOwnerBaseAuthenticationProvider(AuthenticationManager authenticationManager,
@@ -94,8 +95,8 @@ public abstract class OAuth2ResourceOwnerBaseAuthenticationProvider<T extends OA
     /**
      * 当前provider是否支持此令牌类型
      *
-     * @param authentication
-     * @return
+     * @param authentication 认证类
+     * @return 是否支持
      */
     @Override
     public abstract boolean supports(Class<?> authentication);

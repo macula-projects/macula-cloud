@@ -45,6 +45,7 @@ public class LoginController {
      * @param model              the model
      * @param authentication     the authentication
      * @param enableCaptchaLogin the enable captcha login
+     * @param clientId           the client id
      * @param csrfToken          the csrf token
      * @return the string
      */

@@ -62,9 +62,6 @@ public class SysUserDetails implements UserDetails {
     public SysUserDetails() {
     }
 
-    /**
-     * 系统管理用户
-     */
     public SysUserDetails(UserAuthInfo user) {
         this.setUsername(user.getUsername());
         this.setNickname(user.getNickname());

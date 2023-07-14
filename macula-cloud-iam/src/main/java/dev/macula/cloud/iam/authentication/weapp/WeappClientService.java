@@ -13,8 +13,6 @@ public interface WeappClientService {
      *
      * @param clientId the client id
      * @return {@link WeappClient}
-     * @see WeappClient#getAppId() MiniAppClient#getAppId()
-     * @see WeappClient#getSecret() MiniAppClient#getSecret()
      */
     WeappClient get(String clientId);
 }
