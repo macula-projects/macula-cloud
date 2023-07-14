@@ -34,8 +34,6 @@
 
     <properties>
         <revision>5.0.0-SNAPSHOT</revision>
-        <mapstruct.version>1.5.2.Final</mapstruct.version>
-        <lombok.version>1.18.22</lombok.version>
     </properties>
 
     <modules>
@@ -120,6 +118,13 @@
                 </plugin>
             </plugins>
         </pluginManagement>
+
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>true</filtering>
+            </resource>
+        </resources>
     </build>
 
     <repositories>

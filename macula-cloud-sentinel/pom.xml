@@ -12,10 +12,6 @@
     <artifactId>macula-cloud-sentinel</artifactId>
     <packaging>jar</packaging>
 
-    <properties>
-        <resource.delimiter>@</resource.delimiter>
-    </properties>
-
     <dependencies>
         <dependency>
             <groupId>com.alibaba.csp</groupId>
@@ -106,44 +102,14 @@
     </dependencies>
 
     <build>
-        <pluginManagement>
-            <plugins>
-                <plugin>
-                    <groupId>org.apache.maven.plugins</groupId>
-                    <artifactId>maven-resources-plugin</artifactId>
-                    <configuration>
-                        <delimiters>
-                            <delimiter>${resource.delimiter}</delimiter>
-                        </delimiters>
-                        <useDefaultDelimiters>false</useDefaultDelimiters>
-                    </configuration>
-                </plugin>
-            </plugins>
-        </pluginManagement>
         <plugins>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
-                <configuration>
-                    <fork>true</fork>
-                    <mainClass>com.alibaba.csp.sentinel.dashboard.MaculaSentinelApplication</mainClass>
-                </configuration>
-                <executions>
-                    <execution>
-                        <goals>
-                            <goal>repackage</goal>
-                        </goals>
-                    </execution>
-                </executions>
             </plugin>
         </plugins>
 
         <resources>
-            <resource>
-                <directory>src/main/resources</directory>
-                <filtering>true</filtering>
-            </resource>
-
             <resource>
                 <directory>src/main/webapp/</directory>
                 <excludes>
