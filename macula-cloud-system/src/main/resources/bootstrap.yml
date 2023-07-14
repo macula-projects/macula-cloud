@@ -2,6 +2,8 @@ server:
   port: 8081
 
 spring:
+  profiles:
+    active: @profile.active@
   application:
     name: macula-cloud-system
   cloud:

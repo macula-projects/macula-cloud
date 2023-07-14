@@ -2,6 +2,8 @@ server:
   port: 8082
 
 spring:
+  profiles:
+    active: @profile.active@
   application:
     name: macula-cloud-tinyid
   cloud:

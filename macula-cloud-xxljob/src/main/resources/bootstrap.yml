@@ -2,6 +2,8 @@ server:
   port: 8084
 
 spring:
+  profiles:
+    active: @profile.active@
   application:
     name: macula-cloud-xxljob
   cloud:

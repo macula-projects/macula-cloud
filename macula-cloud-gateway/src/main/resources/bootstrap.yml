@@ -2,6 +2,8 @@ server:
   port: 9000
 
 spring:
+  profiles:
+    active: @profile.active@
   application:
     name: macula-cloud-gateway
   cloud:

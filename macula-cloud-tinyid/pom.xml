@@ -65,7 +65,6 @@
             <artifactId>spring-cloud-starter-bootstrap</artifactId>
         </dependency>
     </dependencies>
-
     <build>
         <plugins>
             <plugin>
