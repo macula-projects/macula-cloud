@@ -1,13 +1,9 @@
-server:
-  port: 8080
 spring:
-  profiles:
-    active: dev
   datasource:
-    name: easy_retry
-    url: jdbc:mysql://localhost:3306/easy_retry?useSSL=false&characterEncoding=utf8&useUnicode=true
+    name: macula-retry
+    url: jdbc:mysql://localhost:3306/macula-retry?useSSL=false&characterEncoding=utf8&useUnicode=true
     username: root
-    password: root
+    password:
     type: com.zaxxer.hikari.HikariDataSource
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
@@ -16,7 +12,7 @@ spring:
       maximum-pool-size: 20
       auto-commit: true
       idle-timeout: 30000
-      pool-name: easy_retry
+      pool-name: macula-retry
       max-lifetime: 1800000
       connection-test-query: SELECT 1
   web:
@@ -34,8 +30,6 @@ mybatis-plus:
   configuration:
     map-underscore-to-camel-case: true
     cache-enabled: true
-logging:
-  config: classpath:logback-boot.xml
 
 easy-retry:
   last-days: 30 # 拉取重试数据的天数
@@ -49,5 +43,5 @@ easy-retry:
     max-count: 288 #回调最大执行次数
     trigger-interval: 900 #间隔时间
 
-
-
+logging:
+  config: classpath:logback-boot.xml
