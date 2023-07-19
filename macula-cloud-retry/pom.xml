@@ -12,9 +12,6 @@
     <packaging>jar</packaging>
 
     <properties>
-        <maven.install.skip>true</maven.install.skip>
-        <maven.deploy.skip>true</maven.deploy.skip>
-        <maven.javadoc.skip>true</maven.javadoc.skip>
         <akka.version>2.6.20</akka.version>
         <java-jwt.version>4.3.0</java-jwt.version>
         <shedlock.version>4.0.1</shedlock.version>

@@ -28,12 +28,6 @@
 
     <artifactId>macula-cloud-iam</artifactId>
 
-    <properties>
-        <maven.install.skip>true</maven.install.skip>
-        <maven.deploy.skip>true</maven.deploy.skip>
-        <maven.javadoc.skip>true</maven.javadoc.skip>
-    </properties>
-
     <dependencies>
         <dependency>
             <groupId>org.springframework.security</groupId>
