@@ -6,8 +6,8 @@
         <groupId>dev.macula.cloud</groupId>
         <version>${revision}</version>
     </parent>
+
     <artifactId>macula-cloud-xxljob</artifactId>
-    <packaging>jar</packaging>
 
     <dependencies>
         <dependency>

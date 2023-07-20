@@ -10,7 +10,6 @@
     </parent>
 
     <artifactId>macula-cloud-sentinel</artifactId>
-    <packaging>jar</packaging>
 
     <dependencies>
         <dependency>
