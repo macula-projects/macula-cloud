@@ -24,8 +24,8 @@
             <artifactId>macula-boot-commons</artifactId>
         </dependency>
         <dependency>
-            <groupId>dev.macula.boot</groupId>
-            <artifactId>macula-boot-starter-web</artifactId>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
         <dependency>
@@ -110,12 +110,8 @@
         </dependency>
 
         <dependency>
-            <groupId>com.alibaba.cloud</groupId>
-            <artifactId>spring-cloud-starter-alibaba-nacos-config</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.cloud</groupId>
-            <artifactId>spring-cloud-starter-bootstrap</artifactId>
+            <groupId>dev.macula.boot</groupId>
+            <artifactId>macula-boot-starter-cloud-alibaba</artifactId>
         </dependency>
     </dependencies>
 

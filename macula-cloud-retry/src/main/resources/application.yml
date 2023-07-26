@@ -18,6 +18,15 @@ spring:
   web:
     resources:
       static-locations: classpath:admin/
+  cloud:
+    nacos:
+      discovery:
+        enabled: true
+        server-addr: 127.0.0.1:8848
+        namespace: MACULA5
+        # group:
+    sentinel:
+      enabled: false
 mybatis-plus:
   mapper-locations: classpath:/mapper/*.xml
   typeAliasesPackage: com.aizuda.easy.retry.server.persistence.mybatis.po
@@ -44,4 +53,8 @@ easy-retry:
     trigger-interval: 900 #间隔时间
 
 logging:
-  config: classpath:logback-boot.xml
+  level:
+    root: error
+    com.aizuda: info
+  file:
+    name: ${user.home}/logs/${spring.application.name}/${spring.application.name}.log
