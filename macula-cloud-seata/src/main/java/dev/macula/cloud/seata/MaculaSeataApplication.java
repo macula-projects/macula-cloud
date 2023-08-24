@@ -14,24 +14,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.seata.server.console.service;
 
-import io.seata.server.console.vo.BranchSessionVO;
-import io.seata.console.result.PageResult;
+package dev.macula.cloud.seata;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 /**
- * Branch session service
+ * {@code MaculaSeataApplication} Seata服务端启动
  *
- * @author wangzhongxiang
+ * @author rain
+ * @since 2023/8/24 15:33
  */
-public interface BranchSessionService {
-
-    /**
-     * Query branch session by xid
-     *
-     * @param xid the xid
-     * @return the BranchSessionVO list
-     */
-    PageResult<BranchSessionVO> queryByXid(String xid);
-
+@SpringBootApplication(scanBasePackages = {"io.seata"})
+public class MaculaSeataApplication {
+	public static void main(String[] args) {
+		SpringApplication.run(io.seata.server.ServerApplication.class, args);
+	}
 }
