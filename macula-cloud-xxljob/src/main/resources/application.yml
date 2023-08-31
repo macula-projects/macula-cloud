@@ -81,6 +81,5 @@ logging:
   level:
     root: info
     dev.macula.cloud: debug
-    org.springframework: info
   file:
     name: ${user.home}/logs/${spring.application.name}/${spring.application.name}.log

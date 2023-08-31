@@ -1,0 +1,22 @@
+spring:
+  datasource:
+    druid:
+      master:
+        url: jdbc:mysql://localhost:3306/macula-tinyid?autoReconnect=true&useUnicode=true&characterEncoding=UTF-8
+        username: root
+        password:
+        initialSize: 2
+        maxActive: 20
+        minIdle: 2
+        maxWait: 10000
+  servlet:
+    encoding:
+      force: true
+    context-path: /tinyid
+
+logging:
+  level:
+    root: info
+    dev.macula.cloud: debug
+  file:
+    name: ${user.home}/logs/${spring.application.name}/${spring.application.name}.log
