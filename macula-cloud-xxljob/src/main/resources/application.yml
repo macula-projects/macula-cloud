@@ -61,8 +61,8 @@ spring:
     nacos:
       discovery:
         enabled: true
-        server-addr: 127.0.0.1:8848
-        namespace: MACULA5
+        server-addr: ${nacos.config.server-addr}
+        namespace: ${nacos.config.namespace}
         # group:
     sentinel:
       enabled: false

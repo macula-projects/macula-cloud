@@ -69,4 +69,18 @@ public interface SysApplicationService extends IService<SysApplication> {
      * @return
      */
     boolean addMaintainer(Long appId, ApplicationForm appForm);
+
+    /**
+     * 刷新应用缓存, 应用信息变更及system重启时调用
+     */
+    void refreshApplicationCache();
+
+    /**
+     * 验证新增或编辑的应用编码是否合法
+     *
+     * @param appId
+     * @param appCode
+     * @return
+     */
+    boolean validtorAppCode(Long appId, String appCode);
 }

@@ -3,8 +3,8 @@ spring:
     nacos:
       discovery:
         enabled: true
-        server-addr: 127.0.0.1:8848
-        namespace: MACULA5
+        server-addr: ${nacos.config.server-addr}
+        namespace: ${nacos.config.namespace}
         # group:
     gateway:
       routes:
@@ -18,12 +18,9 @@ spring:
     oauth2:
       resourceserver:
         opaquetoken:
-          #client-id: e4da4a32-592b-46f0-ae1d-784310e88423
-          #client-secret: secret
-          #introspection-uri: http://127.0.0.1:9010/oauth2/introspect
-          client-id: opp-admin
-          client-secret: 5UbCsPTMwPOTAZe6y8CBVUpHSMtougkS
-          introspection-uri: https://goauth-dev.infinitus.com.cn/introspect
+          client-id: e4da4a32-592b-46f0-ae1d-784310e88423
+          client-secret: secret
+          introspection-uri: http://127.0.0.1:9010/oauth2/introspect
   redis:
     database: 0
     host: 127.0.0.1

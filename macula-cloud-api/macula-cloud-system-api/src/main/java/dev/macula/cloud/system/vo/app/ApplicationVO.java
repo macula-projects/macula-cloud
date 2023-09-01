@@ -62,4 +62,10 @@ public class ApplicationVO {
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDateTime createTime;
 
+    @Schema(description = "是否回传属性")
+    private boolean useAttrs;
+
+    @Schema(description = "回传属性列表")
+    private String allowedAttrs;
+
 }

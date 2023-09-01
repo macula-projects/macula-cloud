@@ -74,4 +74,14 @@ public class ApplicationBO {
      */
     @JsonFormat(pattern = "yyyy-MM-dd")
     private Date createTime;
+
+    /**
+     * 是否回传属性
+     */
+    private boolean useAttrs;
+
+    /**
+     * 回传属性列表
+     */
+    private String allowedAttrs;
 }

@@ -25,4 +25,8 @@ public class SysApplication extends BaseEntity {
     private String code;
 
     private String accessPath;
+
+    private boolean useAttrs;
+
+    private String allowedAttrs;
 }

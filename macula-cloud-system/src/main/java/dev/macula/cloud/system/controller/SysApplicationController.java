@@ -25,6 +25,7 @@ import dev.macula.cloud.system.service.SysApplicationService;
 import dev.macula.cloud.system.vo.app.ApplicationVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.Parameters;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -54,6 +55,9 @@ public class SysApplicationController {
     @PostMapping
     public boolean saveApplication(@Valid @RequestBody ApplicationForm formData) {
         boolean result = applicationService.saveApplication(formData);
+        if (result) {
+            applicationService.refreshApplicationCache();
+        }
         return result;
     }
 
@@ -62,6 +66,9 @@ public class SysApplicationController {
     @PutMapping(value = "/{appId}")
     public boolean updateApplication(@PathVariable Long appId, @Valid @RequestBody ApplicationForm formData) {
         boolean result = applicationService.updateApplication(appId, formData);
+        if (result) {
+            applicationService.refreshApplicationCache();
+        }
         return result;
     }
 
@@ -71,6 +78,9 @@ public class SysApplicationController {
     @DeleteMapping("/{ids}")
     public boolean deleteApplications(@PathVariable("ids") String ids) {
         boolean result = applicationService.deleteApplications(ids);
+        if (result) {
+            applicationService.refreshApplicationCache();
+        }
         return result;
     }
 
@@ -83,4 +93,13 @@ public class SysApplicationController {
         return result;
     }
 
+    @Operation(summary = "验证应用code是否规范")
+    @AuditLog(title = "验证应用code是否规范")
+    @Parameters({@Parameter(name = "appId，应用id"), @Parameter(name = "appCode, 应用编码")})
+    @GetMapping("/validtor/appCode")
+    public boolean validtorAppCode(@RequestParam(value = "appId", required = false) Long appId,
+        @RequestParam("appCode") String appCode) {
+        boolean result = applicationService.validtorAppCode(appId, appCode);
+        return result;
+    }
 }
