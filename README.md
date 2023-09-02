@@ -78,3 +78,7 @@
 
 该模块下面是可选择的一些加快开发周期的低代码应用，比如工作流、低代码、报表、
 API接口和DB结构的管理、数据订阅、批处理、资源中心、应用发布管理等应用
+
+## License
+
+Macula Boot and Macula Cloud is Open Source software released under the Apache 2.0 license.
