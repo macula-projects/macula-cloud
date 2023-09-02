@@ -35,12 +35,14 @@ CREATE TABLE `sys_application_tenant`
     `maintainer`       varchar(255) COLLATE utf8mb4_bin                                      DEFAULT NULL COMMENT '维护人',
     `mobile`           varchar(20) COLLATE utf8mb4_bin                              NOT NULL COMMENT '联系方式',
     `access_path`      varchar(255) COLLATE utf8mb4_bin                                      DEFAULT NULL COMMENT '可访问路径',
+    `use_attrs`        bigint                                                       NOT NULL DEFAULT '0' COMMENT '回传属性',
+    `allowed_attrs`    varchar(255) COLLATE utf8mb4_bin                                      DEFAULT NULL COMMENT '允许的回传属性',
     `create_by`        varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '*SYSADM' COMMENT '创建人',
     `create_time`      datetime                                                     NOT NULL COMMENT '创建时间',
     `last_update_by`   varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '*SYSADM' COMMENT '更新人',
     `last_update_time` datetime                                                     NOT NULL COMMENT '更新时间',
     PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=34 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+) ENGINE=InnoDB AUTO_INCREMENT=35 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -51,29 +53,10 @@ LOCK
 TABLES `sys_application_tenant` WRITE;
 /*!40000 ALTER TABLE `sys_application_tenant` DISABLE KEYS */;
 INSERT INTO `sys_application_tenant` (`id`, `tenant_id`, `application_name`, `code`, `ak`, `sk`, `homepage`, `manager`,
-                                      `maintainer`, `mobile`, `access_path`, `create_by`, `create_time`,
-                                      `last_update_by`, `last_update_time`)
-VALUES (15, 1, '商品中心', 'product', 'ea6c8ac6e40dd95119392266031676879299817',
-        'bbc5518970ee8cf5a6fc31d7531676879299817', 'https://product-dev.infinitus.com.cn/', '袁嘉铭', '2,118,116',
-        '18900000000', NULL, 'zlhuan', '2023-02-17 10:20:12', 'jje', '2023-03-01 16:21:21'),
-       (16, 1, '库存中心', 'stock', 'b9cbc99aa99b5098f5cfe3d8381676879317485',
-        '7910fb92a86da7f75f81fd4ce41676879317485', 'https://stock-dev.infinitus.com.cn/', '袁嘉铭', NULL, '18900000000',
-        NULL, 'zlhuan', '2023-02-17 10:25:50', 'zlhuan', '2023-02-17 10:25:50'),
-       (17, 1, '消息中心', 'message', '29c0c65f4b8df591c681f52fa11676879327235',
-        '17a3aecefe71eedf0f3469e2591676879327235', 'https://msg-dev.infinitus.com.cn', '张龙欢', NULL, '18300000000',
-        NULL, 'zlhuan', '2023-02-17 10:26:43', 'zlhuan', '2023-02-17 10:26:43'),
-       (18, 1, '批处理中心', 'batch', 'cf18b26a9725e53c95ce2421911676879336819',
-        '8ab3282cc511b7f136d4cd2ea31676879336819', 'https://batch-dev.infinitus.com.cn', '张龙欢', NULL, '18300000000',
-        NULL, 'zlhuan', '2023-02-17 10:27:49', 'zlhuan', '2023-02-17 10:27:49'),
-       (25, 1, 'macula V5系统管理平台', 'macula-cloud-system', 'a7714c5c2c6d8851e9269f19261677209498202',
-        '0015aa44f4cac4acc499f8e6661677209498203', 'http://10.94.108.102:5800/', '张龙欢', NULL, '13800138000', '',
-        'yh', '2023-02-24 11:32:53', 'jje', '2023-02-28 17:45:43'),
-       (32, 12, '测试来呀1', 'test_cdoe1', 'a6c3e05466d37f9fb6bca815e31677745389651',
-        '409d550642bfad7f8555a447bd1677745389651', 'http://www.baidu.com', '好运来呀', NULL, '13800138000', '', 'admin',
-        '2023-03-02 16:23:40', 'admin', '2023-03-02 16:23:40'),
-       (33, 12, '为3fewre', 'FDS', '19077231d579337e190982794f1677752448782', '539744fae36250d75e6d2060131677752448782',
-        'http://sdfwesdfwe.com', 'wefe', NULL, '13800138001', '', 'admin', '2023-03-02 18:21:26', 'admin',
-        '2023-03-02 18:21:26');
+                                      `maintainer`, `mobile`, `access_path`, `use_attrs`, `allowed_attrs`, `create_by`,
+                                      `create_time`, `last_update_by`, `last_update_time`)
+VALUES (34, 12, 'macula-samples-admin-bff', 'macual-samples-admin-bff', 'example', 'example', 'http://127.0.0.1:5800',
+        'admin', '2', '13822132000', '', 0, NULL, 'admin', '2023-09-01 15:35:27', 'admin', '2023-09-01 16:59:27');
 /*!40000 ALTER TABLE `sys_application_tenant` ENABLE KEYS */;
 UNLOCK
 TABLES;
@@ -116,7 +99,7 @@ VALUES (179, '开发与测试中心', 0, '0', 1, 1, 0, 'zlhuan', '2023-02-17 10:
        (181, '电商平台', 179, '0,179', 1, 1, 0, 'zlhuan', '2023-02-17 10:40:33', 'zlhuan', '2023-02-17 10:40:33'),
        (182, '业务平台', 179, '0,179', 1, 1, 0, 'zlhuan', '2023-02-17 10:40:50', 'zlhuan', '2023-02-17 10:40:50'),
        (183, '企微及展业平台', 179, '0,179', 1, 1, 0, 'zlhuan', '2023-02-17 10:42:24', 'zlhuan', '2023-02-17 10:42:24'),
-       (189, '无限极', 0, '0', 1, 1, 0, 'zlhuan', '2023-02-17 14:47:57', 'zlhuan', '2023-02-17 14:47:57'),
+       (189, 'Macula', 0, '0', 1, 1, 0, 'zlhuan', '2023-02-17 14:47:57', 'admin', '2023-09-01 14:31:49'),
        (190, '数字化中心', 189, '0,189', 1, 1, 0, 'zlhuan', '2023-02-17 14:48:16', 'zlhuan', '2023-02-17 14:48:16'),
        (191, '开发与测试', 190, '0,189,190', 1, 1, 0, 'zlhuan', '2023-02-17 14:49:07', 'zlhuan', '2023-02-17 14:49:24'),
        (192, '共享能力', 191, '0,189,190,191', 1, 1, 0, 'zlhuan', '2023-02-17 14:49:39', 'zlhuan',
@@ -275,7 +258,7 @@ CREATE TABLE `sys_log`
     `last_update_by`    varchar(50) COLLATE utf8mb4_general_ci NOT NULL DEFAULT '*SYSADM' COMMENT '更新人',
     `last_update_time`  datetime                               NOT NULL COMMENT '更新时间',
     PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=47 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -291,7 +274,168 @@ INSERT INTO `sys_log` (`id`, `op_ip`, `op_url`, `op_name`, `op_title`, `op_metho
 VALUES (1, '127.0.0.1', '/api/v1/users', 'admin', '新增用户',
         'dev.macula.cloud.system.controller.SysUserController.saveUser()', 'POST',
         '{\"password\":\"laborum et dolore\",\"roleIds\":[0],\"gender\":1,\"deptId\":1,\"mobile\":\"17025517201\",\"nickname\":\"邹艳\",\"avatar\":\"http://dummyimage.com/100x100\",\"id\":40,\"email\":\"j.gfwgrn@qq.com\",\"status\":1,\"username\":\"test001\"}',
-        0, NULL, 'true', 'admin', '2023-03-24 00:12:28', 'admin', '2023-03-24 00:12:28');
+        0, NULL, 'true', 'admin', '2023-03-24 00:12:28', 'admin', '2023-03-24 00:12:28'),
+       (2, '127.0.0.1', '/api/v1/dept/189', 'admin', '修改部门',
+        'dev.macula.cloud.system.controller.SysDeptController.updateDept()', 'PUT',
+        '189 {\"name\":\"Macula\",\"sort\":1,\"parentId\":0,\"status\":1}', 0, NULL, '189', 'admin',
+        '2023-09-01 14:31:50', 'admin', '2023-09-01 14:31:50'),
+       (3, '127.0.0.1', '/api/v1/tenants/1', 'admin', '修改租户',
+        'dev.macula.cloud.system.controller.SysTenantController.updateTenant()', 'PUT',
+        '1 {\"code\":\"macula-cloud\",\"name\":\"Macula Cloud\",\"description\":\"技术平台\",\"supervisor\":[2,117,118]}',
+        0, NULL, 'true', 'admin', '2023-09-01 14:49:08', 'admin', '2023-09-01 14:49:08'),
+       (4, '127.0.0.1', '/api/v1/tenants/12', 'admin', '修改租户',
+        'dev.macula.cloud.system.controller.SysTenantController.updateTenant()', 'PUT',
+        '12 {\"code\":\"macula-samples\",\"name\":\"Macula Samples\",\"description\":\"示例平台\",\"supervisor\":[117,116]}',
+        0, NULL, 'true', 'admin', '2023-09-01 14:49:37', 'admin', '2023-09-01 14:49:37'),
+       (5, '127.0.0.1', '/api/v1/app/15', 'admin', '删除应用',
+        'dev.macula.cloud.system.controller.SysApplicationController.deleteApplications()', 'DELETE', '15', 0, NULL,
+        'true', 'admin', '2023-09-01 15:28:25', 'admin', '2023-09-01 15:28:25'),
+       (6, '127.0.0.1', '/api/v1/app/16', 'admin', '删除应用',
+        'dev.macula.cloud.system.controller.SysApplicationController.deleteApplications()', 'DELETE', '16', 0, NULL,
+        'true', 'admin', '2023-09-01 15:28:27', 'admin', '2023-09-01 15:28:27'),
+       (7, '127.0.0.1', '/api/v1/app/17', 'admin', '删除应用',
+        'dev.macula.cloud.system.controller.SysApplicationController.deleteApplications()', 'DELETE', '17', 0, NULL,
+        'true', 'admin', '2023-09-01 15:28:29', 'admin', '2023-09-01 15:28:29'),
+       (8, '127.0.0.1', '/api/v1/app/18', 'admin', '删除应用',
+        'dev.macula.cloud.system.controller.SysApplicationController.deleteApplications()', 'DELETE', '18', 0, NULL,
+        'true', 'admin', '2023-09-01 15:28:31', 'admin', '2023-09-01 15:28:31'),
+       (9, '127.0.0.1', '/api/v1/app/25', 'admin', '删除应用',
+        'dev.macula.cloud.system.controller.SysApplicationController.deleteApplications()', 'DELETE', '25', 0, NULL,
+        'true', 'admin', '2023-09-01 15:32:56', 'admin', '2023-09-01 15:32:56'),
+       (10, '127.0.0.1', '/api/v1/app/33', 'admin', '删除应用',
+        'dev.macula.cloud.system.controller.SysApplicationController.deleteApplications()', 'DELETE', '33', 0, NULL,
+        'true', 'admin', '2023-09-01 15:33:04', 'admin', '2023-09-01 15:33:04'),
+       (11, '127.0.0.1', '/api/v1/app/32', 'admin', '删除应用',
+        'dev.macula.cloud.system.controller.SysApplicationController.deleteApplications()', 'DELETE', '32', 0, NULL,
+        'true', 'admin', '2023-09-01 15:33:06', 'admin', '2023-09-01 15:33:06'),
+       (12, '127.0.0.1', '/api/v1/menus', 'admin', '新增菜单',
+        'dev.macula.cloud.system.controller.SysMenuController.addMenu()', 'POST',
+        '{\"redirect\":\"\",\"visible\":1,\"perm\":\"\",\"icon\":\"el-icon-arrow-down\",\"sort\":0,\"type\":\"CATALOG\",\"parentId\":0,\"path\":\"/2342\",\"component\":\"Layout\",\"name\":\"测试菜单\",\"id\":174,\"lastUpdateBy\":\"admin\",\"lastUpdateTime\":\"2023-09-01T15:37:39.848\"}',
+        0, NULL, 'true', 'admin', '2023-09-01 15:37:40', 'admin', '2023-09-01 15:37:40'),
+       (13, '127.0.0.1', '/api/v1/menus', 'admin', '新增菜单',
+        'dev.macula.cloud.system.controller.SysMenuController.addMenu()', 'POST',
+        '{\"redirect\":\"\",\"visible\":1,\"perm\":\"\",\"icon\":\"el-icon-basketball\",\"sort\":10,\"type\":\"MENU\",\"parentId\":174,\"path\":\"/admin/echo\",\"component\":\"admin/echo\",\"name\":\"ECHO\",\"id\":222,\"lastUpdateBy\":\"admin\",\"lastUpdateTime\":\"2023-09-01T15:38:48.457\"}',
+        0, NULL, 'true', 'admin', '2023-09-01 15:38:48', 'admin', '2023-09-01 15:38:48'),
+       (14, '127.0.0.1', '/api/v1/permissions/203,203,203', 'admin', '删除权限',
+        'dev.macula.cloud.system.controller.SysPermissionController.deletePermissions()', 'DELETE', '203,203,203', 0,
+        NULL, 'true', 'admin', '2023-09-01 15:38:48', 'admin', '2023-09-01 15:38:48'),
+       (15, '127.0.0.1', '/api/v1/permissions', 'admin', '新增权限',
+        'dev.macula.cloud.system.controller.SysPermissionController.addPerm()', 'POST',
+        '{\"createBy\":\"admin\",\"createTime\":\"2023-09-01T15:38:48.516\",\"urlPerm\":\"GET:/tesfe\",\"name\":\"test\",\"menuId\":222,\"id\":204,\"lastUpdateBy\":\"admin\",\"lastUpdateTime\":\"2023-09-01T15:38:48.516\"}',
+        0, NULL, 'true', 'admin', '2023-09-01 15:38:49', 'admin', '2023-09-01 15:38:49'),
+       (16, '127.0.0.1', '/api/v1/app/addMaintainer/34', 'admin', '添加维护人',
+        'dev.macula.cloud.system.controller.SysApplicationController.addMaintainer()', 'PUT',
+        '34 {\"useAttrs\":false,\"maintainer\":\"2\"}', 0, NULL, 'true', 'admin', '2023-09-01 16:54:39', 'admin',
+        '2023-09-01 16:54:39'),
+       (17, '127.0.0.1', '/api/v1/app/validtor/appCode', 'admin', '验证应用code是否规范',
+        'dev.macula.cloud.system.controller.SysApplicationController.validtorAppCode()', 'GET', '{}', 0, NULL, 'true',
+        'admin', '2023-09-01 16:59:27', 'admin', '2023-09-01 16:59:27'),
+       (18, '127.0.0.1', '/api/v1/app/34', 'admin', '修改应用',
+        'dev.macula.cloud.system.controller.SysApplicationController.updateApplication()', 'PUT',
+        '34 {\"useAttrs\":false,\"code\":\"macual-samples-admin-bff\",\"manager\":\"admin\",\"accessPath\":\"\",\"mobile\":\"13822132000\",\"sk\":\"example\",\"ak\":\"example\",\"id\":34,\"applicationName\":\"macula-samples-admin-bff\",\"homepage\":\"http://127.0.0.1:5800\"}',
+        0, NULL, 'true', 'admin', '2023-09-01 16:59:27', 'admin', '2023-09-01 16:59:27'),
+       (19, '127.0.0.1', '/api/v1/users/2', 'admin', '修改用户',
+        'dev.macula.cloud.system.controller.SysUserController.updateUser()', 'PUT',
+        '2 {\"roleIds\":[1,2,3,21],\"nickname\":\"系统管理员4\",\"avatar\":\"https://s2.loli.net/2022/04/07/gw1L2Z5sPtS8GIl.gif\",\"id\":2,\"username\":\"admin\"}',
+        0, NULL, 'true', 'admin', '2023-09-01 19:56:54', 'admin', '2023-09-01 19:56:54'),
+       (20, '127.0.0.1', '/api/v1/menus', 'admin', '新增菜单',
+        'dev.macula.cloud.system.controller.SysMenuController.addMenu()', 'POST',
+        '{\"redirect\":\"\",\"visible\":1,\"perm\":\"\",\"icon\":\"\",\"sort\":0,\"type\":\"MENU\",\"parentId\":174,\"path\":\"/hello\",\"component\":\"Layout\",\"name\":\"HELLO\",\"id\":223,\"lastUpdateBy\":\"admin\",\"lastUpdateTime\":\"2023-09-01T20:09:06.385\"}',
+        0, NULL, 'true', 'admin', '2023-09-01 20:09:06', 'admin', '2023-09-01 20:09:06'),
+       (21, '127.0.0.1', '/api/v1/permissions/204,204', 'admin', '删除权限',
+        'dev.macula.cloud.system.controller.SysPermissionController.deletePermissions()', 'DELETE', '204,204', 0, NULL,
+        'true', 'admin', '2023-09-01 20:09:06', 'admin', '2023-09-01 20:09:06'),
+       (22, '127.0.0.1', '/api/v1/roles/1/menus', 'admin', '分配角色的资源权限',
+        'dev.macula.cloud.system.controller.SysRoleController.updateRoleMenus()', 'PUT', '1 [174,223,222]', 0, NULL,
+        'true', 'admin', '2023-09-01 20:09:38', 'admin', '2023-09-01 20:09:38'),
+       (23, '127.0.0.1', '/api/v1/roles/21/menus', 'admin', '分配角色的资源权限',
+        'dev.macula.cloud.system.controller.SysRoleController.updateRoleMenus()', 'PUT', '21 [174,223,222]', 0, NULL,
+        'true', 'admin', '2023-09-01 20:09:47', 'admin', '2023-09-01 20:09:47'),
+       (24, '127.0.0.1', '/api/v1/menus', 'admin', '新增菜单',
+        'dev.macula.cloud.system.controller.SysMenuController.addMenu()', 'POST',
+        '{\"redirect\":\"\",\"visible\":1,\"perm\":\"\",\"icon\":\"el-icon-home-filled\",\"sort\":0,\"type\":\"CATALOG\",\"parentId\":0,\"path\":\"/home\",\"component\":\"Layout\",\"name\":\"首页\",\"id\":224,\"lastUpdateBy\":\"admin\",\"lastUpdateTime\":\"2023-09-01T21:53:54.918\"}',
+        0, NULL, 'true', 'admin', '2023-09-01 21:53:55', 'admin', '2023-09-01 21:53:55'),
+       (25, '127.0.0.1', '/api/v1/menus/225', 'admin', '删除菜单',
+        'dev.macula.cloud.system.controller.SysMenuController.deleteMenus()', 'DELETE', '225', 0, NULL, 'true', 'admin',
+        '2023-09-01 21:54:27', 'admin', '2023-09-01 21:54:27'),
+       (26, '127.0.0.1', '/api/v1/menus', 'admin', '新增菜单',
+        'dev.macula.cloud.system.controller.SysMenuController.addMenu()', 'POST',
+        '{\"redirect\":\"\",\"visible\":1,\"perm\":\"\",\"icon\":\"el-icon-home-filled\",\"sort\":1,\"type\":\"CATALOG\",\"parentId\":0,\"path\":\"/home\",\"component\":\"Layout\",\"name\":\"首页\",\"id\":224,\"lastUpdateBy\":\"admin\",\"lastUpdateTime\":\"2023-09-01T21:54:35.902\"}',
+        0, NULL, 'true', 'admin', '2023-09-01 21:54:36', 'admin', '2023-09-01 21:54:36'),
+       (27, '127.0.0.1', '/api/v1/menus', 'admin', '新增菜单',
+        'dev.macula.cloud.system.controller.SysMenuController.addMenu()', 'POST',
+        '{\"redirect\":\"\",\"visible\":1,\"perm\":\"\",\"icon\":\"el-icon-setting\",\"sort\":2,\"type\":\"CATALOG\",\"parentId\":0,\"path\":\"/system\",\"component\":\"Layout\",\"name\":\"系统管理\",\"id\":1,\"lastUpdateBy\":\"admin\",\"lastUpdateTime\":\"2023-09-01T21:54:39.714\"}',
+        0, NULL, 'true', 'admin', '2023-09-01 21:54:40', 'admin', '2023-09-01 21:54:40'),
+       (28, '127.0.0.1', '/api/v1/menus', 'admin', '新增菜单',
+        'dev.macula.cloud.system.controller.SysMenuController.addMenu()', 'POST',
+        '{\"redirect\":\"\",\"visible\":1,\"perm\":\"\",\"icon\":\"el-icon-grid\",\"sort\":0,\"type\":\"MENU\",\"parentId\":224,\"path\":\"/dashboard\",\"component\":\"dashboard\",\"name\":\"控制台\",\"id\":226,\"lastUpdateBy\":\"admin\",\"lastUpdateTime\":\"2023-09-01T21:56:23.386\"}',
+        0, NULL, 'true', 'admin', '2023-09-01 21:56:23', 'admin', '2023-09-01 21:56:23'),
+       (29, '127.0.0.1', '/api/v1/roles/1/menus', 'admin', '分配角色的资源权限',
+        'dev.macula.cloud.system.controller.SysRoleController.updateRoleMenus()', 'PUT',
+        '1 [224,226,1,106,69,63,60,43,66,68,102,59]', 0, NULL, 'true', 'admin', '2023-09-01 21:57:21', 'admin',
+        '2023-09-01 21:57:21'),
+       (30, '127.0.0.1', '/api/v1/roles/2/menus', 'admin', '分配角色的资源权限',
+        'dev.macula.cloud.system.controller.SysRoleController.updateRoleMenus()', 'PUT', '2 [224,226]', 0, NULL, 'true',
+        'admin', '2023-09-01 21:57:32', 'admin', '2023-09-01 21:57:32'),
+       (31, '127.0.0.1', '/api/v1/roles/3/menus', 'admin', '分配角色的资源权限',
+        'dev.macula.cloud.system.controller.SysRoleController.updateRoleMenus()', 'PUT', '3 [224,226]', 0, NULL, 'true',
+        'admin', '2023-09-01 21:57:38', 'admin', '2023-09-01 21:57:38'),
+       (32, '127.0.0.1', '/api/v1/roles/21/menus', 'admin', '分配角色的资源权限',
+        'dev.macula.cloud.system.controller.SysRoleController.updateRoleMenus()', 'PUT', '21 [224,226,1,106,69,43,102]',
+        0, NULL, 'true', 'admin', '2023-09-01 21:57:45', 'admin', '2023-09-01 21:57:45'),
+       (33, '127.0.0.1', '/api/v1/menus', 'admin', '新增菜单',
+        'dev.macula.cloud.system.controller.SysMenuController.addMenu()', 'POST',
+        '{\"redirect\":\"\",\"visible\":1,\"perm\":\"\",\"icon\":\"el-icon-grid\",\"sort\":0,\"type\":\"MENU\",\"parentId\":224,\"path\":\"/dashboard\",\"component\":\"common/home\",\"name\":\"控制台\",\"id\":226,\"lastUpdateBy\":\"admin\",\"lastUpdateTime\":\"2023-09-01T22:06:17.733\"}',
+        0, NULL, 'true', 'admin', '2023-09-01 22:06:18', 'admin', '2023-09-01 22:06:18'),
+       (34, '127.0.0.1', '/api/v1/menus', 'admin', '新增菜单',
+        'dev.macula.cloud.system.controller.SysMenuController.addMenu()', 'POST',
+        '{\"redirect\":\"\",\"visible\":1,\"perm\":\"\",\"icon\":\"el-icon-menu\",\"sort\":0,\"type\":\"MENU\",\"parentId\":224,\"path\":\"/dashboard\",\"component\":\"common/home\",\"name\":\"控制台\",\"id\":226,\"lastUpdateBy\":\"admin\",\"lastUpdateTime\":\"2023-09-01T22:06:49.303\"}',
+        0, NULL, 'true', 'admin', '2023-09-01 22:06:49', 'admin', '2023-09-01 22:06:49'),
+       (35, '127.0.0.1', '/api/v1/menus', 'admin', '新增菜单',
+        'dev.macula.cloud.system.controller.SysMenuController.addMenu()', 'POST',
+        '{\"redirect\":\"\",\"visible\":1,\"perm\":\"\",\"icon\":\"\",\"sort\":1,\"type\":\"CATALOG\",\"parentId\":0,\"path\":\"/dashboard\",\"component\":\"Layout\",\"name\":\"首页\",\"id\":227,\"lastUpdateBy\":\"admin\",\"lastUpdateTime\":\"2023-09-01T22:10:05.959\"}',
+        0, NULL, 'true', 'admin', '2023-09-01 22:10:06', 'admin', '2023-09-01 22:10:06'),
+       (36, '127.0.0.1', '/api/v1/menus', 'admin', '新增菜单',
+        'dev.macula.cloud.system.controller.SysMenuController.addMenu()', 'POST',
+        '{\"redirect\":\"\",\"visible\":1,\"perm\":\"\",\"icon\":\"el-icon-arrow-down\",\"sort\":2,\"type\":\"CATALOG\",\"parentId\":0,\"path\":\"/2342\",\"component\":\"Layout\",\"name\":\"测试菜单\",\"id\":174,\"lastUpdateBy\":\"admin\",\"lastUpdateTime\":\"2023-09-01T22:10:10.695\"}',
+        0, NULL, 'true', 'admin', '2023-09-01 22:10:11', 'admin', '2023-09-01 22:10:11'),
+       (37, '127.0.0.1', '/api/v1/menus', 'admin', '新增菜单',
+        'dev.macula.cloud.system.controller.SysMenuController.addMenu()', 'POST',
+        '{\"redirect\":\"\",\"visible\":1,\"perm\":\"\",\"icon\":\"\",\"sort\":0,\"type\":\"MENU\",\"parentId\":227,\"path\":\"/dashboard\",\"component\":\"common/home\",\"name\":\"控制台\",\"id\":228,\"lastUpdateBy\":\"admin\",\"lastUpdateTime\":\"2023-09-01T22:10:36.767\"}',
+        0, NULL, 'true', 'admin', '2023-09-01 22:10:37', 'admin', '2023-09-01 22:10:37'),
+       (38, '127.0.0.1', '/api/v1/roles/1/menus', 'admin', '分配角色的资源权限',
+        'dev.macula.cloud.system.controller.SysRoleController.updateRoleMenus()', 'PUT', '1 [227,228,174,223,222]', 0,
+        NULL, 'true', 'admin', '2023-09-01 22:10:48', 'admin', '2023-09-01 22:10:48'),
+       (39, '127.0.0.1', '/api/v1/roles/2/menus', 'admin', '分配角色的资源权限',
+        'dev.macula.cloud.system.controller.SysRoleController.updateRoleMenus()', 'PUT', '2 [227,228]', 0, NULL, 'true',
+        'admin', '2023-09-01 22:10:55', 'admin', '2023-09-01 22:10:55'),
+       (40, '127.0.0.1', '/api/v1/roles/3/menus', 'admin', '分配角色的资源权限',
+        'dev.macula.cloud.system.controller.SysRoleController.updateRoleMenus()', 'PUT', '3 [227,228,174,223,222]', 0,
+        NULL, 'true', 'admin', '2023-09-01 22:11:06', 'admin', '2023-09-01 22:11:06'),
+       (41, '127.0.0.1', '/api/v1/menus', 'admin', '新增菜单',
+        'dev.macula.cloud.system.controller.SysMenuController.addMenu()', 'POST',
+        '{\"redirect\":\"\",\"visible\":1,\"perm\":\"\",\"icon\":\"el-icon-apple\",\"sort\":0,\"type\":\"MENU\",\"parentId\":174,\"path\":\"/hello\",\"component\":\"Layout\",\"name\":\"HELLO\",\"id\":223,\"lastUpdateBy\":\"admin\",\"lastUpdateTime\":\"2023-09-01T22:11:18.334\"}',
+        0, NULL, 'true', 'admin', '2023-09-01 22:11:18', 'admin', '2023-09-01 22:11:18'),
+       (42, '127.0.0.1', '/api/v1/menus', 'admin', '新增菜单',
+        'dev.macula.cloud.system.controller.SysMenuController.addMenu()', 'POST',
+        '{\"redirect\":\"\",\"visible\":1,\"perm\":\"\",\"icon\":\"el-icon-bowl\",\"sort\":10,\"type\":\"MENU\",\"parentId\":174,\"path\":\"/admin/echo\",\"component\":\"admin/echo\",\"name\":\"ECHO\",\"id\":222,\"lastUpdateBy\":\"admin\",\"lastUpdateTime\":\"2023-09-01T22:11:25.613\"}',
+        0, NULL, 'true', 'admin', '2023-09-01 22:11:26', 'admin', '2023-09-01 22:11:26'),
+       (43, '127.0.0.1', '/api/v1/menus', 'admin', '新增菜单',
+        'dev.macula.cloud.system.controller.SysMenuController.addMenu()', 'POST',
+        '{\"redirect\":\"\",\"visible\":1,\"perm\":\"\",\"icon\":\"el-icon-map-location\",\"sort\":2,\"type\":\"CATALOG\",\"parentId\":0,\"path\":\"/2342\",\"component\":\"Layout\",\"name\":\"测试菜单\",\"id\":174,\"lastUpdateBy\":\"admin\",\"lastUpdateTime\":\"2023-09-01T22:11:42.330\"}',
+        0, NULL, 'true', 'admin', '2023-09-01 22:11:42', 'admin', '2023-09-01 22:11:42'),
+       (44, '127.0.0.1', '/api/v1/menus', 'admin', '新增菜单',
+        'dev.macula.cloud.system.controller.SysMenuController.addMenu()', 'POST',
+        '{\"redirect\":\"\",\"visible\":1,\"perm\":\"\",\"icon\":\"el-icon-home-filled\",\"sort\":1,\"type\":\"CATALOG\",\"parentId\":0,\"path\":\"/dashboard\",\"component\":\"Layout\",\"name\":\"首页\",\"id\":227,\"lastUpdateBy\":\"admin\",\"lastUpdateTime\":\"2023-09-01T22:11:54.262\"}',
+        0, NULL, 'true', 'admin', '2023-09-01 22:11:54', 'admin', '2023-09-01 22:11:54'),
+       (45, '127.0.0.1', '/api/v1/menus', 'admin', '新增菜单',
+        'dev.macula.cloud.system.controller.SysMenuController.addMenu()', 'POST',
+        '{\"redirect\":\"\",\"visible\":1,\"perm\":\"\",\"icon\":\"el-icon-menu\",\"sort\":0,\"type\":\"MENU\",\"parentId\":227,\"path\":\"/dashboard\",\"component\":\"common/home\",\"name\":\"控制台\",\"id\":228,\"lastUpdateBy\":\"admin\",\"lastUpdateTime\":\"2023-09-01T22:12:08.569\"}',
+        0, NULL, 'true', 'admin', '2023-09-01 22:12:09', 'admin', '2023-09-01 22:12:09'),
+       (46, '127.0.0.1', '/api/v1/menus', 'admin', '新增菜单',
+        'dev.macula.cloud.system.controller.SysMenuController.addMenu()', 'POST',
+        '{\"redirect\":\"\",\"visible\":1,\"perm\":\"\",\"icon\":\"el-icon-home-filled\",\"sort\":1,\"type\":\"CATALOG\",\"parentId\":0,\"path\":\"/home\",\"component\":\"Layout\",\"name\":\"首页\",\"id\":227,\"lastUpdateBy\":\"admin\",\"lastUpdateTime\":\"2023-09-01T22:15:59.191\"}',
+        0, NULL, 'true', 'admin', '2023-09-01 22:15:59', 'admin', '2023-09-01 22:15:59');
 /*!40000 ALTER TABLE `sys_log` ENABLE KEYS */;
 UNLOCK
 TABLES;
@@ -323,7 +467,7 @@ CREATE TABLE `sys_menu_tenant`
     `last_update_time` datetime                               NOT NULL COMMENT '更新时间',
     `full_page`        tinyint(1) DEFAULT NULL COMMENT '整页路径',
     PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=223 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='菜单管理';
+) ENGINE=InnoDB AUTO_INCREMENT=229 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='菜单管理';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -336,8 +480,8 @@ TABLES `sys_menu_tenant` WRITE;
 INSERT INTO `sys_menu_tenant` (`id`, `tenant_id`, `parent_id`, `type`, `name`, `path`, `component`, `perm`, `icon`,
                                `sort`, `visible`, `redirect`, `create_by`, `create_time`, `last_update_by`,
                                `last_update_time`, `full_page`)
-VALUES (1, 1, 0, 2, '系统管理', '/system', '', '', 'el-icon-setting', 0, 1, '', '*SYSADM', '2023-01-17 13:44:39', 'yh',
-        '2023-02-16 10:11:19', 0),
+VALUES (1, 1, 0, 2, '系统管理', '/system', 'Layout', '', 'el-icon-setting', 2, 1, '', '*SYSADM', '2023-01-17 13:44:39',
+        'admin', '2023-09-01 21:54:40', 0),
        (43, 1, 1, 1, '菜单管理', '/system/menu', 'system/menu', '', 'el-icon-fold', 4, 1, '', '*SYSADM',
         '2023-01-17 13:46:07', 'admin', '2023-03-03 13:12:42', 0),
        (59, 1, 1, 1, '审计日志', '/system/log', 'system/log', '审计日志', 'el-icon-credit-card', 9, 1, '',
@@ -362,10 +506,20 @@ VALUES (1, 1, 0, 2, '系统管理', '/system', '', '', 'el-icon-setting', 0, 1, 
         '2023-02-27 13:56:53', 'admin', '2023-03-08 16:16:53', 0),
        (171, 1, 66, 5, '删除', '', '', 'role:del', '', 0, 1, '', 'admin', '2023-03-02 10:35:35', 'admin',
         '2023-03-02 10:36:00', NULL),
-       (174, 12, 0, 2, '测试菜单i', '/2342', 'Layout', '', 'el-icon-arrow-down', 0, 1, '', 'admin',
-        '2023-03-02 16:21:33', 'admin', '2023-03-02 16:21:54', NULL),
-       (222, 12, 174, 1, '测试二级菜单', '/sfessfw', 'test', '', 'el-icon-basketball', 10, 1, '', 'admin',
-        '2023-03-03 16:05:00', 'admin', '2023-03-03 16:07:46', NULL);
+       (174, 12, 0, 2, '测试菜单', '/2342', 'Layout', '', 'el-icon-map-location', 2, 1, '', 'admin',
+        '2023-03-02 16:21:33', 'admin', '2023-09-01 22:11:42', NULL),
+       (222, 12, 174, 1, 'ECHO', '/admin/echo', 'admin/echo', '', 'el-icon-bowl', 10, 1, '', 'admin',
+        '2023-03-03 16:05:00', 'admin', '2023-09-01 22:11:26', NULL),
+       (223, 12, 174, 1, 'HELLO', '/hello', 'Layout', '', 'el-icon-apple', 0, 1, '', 'admin', '2023-09-01 20:08:50',
+        'admin', '2023-09-01 22:11:18', NULL),
+       (224, 1, 0, 2, '首页', '/home', 'Layout', '', 'el-icon-home-filled', 1, 1, '', 'admin', '2023-09-01 21:53:14',
+        'admin', '2023-09-01 21:54:36', NULL),
+       (226, 1, 224, 1, '控制台', '/dashboard', 'common/home', '', 'el-icon-menu', 0, 1, '', 'admin',
+        '2023-09-01 21:54:48', 'admin', '2023-09-01 22:06:49', NULL),
+       (227, 12, 0, 2, '首页', '/home', 'Layout', '', 'el-icon-home-filled', 1, 1, '', 'admin', '2023-09-01 22:09:50',
+        'admin', '2023-09-01 22:15:59', NULL),
+       (228, 12, 227, 1, '控制台', '/dashboard', 'common/home', '', 'el-icon-menu', 0, 1, '', 'admin',
+        '2023-09-01 22:10:18', 'admin', '2023-09-01 22:12:09', NULL);
 /*!40000 ALTER TABLE `sys_menu_tenant` ENABLE KEYS */;
 UNLOCK
 TABLES;
@@ -458,7 +612,7 @@ CREATE TABLE `sys_permission`
     `last_update_time` datetime                                DEFAULT NULL,
     PRIMARY KEY (`id`),
     UNIQUE KEY `urlPerm_unique` (`url_perm`)
-) ENGINE=InnoDB AUTO_INCREMENT=204 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=205 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -470,8 +624,7 @@ TABLES `sys_permission` WRITE;
 /*!40000 ALTER TABLE `sys_permission` DISABLE KEYS */;
 INSERT INTO `sys_permission` (`id`, `name`, `menu_id`, `url_perm`, `create_by`, `create_time`, `last_update_by`,
                               `last_update_time`)
-VALUES (198, '添加', 68, 'GET:/add', 'admin', '2023-03-02 10:36:15', 'admin', '2023-03-02 10:36:15'),
-       (203, 'test', 222, 'GET:/tesfe', 'admin', '2023-03-03 16:07:46', 'admin', '2023-03-03 16:07:46');
+VALUES (198, '添加', 68, 'GET:/add', 'admin', '2023-03-02 10:36:15', 'admin', '2023-03-02 10:36:15');
 /*!40000 ALTER TABLE `sys_permission` ENABLE KEYS */;
 UNLOCK
 TABLES;
@@ -552,13 +705,34 @@ VALUES (1, 1, 1),
        (1, 69, 1),
        (1, 102, 1),
        (1, 106, 1),
+       (1, 174, 12),
+       (1, 222, 12),
+       (1, 223, 12),
+       (1, 224, 1),
+       (1, 226, 1),
+       (1, 227, 12),
+       (1, 228, 12),
+       (2, 224, 1),
+       (2, 226, 1),
+       (2, 227, 12),
+       (2, 228, 12),
+       (3, 174, 12),
+       (3, 222, 12),
+       (3, 223, 12),
+       (3, 224, 1),
+       (3, 226, 1),
+       (3, 227, 12),
+       (3, 228, 12),
        (21, 1, 1),
        (21, 43, 1),
        (21, 69, 1),
        (21, 102, 1),
        (21, 106, 1),
        (21, 174, 12),
-       (21, 222, 12);
+       (21, 222, 12),
+       (21, 223, 12),
+       (21, 224, 1),
+       (21, 226, 1);
 /*!40000 ALTER TABLE `sys_role_menu_tenant` ENABLE KEYS */;
 UNLOCK
 TABLES;
@@ -590,7 +764,6 @@ INSERT INTO `sys_role_permission_tenant` (`role_id`, `permission_id`, `tenant_id
 VALUES (1, 198, 1),
        (41, 198, 1),
        (42, 198, 12),
-       (21, 203, 12),
        (41, 203, 1),
        (42, 203, 12),
        (42, 205, 12);
@@ -629,10 +802,10 @@ TABLES `sys_tenant_info` WRITE;
 /*!40000 ALTER TABLE `sys_tenant_info` DISABLE KEYS */;
 INSERT INTO `sys_tenant_info` (`id`, `name`, `create_by`, `create_time`, `last_update_by`, `last_update_time`, `code`,
                                `description`, `supervisor`)
-VALUES (1, '系统管理', 'anonymousUser', '2023-02-21 15:36:08', 'admin', '2023-03-03 15:23:57', 'macula-cloud-system',
-        'zlh', 'zlh'),
-       (12, '测试', 'admin', '2023-02-28 15:04:21', 'admin', '2023-03-08 16:15:53', 'test', '测试租户，命名随便取的',
-        NULL);
+VALUES (1, 'Macula Cloud', 'anonymousUser', '2023-02-21 15:36:08', 'admin', '2023-09-01 14:49:08', 'macula-cloud',
+        '技术平台', 'zlh'),
+       (12, 'Macula Samples', 'admin', '2023-02-28 15:04:21', 'admin', '2023-09-01 14:49:37', 'macula-samples',
+        '示例平台', NULL);
 /*!40000 ALTER TABLE `sys_tenant_info` ENABLE KEYS */;
 UNLOCK
 TABLES;
@@ -666,13 +839,13 @@ VALUES (2, 8),
        (117, 9),
        (2, 10),
        (2, 11),
-       (118, 1),
-       (117, 1),
-       (2, 1),
        (2, 13),
        (2, 14),
-       (116, 12),
-       (117, 12);
+       (2, 1),
+       (117, 1),
+       (118, 1),
+       (117, 12),
+       (116, 12);
 /*!40000 ALTER TABLE `sys_tenant_user` ENABLE KEYS */;
 UNLOCK
 TABLES;
@@ -720,7 +893,7 @@ VALUES (1, 'root', '有来技术', 0, '{bcrypt}$2a$10$xVWsNOhHrCxh5UbpCE7/HuJ.PA
         '2019-10-10 13:41:22', '*SYSADM', '2019-10-10 13:41:22'),
        (2, 'admin', '系统管理员4', 1, '{bcrypt}$2a$10$RPN.7c8mBjDYbUfajFGq0.26qc1KCfl80KwgqjKK3LKfE78/y//jO', 180,
         'https://s2.loli.net/2022/04/07/gw1L2Z5sPtS8GIl.gif', '17621210366', 1, '', 0, '*SYSADM', '2019-10-10 13:41:22',
-        'zlhuan', '2023-02-17 10:45:51'),
+        'admin', '2023-09-01 19:56:53'),
        (40, 'test001', '邹艳', 1, '{bcrypt}$2a$10$OKtTsZbc8zDOfz059V5D1O1M51Ge.aoGVUZww3hIFtbw1GOWyfUWW', 1,
         'http://dummyimage.com/100x100', '17025517201', 1, 'j.gfwgrn@qq.com', 0, 'admin', '2023-03-24 00:12:27',
         'admin', '2023-03-24 00:12:27'),
@@ -763,6 +936,9 @@ TABLES `sys_user_role` WRITE;
 INSERT INTO `sys_user_role` (`user_id`, `role_id`)
 VALUES (1, 1),
        (2, 1),
+       (2, 2),
+       (2, 3),
+       (2, 21),
        (40, 0),
        (116, 21),
        (117, 1),
@@ -782,4 +958,4 @@ TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2023-08-31 15:50:20
+-- Dump completed on 2023-09-02 21:46:58
