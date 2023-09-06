@@ -47,6 +47,11 @@
 
         <dependency>
             <groupId>dev.macula.boot</groupId>
+            <artifactId>macula-boot-starter-auditlog</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>dev.macula.boot</groupId>
             <artifactId>macula-boot-starter-mybatis-plus</artifactId>
         </dependency>
 

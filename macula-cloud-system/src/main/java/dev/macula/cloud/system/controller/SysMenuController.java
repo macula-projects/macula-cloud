@@ -18,7 +18,7 @@
 package dev.macula.cloud.system.controller;
 
 import dev.macula.boot.result.Option;
-import dev.macula.cloud.system.annotation.AuditLog;
+import dev.macula.boot.starter.auditlog.annotation.AuditLog;
 import dev.macula.cloud.system.pojo.entity.SysMenu;
 import dev.macula.cloud.system.query.MenuQuery;
 import dev.macula.cloud.system.service.SysMenuService;

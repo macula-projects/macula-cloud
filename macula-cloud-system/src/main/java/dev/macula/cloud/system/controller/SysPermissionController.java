@@ -20,7 +20,7 @@ package dev.macula.cloud.system.controller;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import dev.macula.boot.result.Option;
-import dev.macula.cloud.system.annotation.AuditLog;
+import dev.macula.boot.starter.auditlog.annotation.AuditLog;
 import dev.macula.cloud.system.form.PermissionValidtorForm;
 import dev.macula.cloud.system.pojo.entity.SysPermission;
 import dev.macula.cloud.system.query.PermPageQuery;

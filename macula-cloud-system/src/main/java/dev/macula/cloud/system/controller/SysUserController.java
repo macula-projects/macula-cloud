@@ -21,7 +21,7 @@ import com.alibaba.excel.EasyExcel;
 import com.alibaba.excel.ExcelWriter;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
-import dev.macula.cloud.system.annotation.AuditLog;
+import dev.macula.boot.starter.auditlog.annotation.AuditLog;
 import dev.macula.cloud.system.dto.UserImportDTO;
 import dev.macula.cloud.system.form.UserForm;
 import dev.macula.cloud.system.pojo.entity.SysUser;

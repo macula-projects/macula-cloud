@@ -18,7 +18,7 @@
 package dev.macula.cloud.system.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
-import dev.macula.cloud.system.annotation.AuditLog;
+import dev.macula.boot.starter.auditlog.annotation.AuditLog;
 import dev.macula.cloud.system.form.ApplicationForm;
 import dev.macula.cloud.system.query.ApplicationPageQuery;
 import dev.macula.cloud.system.service.SysApplicationService;

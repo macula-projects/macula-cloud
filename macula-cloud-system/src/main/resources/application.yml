@@ -73,6 +73,3 @@ logging:
     dev.macula.cloud: debug
   file:
     name: ${user.home}/logs/${spring.application.name}/${spring.application.name}.log
-
-test:
-  env: local

@@ -19,7 +19,7 @@ package dev.macula.cloud.system.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import dev.macula.boot.result.Option;
-import dev.macula.cloud.system.annotation.AuditLog;
+import dev.macula.boot.starter.auditlog.annotation.AuditLog;
 import dev.macula.cloud.system.form.RoleForm;
 import dev.macula.cloud.system.pojo.entity.SysRole;
 import dev.macula.cloud.system.query.RolePageQuery;

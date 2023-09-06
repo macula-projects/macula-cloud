@@ -18,7 +18,7 @@
 package dev.macula.cloud.system.controller;
 
 import dev.macula.boot.result.Option;
-import dev.macula.cloud.system.annotation.AuditLog;
+import dev.macula.boot.starter.auditlog.annotation.AuditLog;
 import dev.macula.cloud.system.form.DeptForm;
 import dev.macula.cloud.system.query.DeptQuery;
 import dev.macula.cloud.system.service.SysDeptService;
