@@ -5,8 +5,8 @@
 </p>
 
 <p align="center">
-    <a href="http://www.apache.org/licenses/LICENSE-2.0.html" target="_blank">
-        <img src="http://img.shields.io/:license-apache-brightgreen.svg" >
+    <a href="https://github.com/macula-projects/macula-cloud/blob/main/LICENSE" target="_blank">
+        <img src="https://img.shields.io/github/license/macula-projects/macula-cloud.svg" >
     </a>
     <a href="https://central.sonatype.com/search?q=macula&smo=true" target="_blank">
         <img src="https://img.shields.io/maven-central/v/dev.macula.boot/macula-boot-starters" />
