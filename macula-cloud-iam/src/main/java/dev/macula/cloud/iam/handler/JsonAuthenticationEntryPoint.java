@@ -10,11 +10,9 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.AuthenticationEntryPoint;
 
-import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.HashMap;
 
 /**
  * 处理认证失败的逻辑，返回JSON格式
@@ -27,7 +25,7 @@ import java.util.HashMap;
 public class JsonAuthenticationEntryPoint extends ResponseWriter implements AuthenticationEntryPoint {
     @Override
     public void commence(HttpServletRequest request, HttpServletResponse response,
-        AuthenticationException authException) throws IOException, ServletException {
+        AuthenticationException authException) throws IOException {
         String message = exceptionMessage(authException);
         request.setAttribute("exMsg", message);
         this.write(request, response);
@@ -35,10 +33,9 @@ public class JsonAuthenticationEntryPoint extends ResponseWriter implements Auth
 
     @Override
     protected Result<?> body(HttpServletRequest request) {
-        HashMap<String, String> map = new HashMap<>(1);
-        map.put("uri", request.getRequestURI());
         String exMsg = (String)request.getAttribute("exMsg");
-        return Result.failed(String.valueOf(HttpStatus.UNAUTHORIZED.value()), exMsg, map);
+        return Result.failed(String.valueOf(HttpStatus.UNAUTHORIZED.value()), exMsg,
+            "{\"uri\": \"" + request.getRequestURI() + "\"}");
     }
 
     private String exceptionMessage(AuthenticationException exception) {

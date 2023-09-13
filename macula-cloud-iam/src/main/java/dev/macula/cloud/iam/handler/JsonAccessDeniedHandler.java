@@ -8,8 +8,6 @@ import org.springframework.security.web.access.AccessDeniedHandler;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
 
 /**
  * 访问被拒绝时的处理逻辑，JSON格式返回
@@ -27,8 +25,7 @@ public class JsonAccessDeniedHandler extends ResponseWriter implements AccessDen
 
     @Override
     protected Result<?> body(HttpServletRequest request) {
-        Map<String, String> map = new HashMap<>(1);
-        map.put("uri", request.getRequestURI());
-        return Result.failed(String.valueOf(HttpStatus.FORBIDDEN.value()), "禁止访问", map);
+        return Result.failed(String.valueOf(HttpStatus.FORBIDDEN.value()), "禁止访问",
+            "{\"uri\": \"" + request.getRequestURI() + "\"}");
     }
 }
