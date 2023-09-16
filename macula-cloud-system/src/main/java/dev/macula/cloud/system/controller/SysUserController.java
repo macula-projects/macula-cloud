@@ -21,8 +21,10 @@ import com.alibaba.excel.EasyExcel;
 import com.alibaba.excel.ExcelWriter;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import dev.macula.boot.constants.GlobalConstants;
 import dev.macula.boot.starter.auditlog.annotation.AuditLog;
 import dev.macula.cloud.system.dto.UserImportDTO;
+import dev.macula.cloud.system.dto.UserTokenRolesDTO;
 import dev.macula.cloud.system.form.UserForm;
 import dev.macula.cloud.system.pojo.entity.SysUser;
 import dev.macula.cloud.system.query.UserPageQuery;
@@ -147,11 +149,22 @@ public class SysUserController {
         EasyExcel.write(response.getOutputStream(), UserExportVO.class).sheet("用户列表").doWrite(exportUserList);
     }
 
-    @Operation(summary = "获取登录后用户信息", description = "根据用户名获取认证信息，给starter-system用，角色前端添加")
+    @Operation(summary = "获取登录后用户信息",
+        description = "根据用户名获取认证信息，给starter-system用，角色前端添加，已废弃")
     @Parameter(name = "用户名")
     @GetMapping("/{username}/loginUserinfo")
-    public UserLoginVO getLoginUserInfoWithoutRoles(@PathVariable String username) {
-        return userService.getLoginUserInfo(username, null);
+    @Deprecated
+    public UserLoginVO getLoginUserInfoWithoutRoles(@PathVariable String username,
+        @RequestParam(value = GlobalConstants.TOKEN_ID_NAME, required = false) String tokenId) {
+        return userService.getLoginUserInfo(username, null, tokenId);
+    }
+
+    @Operation(summary = "获取登录后用户信息", description = "根据用户名获取认证信息，给starter-system用")
+    @Parameter(name = "用户名")
+    @Parameter(name = "角色和TokenID", description = "包含TokenID和角色列表")
+    @PostMapping("/{username}/loginUserinfo")
+    public UserLoginVO getLoginUserInfoForRemote(@PathVariable String username, UserTokenRolesDTO roles) {
+        return userService.getLoginUserInfo(username, roles.getRoles(), roles.getTokenId());
     }
 
     @Operation(summary = "获取当前登录用户信息", description = "获取登录用户信息，给前端登录后用")

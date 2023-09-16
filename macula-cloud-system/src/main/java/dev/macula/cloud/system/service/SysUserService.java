@@ -47,7 +47,7 @@ public interface SysUserService extends IService<SysUser> {
      * @param roles    该用户的角色
      * @return 登录用户信息
      */
-    UserLoginVO getLoginUserInfo(String username, Set<String> roles);
+    UserLoginVO getLoginUserInfo(String username, Set<String> roles, String tokenId);
 
     /**
      * 获取当前登录用户的信息

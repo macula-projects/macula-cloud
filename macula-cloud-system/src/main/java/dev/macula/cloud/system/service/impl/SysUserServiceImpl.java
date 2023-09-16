@@ -94,7 +94,7 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
      */
     @Override
     @SuppressWarnings("unchecked")
-    public UserLoginVO getLoginUserInfo(String username, Set<String> roles) {
+    public UserLoginVO getLoginUserInfo(String username, Set<String> roles, String tokenId) {
         // 登录用户entity
         SysUser user = this.getOne(new LambdaQueryWrapper<SysUser>().eq(SysUser::getUsername, username)
             .select(SysUser::getId, SysUser::getUsername, SysUser::getNickname, SysUser::getAvatar));
@@ -107,7 +107,6 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         // @formatter:off
         // 用户权限集合
         Long tenantId = SecurityUtils.getTenantId();
-        String tokenId = SecurityUtils.getTokenId();
         if (StrUtil.isNotBlank(tokenId)) {
             Set<String> perms = (Set<String>)redisTemplate.opsForValue().get(buildBtnPermKey(username, tokenId, tenantId));
             if (perms == null) {
@@ -130,7 +129,7 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
      */
     @Override
     public UserLoginVO getLoginUserInfo() {
-        return getLoginUserInfo(SecurityUtils.getCurrentUser(), SecurityUtils.getRoles());
+        return getLoginUserInfo(SecurityUtils.getCurrentUser(), SecurityUtils.getRoles(), SecurityUtils.getTokenId());
     }
 
     /**
