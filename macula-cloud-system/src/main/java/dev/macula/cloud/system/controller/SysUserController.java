@@ -163,8 +163,9 @@ public class SysUserController {
     @Parameter(name = "用户名")
     @Parameter(name = "角色和TokenID", description = "包含TokenID和角色列表")
     @PostMapping("/{username}/loginUserinfo")
-    public UserLoginVO getLoginUserInfoForRemote(@PathVariable String username, UserTokenRolesDTO roles) {
-        return userService.getLoginUserInfo(username, roles.getRoles(), roles.getTokenId());
+    public UserLoginVO getLoginUserInfoForRemote(@PathVariable String username,
+        @RequestBody UserTokenRolesDTO tokenRoles) {
+        return userService.getLoginUserInfo(username, tokenRoles.getRoles(), tokenRoles.getTokenId());
     }
 
     @Operation(summary = "获取当前登录用户信息", description = "获取登录用户信息，给前端登录后用")
