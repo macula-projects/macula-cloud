@@ -18,15 +18,17 @@
 package dev.macula.cloud.system.api;
 
 import dev.macula.cloud.system.api.fallback.AbstractUserFeignFallbackFactory;
+import dev.macula.cloud.system.dto.UserTokenRolesDTO;
 import dev.macula.cloud.system.vo.user.UserLoginVO;
 import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 
 @FeignClient(value = "macula-cloud-system", contextId = "userFeignClient",
     fallbackFactory = AbstractUserFeignFallbackFactory.class)
 public interface UserFeignClient {
 
-    @GetMapping("/api/v1/users/{username}/loginUserinfo")
-    UserLoginVO getLoginUserInfoWithoutRoles(@PathVariable String username);
+    @PostMapping("/api/v1/users/{username}/loginUserinfo")
+    UserLoginVO getLoginUserInfo(@PathVariable String username, @RequestBody UserTokenRolesDTO roles);
 }
