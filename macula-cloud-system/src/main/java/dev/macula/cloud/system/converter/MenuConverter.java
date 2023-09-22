@@ -17,6 +17,7 @@
 
 package dev.macula.cloud.system.converter;
 
+import dev.macula.cloud.system.form.MenuForm;
 import dev.macula.cloud.system.pojo.entity.SysMenu;
 import dev.macula.cloud.system.vo.menu.MenuVO;
 import org.mapstruct.Mapper;
@@ -34,4 +35,5 @@ public interface MenuConverter {
     @Mapping(source = "path", target = "routePath")
     MenuVO entity2VO(SysMenu entity);
 
+    SysMenu form2Entity(MenuForm menuForm);
 }

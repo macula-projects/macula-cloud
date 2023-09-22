@@ -28,11 +28,13 @@ import dev.macula.boot.enums.MenuTypeEnum;
 import dev.macula.boot.enums.StatusEnum;
 import dev.macula.boot.result.Option;
 import dev.macula.cloud.system.converter.MenuConverter;
+import dev.macula.cloud.system.form.MenuForm;
 import dev.macula.cloud.system.mapper.SysMenuMapper;
 import dev.macula.cloud.system.pojo.bo.RouteBO;
 import dev.macula.cloud.system.pojo.entity.SysMenu;
 import dev.macula.cloud.system.query.MenuQuery;
 import dev.macula.cloud.system.service.SysMenuService;
+import dev.macula.cloud.system.service.SysPermissionService;
 import dev.macula.cloud.system.vo.menu.MenuVO;
 import dev.macula.cloud.system.vo.menu.ResourceVO;
 import dev.macula.cloud.system.vo.menu.RouteVO;
@@ -55,6 +57,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> implements SysMenuService {
     private final MenuConverter menuConverter;
+
+    private final SysPermissionService permissionService;
 
     /**
      * 递归生成资源（菜单+权限）树形列表
@@ -289,6 +293,18 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
     public List<Option> requestMethodOption() {
         return Arrays.asList(RequestMethod.values()).stream()
             .map(method -> new Option(method.toString(), method.toString())).collect(Collectors.toList());
+    }
+
+    @Override
+    public boolean saveMenuOrPermission(MenuForm menuForm) {
+        SysMenu sysMenu = menuConverter.form2Entity(menuForm);
+        boolean result = saveMenu(sysMenu);
+        Assert.isTrue(result, "菜单信息保存失败！");
+        // 菜单结构问题会找不到当前新增的菜单，前端已做菜单新增处理，理论上不存在新增菜单会保存权限情况
+        if(sysMenu.getId() == null){
+            return true;
+        }
+        return permissionService.saveOrUpdate(sysMenu.getId(), menuForm.getApiList());
     }
 
     /**
