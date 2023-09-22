@@ -63,4 +63,11 @@ public interface SysPermissionService extends IService<SysPermission> {
      */
     List<Option<Boolean>> validatorUrlPerm(List<PermissionValidtorForm> validatorForms);
 
+    /**
+     * 更新或保存相关菜单的路径权限信息
+     * @param menuId
+     * @param apiList
+     * @return
+     */
+    boolean saveOrUpdate(Long menuId, List<PermissionValidtorForm> apiList);
 }

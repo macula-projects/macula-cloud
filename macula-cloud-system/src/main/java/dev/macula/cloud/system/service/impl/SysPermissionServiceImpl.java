@@ -18,6 +18,7 @@
 package dev.macula.cloud.system.service.impl;
 
 import cn.hutool.core.collection.CollectionUtil;
+import cn.hutool.core.text.CharPool;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -130,5 +131,40 @@ public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, S
                         wrapper -> wrapper.ne(SysPermission::getId, keyIdArr[0])));
             return new Option<>(count == 0, item);
         }).collect(Collectors.toList());
+    }
+
+    @Override
+    public boolean saveOrUpdate(Long menuId, List<PermissionValidtorForm> apiList) {
+        if(apiList == null || apiList.isEmpty()){
+            return true;
+        }
+        //获取当前的菜单对应的权限，做多删处理
+        List<SysPermission> perms = list(new LambdaQueryWrapper<SysPermission>().eq(SysPermission::getMenuId, menuId));
+        Map<Long, SysPermission> mPerm = perms.stream().collect(Collectors.toMap(SysPermission::getId, item -> item));
+        List<SysPermission> savePerms = new ArrayList();
+        apiList.forEach(item->{
+            SysPermission dbPerm = null;
+            if(item.getId() != null){
+                dbPerm = mPerm.remove(item.getId());
+            }
+            String urlPerm = item.getMethod().name() + CharPool.COLON + item.getUrl();
+            // 相同不处理
+            if(dbPerm != null && StringUtils.equals(dbPerm.getUrlPerm(), urlPerm)
+                    && StringUtils.equals(item.getCode(), dbPerm.getName())){
+                return;
+            }
+            SysPermission sysPermission = new SysPermission();
+            if(dbPerm != null){
+                sysPermission.setId(dbPerm.getId());
+            }
+            sysPermission.setName(item.getCode());
+            sysPermission.setUrlPerm(urlPerm);
+            sysPermission.setMenuId(menuId);
+            savePerms.add(sysPermission);
+        });
+        if(!mPerm.isEmpty()){
+            removeByIds(mPerm.keySet());
+        }
+        return saveOrUpdateBatch(savePerms);
     }
 }

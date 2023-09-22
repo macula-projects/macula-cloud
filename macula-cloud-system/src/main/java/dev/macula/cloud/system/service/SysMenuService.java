@@ -19,6 +19,7 @@ package dev.macula.cloud.system.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
 import dev.macula.boot.result.Option;
+import dev.macula.cloud.system.form.MenuForm;
 import dev.macula.cloud.system.pojo.entity.SysMenu;
 import dev.macula.cloud.system.query.MenuQuery;
 import dev.macula.cloud.system.vo.menu.MenuVO;
@@ -99,4 +100,12 @@ public interface SysMenuService extends IService<SysMenu> {
      * @return
      */
     List<Option> requestMethodOption();
+
+    /**
+     * 新增菜单及菜单相关的权限信息
+     *
+     * @param menuForm
+     * @return
+     */
+    boolean saveMenuOrPermission(MenuForm menuForm);
 }

@@ -19,6 +19,7 @@ package dev.macula.cloud.system.controller;
 
 import dev.macula.boot.result.Option;
 import dev.macula.boot.starter.auditlog.annotation.AuditLog;
+import dev.macula.cloud.system.form.MenuForm;
 import dev.macula.cloud.system.pojo.entity.SysMenu;
 import dev.macula.cloud.system.query.MenuQuery;
 import dev.macula.cloud.system.service.SysMenuService;
@@ -96,8 +97,8 @@ public class SysMenuController {
     @AuditLog(title = "新增菜单")
     @PostMapping
     @CacheEvict(cacheNames = "system", key = "'routes'")
-    public boolean addMenu(@RequestBody SysMenu menu) {
-        boolean result = menuService.saveMenu(menu);
+    public boolean addMenu(@RequestBody MenuForm menuForm) {
+        boolean result = menuService.saveMenuOrPermission(menuForm);
         return result;
     }
 
