@@ -39,22 +39,22 @@ public interface SysMenuService extends IService<SysMenu> {
     /**
      * 获取菜单表格列表
      *
-     * @return
+     * @return 菜单表格列表
      */
     List<MenuVO> listMenus(MenuQuery queryParams);
 
     /**
      * 获取菜单下拉列表
      *
-     * @return
+     * @return 菜单下拉列表
      */
-    List<Option> listMenuOptions();
+    List<Option<Long>> listMenuOptions();
 
     /**
      * 新增菜单
      *
-     * @param menu
-     * @return
+     * @param menu 菜单数据
+     * @return 是否成功
      */
     boolean saveMenu(SysMenu menu);
 
@@ -66,14 +66,14 @@ public interface SysMenuService extends IService<SysMenu> {
     /**
      * 获取路由列表
      *
-     * @return
+     * @return 路由列表
      */
     List<RouteVO> listRoutes();
 
     /**
      * 资源(菜单+权限)树形列表
      *
-     * @return
+     * @return 树形列表
      */
     List<ResourceVO> listResources();
 
@@ -82,30 +82,30 @@ public interface SysMenuService extends IService<SysMenu> {
      *
      * @param menuId  菜单ID
      * @param visible 是否显示(1->显示；2->隐藏)
-     * @return
+     * @return 是否成功
      */
     boolean updateMenuVisible(Long menuId, Integer visible);
 
     /**
      * 获取角色权限集合
      *
-     * @param roles
-     * @return
+     * @param roles 角色
+     * @return 权限集合
      */
     Set<String> listRolePerms(Set<String> roles);
 
     /**
      * 请求方法下拉列表
      *
-     * @return
+     * @return 请求方法下拉列表
      */
-    List<Option> requestMethodOption();
+    List<Option<String>> requestMethodOption();
 
     /**
      * 新增菜单及菜单相关的权限信息
      *
-     * @param menuForm
-     * @return
+     * @param menuForm 菜单表单数据
+     * @return 是否成功
      */
     boolean saveMenuOrPermission(MenuForm menuForm);
 }

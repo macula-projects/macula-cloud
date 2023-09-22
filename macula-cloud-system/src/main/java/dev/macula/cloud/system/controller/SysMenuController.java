@@ -53,44 +53,39 @@ public class SysMenuController {
 
     @Operation(summary = "获取请求方法下拉列表")
     @GetMapping("/methodOption")
-    public List<Option> requestMethodOption() {
+    public List<Option<String>> requestMethodOption() {
         return menuService.requestMethodOption();
     }
 
     @Operation(summary = "资源(菜单+权限)列表")
     @GetMapping("/resources")
     public List<ResourceVO> listResources() {
-        List<ResourceVO> resources = menuService.listResources();
-        return resources;
+        return menuService.listResources();
     }
 
     @Operation(summary = "菜单列表")
     @GetMapping
     public List<MenuVO> listMenus(MenuQuery queryParams) {
-        List<MenuVO> menuList = menuService.listMenus(queryParams);
-        return menuList;
+        return menuService.listMenus(queryParams);
     }
 
     @Operation(summary = "菜单下拉列表")
     @GetMapping("/options")
-    public List<Option> listMenuOptions() {
-        List<Option> menus = menuService.listMenuOptions();
-        return menus;
+    public List<Option<Long>> listMenuOptions() {
+        return menuService.listMenuOptions();
     }
 
     @Operation(summary = "路由列表")
     @GetMapping("/routes")
     public List<RouteVO> listRoutes() {
-        List<RouteVO> routeList = menuService.listRoutes();
-        return routeList;
+        return menuService.listRoutes();
     }
 
     @Operation(summary = "菜单详情")
     @Parameter(name = "菜单ID")
     @GetMapping("/{id}")
     public SysMenu detail(@PathVariable Long id) {
-        SysMenu menu = menuService.getById(id);
-        return menu;
+        return menuService.getById(id);
     }
 
     @Operation(summary = "新增菜单")
@@ -98,17 +93,15 @@ public class SysMenuController {
     @PostMapping
     @CacheEvict(cacheNames = "system", key = "'routes'")
     public boolean addMenu(@RequestBody MenuForm menuForm) {
-        boolean result = menuService.saveMenuOrPermission(menuForm);
-        return result;
+        return menuService.saveMenuOrPermission(menuForm);
     }
 
     @Operation(summary = "修改菜单")
     @AuditLog(title = "修改菜单")
     @PutMapping(value = "/{id}")
     @CacheEvict(cacheNames = "system", key = "'routes'")
-    public boolean updateMenu(@RequestBody SysMenu menu) {
-        boolean result = menuService.saveMenu(menu);
-        return result;
+    public boolean updateMenu(@RequestBody MenuForm menuForm) {
+        return menuService.saveMenuOrPermission(menuForm);
     }
 
     @Operation(summary = "删除菜单")
@@ -117,8 +110,7 @@ public class SysMenuController {
     @DeleteMapping("/{ids}")
     @CacheEvict(cacheNames = "system", key = "'routes'")
     public boolean deleteMenus(@PathVariable("ids") String ids) {
-        boolean result = menuService.removeByIds(Arrays.asList(ids.split(",")));
-        return result;
+        return menuService.removeByIds(Arrays.asList(ids.split(",")));
     }
 
     @Operation(summary = "修改菜单显示状态")
@@ -126,11 +118,8 @@ public class SysMenuController {
     @Parameter(name = "菜单ID")
     @Parameter(name = "显示状态", description = "显示状态(1:显示;0:隐藏)")
     @PatchMapping("/{menuId}")
-    public boolean updateMenuVisible(@PathVariable Long menuId, Integer visible
-
-    ) {
-        boolean result = menuService.updateMenuVisible(menuId, visible);
-        return result;
+    public boolean updateMenuVisible(@PathVariable Long menuId, Integer visible) {
+        return menuService.updateMenuVisible(menuId, visible);
     }
 }
 

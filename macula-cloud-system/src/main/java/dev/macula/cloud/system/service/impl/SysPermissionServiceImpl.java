@@ -36,6 +36,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -134,27 +135,28 @@ public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, S
     }
 
     @Override
+    @Transactional
     public boolean saveOrUpdate(Long menuId, List<PermissionValidtorForm> apiList) {
-        if(apiList == null || apiList.isEmpty()){
+        if (apiList == null || apiList.isEmpty()) {
             return true;
         }
         //获取当前的菜单对应的权限，做多删处理
         List<SysPermission> perms = list(new LambdaQueryWrapper<SysPermission>().eq(SysPermission::getMenuId, menuId));
         Map<Long, SysPermission> mPerm = perms.stream().collect(Collectors.toMap(SysPermission::getId, item -> item));
-        List<SysPermission> savePerms = new ArrayList();
-        apiList.forEach(item->{
+        List<SysPermission> savePerms = new ArrayList<>();
+        apiList.forEach(item -> {
             SysPermission dbPerm = null;
-            if(item.getId() != null){
+            if (item.getId() != null) {
                 dbPerm = mPerm.remove(item.getId());
             }
             String urlPerm = item.getMethod().name() + CharPool.COLON + item.getUrl();
             // 相同不处理
-            if(dbPerm != null && StringUtils.equals(dbPerm.getUrlPerm(), urlPerm)
-                    && StringUtils.equals(item.getCode(), dbPerm.getName())){
+            if (dbPerm != null && StringUtils.equals(dbPerm.getUrlPerm(), urlPerm) && StringUtils.equals(item.getCode(),
+                dbPerm.getName())) {
                 return;
             }
             SysPermission sysPermission = new SysPermission();
-            if(dbPerm != null){
+            if (dbPerm != null) {
                 sysPermission.setId(dbPerm.getId());
             }
             sysPermission.setName(item.getCode());
@@ -162,7 +164,7 @@ public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, S
             sysPermission.setMenuId(menuId);
             savePerms.add(sysPermission);
         });
-        if(!mPerm.isEmpty()){
+        if (!mPerm.isEmpty()) {
             removeByIds(mPerm.keySet());
         }
         return saveOrUpdateBatch(savePerms);

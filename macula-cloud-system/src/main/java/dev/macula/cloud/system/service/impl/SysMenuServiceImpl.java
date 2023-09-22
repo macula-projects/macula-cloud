@@ -27,6 +27,7 @@ import dev.macula.boot.constants.SecurityConstants;
 import dev.macula.boot.enums.MenuTypeEnum;
 import dev.macula.boot.enums.StatusEnum;
 import dev.macula.boot.result.Option;
+import dev.macula.boot.starter.mp.entity.BaseEntity;
 import dev.macula.cloud.system.converter.MenuConverter;
 import dev.macula.cloud.system.form.MenuForm;
 import dev.macula.cloud.system.mapper.SysMenuMapper;
@@ -42,6 +43,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.RequestMethod;
 
 import java.util.*;
@@ -65,11 +67,11 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
      *
      * @param parentId 父级ID
      * @param menuList 菜单列表
-     * @return
+     * @return 树形列表
      */
     private static List<ResourceVO> recurResources(Long parentId, List<SysMenu> menuList) {
         if (CollectionUtil.isEmpty(menuList)) {
-            return Collections.EMPTY_LIST;
+            return new ArrayList<>();
         }
 
         List<ResourceVO> menus = menuList.stream().filter(menu -> menu.getParentId().equals(parentId)).map(menu -> {
@@ -90,23 +92,20 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
      *
      * @param parentId 父级ID
      * @param menuList 菜单列表
-     * @return
+     * @return 菜单下拉层级列表
      */
-    private static List<Option> recurMenuOptions(Long parentId, List<SysMenu> menuList) {
+    private static List<Option<Long>> recurMenuOptions(Long parentId, List<SysMenu> menuList) {
         if (CollectionUtil.isEmpty(menuList)) {
-            return Collections.EMPTY_LIST;
+            return new ArrayList<>();
         }
 
-        List<Option> menus = menuList.stream().filter(menu -> menu.getParentId().equals(parentId))
-            .map(menu -> new Option(menu.getId(), menu.getName(), recurMenuOptions(menu.getId(), menuList)))
+        return menuList.stream().filter(menu -> menu.getParentId().equals(parentId))
+            .map(menu -> new Option<>(menu.getId(), menu.getName(), recurMenuOptions(menu.getId(), menuList)))
             .collect(ArrayList::new, ArrayList::add, ArrayList::addAll);
-        return menus;
     }
 
-    /**
-     * 保存菜单
-     */
     @Override
+    @Transactional
     public boolean saveMenu(SysMenu menu) {
         String path = menu.getPath();
 
@@ -121,22 +120,18 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
                 break;
         }
 
-        boolean result = this.saveOrUpdate(menu);
-        return result;
+        return this.saveOrUpdate(menu);
     }
 
-    /**
-     * 菜单表格树形列表
-     */
     @Override
     public List<MenuVO> listMenus(MenuQuery queryParams) {
         List<SysMenu> menus = this.list(
             new LambdaQueryWrapper<SysMenu>().like(StrUtil.isNotBlank(queryParams.getKeywords()), SysMenu::getName,
                 queryParams.getKeywords()).orderByAsc(SysMenu::getSort));
 
-        Set<Long> cacheMenuIds = menus.stream().map(menu -> menu.getId()).collect(Collectors.toSet());
+        Set<Long> cacheMenuIds = menus.stream().map(BaseEntity::getId).collect(Collectors.toSet());
 
-        List<MenuVO> list = menus.stream().map(menu -> {
+        return menus.stream().map(menu -> {
             Long parentId = menu.getParentId();
             // parentId不在当前菜单ID的列表，说明为顶级菜单ID，根据此ID作为递归的开始条件节点
             if (!cacheMenuIds.contains(parentId)) {
@@ -145,28 +140,19 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
             }
             return new LinkedList<MenuVO>();
         }).collect(ArrayList::new, ArrayList::addAll, ArrayList::addAll);
-        return list;
     }
 
-    /**
-     * 菜单下拉数据
-     */
     @Override
-    public List<Option> listMenuOptions() {
+    public List<Option<Long>> listMenuOptions() {
         List<SysMenu> menuList = this.list(new LambdaQueryWrapper<SysMenu>().orderByAsc(SysMenu::getSort));
-        List<Option> menus = recurMenuOptions(SecurityConstants.ROOT_NODE_ID, menuList);
-        return menus;
+        return recurMenuOptions(SecurityConstants.ROOT_NODE_ID, menuList);
     }
 
-    /**
-     * 路由列表
-     */
     @Override
     @Cacheable(cacheNames = "system", key = "'routes'")
     public List<RouteVO> listRoutes() {
         List<RouteBO> menuList = this.baseMapper.listRoutes();
-        List<RouteVO> routeList = recurRoutes(SecurityConstants.ROOT_NODE_ID, menuList);
-        return routeList;
+        return recurRoutes(SecurityConstants.ROOT_NODE_ID, menuList);
     }
 
     /**
@@ -174,7 +160,7 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
      *
      * @param parentId 父级ID
      * @param menuList 菜单列表
-     * @return
+     * @return List<RouteVO> 路由层级列表
      */
     private List<RouteVO> recurRoutes(Long parentId, List<RouteBO> menuList) {
         List<RouteVO> list = new ArrayList<>();
@@ -216,16 +202,10 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
         return list;
     }
 
-    /**
-     * 获取菜单资源树形列表
-     *
-     * @return
-     */
     @Override
     public List<ResourceVO> listResources() {
         List<SysMenu> menuList = this.list(new LambdaQueryWrapper<SysMenu>().orderByAsc(SysMenu::getSort));
-        List<ResourceVO> resources = recurResources(SecurityConstants.ROOT_NODE_ID, menuList);
-        return resources;
+        return recurResources(SecurityConstants.ROOT_NODE_ID, menuList);
     }
 
     /**
@@ -248,18 +228,10 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
         }).collect(Collectors.toList());
     }
 
-    /**
-     * 修改菜单显示状态
-     *
-     * @param menuId  菜单ID
-     * @param visible 是否显示(1->显示；2->隐藏)
-     * @return
-     */
     @Override
     public boolean updateMenuVisible(Long menuId, Integer visible) {
-        boolean result = this.update(
+        return this.update(
             new LambdaUpdateWrapper<SysMenu>().eq(SysMenu::getId, menuId).set(SysMenu::getVisible, visible));
-        return result;
     }
 
     @Override
@@ -276,9 +248,12 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
         Set<String> perms = new HashSet<>();
 
         if (CollectionUtil.isNotEmpty(positiveRoles)) {
+            // 查询正向角色的按钮权限
             Set<String> positivePerms = this.baseMapper.listRolePerms(positiveRoles);
             perms.addAll(positivePerms);
+            // 如果存在正向角色按钮权限并且存在反向角色，则需要排除反向角色对应的按钮权限
             if (CollectionUtil.isNotEmpty(positivePerms) && CollectionUtil.isNotEmpty(negativeRoles)) {
+                // 查询反向角色对应按钮权限并从正向权限列表排除
                 Set<String> negativePerms = this.baseMapper.listRolePerms(negativeRoles);
                 if (CollectionUtil.isNotEmpty(negativePerms)) {
                     perms = perms.stream().filter(item -> !negativePerms.contains(item)).collect(Collectors.toSet());
@@ -290,12 +265,13 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
     }
 
     @Override
-    public List<Option> requestMethodOption() {
-        return Arrays.asList(RequestMethod.values()).stream()
-            .map(method -> new Option(method.toString(), method.toString())).collect(Collectors.toList());
+    public List<Option<String>> requestMethodOption() {
+        return Arrays.stream(RequestMethod.values()).map(method -> new Option<>(method.toString(), method.toString()))
+            .collect(Collectors.toList());
     }
 
     @Override
+    @Transactional
     public boolean saveMenuOrPermission(MenuForm menuForm) {
         SysMenu sysMenu = menuConverter.form2Entity(menuForm);
         boolean result = saveMenu(sysMenu);
@@ -307,9 +283,6 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
         return permissionService.saveOrUpdate(sysMenu.getId(), menuForm.getApiList());
     }
 
-    /**
-     * 清理路由缓存
-     */
     @Override
     @CacheEvict(cacheNames = "system", key = "'routes'")
     public void cleanCache() {
