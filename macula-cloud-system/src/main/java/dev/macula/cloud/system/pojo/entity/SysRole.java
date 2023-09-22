@@ -18,6 +18,7 @@
 package dev.macula.cloud.system.pojo.entity;
 
 import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableLogic;
 import dev.macula.boot.enums.DataScopeEnum;
 import dev.macula.boot.starter.mp.entity.BaseEntity;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -37,10 +38,13 @@ public class SysRole extends BaseEntity {
 
     private Integer status;
 
+    /** 是否是反向角色 */
+    private Boolean negative;
+
     private DataScopeEnum dataScope;
 
     @Schema(description = "逻辑删除标识 0-未删除 1-已删除")
-    //@TableLogic(value = "0", delval = "1")
+    @TableLogic(value = "0", delval = "1")
     private Integer deleted;
 
     @TableField(exist = false)

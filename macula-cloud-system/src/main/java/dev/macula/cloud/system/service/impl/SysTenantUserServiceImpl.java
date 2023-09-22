@@ -47,7 +47,6 @@ public class SysTenantUserServiceImpl extends ServiceImpl<SysTenantUserMapper, S
         Assert.notNull(sysUser, "登录已过期，请重新登录！");
         List<SysTenantUser> userTenantList =
             list(new LambdaQueryWrapper<SysTenantUser>().eq(SysTenantUser::getUserId, sysUser.getId()));
-        Set<Long> result = userTenantList.stream().map(SysTenantUser::getTenantId).collect(Collectors.toSet());
-        return result;
+        return userTenantList.stream().map(SysTenantUser::getTenantId).collect(Collectors.toSet());
     }
 }

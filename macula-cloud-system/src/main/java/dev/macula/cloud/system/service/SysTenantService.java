@@ -40,17 +40,17 @@ public interface SysTenantService extends IService<SysTenantInfo> {
     /**
      * 删除用户
      *
-     * @param ids
-     * @return
+     * @param ids 租户IDS
+     * @return boolean
      */
     boolean deleteTenants(String ids);
 
     /**
      * 根据filterMe属性获取租户下拉列表
      *
-     * @param filterMe 1: 获取我的租户下拉选项; 0: 获取所有租户下拉选项
-     * @return
+     * @param filterMe true: 获取我的租户下拉选项; false: 获取所有租户下拉选项
+     * @return Option List
      */
-    List<Option> listTenantOptions(Integer filterMe);
+    List<Option<Long>> listTenantOptions(boolean filterMe);
 
 }

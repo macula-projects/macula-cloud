@@ -1,5 +1,6 @@
 package dev.macula.cloud.system.service.impl;
 
+import cn.hutool.core.collection.CollectionUtil;
 import cn.hutool.core.lang.Assert;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -24,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -93,16 +95,17 @@ public class SysTenantServiceImpl extends ServiceImpl<SysTenantInfoMapper, SysTe
     }
 
     @Override
-    public List<Option> listTenantOptions(Integer filterMe) {
-        boolean filterMeFlag = filterMe.equals(1) && !SecurityUtils.isRoot();
-        List<SysTenantInfo> sysTenantInfoList = list(
-            new LambdaQueryWrapper<SysTenantInfo>().in(filterMeFlag, SysTenantInfo::getId,
-                tenantUserService.getMeTenantIds()));
-        List<Option> result = sysTenantInfoList.stream().map(tenantInfo -> {
-            Option option = new Option(tenantInfo.getId(), tenantInfo.getName());
-            return option;
-        }).collect(Collectors.toList());
-        return result;
+    public List<Option<Long>> listTenantOptions(boolean filterMe) {
+        boolean filterMeFlag = filterMe && !SecurityUtils.isRoot();
+        Set<Long> ids = tenantUserService.getMeTenantIds();
+        if (CollectionUtil.isEmpty(ids)) {
+            // 默认租户
+            ids.add(1L);
+        }
+        List<SysTenantInfo> sysTenantInfoList =
+            list(new LambdaQueryWrapper<SysTenantInfo>().in(filterMeFlag, SysTenantInfo::getId, ids));
+        return sysTenantInfoList.stream().map(tenantInfo -> new Option<>(tenantInfo.getId(), tenantInfo.getName()))
+            .collect(Collectors.toList());
     }
 
 }

@@ -38,7 +38,7 @@ public interface SysPermissionService extends IService<SysPermission> {
     /**
      * 权限<->有权限的角色集合
      *
-     * @return
+     * @return 权限集合
      */
     List<SysPermission> listPermRoles();
 
@@ -58,9 +58,9 @@ public interface SysPermissionService extends IService<SysPermission> {
     /**
      * 接口权限路径验证器
      *
-     * @param validtorForms
-     * @return
+     * @param validatorForms 校验数据
+     * @return Boolean
      */
-    List<Option> validtorUrlPerm(List<PermissionValidtorForm> validtorForms);
+    List<Option<Boolean>> validatorUrlPerm(List<PermissionValidtorForm> validatorForms);
 
 }

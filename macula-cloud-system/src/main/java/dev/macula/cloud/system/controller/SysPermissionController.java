@@ -48,33 +48,29 @@ public class SysPermissionController {
     @Operation(summary = "权限分页列表")
     @GetMapping("/page")
     public Page<PermPageVO> listPermPages(PermPageQuery permPageQuery) {
-        Page<PermPageVO> result = sysPermissionService.listPermPages(permPageQuery);
-        return result;
+        return sysPermissionService.listPermPages(permPageQuery);
     }
 
     @Operation(summary = "权限列表")
     @Parameter(name = "菜单ID")
     @GetMapping
     public List<SysPermission> listPermissions(@RequestParam(required = false) Long menuId) {
-        List<SysPermission> list = sysPermissionService.list(
+        return sysPermissionService.list(
             new LambdaQueryWrapper<SysPermission>().eq(menuId != null, SysPermission::getMenuId, menuId));
-        return list;
     }
 
     @Operation(summary = "权限详情")
     @Parameter(name = "权限ID")
     @GetMapping("/{permissionId}")
     public SysPermission getPermissionDetail(@PathVariable Long permissionId) {
-        SysPermission permission = sysPermissionService.getById(permissionId);
-        return permission;
+        return sysPermissionService.getById(permissionId);
     }
 
     @Operation(summary = "新增权限")
     @AuditLog(title = "新增权限")
     @PostMapping
     public boolean addPerm(@RequestBody SysPermission permission) {
-        boolean result = sysPermissionService.save(permission);
-        return result;
+        return sysPermissionService.save(permission);
     }
 
     @Operation(summary = "修改权限")
@@ -106,8 +102,8 @@ public class SysPermissionController {
         description = "接口权限路径验证器， 返回下拉列表对象，label: code:url:method; value: true/false", content = {
         @Content(mediaType = "application/json", schema = @Schema(implementation = PermissionValidtorForm.class))})
     @PostMapping("/validtor/urlPerm")
-    public List<Option> validtorUrlPerm(@RequestBody List<PermissionValidtorForm> validtorForms) {
-        return sysPermissionService.validtorUrlPerm(validtorForms);
+    public List<Option<Boolean>> validatorUrlPerm(@RequestBody List<PermissionValidtorForm> validatorForms) {
+        return sysPermissionService.validatorUrlPerm(validatorForms);
     }
 }
 

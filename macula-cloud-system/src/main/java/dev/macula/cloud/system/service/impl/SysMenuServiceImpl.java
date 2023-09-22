@@ -229,20 +229,19 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
      *
      * @param parentId 父级ID
      * @param menuList 菜单列表
-     * @return
+     * @return List<MenuVO>
      */
     private List<MenuVO> recurMenus(Long parentId, List<SysMenu> menuList) {
         if (CollectionUtil.isEmpty(menuList)) {
-            return Collections.EMPTY_LIST;
+            return new ArrayList<>();
         }
 
-        List<MenuVO> menus = menuList.stream().filter(menu -> menu.getParentId().equals(parentId)).map(entity -> {
+        return menuList.stream().filter(menu -> menu.getParentId().equals(parentId)).map(entity -> {
             MenuVO menuVO = menuConverter.entity2VO(entity);
             List<MenuVO> children = recurMenus(entity.getId(), menuList);
             menuVO.setChildren(children);
             return menuVO;
         }).collect(Collectors.toList());
-        return menus;
     }
 
     /**
@@ -261,7 +260,28 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
 
     @Override
     public Set<String> listRolePerms(Set<String> roles) {
-        Set<String> perms = this.baseMapper.listRolePerms(roles);
+        // 要处理反向角色，正向角色-反向角色
+        Set<String> positiveRoles =
+            roles.stream().filter(role -> !role.startsWith(SecurityConstants.NEGATED_ROLE_PREFIX))
+                .collect(Collectors.toSet());
+
+        Set<String> negativeRoles =
+            roles.stream().filter(role -> role.startsWith(SecurityConstants.NEGATED_ROLE_PREFIX))
+                .collect(Collectors.toSet());
+
+        Set<String> perms = new HashSet<>();
+
+        if (CollectionUtil.isNotEmpty(positiveRoles)) {
+            Set<String> positivePerms = this.baseMapper.listRolePerms(positiveRoles);
+            perms.addAll(positivePerms);
+            if (CollectionUtil.isNotEmpty(positivePerms) && CollectionUtil.isNotEmpty(negativeRoles)) {
+                Set<String> negativePerms = this.baseMapper.listRolePerms(negativeRoles);
+                if (CollectionUtil.isNotEmpty(negativePerms)) {
+                    perms = perms.stream().filter(item -> !negativePerms.contains(item)).collect(Collectors.toSet());
+                }
+            }
+        }
+
         return perms;
     }
 

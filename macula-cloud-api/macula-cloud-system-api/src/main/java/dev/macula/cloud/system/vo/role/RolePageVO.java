@@ -37,6 +37,9 @@ public class RolePageVO {
     @Schema(description = "角色编码")
     private String code;
 
+    @Schema(description = "反向角色（1-是，0-否）")
+    private Boolean negative;
+
     @Schema(description = "角色状态")
     private Integer status;
 

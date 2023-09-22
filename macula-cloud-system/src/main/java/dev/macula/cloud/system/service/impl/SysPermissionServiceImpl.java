@@ -23,7 +23,6 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import dev.macula.boot.constants.CacheConstants;
-import dev.macula.boot.constants.SecurityConstants;
 import dev.macula.boot.result.Option;
 import dev.macula.cloud.system.form.PermissionValidtorForm;
 import dev.macula.cloud.system.mapper.SysPermissionMapper;
@@ -51,17 +50,16 @@ import java.util.stream.Collectors;
 public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, SysPermission>
     implements SysPermissionService {
 
-    private final RedisTemplate redisTemplate;
-
-    private static final String VALIDTOR_PERM_ID_SPLITOR = "::";
-    private static final String VALIDTOR_PERM_JOIN = ":";
+    private static final String VALIDATOR_PERM_ID_SPLIT = "::";
+    private static final String VALIDATOR_PERM_JOIN = ":";
+    private final RedisTemplate<String, Object> redisTemplate;
     private static final String EMPTY_STR = "";
 
     /**
      * 获取权限分页列表
      *
-     * @param queryParams
-     * @return
+     * @param queryParams 查询条件
+     * @return URL权限列表
      */
     @Override
     public Page<PermPageVO> listPermPages(PermPageQuery queryParams) {
@@ -97,7 +95,7 @@ public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, S
                 permissions.stream().filter(item -> StrUtil.isNotBlank(item.getUrlPerm())).collect(Collectors.toList());
             if (CollectionUtil.isNotEmpty(urlPermList)) {
                 Map<String, List<String>> urlPermRoles = new HashMap<>();
-                urlPermList.stream().forEach(item -> {
+                urlPermList.forEach(item -> {
                     String perm = item.getUrlPerm();
                     List<String> roles = item.getRoles();
                     urlPermRoles.put(perm, roles);
@@ -108,30 +106,29 @@ public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, S
     }
 
     @Override
-    public List<Option> validtorUrlPerm(List<PermissionValidtorForm> validtorForms) {
-        if (validtorForms.isEmpty()) {
+    public List<Option<Boolean>> validatorUrlPerm(List<PermissionValidtorForm> validatorForms) {
+        if (validatorForms.isEmpty()) {
             return new ArrayList<>();
         }
-        Map<String, String> validtorFormMap = validtorForms.stream().collect(Collectors.toMap(form -> {
+        Map<String, String> validtorFormMap = validatorForms.stream().collect(Collectors.toMap(form -> {
             StringBuffer sb = new StringBuffer();
-            sb.append(Objects.isNull(form.getId()) ? EMPTY_STR : form.getId()).append(VALIDTOR_PERM_ID_SPLITOR)
-                .append(form.getCode()).append(VALIDTOR_PERM_JOIN).append(form.getUrl()).append(VALIDTOR_PERM_JOIN)
+            sb.append(Objects.isNull(form.getId()) ? EMPTY_STR : form.getId()).append(VALIDATOR_PERM_ID_SPLIT)
+                .append(form.getCode()).append(VALIDATOR_PERM_JOIN).append(form.getUrl()).append(VALIDATOR_PERM_JOIN)
                 .append(form.getMethod().toString());
             return sb.toString();
         }, form -> {
             StringBuffer sb = new StringBuffer();
-            sb.append(form.getMethod().toString()).append(VALIDTOR_PERM_JOIN).append(form.getUrl());
+            sb.append(form.getMethod().toString()).append(VALIDATOR_PERM_JOIN).append(form.getUrl());
             return sb.toString();
         }, (oldValue, newValue) -> newValue));
 
-        List<Option> result = validtorFormMap.keySet().stream().map(item -> {
-            String[] keyIdArr = item.split(VALIDTOR_PERM_ID_SPLITOR);
+        return validtorFormMap.keySet().stream().map(item -> {
+            String[] keyIdArr = item.split(VALIDATOR_PERM_ID_SPLIT);
             long count = count(
                 new LambdaQueryWrapper<SysPermission>().eq(SysPermission::getUrlPerm, validtorFormMap.get(item))
                     .and(StringUtils.isNotBlank(keyIdArr[0]),
                         wrapper -> wrapper.ne(SysPermission::getId, keyIdArr[0])));
-            return new Option(count == 0, item);
+            return new Option<>(count == 0, item);
         }).collect(Collectors.toList());
-        return result;
     }
 }

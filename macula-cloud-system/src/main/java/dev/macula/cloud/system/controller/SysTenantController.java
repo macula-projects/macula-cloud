@@ -59,8 +59,7 @@ public class SysTenantController {
     @Operation(summary = "获取租户下拉选项")
     @Parameter(name = "过滤出我的租户下拉选项", description = "1: 获取我的租户下拉选项; 0: 获取所有租户下拉选项")
     @GetMapping("/options")
-    public List<Option> listTenantOptions(@RequestParam(name = "filterMe", defaultValue = "1") Integer filterMe) {
-        List<Option> result = sysTenantService.listTenantOptions(filterMe);
-        return result;
+    public List<Option<Long>> listTenantOptions(@RequestParam(name = "filterMe", defaultValue = "1") Integer filterMe) {
+        return sysTenantService.listTenantOptions(filterMe == 1);
     }
 }
