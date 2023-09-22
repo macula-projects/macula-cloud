@@ -21,6 +21,8 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import dev.macula.cloud.system.pojo.entity.SysUserRole;
 import org.apache.ibatis.annotations.Mapper;
 
+import java.util.List;
+
 /**
  * 用户角色持久层
  *
@@ -29,5 +31,5 @@ import org.apache.ibatis.annotations.Mapper;
  */
 @Mapper
 public interface SysUserRoleMapper extends BaseMapper<SysUserRole> {
-
+    List<Long> listRoleIdsByUserIdAndScope(Long userId);
 }

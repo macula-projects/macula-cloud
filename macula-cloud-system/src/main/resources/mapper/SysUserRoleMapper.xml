@@ -27,4 +27,15 @@
         FROM sys_user_role
         WHERE user_id = #{userId}
     </select>
+
+    <select id="listRoleIdsByUserIdAndScope" resultType="java.lang.Long">
+        SELECT sur.role_id
+        FROM sys_user_role sur
+        LEFT JOIN sys_role sr
+        ON sur.role_id = sr.id
+        WHERE sur.user_id = #{userId}
+        <if test="@dev.macula.boot.starter.security.utils.SecurityUtils@isRoot() == false">
+            and sr.code != '${@dev.macula.boot.constants.SecurityConstants@ROOT_ROLE_CODE}'
+        </if>
+    </select>
 </mapper>
