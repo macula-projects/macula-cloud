@@ -23,7 +23,7 @@ import lombok.Data;
 
 @Data
 @AllArgsConstructor
-@TableName("sys_role_permission_tenant")
+@TableName("sys_role_permission")
 public class SysRolePermission {
     private Long roleId;
     private Long permissionId;

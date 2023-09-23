@@ -17,6 +17,7 @@
 
 package dev.macula.cloud.system.mapper;
 
+import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import dev.macula.cloud.system.pojo.entity.SysPermission;
@@ -43,6 +44,7 @@ public interface SysPermissionMapper extends BaseMapper<SysPermission> {
      *
      * @return
      */
+    @InterceptorIgnore(tenantLine = "true")
     List<SysPermission> listPermRoles();
 
 }

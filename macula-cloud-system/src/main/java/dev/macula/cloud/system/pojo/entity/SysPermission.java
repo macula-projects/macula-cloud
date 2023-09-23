@@ -34,8 +34,11 @@ public class SysPermission extends BaseEntity {
 
     private String urlPerm;
 
+    // 租户CODE
+    @TableField(exist = false)
+    private String tenantCode;
+
     // 有权限的角色编号集合
     @TableField(exist = false)
     private List<String> roles;
-
 }

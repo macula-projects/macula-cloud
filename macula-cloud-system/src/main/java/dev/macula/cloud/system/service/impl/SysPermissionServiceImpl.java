@@ -100,7 +100,8 @@ public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, S
                 urlPermList.forEach(item -> {
                     String perm = item.getUrlPerm();
                     List<String> roles = item.getRoles();
-                    urlPermRoles.put(perm, roles);
+                    String tenantCode = item.getTenantCode();
+                    urlPermRoles.put(tenantCode + "**" + CharPool.COLON + perm, roles);
                 });
                 redisTemplate.opsForHash().putAll(CacheConstants.SECURITY_URL_PERM_ROLES_KEY, urlPermRoles);
             }

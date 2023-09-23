@@ -29,8 +29,8 @@ public interface SysRolePermissionMapper extends BaseMapper<SysRolePermission> {
     /**
      * 获取角色拥有的权限ID集合
      *
-     * @param roleId
-     * @return
+     * @param roleId 角色ID
+     * @return 权限ID集合
      */
     List<Long> listPermIdsByRoleId(Long roleId);
 }

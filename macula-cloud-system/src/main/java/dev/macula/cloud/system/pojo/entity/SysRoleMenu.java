@@ -23,7 +23,7 @@ import lombok.Data;
 
 @Data
 @AllArgsConstructor
-@TableName("sys_role_menu_tenant")
+@TableName("sys_role_menu")
 public class SysRoleMenu {
 
     private Long roleId;

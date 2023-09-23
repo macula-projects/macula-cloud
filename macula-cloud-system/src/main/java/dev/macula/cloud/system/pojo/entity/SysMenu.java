@@ -68,4 +68,6 @@ public class SysMenu extends BaseEntity {
      */
     private String perm;
 
+    private Long tenantId;
+
 }

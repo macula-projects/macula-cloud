@@ -594,13 +594,13 @@ UNLOCK
 TABLES;
 
 --
--- Table structure for table `sys_permission`
+-- Table structure for table `sys_permission_tenant`
 --
 
-DROP TABLE IF EXISTS `sys_permission`;
+DROP TABLE IF EXISTS `sys_permission_tenant`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `sys_permission`
+CREATE TABLE `sys_permission_tenant`
 (
     `id`               bigint NOT NULL AUTO_INCREMENT,
     `name`             varchar(64) COLLATE utf8mb4_general_ci  DEFAULT NULL,
@@ -616,16 +616,17 @@ CREATE TABLE `sys_permission`
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Dumping data for table `sys_permission`
+-- Dumping data for table `sys_permission_tenant`
 --
 
 LOCK
-TABLES `sys_permission` WRITE;
-/*!40000 ALTER TABLE `sys_permission` DISABLE KEYS */;
-INSERT INTO `sys_permission` (`id`, `name`, `menu_id`, `url_perm`, `create_by`, `create_time`, `last_update_by`,
+TABLES `sys_permission_tenant` WRITE;
+/*!40000 ALTER TABLE `sys_permission_tenant` DISABLE KEYS */;
+INSERT INTO `sys_permission_tenant` (`id`, `name`, `menu_id`, `url_perm`, `tenant_id`, `create_by`, `create_time`,
+                                     `last_update_by`,
                               `last_update_time`)
-VALUES (198, '添加', 68, 'GET:/add', 'admin', '2023-03-02 10:36:15', 'admin', '2023-03-02 10:36:15');
-/*!40000 ALTER TABLE `sys_permission` ENABLE KEYS */;
+VALUES (198, '添加', 68, 'GET:/add', 1, 'admin', '2023-03-02 10:36:15', 'admin', '2023-03-02 10:36:15');
+/*!40000 ALTER TABLE `sys_permission_tenant` ENABLE KEYS */;
 UNLOCK
 TABLES;
 
@@ -672,102 +673,100 @@ UNLOCK
 TABLES;
 
 --
--- Table structure for table `sys_role_menu_tenant`
+-- Table structure for table `sys_role_menu`
 --
 
-DROP TABLE IF EXISTS `sys_role_menu_tenant`;
+DROP TABLE IF EXISTS `sys_role_menu`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `sys_role_menu_tenant`
+CREATE TABLE `sys_role_menu`
 (
     `role_id`   bigint NOT NULL COMMENT '角色ID',
-    `menu_id`   bigint NOT NULL COMMENT '菜单ID',
-    `tenant_id` bigint DEFAULT NULL COMMENT '租户id',
+    `menu_id` bigint NOT NULL COMMENT '菜单ID'
     PRIMARY KEY (`role_id`, `menu_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='角色和菜单关联表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Dumping data for table `sys_role_menu_tenant`
+-- Dumping data for table `sys_role_menu`
 --
 
 LOCK
-TABLES `sys_role_menu_tenant` WRITE;
-/*!40000 ALTER TABLE `sys_role_menu_tenant` DISABLE KEYS */;
-INSERT INTO `sys_role_menu_tenant` (`role_id`, `menu_id`, `tenant_id`)
-VALUES (1, 1, 1),
-       (1, 43, 1),
-       (1, 59, 1),
-       (1, 60, 1),
-       (1, 63, 1),
-       (1, 66, 1),
-       (1, 68, 1),
-       (1, 69, 1),
-       (1, 102, 1),
-       (1, 106, 1),
-       (1, 174, 12),
-       (1, 222, 12),
-       (1, 223, 12),
-       (1, 224, 1),
-       (1, 226, 1),
-       (1, 227, 12),
-       (1, 228, 12),
-       (2, 224, 1),
-       (2, 226, 1),
-       (2, 227, 12),
-       (2, 228, 12),
-       (3, 174, 12),
-       (3, 222, 12),
-       (3, 223, 12),
-       (3, 224, 1),
-       (3, 226, 1),
-       (3, 227, 12),
-       (3, 228, 12),
-       (21, 1, 1),
-       (21, 43, 1),
-       (21, 69, 1),
-       (21, 102, 1),
-       (21, 106, 1),
-       (21, 174, 12),
-       (21, 222, 12),
-       (21, 223, 12),
-       (21, 224, 1),
-       (21, 226, 1);
-/*!40000 ALTER TABLE `sys_role_menu_tenant` ENABLE KEYS */;
+TABLES `sys_role_menu` WRITE;
+/*!40000 ALTER TABLE `sys_role_menu` DISABLE KEYS */;
+INSERT INTO `sys_role_menu` (`role_id`, `menu_id`)
+VALUES (1, 1),
+       (1, 43),
+       (1, 59),
+       (1, 60),
+       (1, 63),
+       (1, 66),
+       (1, 68),
+       (1, 69),
+       (1, 102),
+       (1, 106),
+       (1, 174),
+       (1, 222),
+       (1, 223),
+       (1, 224),
+       (1, 226),
+       (1, 227),
+       (1, 228),
+       (2, 224),
+       (2, 226),
+       (2, 227),
+       (2, 228),
+       (3, 174),
+       (3, 222),
+       (3, 223),
+       (3, 224),
+       (3, 226),
+       (3, 227),
+       (3, 228),
+       (21, 1),
+       (21, 43),
+       (21, 69),
+       (21, 102),
+       (21, 106),
+       (21, 174),
+       (21, 222),
+       (21, 223),
+       (21, 224),
+       (21, 226);
+/*!40000 ALTER TABLE `sys_role_menu` ENABLE KEYS */;
 UNLOCK
 TABLES;
 
 --
--- Table structure for table `sys_role_permission_tenant`
+-- Table structure for table `sys_role_permission`
 --
 
-DROP TABLE IF EXISTS `sys_role_permission_tenant`;
+DROP TABLE IF EXISTS `sys_role_permission`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `sys_role_permission_tenant`
+CREATE TABLE `sys_role_permission`
 (
     `role_id`       int NOT NULL,
     `permission_id` int NOT NULL,
-    `tenant_id`     bigint DEFAULT NULL COMMENT '租户id',
     PRIMARY KEY (`permission_id`, `role_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Dumping data for table `sys_role_permission_tenant`
+-- Dumping data for table `sys_role_permission`
 --
 
 LOCK
-TABLES `sys_role_permission_tenant` WRITE;
-/*!40000 ALTER TABLE `sys_role_permission_tenant` DISABLE KEYS */;
-INSERT INTO `sys_role_permission_tenant` (`role_id`, `permission_id`, `tenant_id`)
-VALUES (1, 198, 1),
-       (41, 198, 1),
-       (42, 198, 12),
-       (41, 203, 1),
-       (42, 203, 12),
-       (42, 205, 12);
-/*!40000 ALTER TABLE `sys_role_permission_tenant` ENABLE KEYS */;
+TABLES `sys_role_permission` WRITE;
+/*!40000 ALTER TABLE `sys_role_permission` DISABLE KEYS */;
+INSERT INTO `sys_role_permission` (`role_id`, `permission_id`)
+VALUES (1, 198),
+       (41, 198),
+       (42, 198),
+       (41, 203),
+       (42, 203),
+       (42, 205);
+/*!40000 ALTER TABLE `sys_role_permission` ENABLE KEYS */;
 UNLOCK
 TABLES;
 
