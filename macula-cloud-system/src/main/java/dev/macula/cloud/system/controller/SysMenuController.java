@@ -94,12 +94,8 @@ public class SysMenuController {
     @AuditLog(title = "新增菜单")
     @PostMapping
     @CacheEvict(cacheNames = "system", key = "'routes'")
-    public boolean addMenu(@RequestBody MenuForm menuForm) {
-        boolean result = menuService.saveMenuOrPermission(menuForm);
-        if (result) {
-            permissionService.refreshPermRolesRules();
-        }
-        return result;
+    public boolean addMenu(@RequestBody SysMenu sysMenu) {
+        return menuService.saveMenu(sysMenu);
     }
 
     @Operation(summary = "修改菜单")
@@ -107,7 +103,7 @@ public class SysMenuController {
     @PutMapping(value = "/{id}")
     @CacheEvict(cacheNames = "system", key = "'routes'")
     public boolean updateMenu(@RequestBody MenuForm menuForm) {
-        boolean result = menuService.saveMenuOrPermission(menuForm);
+        boolean result = menuService.updateMenuPermission(menuForm);
         if (result) {
             permissionService.refreshPermRolesRules();
         }

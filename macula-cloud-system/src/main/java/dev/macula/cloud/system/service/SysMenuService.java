@@ -107,7 +107,7 @@ public interface SysMenuService extends IService<SysMenu> {
      * @param menuForm 菜单表单数据
      * @return 是否成功
      */
-    boolean saveMenuOrPermission(MenuForm menuForm);
+    boolean updateMenuPermission(MenuForm menuForm);
 
     /**
      * 删除菜单

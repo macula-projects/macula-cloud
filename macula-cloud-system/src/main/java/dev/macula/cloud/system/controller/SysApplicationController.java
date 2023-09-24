@@ -46,8 +46,7 @@ public class SysApplicationController {
     @Operation(summary = "获取应用列表分页")
     @GetMapping
     public IPage<ApplicationVO> listApplications(ApplicationPageQuery queryParams) {
-        IPage<ApplicationVO> list = applicationService.listApplicationPages(queryParams);
-        return list;
+        return applicationService.listApplicationPages(queryParams);
     }
 
     @Operation(summary = "新增应用")
@@ -89,8 +88,7 @@ public class SysApplicationController {
     @Parameter(name = "userId，多个以英文逗号(,)分割")
     @PutMapping("/addMaintainer/{appId}")
     public boolean addMaintainer(@PathVariable Long appId, @RequestBody ApplicationForm formData) {
-        boolean result = applicationService.addMaintainer(appId, formData);
-        return result;
+        return applicationService.addMaintainer(appId, formData);
     }
 
     @Operation(summary = "验证应用code是否规范")
@@ -99,7 +97,6 @@ public class SysApplicationController {
     @GetMapping("/validtor/appCode")
     public boolean validtorAppCode(@RequestParam(value = "appId", required = false) Long appId,
         @RequestParam("appCode") String appCode) {
-        boolean result = applicationService.validtorAppCode(appId, appCode);
-        return result;
+        return applicationService.validtorAppCode(appId, appCode);
     }
 }

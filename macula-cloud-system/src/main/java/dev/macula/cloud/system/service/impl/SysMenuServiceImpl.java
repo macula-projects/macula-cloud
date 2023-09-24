@@ -277,15 +277,13 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
 
     @Override
     @Transactional
-    public boolean saveMenuOrPermission(MenuForm menuForm) {
+    public boolean updateMenuPermission(MenuForm menuForm) {
         SysMenu sysMenu = menuConverter.form2Entity(menuForm);
         boolean result = saveMenu(sysMenu);
-        Assert.isTrue(result, "菜单信息保存失败！");
-        // 菜单结构问题会找不到当前新增的菜单，前端已做菜单新增处理，理论上不存在新增菜单会保存权限情况
-        if (sysMenu.getId() == null) {
-            return true;
+        if (result) {
+            return permissionService.saveOrUpdatePerms(sysMenu.getId(), menuForm.getApiList());
         }
-        return permissionService.saveOrUpdatePerms(sysMenu.getId(), menuForm.getApiList());
+        return false;
     }
 
     @Transactional

@@ -43,32 +43,28 @@ public class SysDictTypeController {
     @Operation(summary = "字典类型分页列表")
     @GetMapping("/pages")
     public IPage<DictTypePageVO> listDictTypePages(DictTypePageQuery queryParams) {
-        IPage<DictTypePageVO> result = dictTypeService.listDictTypePages(queryParams);
-        return result;
+        return dictTypeService.listDictTypePages(queryParams);
     }
 
     @Operation(summary = "字典类型表单详情")
     @Parameter(name = "字典ID")
     @GetMapping("/{id}/form")
     public DictTypeForm getDictTypeFormData(@PathVariable Long id) {
-        DictTypeForm dictTypeForm = dictTypeService.getDictTypeFormData(id);
-        return dictTypeForm;
+        return dictTypeService.getDictTypeFormData(id);
     }
 
     @Operation(summary = "新增字典类型")
     @AuditLog(title = "新增字典类型")
     @PostMapping
     public boolean saveDictType(@RequestBody DictTypeForm dictTypeForm) {
-        boolean result = dictTypeService.saveDictType(dictTypeForm);
-        return result;
+        return dictTypeService.saveDictType(dictTypeForm);
     }
 
     @Operation(summary = "修改字典类型")
     @AuditLog(title = "修改字典类型")
     @PutMapping("/{id}")
     public boolean updateDict(@PathVariable Long id, @RequestBody DictTypeForm dictTypeForm) {
-        boolean status = dictTypeService.updateDictType(id, dictTypeForm);
-        return status;
+        return dictTypeService.updateDictType(id, dictTypeForm);
     }
 
     @Operation(summary = "删除字典类型")
@@ -76,15 +72,13 @@ public class SysDictTypeController {
     @Parameter(name = "字典ID", description = "字典类型ID，多个以英文逗号(,)分割")
     @DeleteMapping("/{ids}")
     public boolean deleteDictTypes(@PathVariable String ids) {
-        boolean result = dictTypeService.deleteDictTypes(ids);
-        return result;
+        return dictTypeService.deleteDictTypes(ids);
     }
 
     @Operation(summary = "获取字典类型的数据项")
     @Parameter(name = "字典类型编码")
     @GetMapping("/{typeCode}/items")
-    public List<Option> listDictItemsByTypeCode(@PathVariable String typeCode) {
-        List<Option> list = dictTypeService.listDictItemsByTypeCode(typeCode);
-        return list;
+    public List<Option<String>> listDictItemsByTypeCode(@PathVariable String typeCode) {
+        return dictTypeService.listDictItemsByTypeCode(typeCode);
     }
 }

@@ -27,8 +27,7 @@ public class SysTenantController {
     @Operation(summary = "租户分页列表")
     @GetMapping
     public IPage<TenantPageVO> listTenantPages(TenantPageQuery tenantPageQuery) {
-        IPage<TenantPageVO> result = sysTenantService.listTenantpages(tenantPageQuery);
-        return result;
+        return sysTenantService.listTenantpages(tenantPageQuery);
     }
 
     @Operation(summary = "新增租户")
@@ -43,8 +42,7 @@ public class SysTenantController {
     @Parameter(name = "租户ID")
     @PutMapping(value = "/{id}")
     public boolean updateTenant(@PathVariable Long id, @RequestBody @Validated TenantForm tenantForm) {
-        boolean result = sysTenantService.updateTenant(id, tenantForm);
-        return result;
+        return sysTenantService.updateTenant(id, tenantForm);
     }
 
     @Operation(summary = "删除租户")
@@ -52,8 +50,7 @@ public class SysTenantController {
     @Parameter(name = "租户ID", description = "租户ID，多个以英文逗号(,)分割")
     @DeleteMapping("/{ids}")
     public boolean deleteTenants(@PathVariable String ids) {
-        boolean result = sysTenantService.deleteTenants(ids);
-        return result;
+        return sysTenantService.deleteTenants(ids);
     }
 
     @Operation(summary = "获取租户下拉选项")

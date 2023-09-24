@@ -41,8 +41,7 @@ public class SysApplicationServiceImpl extends ServiceImpl<SysApplicationMapper,
     public Page<ApplicationVO> listApplicationPages(ApplicationPageQuery queryParams) {
         Page<SysApplication> page = new Page<>(queryParams.getPageNum(), queryParams.getPageSize());
         Page<ApplicationBO> bo = this.baseMapper.listApplicationPages(page, queryParams);
-        Page<ApplicationVO> list = applicationConverter.bo2Vo(bo);
-        return list;
+        return applicationConverter.bo2Vo(bo);
     }
 
     @Override
