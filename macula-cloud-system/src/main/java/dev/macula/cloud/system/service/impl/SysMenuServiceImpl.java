@@ -33,9 +33,12 @@ import dev.macula.cloud.system.form.MenuForm;
 import dev.macula.cloud.system.mapper.SysMenuMapper;
 import dev.macula.cloud.system.pojo.bo.RouteBO;
 import dev.macula.cloud.system.pojo.entity.SysMenu;
+import dev.macula.cloud.system.pojo.entity.SysPermission;
+import dev.macula.cloud.system.pojo.entity.SysRoleMenu;
 import dev.macula.cloud.system.query.MenuQuery;
 import dev.macula.cloud.system.service.SysMenuService;
 import dev.macula.cloud.system.service.SysPermissionService;
+import dev.macula.cloud.system.service.SysRoleMenuService;
 import dev.macula.cloud.system.vo.menu.MenuVO;
 import dev.macula.cloud.system.vo.menu.ResourceVO;
 import dev.macula.cloud.system.vo.menu.RouteVO;
@@ -61,6 +64,8 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
     private final MenuConverter menuConverter;
 
     private final SysPermissionService permissionService;
+
+    private final SysRoleMenuService roleMenuService;
 
     /**
      * 递归生成资源（菜单+权限）树形列表
@@ -277,10 +282,23 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
         boolean result = saveMenu(sysMenu);
         Assert.isTrue(result, "菜单信息保存失败！");
         // 菜单结构问题会找不到当前新增的菜单，前端已做菜单新增处理，理论上不存在新增菜单会保存权限情况
-        if(sysMenu.getId() == null){
+        if (sysMenu.getId() == null) {
             return true;
         }
-        return permissionService.saveOrUpdate(sysMenu.getId(), menuForm.getApiList());
+        return permissionService.saveOrUpdatePerms(sysMenu.getId(), menuForm.getApiList());
+    }
+
+    @Transactional
+    public boolean deleteMenus(String ids) {
+        List<Long> menuIds = Arrays.stream(ids.split(",")).map(Long::parseLong).collect(Collectors.toList());
+        // 如果有关联URL权限不能删除，删除菜单时同时会删除与角色表的关系
+        Optional.of(menuIds).orElse(new ArrayList<>()).forEach(id -> {
+            long count =
+                permissionService.count(new LambdaQueryWrapper<SysPermission>().eq(SysPermission::getMenuId, id));
+            Assert.isTrue(count <= 0, "该菜单下有URL权限，无法删除");
+            roleMenuService.remove(new LambdaQueryWrapper<SysRoleMenu>().eq(SysRoleMenu::getMenuId, id));
+        });
+        return this.removeByIds(menuIds);
     }
 
     @Override

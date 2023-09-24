@@ -28,4 +28,11 @@
                  INNER JOIN sys_menu_tenant m ON rm.menu_id = m.id
         WHERE rm.role_id = #{roleId}
     </select>
+
+    <!-- 获取菜单拥有的角色ID集合 -->
+    <select id="listRoleIdsByMenuId" resultType="java.lang.Long">
+        SELECT rm.role_id
+        FROM sys_role_menu rm
+        WHERE rm.menu_id = #{menuId}
+    </select>
 </mapper>

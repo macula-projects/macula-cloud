@@ -69,5 +69,7 @@ public interface SysPermissionService extends IService<SysPermission> {
      * @param apiList
      * @return
      */
-    boolean saveOrUpdate(Long menuId, List<PermissionValidtorForm> apiList);
+    boolean saveOrUpdatePerms(Long menuId, List<PermissionValidtorForm> apiList);
+
+    boolean deletePerms(String ids);
 }

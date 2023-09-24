@@ -34,7 +34,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Arrays;
 import java.util.List;
 
 @Tag(name = "权限接口")
@@ -90,7 +89,7 @@ public class SysPermissionController {
     @Parameter(name = "权限ID", description = "权限ID，多个以英文逗号(,)分割")
     @DeleteMapping("/{ids}")
     public boolean deletePermissions(@PathVariable String ids) {
-        boolean result = sysPermissionService.removeByIds(Arrays.asList(ids.split(",")));
+        boolean result = sysPermissionService.deletePerms(ids);
         if (result) {
             sysPermissionService.refreshPermRolesRules();
         }

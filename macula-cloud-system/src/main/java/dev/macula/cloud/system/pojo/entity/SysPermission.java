@@ -18,6 +18,7 @@
 package dev.macula.cloud.system.pojo.entity;
 
 import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableName;
 import dev.macula.boot.starter.mp.entity.BaseEntity;
 import lombok.Data;
 import lombok.experimental.Accessors;
@@ -26,6 +27,7 @@ import java.util.List;
 
 @Data
 @Accessors(chain = true)
+@TableName("sys_permission_tenant")
 public class SysPermission extends BaseEntity {
 
     private String name;

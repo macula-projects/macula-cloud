@@ -108,4 +108,12 @@ public interface SysMenuService extends IService<SysMenu> {
      * @return 是否成功
      */
     boolean saveMenuOrPermission(MenuForm menuForm);
+
+    /**
+     * 删除菜单
+     *
+     * @param ids 被删除菜单ID
+     * @return 删除是否成功
+     */
+    boolean deleteMenus(String ids);
 }

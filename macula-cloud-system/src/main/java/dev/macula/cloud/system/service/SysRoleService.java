@@ -19,6 +19,7 @@ package dev.macula.cloud.system.service;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
+import dev.macula.boot.enums.DataScopeEnum;
 import dev.macula.boot.result.Option;
 import dev.macula.cloud.system.form.RoleForm;
 import dev.macula.cloud.system.pojo.entity.SysRole;
@@ -49,7 +50,7 @@ public interface SysRoleService extends IService<SysRole> {
      *
      * @return
      */
-    List<Option> listRoleOptions();
+    List<Option<Long>> listRoleOptions();
 
     /**
      * @param roleForm
@@ -122,6 +123,6 @@ public interface SysRoleService extends IService<SysRole> {
      *
      * @return
      */
-    List<Option> optionsByDataScope();
+    List<Option<DataScopeEnum>> optionsByDataScope();
 
 }

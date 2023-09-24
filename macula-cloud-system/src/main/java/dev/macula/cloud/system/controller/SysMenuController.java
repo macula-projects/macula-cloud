@@ -23,6 +23,7 @@ import dev.macula.cloud.system.form.MenuForm;
 import dev.macula.cloud.system.pojo.entity.SysMenu;
 import dev.macula.cloud.system.query.MenuQuery;
 import dev.macula.cloud.system.service.SysMenuService;
+import dev.macula.cloud.system.service.SysPermissionService;
 import dev.macula.cloud.system.vo.menu.MenuVO;
 import dev.macula.cloud.system.vo.menu.ResourceVO;
 import dev.macula.cloud.system.vo.menu.RouteVO;
@@ -34,7 +35,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -50,6 +50,8 @@ import java.util.List;
 @Slf4j
 public class SysMenuController {
     private final SysMenuService menuService;
+
+    private final SysPermissionService permissionService;
 
     @Operation(summary = "获取请求方法下拉列表")
     @GetMapping("/methodOption")
@@ -93,7 +95,11 @@ public class SysMenuController {
     @PostMapping
     @CacheEvict(cacheNames = "system", key = "'routes'")
     public boolean addMenu(@RequestBody MenuForm menuForm) {
-        return menuService.saveMenuOrPermission(menuForm);
+        boolean result = menuService.saveMenuOrPermission(menuForm);
+        if (result) {
+            permissionService.refreshPermRolesRules();
+        }
+        return result;
     }
 
     @Operation(summary = "修改菜单")
@@ -101,7 +107,11 @@ public class SysMenuController {
     @PutMapping(value = "/{id}")
     @CacheEvict(cacheNames = "system", key = "'routes'")
     public boolean updateMenu(@RequestBody MenuForm menuForm) {
-        return menuService.saveMenuOrPermission(menuForm);
+        boolean result = menuService.saveMenuOrPermission(menuForm);
+        if (result) {
+            permissionService.refreshPermRolesRules();
+        }
+        return result;
     }
 
     @Operation(summary = "删除菜单")
@@ -110,7 +120,7 @@ public class SysMenuController {
     @DeleteMapping("/{ids}")
     @CacheEvict(cacheNames = "system", key = "'routes'")
     public boolean deleteMenus(@PathVariable("ids") String ids) {
-        return menuService.removeByIds(Arrays.asList(ids.split(",")));
+        return menuService.deleteMenus(ids);
     }
 
     @Operation(summary = "修改菜单显示状态")

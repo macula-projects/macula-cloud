@@ -18,6 +18,7 @@
 package dev.macula.cloud.system.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import dev.macula.boot.enums.DataScopeEnum;
 import dev.macula.boot.result.Option;
 import dev.macula.boot.starter.auditlog.annotation.AuditLog;
 import dev.macula.cloud.system.form.RoleForm;
@@ -47,31 +48,27 @@ public class SysRoleController {
     @Operation(summary = "角色分页列表")
     @GetMapping("/pages")
     public IPage<RolePageVO> listRolePages(RolePageQuery queryParams) {
-        IPage<RolePageVO> result = roleService.listRolePages(queryParams);
-        return result;
+        return roleService.listRolePages(queryParams);
     }
 
     @Operation(summary = "角色下拉列表")
     @GetMapping("/options")
-    public List<Option> listRoleOptions() {
-        List<Option> list = roleService.listRoleOptions();
-        return list;
+    public List<Option<Long>> listRoleOptions() {
+        return roleService.listRoleOptions();
     }
 
     @Operation(summary = "角色详情")
     @Parameter(name = "角色ID")
     @GetMapping("/{roleId}")
     public SysRole getRoleDetail(@PathVariable Long roleId) {
-        SysRole role = roleService.getById(roleId);
-        return role;
+        return roleService.getById(roleId);
     }
 
     @Operation(summary = "新增角色")
     @AuditLog(title = "新增角色")
     @PostMapping
     public boolean addRole(@Valid @RequestBody RoleForm roleForm) {
-        boolean result = roleService.saveRole(roleForm);
-        return result;
+        return roleService.saveRole(roleForm);
     }
 
     @Operation(summary = "修改角色")
@@ -91,6 +88,9 @@ public class SysRoleController {
     @DeleteMapping("/{ids}")
     public boolean deleteRoles(@PathVariable String ids) {
         boolean result = roleService.deleteRoles(ids);
+        if (result) {
+            sysPermissionService.refreshPermRolesRules();
+        }
         return result;
     }
 
@@ -100,16 +100,14 @@ public class SysRoleController {
     @Parameter(name = "角色状态", description = "角色状态:1-启用；0-禁用")
     @PutMapping(value = "/{roleId}/status")
     public boolean updateRoleStatus(@PathVariable Long roleId, @RequestParam Integer status) {
-        boolean result = roleService.updateRoleStatus(roleId, status);
-        return result;
+        return roleService.updateRoleStatus(roleId, status);
     }
 
     @Operation(summary = "获取角色的菜单ID集合")
     @Parameter(name = "角色ID")
     @GetMapping("/{roleId}/menuIds")
     public List<Long> getRoleMenuIds(@PathVariable Long roleId) {
-        List<Long> resourceIds = roleService.getRoleMenuIds(roleId);
-        return resourceIds;
+        return roleService.getRoleMenuIds(roleId);
     }
 
     @Operation(summary = "分配角色的资源权限")
@@ -141,7 +139,7 @@ public class SysRoleController {
 
     @Operation(summary = "获取数据权限的下拉列表")
     @GetMapping("/optionsByDataScope")
-    public List<Option> optionsByDataScope() {
+    public List<Option<DataScopeEnum>> optionsByDataScope() {
         return roleService.optionsByDataScope();
     }
 

@@ -28,8 +28,11 @@ import dev.macula.boot.result.Option;
 import dev.macula.cloud.system.form.PermissionValidtorForm;
 import dev.macula.cloud.system.mapper.SysPermissionMapper;
 import dev.macula.cloud.system.pojo.entity.SysPermission;
+import dev.macula.cloud.system.pojo.entity.SysRolePermission;
 import dev.macula.cloud.system.query.PermPageQuery;
 import dev.macula.cloud.system.service.SysPermissionService;
+import dev.macula.cloud.system.service.SysRoleMenuService;
+import dev.macula.cloud.system.service.SysRolePermissionService;
 import dev.macula.cloud.system.vo.perm.PermPageVO;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
@@ -54,8 +57,13 @@ public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, S
 
     private static final String VALIDATOR_PERM_ID_SPLIT = "::";
     private static final String VALIDATOR_PERM_JOIN = ":";
-    private final RedisTemplate<String, Object> redisTemplate;
     private static final String EMPTY_STR = "";
+
+    private final RedisTemplate<String, Object> redisTemplate;
+
+    private final SysRolePermissionService rolePermissionService;
+
+    private final SysRoleMenuService roleMenuService;
 
     /**
      * 获取权限分页列表
@@ -137,8 +145,8 @@ public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, S
 
     @Override
     @Transactional
-    public boolean saveOrUpdate(Long menuId, List<PermissionValidtorForm> apiList) {
-        if (apiList == null || apiList.isEmpty()) {
+    public boolean saveOrUpdatePerms(Long menuId, List<PermissionValidtorForm> apiList) {
+        if (apiList == null) {
             return true;
         }
         //获取当前的菜单对应的权限，做多删处理
@@ -168,6 +176,40 @@ public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, S
         if (!mPerm.isEmpty()) {
             removeByIds(mPerm.keySet());
         }
-        return saveOrUpdateBatch(savePerms);
+        boolean result = saveOrUpdateBatch(savePerms);
+
+        if (result || savePerms.isEmpty()) {
+            // 更新role permission（看菜单与哪些角色关联，就把所有权限给关联到该角色上）
+            List<Long> roleIds = roleMenuService.listRoleIdsByMenuId(menuId);
+            // 根据角色IDs更新permission
+            if (CollectionUtil.isNotEmpty(roleIds)) {
+                // 先把原来该角色关联的所有权限ID删除
+                rolePermissionService.remove(
+                    new LambdaQueryWrapper<SysRolePermission>().in(SysRolePermission::getRoleId, roleIds));
+                // 再把该菜单下所有权限ID关联上角色
+                List<SysPermission> newPerms =
+                    list(new LambdaQueryWrapper<SysPermission>().eq(SysPermission::getMenuId, menuId));
+                List<SysRolePermission> newRolePerms = new ArrayList<>();
+                roleIds.forEach(roleId -> {
+                    newPerms.forEach(perm -> {
+                        newRolePerms.add(new SysRolePermission(roleId, perm.getId()));
+                    });
+                });
+                rolePermissionService.saveBatch(newRolePerms);
+            }
+        }
+
+        return result;
+    }
+
+    @Transactional
+    public boolean deletePerms(String ids) {
+        List<Long> permIds = Arrays.stream(ids.split(",")).map(Long::parseLong).collect(Collectors.toList());
+        // 删除权限时同时会删除与角色表的关系
+        Optional.of(permIds).orElse(new ArrayList<>()).forEach(id -> {
+            rolePermissionService.remove(
+                new LambdaQueryWrapper<SysRolePermission>().eq(SysRolePermission::getPermissionId, id));
+        });
+        return this.removeByIds(permIds);
     }
 }
