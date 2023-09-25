@@ -31,9 +31,10 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 /**
+ *
+ * 自定义流控异常
  * @author haoxr
- * @description 自定义流控异常
- * @createTime 2021/4/12 22:57
+ * @since 2021/4/12 22:57
  */
 @Component
 public class DefaultBlockExceptionHandler implements BlockExceptionHandler {

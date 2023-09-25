@@ -12,7 +12,7 @@ public class SysApplication extends BaseEntity {
 
     private String homepage;
 
-    private String ak;
+    private String code;
 
     private String sk;
 
@@ -21,8 +21,6 @@ public class SysApplication extends BaseEntity {
     private String maintainer;
 
     private String mobile;
-
-    private String code;
 
     private String accessPath;
 

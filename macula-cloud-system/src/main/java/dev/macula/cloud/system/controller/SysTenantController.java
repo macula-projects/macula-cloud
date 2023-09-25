@@ -27,7 +27,7 @@ public class SysTenantController {
     @Operation(summary = "租户分页列表")
     @GetMapping
     public IPage<TenantPageVO> listTenantPages(TenantPageQuery tenantPageQuery) {
-        return sysTenantService.listTenantpages(tenantPageQuery);
+        return sysTenantService.listTenantPages(tenantPageQuery);
     }
 
     @Operation(summary = "新增租户")

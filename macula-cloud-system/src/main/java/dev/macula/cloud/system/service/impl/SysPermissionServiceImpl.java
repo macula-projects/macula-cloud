@@ -65,12 +65,6 @@ public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, S
 
     private final SysRoleMenuService roleMenuService;
 
-    /**
-     * 获取权限分页列表
-     *
-     * @param queryParams 查询条件
-     * @return URL权限列表
-     */
     @Override
     public Page<PermPageVO> listPermPages(PermPageQuery queryParams) {
         Page<PermPageVO> page = new Page<>(queryParams.getPageNum(), queryParams.getPageSize());
@@ -79,21 +73,11 @@ public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, S
         return page;
     }
 
-    /**
-     * 权限<->有权限的角色集合
-     *
-     * @return
-     */
     @Override
     public List<SysPermission> listPermRoles() {
         return this.baseMapper.listPermRoles();
     }
 
-    /**
-     * 刷新权限角色缓存
-     *
-     * @return
-     */
     @Override
     @Async
     public void refreshPermRolesRules() {

@@ -20,7 +20,9 @@ package dev.macula.cloud.system.query;
 import dev.macula.boot.base.BasePageQuery;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
+@EqualsAndHashCode(callSuper = true)
 @Schema(description = "字典类型分页查询对象")
 @Data
 public class DictTypePageQuery extends BasePageQuery {

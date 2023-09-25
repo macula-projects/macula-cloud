@@ -38,15 +38,15 @@ public interface SysMenuMapper extends BaseMapper<SysMenu> {
     /**
      * 获取路由列表
      *
-     * @return
+     * @return 路由列表
      */
     List<RouteBO> listRoutes();
 
     /**
      * 获取角色权限集合
      *
-     * @param roles
-     * @return
+     * @param roles 角色CODE集合
+     * @return 按钮权限集合
      */
     Set<String> listRolePerms(Set<String> roles);
 }

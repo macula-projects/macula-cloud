@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import dev.macula.boot.constants.GlobalConstants;
 import dev.macula.boot.result.Option;
 import dev.macula.boot.starter.security.utils.SecurityUtils;
 import dev.macula.cloud.system.converter.TenantConverter;
@@ -36,13 +37,12 @@ public class SysTenantServiceImpl extends ServiceImpl<SysTenantInfoMapper, SysTe
     private final SysTenantUserService tenantUserService;
 
     @Override
-    public IPage<TenantPageVO> listTenantpages(TenantPageQuery queryParams) {
+    public IPage<TenantPageVO> listTenantPages(TenantPageQuery queryParams) {
         // 查询数据
-        Page<TenantBO> tenantpages =
-            this.baseMapper.listTenantpages(new Page<>(queryParams.getPageNum(), queryParams.getPageSize()),
+        Page<TenantBO> tenantPages =
+            this.baseMapper.listTenantPages(new Page<>(queryParams.getPageNum(), queryParams.getPageSize()),
                 queryParams);
-        Page<TenantPageVO> result = tenantConverter.bo2Page(tenantpages);
-        return result;
+        return tenantConverter.bo2Page(tenantPages);
     }
 
     @Override
@@ -88,10 +88,8 @@ public class SysTenantServiceImpl extends ServiceImpl<SysTenantInfoMapper, SysTe
     public boolean deleteTenants(String idsStr) {
         Assert.isTrue(StrUtil.isNotBlank(idsStr), "删除的租户数据为空");
         // 逻辑删除
-        List<Long> ids =
-            Arrays.asList(idsStr.split(",")).stream().map(idStr -> Long.parseLong(idStr)).collect(Collectors.toList());
-        boolean result = this.removeByIds(ids);
-        return result;
+        List<Long> ids = Arrays.stream(idsStr.split(",")).map(Long::parseLong).collect(Collectors.toList());
+        return this.removeByIds(ids);
     }
 
     @Override
@@ -100,7 +98,7 @@ public class SysTenantServiceImpl extends ServiceImpl<SysTenantInfoMapper, SysTe
         Set<Long> ids = tenantUserService.getMeTenantIds();
         if (CollectionUtil.isEmpty(ids)) {
             // 默认租户
-            ids.add(1L);
+            ids.add(GlobalConstants.DEFAULT_TENANT_ID);
         }
         List<SysTenantInfo> sysTenantInfoList =
             list(new LambdaQueryWrapper<SysTenantInfo>().in(filterMeFlag, SysTenantInfo::getId, ids));

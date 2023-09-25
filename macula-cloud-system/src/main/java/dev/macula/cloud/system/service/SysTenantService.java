@@ -15,25 +15,25 @@ public interface SysTenantService extends IService<SysTenantInfo> {
     /**
      * 租户分页列表
      *
-     * @param tenantPageQuery
-     * @return
+     * @param tenantPageQuery 查询参数
+     * @return 租户列表
      */
-    IPage<TenantPageVO> listTenantpages(TenantPageQuery tenantPageQuery);
+    IPage<TenantPageVO> listTenantPages(TenantPageQuery tenantPageQuery);
 
     /**
      * 新增租户
      *
-     * @param tenantForm
-     * @return
+     * @param tenantForm 租户表单
+     * @return 新增是否成功
      */
     boolean saveTenant(TenantForm tenantForm);
 
     /**
      * 更新租户
      *
-     * @param id
-     * @param tenantForm
-     * @return
+     * @param id 租户ID
+     * @param tenantForm 租户表单
+     * @return 更新是否成功
      */
     boolean updateTenant(Long id, TenantForm tenantForm);
 

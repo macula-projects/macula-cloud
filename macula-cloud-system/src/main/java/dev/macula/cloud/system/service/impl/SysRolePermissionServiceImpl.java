@@ -32,12 +32,6 @@ import java.util.List;
 public class SysRolePermissionServiceImpl extends ServiceImpl<SysRolePermissionMapper, SysRolePermission>
     implements SysRolePermissionService {
 
-    /**
-     * 获取角色拥有的权限ID集合
-     *
-     * @param roleId 角色ID
-     * @return 权限ID集合
-     */
     @Override
     public List<Long> listPermIdsByRoleId(Long roleId) {
         return this.baseMapper.listPermIdsByRoleId(roleId);

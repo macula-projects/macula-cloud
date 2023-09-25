@@ -40,11 +40,11 @@ import java.util.List;
 public interface SysUserMapper extends BaseMapper<SysUser> {
 
     /**
-     * 获取用户分页列表
+     * 获取用户分页列表（过滤数据权限）
      *
-     * @param page
+     * @param page 分页对象
      * @param queryParams 查询参数
-     * @return
+     * @return 用户列表
      */
     @DataPermission(deptAlias = "u", userAlias = "u")
     Page<UserBO> listUserPages(Page<UserBO> page, UserPageQuery queryParams);
@@ -52,9 +52,9 @@ public interface SysUserMapper extends BaseMapper<SysUser> {
     /**
      * 根据用户id获取用户分页列表
      *
-     * @param page
-     * @param queryParams
-     * @return
+     * @param page 分页对象
+     * @param queryParams 查询条件
+     * @return 用户列表
      */
     Page<UserBO> listUserPagesByIds(Page<UserBO> page, UserPageQuery queryParams);
 
@@ -62,23 +62,23 @@ public interface SysUserMapper extends BaseMapper<SysUser> {
      * 获取用户表单详情
      *
      * @param userId 用户ID
-     * @return
+     * @return 用户详情
      */
     UserFormBO getUserDetail(Long userId);
 
     /**
      * 根据用户名获取认证信息
      *
-     * @param username
-     * @return
+     * @param username 用户名
+     * @return 用户认证信息
      */
     UserAuthInfo getUserAuthInfo(String username);
 
     /**
      * 获取导出用户列表
      *
-     * @param queryParams
-     * @return
+     * @param queryParams 查询条件
+     * @return 用户导出列表
      */
     @DataPermission(deptAlias = "u")
     List<UserExportVO> listExportUsers(UserPageQuery queryParams);

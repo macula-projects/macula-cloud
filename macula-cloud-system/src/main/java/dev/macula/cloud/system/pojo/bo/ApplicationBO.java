@@ -35,8 +35,14 @@ public class ApplicationBO {
      */
     private String applicationName;
 
-    private String ak;
+    /**
+     * 应用编码
+     */
+    private String code;
 
+    /**
+     * 应用密钥
+     */
     private String sk;
 
     /**
@@ -58,11 +64,6 @@ public class ApplicationBO {
      * 手机号
      */
     private String mobile;
-
-    /**
-     * 应用编码
-     */
-    private String code;
 
     /**
      * 可访问url

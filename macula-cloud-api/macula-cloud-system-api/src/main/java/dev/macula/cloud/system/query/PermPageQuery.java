@@ -20,6 +20,7 @@ package dev.macula.cloud.system.query;
 import dev.macula.boot.base.BasePageQuery;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 /**
  * 权限分页查询对象
@@ -27,6 +28,7 @@ import lombok.Data;
  * @author haoxr
  * @since 2022/1/14 22:22
  */
+@EqualsAndHashCode(callSuper = true)
 @Data
 @Schema(description = "权限分页查询对象")
 public class PermPageQuery extends BasePageQuery {

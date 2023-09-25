@@ -39,7 +39,7 @@ public interface SysDictTypeService extends IService<SysDictType> {
      * 字典类型分页列表
      *
      * @param queryParams 分页查询对象
-     * @return
+     * @return 字典类型列表
      */
     Page<DictTypePageVO> listDictTypePages(DictTypePageQuery queryParams);
 
@@ -47,7 +47,7 @@ public interface SysDictTypeService extends IService<SysDictType> {
      * 获取字典类型表单详情
      *
      * @param id 字典类型ID
-     * @return
+     * @return 字典类型详情
      */
     DictTypeForm getDictTypeFormData(Long id);
 
@@ -55,16 +55,16 @@ public interface SysDictTypeService extends IService<SysDictType> {
      * 新增字典类型
      *
      * @param dictTypeForm 字典类型表单
-     * @return
+     * @return 现在是否成功
      */
     boolean saveDictType(DictTypeForm dictTypeForm);
 
     /**
      * 修改字典类型
      *
-     * @param id
+     * @param id 字典类型ID
      * @param dictTypeForm 字典类型表单
-     * @return
+     * @return 更新是否成功
      */
     boolean updateDictType(Long id, DictTypeForm dictTypeForm);
 
@@ -72,15 +72,15 @@ public interface SysDictTypeService extends IService<SysDictType> {
      * 删除字典类型
      *
      * @param idsStr 字典类型ID，多个以英文逗号(,)分割
-     * @return
+     * @return 删除是否成功
      */
     boolean deleteDictTypes(String idsStr);
 
     /**
      * 获取字典类型的数据项
      *
-     * @param typeCode
-     * @return
+     * @param typeCode 字典类型编码
+     * @return 下拉列表
      */
     List<Option<String>> listDictItemsByTypeCode(String typeCode);
 }

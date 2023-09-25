@@ -33,16 +33,16 @@ public interface SysPermissionMapper extends BaseMapper<SysPermission> {
     /**
      * 获取权限分页列表
      *
-     * @param page
-     * @param queryParams
-     * @return
+     * @param page 分页对象
+     * @param queryParams 查询参数
+     * @return 权限分页列表
      */
     List<PermPageVO> listPermPages(Page<PermPageVO> page, PermPageQuery queryParams);
 
     /**
      * 权限<->有权限的角色集合
      *
-     * @return
+     * @return 权限-角色集合
      */
     @InterceptorIgnore(tenantLine = "true")
     List<SysPermission> listPermRoles();

@@ -34,18 +34,15 @@ public class ApplicationForm {
     @NotBlank(message = "应用名称不能为空")
     private String applicationName;
 
-    @Schema(description = "ak")
-    private String ak;
+    @Schema(description = "应用编码")
+    @NotBlank(message = "应用编码不能为空")
+    private String code;
 
     @Schema(description = "sk")
     private String sk;
 
     @Schema(description = "主页")
     private String homepage;
-
-    @Schema(description = "应用编码")
-    @NotBlank(message = "应用编码不能为空")
-    private String code;
 
     @Schema(description = "可访问路径")
     private String accessPath;

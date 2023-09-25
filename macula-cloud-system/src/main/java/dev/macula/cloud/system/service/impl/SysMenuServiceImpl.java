@@ -67,48 +67,6 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
 
     private final SysRoleMenuService roleMenuService;
 
-    /**
-     * 递归生成资源（菜单+权限）树形列表
-     *
-     * @param parentId 父级ID
-     * @param menuList 菜单列表
-     * @return 树形列表
-     */
-    private static List<ResourceVO> recurResources(Long parentId, List<SysMenu> menuList) {
-        if (CollectionUtil.isEmpty(menuList)) {
-            return new ArrayList<>();
-        }
-
-        List<ResourceVO> menus = menuList.stream().filter(menu -> menu.getParentId().equals(parentId)).map(menu -> {
-            ResourceVO resourceVO = new ResourceVO();
-            resourceVO.setValue(menu.getId());
-            resourceVO.setLabel(menu.getName());
-
-            List<ResourceVO> children = recurResources(menu.getId(), menuList);
-            resourceVO.setChildren(children);
-
-            return resourceVO;
-        }).collect(Collectors.toList());
-        return menus;
-    }
-
-    /**
-     * 递归生成菜单下拉层级列表
-     *
-     * @param parentId 父级ID
-     * @param menuList 菜单列表
-     * @return 菜单下拉层级列表
-     */
-    private static List<Option<Long>> recurMenuOptions(Long parentId, List<SysMenu> menuList) {
-        if (CollectionUtil.isEmpty(menuList)) {
-            return new ArrayList<>();
-        }
-
-        return menuList.stream().filter(menu -> menu.getParentId().equals(parentId))
-            .map(menu -> new Option<>(menu.getId(), menu.getName(), recurMenuOptions(menu.getId(), menuList)))
-            .collect(ArrayList::new, ArrayList::add, ArrayList::addAll);
-    }
-
     @Override
     @Transactional
     public boolean saveMenu(SysMenu menu) {
@@ -160,77 +118,10 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
         return recurRoutes(SecurityConstants.ROOT_NODE_ID, menuList);
     }
 
-    /**
-     * 递归生成菜单路由层级列表
-     *
-     * @param parentId 父级ID
-     * @param menuList 菜单列表
-     * @return List<RouteVO> 路由层级列表
-     */
-    private List<RouteVO> recurRoutes(Long parentId, List<RouteBO> menuList) {
-        List<RouteVO> list = new ArrayList<>();
-        Optional.ofNullable(menuList)
-            .ifPresent(menus -> menus.stream().filter(menu -> menu.getParentId().equals(parentId)).forEach(menu -> {
-                RouteVO routeVO = new RouteVO();
-
-                MenuTypeEnum menuTypeEnum = menu.getType();
-
-                if (MenuTypeEnum.MENU.equals(menuTypeEnum)) {
-                    routeVO.setName(menu.getPath()); //  根据name路由跳转 this.$router.push({name:xxx})
-                }
-                routeVO.setPath(menu.getPath()); // 根据path路由跳转 this.$router.push({path:xxx})
-                routeVO.setRedirect(menu.getRedirect());
-                routeVO.setComponent(menu.getComponent());
-                routeVO.setId(menu.getId());
-                routeVO.setParentId(menu.getParentId());
-                routeVO.setSort(menu.getSort());
-
-                RouteVO.Meta meta = new RouteVO.Meta();
-                meta.setTitle(menu.getName());
-                meta.setIcon(menu.getIcon());
-                meta.setRoles(menu.getRoles());
-                meta.setHidden(StatusEnum.DISABLE.getValue().equals(menu.getVisible()));
-                meta.setKeepAlive(true);
-                meta.setType(menu.getType());
-                meta.setVisible(menu.getVisible() == 1);
-
-                routeVO.setMeta(meta);
-                List<RouteVO> children = recurRoutes(menu.getId(), menuList);
-                // 含有子节点的目录设置为可见
-                boolean alwaysShow = CollectionUtil.isNotEmpty(children) && children.stream()
-                    .anyMatch(item -> item.getMeta().getHidden().equals(false));
-                meta.setAlwaysShow(alwaysShow);
-                routeVO.setChildren(children);
-
-                list.add(routeVO);
-            }));
-        return list;
-    }
-
     @Override
     public List<ResourceVO> listResources() {
         List<SysMenu> menuList = this.list(new LambdaQueryWrapper<SysMenu>().orderByAsc(SysMenu::getSort));
         return recurResources(SecurityConstants.ROOT_NODE_ID, menuList);
-    }
-
-    /**
-     * 递归生成菜单列表
-     *
-     * @param parentId 父级ID
-     * @param menuList 菜单列表
-     * @return List<MenuVO>
-     */
-    private List<MenuVO> recurMenus(Long parentId, List<SysMenu> menuList) {
-        if (CollectionUtil.isEmpty(menuList)) {
-            return new ArrayList<>();
-        }
-
-        return menuList.stream().filter(menu -> menu.getParentId().equals(parentId)).map(entity -> {
-            MenuVO menuVO = menuConverter.entity2VO(entity);
-            List<MenuVO> children = recurMenus(entity.getId(), menuList);
-            menuVO.setChildren(children);
-            return menuVO;
-        }).collect(Collectors.toList());
     }
 
     @Override
@@ -304,4 +195,111 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
     public void cleanCache() {
     }
 
+    /**
+     * 递归生成资源树
+     *
+     * @param parentId 父菜单ID
+     * @param menuList 菜单集合
+     * @return 资源列表
+     */
+    private List<ResourceVO> recurResources(Long parentId, List<SysMenu> menuList) {
+        if (CollectionUtil.isEmpty(menuList)) {
+            return new ArrayList<>();
+        }
+
+        return menuList.stream().filter(menu -> menu.getParentId().equals(parentId)).map(menu -> {
+            ResourceVO resourceVO = new ResourceVO();
+            resourceVO.setValue(menu.getId());
+            resourceVO.setLabel(menu.getName());
+
+            List<ResourceVO> children = recurResources(menu.getId(), menuList);
+            resourceVO.setChildren(children);
+
+            return resourceVO;
+        }).collect(Collectors.toList());
+    }
+
+    /**
+     * 递归生成菜单下拉层级列表
+     *
+     * @param parentId 父级ID
+     * @param menuList 菜单列表
+     * @return 菜单下拉层级列表
+     */
+    private List<Option<Long>> recurMenuOptions(Long parentId, List<SysMenu> menuList) {
+        if (CollectionUtil.isEmpty(menuList)) {
+            return new ArrayList<>();
+        }
+
+        return menuList.stream().filter(menu -> menu.getParentId().equals(parentId))
+            .map(menu -> new Option<>(menu.getId(), menu.getName(), recurMenuOptions(menu.getId(), menuList)))
+            .collect(ArrayList::new, ArrayList::add, ArrayList::addAll);
+    }
+
+    /**
+     * 递归生成菜单列表
+     *
+     * @param parentId 父级ID
+     * @param menuList 菜单列表
+     * @return List<MenuVO>
+     */
+    private List<MenuVO> recurMenus(Long parentId, List<SysMenu> menuList) {
+        if (CollectionUtil.isEmpty(menuList)) {
+            return new ArrayList<>();
+        }
+
+        return menuList.stream().filter(menu -> menu.getParentId().equals(parentId)).map(entity -> {
+            MenuVO menuVO = menuConverter.entity2VO(entity);
+            List<MenuVO> children = recurMenus(entity.getId(), menuList);
+            menuVO.setChildren(children);
+            return menuVO;
+        }).collect(Collectors.toList());
+    }
+
+    /**
+     * 递归生成菜单路由层级列表
+     *
+     * @param parentId 父级ID
+     * @param menuList 菜单列表
+     * @return List<RouteVO> 路由层级列表
+     */
+    private List<RouteVO> recurRoutes(Long parentId, List<RouteBO> menuList) {
+        List<RouteVO> list = new ArrayList<>();
+        Optional.ofNullable(menuList)
+            .ifPresent(menus -> menus.stream().filter(menu -> menu.getParentId().equals(parentId)).forEach(menu -> {
+                RouteVO routeVO = new RouteVO();
+
+                MenuTypeEnum menuTypeEnum = menu.getType();
+
+                if (MenuTypeEnum.MENU.equals(menuTypeEnum)) {
+                    routeVO.setName(menu.getPath()); //  根据name路由跳转 this.$router.push({name:xxx})
+                }
+                routeVO.setPath(menu.getPath()); // 根据path路由跳转 this.$router.push({path:xxx})
+                routeVO.setRedirect(menu.getRedirect());
+                routeVO.setComponent(menu.getComponent());
+                routeVO.setId(menu.getId());
+                routeVO.setParentId(menu.getParentId());
+                routeVO.setSort(menu.getSort());
+
+                RouteVO.Meta meta = new RouteVO.Meta();
+                meta.setTitle(menu.getName());
+                meta.setIcon(menu.getIcon());
+                meta.setRoles(menu.getRoles());
+                meta.setHidden(StatusEnum.DISABLE.getValue().equals(menu.getVisible()));
+                meta.setKeepAlive(true);
+                meta.setType(menu.getType());
+                meta.setVisible(menu.getVisible() == 1);
+
+                routeVO.setMeta(meta);
+                List<RouteVO> children = recurRoutes(menu.getId(), menuList);
+                // 含有子节点的目录设置为可见
+                boolean alwaysShow = CollectionUtil.isNotEmpty(children) && children.stream()
+                    .anyMatch(item -> item.getMeta().getHidden().equals(false));
+                meta.setAlwaysShow(alwaysShow);
+                routeVO.setChildren(children);
+
+                list.add(routeVO);
+            }));
+        return list;
+    }
 }

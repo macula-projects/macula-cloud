@@ -126,7 +126,7 @@ public class SysRoleController {
     @Parameter(name = "角色编码")
     @GetMapping("/validtor/code")
     public boolean validtorForCode(@RequestParam(required = false) Long id, @RequestParam String code) {
-        return roleService.validtorForCode(id, code);
+        return roleService.validatorForCode(id, code);
     }
 
     @Operation(summary = "角色名称值验证器")
@@ -134,7 +134,7 @@ public class SysRoleController {
     @Parameter(name = "角色名称")
     @GetMapping("/validtor/name")
     public boolean validtorForName(@RequestParam(required = false) Long id, @RequestParam String name) {
-        return roleService.validtorForName(id, name);
+        return roleService.validatorForName(id, name);
     }
 
     @Operation(summary = "获取数据权限的下拉列表")

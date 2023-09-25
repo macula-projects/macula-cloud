@@ -18,7 +18,7 @@
     </resultMap>
 
     <!-- 租户分页列表 -->
-    <select id="listTenantpages" resultMap="TenantMap">
+    <select id="listTenantPages" resultMap="TenantMap">
         SELECT
         t.id,
         t.name,

@@ -45,7 +45,7 @@ public interface SysPermissionService extends IService<SysPermission> {
     /**
      * 获取权限分页列表
      *
-     * @param permPageQuery
+     * @param permPageQuery 查询参数
      * @return 权限列表
      */
     Page<PermPageVO> listPermPages(PermPageQuery permPageQuery);
@@ -64,12 +64,18 @@ public interface SysPermissionService extends IService<SysPermission> {
     List<Option<Boolean>> validatorUrlPerm(List<PermissionValidtorForm> validatorForms);
 
     /**
-     * 更新或保存相关菜单的路径权限信息
-     * @param menuId
-     * @param apiList
-     * @return
+     * 更新或保存相关菜单和路径权限信息
+     * @param menuId 菜单ID
+     * @param apiList 权限URL列表数据
+     * @return 更新保存是否成功
      */
     boolean saveOrUpdatePerms(Long menuId, List<PermissionValidtorForm> apiList);
 
+    /**
+     * 根据ID删除URL权限
+     *
+     * @param ids URL权限ID
+     * @return 删除是否成功
+     */
     boolean deletePerms(String ids);
 }

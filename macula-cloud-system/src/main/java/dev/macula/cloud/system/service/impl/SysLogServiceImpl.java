@@ -22,7 +22,6 @@ public class SysLogServiceImpl extends ServiceImpl<SysLogMapper, SysLog> impleme
     public Page<AuditLogVO> listUserPages(LogPageQuery queryParams) {
         Page<SysLog> page = new Page<>(queryParams.getPageNum(), queryParams.getPageSize());
         Page<AuditLogBO> bos = this.baseMapper.listLogPages(page, queryParams);
-        Page<AuditLogVO> voPage = auditLogConverter.bo2Vo(bos);
-        return voPage;
+        return auditLogConverter.bo2Vo(bos);
     }
 }

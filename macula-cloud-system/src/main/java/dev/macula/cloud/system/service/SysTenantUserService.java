@@ -27,7 +27,7 @@ public interface SysTenantUserService extends IService<SysTenantUser> {
     /**
      * 获取我负责的租户id列表
      *
-     * @return
+     * @return 租户ID列表
      */
     Set<Long> getMeTenantIds();
 }

@@ -27,9 +27,8 @@ public interface SysUserRoleService extends IService<SysUserRole> {
     /**
      * 保存用户角色
      *
-     * @param userId
-     * @param roleIds
-     * @return
+     * @param userId  用户ID
+     * @param roleIds 角色ID集合
      */
-    boolean saveUserRoles(Long userId, List<Long> roleIds);
+    void saveUserRoles(Long userId, List<Long> roleIds);
 }

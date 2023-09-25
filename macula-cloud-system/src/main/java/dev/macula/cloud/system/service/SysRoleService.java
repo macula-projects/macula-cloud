@@ -40,88 +40,90 @@ public interface SysRoleService extends IService<SysRole> {
     /**
      * 角色分页列表
      *
-     * @param queryParams
-     * @return
+     * @param queryParams 查询参数
+     * @return 角色列表
      */
     Page<RolePageVO> listRolePages(RolePageQuery queryParams);
 
     /**
      * 角色下拉列表
      *
-     * @return
+     * @return 角色下拉列表
      */
     List<Option<Long>> listRoleOptions();
 
     /**
-     * @param roleForm
-     * @return
+     * 新增角色
+     *
+     * @param roleForm 角色表单
+     * @return 现在是否成功
      */
     boolean saveRole(RoleForm roleForm);
 
     /**
      * 修改角色状态
      *
-     * @param roleId
-     * @param status
-     * @return
+     * @param roleId 角色ID
+     * @param status 角色状态
+     * @return 修改是否成功
      */
     boolean updateRoleStatus(Long roleId, Integer status);
 
     /**
      * 批量删除角色
      *
-     * @param ids
-     * @return
+     * @param ids 角色ID（逗号分隔）
+     * @return 删除是否成功
      */
     boolean deleteRoles(String ids);
 
     /**
      * 获取角色的资源ID集合,资源包括菜单和权限
      *
-     * @param roleId
-     * @return
+     * @param roleId 角色ID
+     * @return 角色对应的菜单ID集合
      */
     List<Long> getRoleMenuIds(Long roleId);
 
     /**
      * 修改角色的资源权限
      *
-     * @param roleId
-     * @param menuIds
-     * @return
+     * @param roleId 角色ID
+     * @param menuIds 菜单ID集合
+     * @return 更新是否成功
      */
     boolean updateRoleMenus(Long roleId, List<Long> menuIds);
 
     /**
      * 获取最大范围的数据权限
      *
-     * @param roles
-     * @return
+     * @param roles 角色集合
+     * @return 数据权限标识（看DataScopeEnum）
      */
     Integer getMaximumDataScope(Set<String> roles);
 
     /**
      * 验证角色是否可配置该角色code
      *
-     * @param id
-     * @param code
-     * @return
+     * @param id 角色ID
+     * @param code 角色编码
+     * @return 验证结果
      */
-    boolean validtorForCode(Long id, String code);
+    boolean validatorForCode(Long id, String code);
 
     /**
      * 验证角色是否可配置该角色名称
      *
-     * @param id
-     * @param name
-     * @return
+     * @param id 角色ID
+     * @param name 角色名称
+     * @return 验证结果
      */
-    boolean validtorForName(Long id, String name);
+    boolean validatorForName(Long id, String name);
 
     /**
      * 获取数据权限的下拉列表
      *
-     * @return
+     * @return 数据权限列表
      */
     List<Option<DataScopeEnum>> optionsByDataScope();
 

@@ -31,6 +31,7 @@ import dev.macula.cloud.system.service.SysDictItemService;
 import dev.macula.cloud.system.vo.dict.DictItemPageVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Arrays;
 import java.util.List;
@@ -48,12 +49,6 @@ public class SysDictItemServiceImpl extends ServiceImpl<SysDictItemMapper, SysDi
 
     private final DictItemConverter dictItemConverter;
 
-    /**
-     * 字典数据项分页列表
-     *
-     * @param queryParams
-     * @return
-     */
     @Override
     public Page<DictItemPageVO> listDictItemPages(DictItemPageQuery queryParams) {
         // 查询参数
@@ -65,78 +60,45 @@ public class SysDictItemServiceImpl extends ServiceImpl<SysDictItemMapper, SysDi
         // 查询数据
         Page<SysDictItem> dictItemPage = this.page(new Page<>(pageNum, pageSize),
             new LambdaQueryWrapper<SysDictItem>().like(StrUtil.isNotBlank(keywords), SysDictItem::getName, keywords)
-                .eq(StrUtil.isNotBlank(typeCode), SysDictItem::getTypeCode, typeCode)
-                .select(SysDictItem::getId, SysDictItem::getName, SysDictItem::getValue, SysDictItem::getStatus));
+                .eq(StrUtil.isNotBlank(typeCode), SysDictItem::getTypeCode, typeCode));
 
         // 实体转换
-        Page<DictItemPageVO> pageResult = dictItemConverter.entity2Page(dictItemPage);
-        return pageResult;
+        return dictItemConverter.entity2Page(dictItemPage);
     }
 
-    /**
-     * 字典数据项表单详情
-     *
-     * @param id 字典数据项ID
-     * @return
-     */
     @Override
     public DictItemForm getDictItemForm(Long id) {
         // 获取entity
-        SysDictItem entity = this.getOne(new LambdaQueryWrapper<SysDictItem>().eq(SysDictItem::getId, id)
-            .select(SysDictItem::getId, SysDictItem::getTypeCode, SysDictItem::getName, SysDictItem::getValue,
-                SysDictItem::getStatus, SysDictItem::getSort, SysDictItem::getRemark));
+        SysDictItem entity = this.getOne(new LambdaQueryWrapper<SysDictItem>().eq(SysDictItem::getId, id));
         Assert.isTrue(entity != null, "字典数据项不存在");
 
         // 实体转换
-        DictItemForm dictItemForm = dictItemConverter.entity2Form(entity);
-        return dictItemForm;
+        return dictItemConverter.entity2Form(entity);
     }
 
-    /**
-     * 新增字典数据项
-     *
-     * @param dictItemForm 字典数据项表单
-     * @return
-     */
     @Override
     public boolean saveDictItem(DictItemForm dictItemForm) {
         // 实体对象转换 form->entity
         SysDictItem entity = dictItemConverter.form2Entity(dictItemForm);
         // 持久化
-        boolean result = this.save(entity);
-        return result;
+        return this.save(entity);
     }
 
-    /**
-     * 修改字典数据项
-     *
-     * @param id           字典数据项ID
-     * @param dictItemForm 字典数据项表单
-     * @return
-     */
     @Override
     public boolean updateDictItem(Long id, DictItemForm dictItemForm) {
         SysDictItem entity = dictItemConverter.form2Entity(dictItemForm);
-        boolean result = this.updateById(entity);
-        return result;
+        return this.updateById(entity);
     }
 
-    /**
-     * 删除字典数据项
-     *
-     * @param idsStr 字典数据项ID，多个以英文逗号(,)分割
-     * @return
-     */
     @Override
+    @Transactional
     public boolean deleteDictItems(String idsStr) {
         Assert.isTrue(StrUtil.isNotBlank(idsStr), "删除数据为空");
         //
-        List<Long> ids =
-            Arrays.asList(idsStr.split(",")).stream().map(id -> Long.parseLong(id)).collect(Collectors.toList());
+        List<Long> ids = Arrays.stream(idsStr.split(",")).map(Long::parseLong).collect(Collectors.toList());
 
         // 删除字典数据项
-        boolean result = this.removeByIds(ids);
-        return result;
+        return this.removeByIds(ids);
     }
 
 }

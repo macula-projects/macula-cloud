@@ -31,8 +31,8 @@ public interface SysDictItemService extends IService<SysDictItem> {
     /**
      * 字典数据项分页列表
      *
-     * @param queryParams
-     * @return
+     * @param queryParams 查询参数
+     * @return 字典数据项列表
      */
     Page<DictItemPageVO> listDictItemPages(DictItemPageQuery queryParams);
 
@@ -40,7 +40,7 @@ public interface SysDictItemService extends IService<SysDictItem> {
      * 字典数据项表单详情
      *
      * @param id 字典数据项ID
-     * @return
+     * @return 字典数据项详情
      */
     DictItemForm getDictItemForm(Long id);
 
@@ -48,7 +48,7 @@ public interface SysDictItemService extends IService<SysDictItem> {
      * 新增字典数据项
      *
      * @param dictItemForm 字典数据项表单
-     * @return
+     * @return 新增是否成功
      */
     boolean saveDictItem(DictItemForm dictItemForm);
 
@@ -57,7 +57,7 @@ public interface SysDictItemService extends IService<SysDictItem> {
      *
      * @param id           字典数据项ID
      * @param dictItemForm 字典数据项表单
-     * @return
+     * @return 更新是否成功
      */
     boolean updateDictItem(Long id, DictItemForm dictItemForm);
 
@@ -65,7 +65,7 @@ public interface SysDictItemService extends IService<SysDictItem> {
      * 删除字典数据项
      *
      * @param idsStr 字典数据项ID，多个以英文逗号(,)分割
-     * @return
+     * @return 删除是否成功
      */
     boolean deleteDictItems(String idsStr);
 }

@@ -20,6 +20,7 @@ package dev.macula.cloud.system.query;
 import dev.macula.boot.base.BasePageQuery;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 /**
  * 角色分页查询实体
@@ -27,6 +28,7 @@ import lombok.Data;
  * @author haoxr
  * @since 2022/6/3
  */
+@EqualsAndHashCode(callSuper = true)
 @Data
 public class RolePageQuery extends BasePageQuery {
 

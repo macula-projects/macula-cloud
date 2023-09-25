@@ -20,6 +20,7 @@ package dev.macula.cloud.system.query;
 import dev.macula.boot.base.BasePageQuery;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 /**
  * 用户分页查询对象
@@ -27,6 +28,7 @@ import lombok.Data;
  * @author haoxr
  * @since 2022/1/14
  */
+@EqualsAndHashCode(callSuper = true)
 @Schema(description = "用户分页查询对象")
 @Data
 public class UserPageQuery extends BasePageQuery {

@@ -60,12 +60,6 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
     private final SysPermissionService sysPermissionService;
     private final RoleConverter roleConverter;
 
-    /**
-     * 角色分页列表
-     *
-     * @param queryParams
-     * @return
-     */
     @Override
     public Page<RolePageVO> listRolePages(RolePageQuery queryParams) {
         // 查询参数
@@ -86,11 +80,6 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
         return roleConverter.entity2Page(rolePage);
     }
 
-    /**
-     * 角色下拉列表
-     *
-     * @return
-     */
     @Override
     public List<Option<Long>> listRoleOptions() {
         // 查询数据
@@ -103,10 +92,6 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
         return roleConverter.roles2Options(roleList);
     }
 
-    /**
-     * @param roleForm
-     * @return
-     */
     @Override
     @Transactional
     public boolean saveRole(RoleForm roleForm) {
@@ -124,25 +109,12 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
         return this.saveOrUpdate(role);
     }
 
-    /**
-     * 修改角色状态
-     *
-     * @param roleId
-     * @param status
-     * @return
-     */
     @Override
     public boolean updateRoleStatus(Long roleId, Integer status) {
         return this.update(
             new LambdaUpdateWrapper<SysRole>().eq(SysRole::getId, roleId).set(SysRole::getStatus, status));
     }
 
-    /**
-     * 批量删除角色
-     *
-     * @param ids
-     * @return
-     */
     @Override
     @Transactional
     public boolean deleteRoles(String ids) {
@@ -160,25 +132,12 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
         return this.removeByIds(roleIds);
     }
 
-    /**
-     * 获取角色的资源ID集合,资源包括菜单和权限
-     *
-     * @param roleId
-     * @return
-     */
     @Override
     public List<Long> getRoleMenuIds(Long roleId) {
         // 获取角色拥有的菜单ID集合
         return sysRoleMenuService.listMenuIdsByRoleId(roleId);
     }
 
-    /**
-     * 修改角色的资源权限
-     *
-     * @param roleId
-     * @param menuIds
-     * @return
-     */
     @Override
     @Transactional
     @CacheEvict(cacheNames = "system", key = "'routes'")
@@ -213,26 +172,20 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
         return true;
     }
 
-    /**
-     * 获取最大范围的数据权限
-     *
-     * @param roles
-     * @return
-     */
     @Override
     public Integer getMaximumDataScope(Set<String> roles) {
         return this.baseMapper.getMaximumDataScope(roles);
     }
 
     @Override
-    public boolean validtorForCode(Long id, String code) {
+    public boolean validatorForCode(Long id, String code) {
         long count = this.count(new LambdaQueryWrapper<SysRole>().ne(id != null, SysRole::getId, id)
             .and(wrapper -> wrapper.eq(SysRole::getCode, code)));
         return count == 0;
     }
 
     @Override
-    public boolean validtorForName(Long id, String name) {
+    public boolean validatorForName(Long id, String name) {
         long count = this.count(new LambdaQueryWrapper<SysRole>().ne(id != null, SysRole::getId, id)
             .and(wrapper -> wrapper.eq(SysRole::getName, name)));
         return count == 0;
@@ -244,5 +197,4 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
             .map(roleDataScopeEnum -> new Option<>(roleDataScopeEnum, roleDataScopeEnum.getLabel()))
             .collect(Collectors.toList());
     }
-
 }

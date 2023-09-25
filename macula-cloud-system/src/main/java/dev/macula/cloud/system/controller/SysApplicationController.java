@@ -97,6 +97,6 @@ public class SysApplicationController {
     @GetMapping("/validtor/appCode")
     public boolean validtorAppCode(@RequestParam(value = "appId", required = false) Long appId,
         @RequestParam("appCode") String appCode) {
-        return applicationService.validtorAppCode(appId, appCode);
+        return applicationService.validatorAppCode(appId, appCode);
     }
 }

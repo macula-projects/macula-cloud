@@ -37,19 +37,17 @@ public class SysUserRoleServiceImpl extends ServiceImpl<SysUserRoleMapper, SysUs
      *
      * @param userId  用户ID
      * @param roleIds 角色IDS
-     * @return 保存是否成功
      */
     @Override
     @Transactional
-    public boolean saveUserRoles(Long userId, List<Long> roleIds) {
+    public void saveUserRoles(Long userId, List<Long> roleIds) {
 
         if (userId == null || CollectionUtil.isEmpty(roleIds)) {
-            return false;
+            return;
         }
 
         // 用户原角色ID集合
-        List<Long> userRoleIds =
-            this.getBaseMapper().listRoleIdsByUserIdAndScope(userId);
+        List<Long> userRoleIds = this.getBaseMapper().listRoleIdsByUserIdAndScope(userId);
 
         // 新增用户角色
         List<Long> saveRoleIds;
@@ -73,7 +71,6 @@ public class SysUserRoleServiceImpl extends ServiceImpl<SysUserRoleMapper, SysUs
                     .in(SysUserRole::getRoleId, removeRoleIds));
             }
         }
-        return true;
 
     }
 }

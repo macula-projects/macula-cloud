@@ -13,9 +13,9 @@ public interface SysTenantInfoMapper extends BaseMapper<SysTenantInfo> {
     /**
      * 租户分页列表
      *
-     * @param page
-     * @param queryParams
-     * @return
+     * @param page 分页对象
+     * @param queryParams 查询条件
+     * @return 租户列表
      */
-    Page<TenantBO> listTenantpages(Page<TenantBO> page, TenantPageQuery queryParams);
+    Page<TenantBO> listTenantPages(Page<TenantBO> page, TenantPageQuery queryParams);
 }

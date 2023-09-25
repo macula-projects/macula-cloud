@@ -18,7 +18,6 @@
 package dev.macula.cloud.system.vo.menu;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import dev.macula.boot.result.Option;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
@@ -37,8 +36,4 @@ public class ResourceVO {
     @Schema(description = "子菜单")
     @JsonInclude(value = JsonInclude.Include.NON_EMPTY)
     private List<ResourceVO> children;
-
-    @JsonInclude(value = JsonInclude.Include.NON_NULL)
-    private List<Option> perms;
-
 }

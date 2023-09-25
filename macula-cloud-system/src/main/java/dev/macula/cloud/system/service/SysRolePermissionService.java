@@ -33,8 +33,8 @@ public interface SysRolePermissionService extends IService<SysRolePermission> {
     /**
      * 获取角色拥有的权限ID集合
      *
-     * @param roleId
-     * @return
+     * @param roleId 角色ID
+     * @return URL权限集合
      */
     List<Long> listPermIdsByRoleId(Long roleId);
 }

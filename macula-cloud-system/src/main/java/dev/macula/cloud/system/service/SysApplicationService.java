@@ -32,7 +32,7 @@ public interface SysApplicationService extends IService<SysApplication> {
     /**
      * 应用分页列表
      *
-     * @return
+     * @return 应用列表
      */
     Page<ApplicationVO> listApplicationPages(ApplicationPageQuery queryParams);
 
@@ -40,7 +40,7 @@ public interface SysApplicationService extends IService<SysApplication> {
      * 新增应用
      *
      * @param appForm 应用表单对象
-     * @return
+     * @return 新增是否成功
      */
     boolean saveApplication(ApplicationForm appForm);
 
@@ -49,7 +49,7 @@ public interface SysApplicationService extends IService<SysApplication> {
      *
      * @param appId   应用ID
      * @param appForm 应用表单对象
-     * @return
+     * @return 修改是否成功
      */
     boolean updateApplication(Long appId, ApplicationForm appForm);
 
@@ -57,16 +57,16 @@ public interface SysApplicationService extends IService<SysApplication> {
      * 删除应用
      *
      * @param idsStr 应用ID，多个以英文逗号(,)分割
-     * @return
+     * @return 删除是否成功
      */
     boolean deleteApplications(String idsStr);
 
     /**
      * 管理维护人
      *
-     * @param appId
-     * @param appForm
-     * @return
+     * @param appId 应用ID
+     * @param appForm 应用表单
+     * @return 添加维护人是否成功
      */
     boolean addMaintainer(Long appId, ApplicationForm appForm);
 
@@ -78,9 +78,9 @@ public interface SysApplicationService extends IService<SysApplication> {
     /**
      * 验证新增或编辑的应用编码是否合法
      *
-     * @param appId
-     * @param appCode
-     * @return
+     * @param appId 应用ID
+     * @param appCode 应用CODE
+     * @return 校验是否成功
      */
-    boolean validtorAppCode(Long appId, String appCode);
+    boolean validatorAppCode(Long appId, String appCode);
 }

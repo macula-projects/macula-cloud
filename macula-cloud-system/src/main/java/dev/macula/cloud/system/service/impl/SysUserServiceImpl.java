@@ -85,13 +85,6 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
     private final SysRoleService roleService;
     private final RedisTemplate<String, Object> redisTemplate;
 
-    /**
-     * 给已登录用户获取用户信息用
-     *
-     * @param username 用户名
-     * @param roles    该用户的角色
-     * @return 登录用户信息
-     */
     @Override
     @SuppressWarnings("unchecked")
     public UserLoginVO getLoginUserInfo(String username, Set<String> roles, String tokenId) {
@@ -122,22 +115,11 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         return userLoginVO;
     }
 
-    /**
-     * 获取当前登录用户信息
-     *
-     * @return 登录用户的角色和权限等信息
-     */
     @Override
     public UserLoginVO getLoginUserInfo() {
         return getLoginUserInfo(SecurityUtils.getCurrentUser(), SecurityUtils.getRoles(), SecurityUtils.getTokenId());
     }
 
-    /**
-     * 根据用户名获取认证信息(给oauth2调用的，带了密码，不要给其他应用访问）
-     *
-     * @param username 用户名
-     * @return UserAuthInfo
-     */
     @Override
     public UserAuthInfo getUserAuthInfo(String username) {
         UserAuthInfo userAuthInfo = this.baseMapper.getUserAuthInfo(username);
@@ -151,12 +133,6 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         return userAuthInfo;
     }
 
-    /**
-     * 清除指定用户缓存的按钮权限数据
-     *
-     * @param username 用户名
-     * @return 清除成功返回ture，否则返回false
-     */
     @Override
     public boolean clearBtnPerms(String username) {
         Set<String> keys = redisTemplate.keys(CacheConstants.SECURITY_USER_BTN_PERMS_KEY + username + "*");
@@ -166,12 +142,6 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         return true;
     }
 
-    /**
-     * 获取用户分页列表
-     *
-     * @param queryParams 查询条件
-     * @return 用户分页列表
-     */
     @Override
     public IPage<UserVO> listUserPages(UserPageQuery queryParams) {
 
@@ -183,12 +153,6 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         return userConverter.bo2Vo(userBoPage);
     }
 
-    /**
-     * 获取用户详情
-     *
-     * @param userId 用户ID
-     * @return 用户详情
-     */
     @Override
     public UserForm getUserFormData(Long userId) {
         UserFormBO userFormBO = this.baseMapper.getUserDetail(userId);
@@ -196,12 +160,6 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         return userConverter.bo2Form(userFormBO);
     }
 
-    /**
-     * 新增用户
-     *
-     * @param userForm 用户表单对象
-     * @return 保存是否成功的结果
-     */
     @Override
     @Transactional
     public boolean saveUser(UserForm userForm) {
@@ -228,13 +186,6 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         return result;
     }
 
-    /**
-     * 更新用户
-     *
-     * @param userId   用户ID
-     * @param userForm 用户表单对象
-     * @return 更新是否成功标志
-     */
     @Override
     @Transactional
     public boolean updateUser(Long userId, UserForm userForm) {
@@ -258,12 +209,6 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         return result;
     }
 
-    /**
-     * 删除用户
-     *
-     * @param idsStr 用户ID，多个以英文逗号(,)分割
-     * @return 删除结果
-     */
     @Override
     @Transactional
     public boolean deleteUsers(String idsStr) {
@@ -274,13 +219,6 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
 
     }
 
-    /**
-     * 修改用户密码
-     *
-     * @param userId   用户ID
-     * @param password 用户密码
-     * @return 更新结果
-     */
     @Override
     public boolean updatePassword(Long userId, String password) {
         String encryptedPassword = passwordEncoder.encode(password);
@@ -289,12 +227,6 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
             new LambdaUpdateWrapper<SysUser>().eq(SysUser::getId, userId).set(SysUser::getPassword, encryptedPassword));
     }
 
-    /**
-     * 导入用户
-     *
-     * @param userImportDTO 导入DTO
-     * @return 导入后的信息
-     */
     @Transactional
     @Override
     public String importUsers(UserImportDTO userImportDTO) throws IOException {
@@ -376,12 +308,6 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
 
     }
 
-    /**
-     * 获取导出用户列表
-     *
-     * @param queryParams 查询条件
-     * @return 导出的用户列表
-     */
     @Override
     public List<UserExportVO> listExportUsers(UserPageQuery queryParams) {
         return this.baseMapper.listExportUsers(queryParams);

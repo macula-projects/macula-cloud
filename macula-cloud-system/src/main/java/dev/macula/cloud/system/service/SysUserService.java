@@ -59,7 +59,7 @@ public interface SysUserService extends IService<SysUser> {
     /**
      * 根据用户名获取认证信息
      *
-     * @param username
+     * @param username 用户名
      * @return 认证信息
      */
     UserAuthInfo getUserAuthInfo(String username);
@@ -74,7 +74,7 @@ public interface SysUserService extends IService<SysUser> {
     /**
      * 获取用户详情
      *
-     * @param userId
+     * @param userId 用户ID
      * @return 用户详情
      */
     UserForm getUserFormData(Long userId);
@@ -116,7 +116,7 @@ public interface SysUserService extends IService<SysUser> {
     /**
      * 导入用户
      *
-     * @param userImportDTO
+     * @param userImportDTO 导入用户数据
      * @return 成功标识
      */
     String importUsers(UserImportDTO userImportDTO) throws IOException;
@@ -124,16 +124,16 @@ public interface SysUserService extends IService<SysUser> {
     /**
      * 获取导出用户列表
      *
-     * @param queryParams
+     * @param queryParams 查询参数
      * @return 用户列表
      */
     List<UserExportVO> listExportUsers(UserPageQuery queryParams);
 
     /**
-     * 根据用户id获取用户分页列表
+     * 根据查询条件获取用户分页列表
      *
-     * @param queryParams
-     * @return
+     * @param queryParams 查询参数
+     * @return 用户列表
      */
     IPage<UserVO> listUserPagesByIds(UserPageQuery queryParams);
 

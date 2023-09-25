@@ -55,12 +55,6 @@ public class SysDictTypeServiceImpl extends ServiceImpl<SysDictTypeMapper, SysDi
     private final SysDictItemService dictItemService;
     private final DictTypeConverter dictTypeConverter;
 
-    /**
-     * 字典分页列表
-     *
-     * @param queryParams 分页查询对象
-     * @return
-     */
     @Override
     public Page<DictTypePageVO> listDictTypePages(DictTypePageQuery queryParams) {
         // 查询参数
@@ -75,16 +69,9 @@ public class SysDictTypeServiceImpl extends ServiceImpl<SysDictTypeMapper, SysDi
                 .select(SysDictType::getId, SysDictType::getName, SysDictType::getCode, SysDictType::getStatus));
 
         // 实体转换
-        Page<DictTypePageVO> pageResult = dictTypeConverter.entity2Page(dictTypePage);
-        return pageResult;
+        return dictTypeConverter.entity2Page(dictTypePage);
     }
 
-    /**
-     * 获取字典类型表单详情
-     *
-     * @param id 字典类型ID
-     * @return
-     */
     @Override
     public DictTypeForm getDictTypeFormData(Long id) {
         // 获取entity
@@ -94,32 +81,17 @@ public class SysDictTypeServiceImpl extends ServiceImpl<SysDictTypeMapper, SysDi
         Assert.isTrue(entity != null, "字典类型不存在");
 
         // 实体转换
-        DictTypeForm dictTypeForm = dictTypeConverter.entity2Form(entity);
-        return dictTypeForm;
+        return dictTypeConverter.entity2Form(entity);
     }
 
-    /**
-     * 新增字典类型
-     *
-     * @param dictTypeForm
-     * @return
-     */
     @Override
     public boolean saveDictType(DictTypeForm dictTypeForm) {
         // 实体对象转换 form->entity
         SysDictType entity = dictTypeConverter.form2Entity(dictTypeForm);
         // 持久化
-        boolean result = this.save(entity);
-        return result;
+        return this.save(entity);
     }
 
-    /**
-     * 修改字典类型
-     *
-     * @param id           字典类型ID
-     * @param dictTypeForm 字典类型表单
-     * @return
-     */
     @Override
     public boolean updateDictType(Long id, DictTypeForm dictTypeForm) {
         // 获取字典类型
@@ -140,38 +112,25 @@ public class SysDictTypeServiceImpl extends ServiceImpl<SysDictTypeMapper, SysDi
         return result;
     }
 
-    /**
-     * 删除字典类型
-     *
-     * @param idsStr 字典类型ID，多个以英文逗号(,)分割
-     * @return
-     */
     @Override
     @Transactional
     public boolean deleteDictTypes(String idsStr) {
 
         Assert.isTrue(StrUtil.isNotBlank(idsStr), "删除数据为空");
 
-        List ids = Arrays.asList(idsStr.split(",")).stream().collect(Collectors.toList());
+        List<String> ids = Arrays.stream(idsStr.split(",")).collect(Collectors.toList());
 
         // 删除字典数据项
         List<String> dictTypeCodes =
             this.list(new LambdaQueryWrapper<SysDictType>().in(SysDictType::getId, ids).select(SysDictType::getCode))
-                .stream().map(dictType -> dictType.getCode()).collect(Collectors.toList());
+                .stream().map(SysDictType::getCode).collect(Collectors.toList());
         if (CollectionUtil.isNotEmpty(dictTypeCodes)) {
             dictItemService.remove(new LambdaQueryWrapper<SysDictItem>().in(SysDictItem::getTypeCode, dictTypeCodes));
         }
         // 删除字典类型
-        boolean result = this.removeByIds(ids);
-        return result;
+        return this.removeByIds(ids);
     }
 
-    /**
-     * 获取字典类型的数据项
-     *
-     * @param typeCode
-     * @return
-     */
     @Override
     public List<Option<String>> listDictItemsByTypeCode(String typeCode) {
         // 数据字典项

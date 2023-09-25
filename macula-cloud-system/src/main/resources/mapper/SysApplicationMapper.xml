@@ -8,10 +8,9 @@
         SELECT
         id,
         application_name,
-        ak,
+        code,
         sk,
         homepage,
-        code,
         access_path,
         manager,
         maintainer,
@@ -30,10 +29,9 @@
     <select id="listAllApplication" resultType="dev.macula.cloud.system.pojo.bo.ApplicationBO">
         SELECT id,
                application_name,
-               ak,
+               code,
                sk,
                homepage,
-               code,
                manager,
                maintainer,
                mobile,

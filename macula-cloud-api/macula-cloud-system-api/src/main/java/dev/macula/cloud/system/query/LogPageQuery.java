@@ -3,7 +3,9 @@ package dev.macula.cloud.system.query;
 import dev.macula.boot.base.BasePageQuery;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
+@EqualsAndHashCode(callSuper = true)
 @Schema(description = "审计日志分页查询对象")
 @Data
 public class LogPageQuery extends BasePageQuery {
