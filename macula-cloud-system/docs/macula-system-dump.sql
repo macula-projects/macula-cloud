@@ -28,7 +28,6 @@ CREATE TABLE `sys_application_tenant`
     `tenant_id`        bigint                                                                DEFAULT NULL COMMENT '租户id',
     `application_name` varchar(55) COLLATE utf8mb4_bin                              NOT NULL,
     `code`             varchar(55) COLLATE utf8mb4_bin                              NOT NULL COMMENT '应用编码',
-    `ak`               varchar(55) COLLATE utf8mb4_bin                                       DEFAULT NULL,
     `sk`               varchar(55) COLLATE utf8mb4_bin                                       DEFAULT NULL,
     `homepage`         varchar(55) COLLATE utf8mb4_bin                                       DEFAULT NULL,
     `manager`          varchar(55) COLLATE utf8mb4_bin                              NOT NULL COMMENT '负责人',
@@ -52,10 +51,10 @@ CREATE TABLE `sys_application_tenant`
 LOCK
 TABLES `sys_application_tenant` WRITE;
 /*!40000 ALTER TABLE `sys_application_tenant` DISABLE KEYS */;
-INSERT INTO `sys_application_tenant` (`id`, `tenant_id`, `application_name`, `code`, `ak`, `sk`, `homepage`, `manager`,
+INSERT INTO `sys_application_tenant` (`id`, `tenant_id`, `application_name`, `code`, `sk`, `homepage`, `manager`,
                                       `maintainer`, `mobile`, `access_path`, `use_attrs`, `allowed_attrs`, `create_by`,
                                       `create_time`, `last_update_by`, `last_update_time`)
-VALUES (34, 12, 'macula-samples-admin-bff', 'macual-samples-admin-bff', 'example', 'example', 'http://127.0.0.1:5800',
+VALUES (34, 12, 'macula-samples-admin-bff', 'macual-samples-admin-bff', 'example', 'http://127.0.0.1:5800',
         'admin', '2', '13822132000', '', 0, NULL, 'admin', '2023-09-01 15:35:27', 'admin', '2023-09-01 16:59:27');
 /*!40000 ALTER TABLE `sys_application_tenant` ENABLE KEYS */;
 UNLOCK
@@ -332,7 +331,7 @@ VALUES (1, '127.0.0.1', '/api/v1/users', 'admin', '新增用户',
         'admin', '2023-09-01 16:59:27', 'admin', '2023-09-01 16:59:27'),
        (18, '127.0.0.1', '/api/v1/app/34', 'admin', '修改应用',
         'dev.macula.cloud.system.controller.SysApplicationController.updateApplication()', 'PUT',
-        '34 {\"useAttrs\":false,\"code\":\"macual-samples-admin-bff\",\"manager\":\"admin\",\"accessPath\":\"\",\"mobile\":\"13822132000\",\"sk\":\"example\",\"ak\":\"example\",\"id\":34,\"applicationName\":\"macula-samples-admin-bff\",\"homepage\":\"http://127.0.0.1:5800\"}',
+        '34 {\"useAttrs\":false,\"code\":\"macual-samples-admin-bff\",\"manager\":\"admin\",\"accessPath\":\"\",\"mobile\":\"13822132000\",\"sk\":\"example\",\"id\":34,\"applicationName\":\"macula-samples-admin-bff\",\"homepage\":\"http://127.0.0.1:5800\"}',
         0, NULL, 'true', 'admin', '2023-09-01 16:59:27', 'admin', '2023-09-01 16:59:27'),
        (19, '127.0.0.1', '/api/v1/users/2', 'admin', '修改用户',
         'dev.macula.cloud.system.controller.SysUserController.updateUser()', 'PUT',
