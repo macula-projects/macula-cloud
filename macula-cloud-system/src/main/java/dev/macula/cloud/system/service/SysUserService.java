@@ -59,10 +59,11 @@ public interface SysUserService extends IService<SysUser> {
     /**
      * 根据用户名获取认证信息
      *
+     * @param tennantId 租户ID
      * @param username 用户名
      * @return 认证信息
      */
-    UserAuthInfo getUserAuthInfo(String username);
+    UserAuthInfo getUserAuthInfo(Long tennantId, String username);
 
     /**
      * 用户分页列表

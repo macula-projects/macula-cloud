@@ -27,7 +27,7 @@
         SELECT
         min(data_scope)
         FROM
-        sys_role
+        sys_role_tenant
         <where>
             <choose>
                 <when test="roles!=null and roles.size>0">

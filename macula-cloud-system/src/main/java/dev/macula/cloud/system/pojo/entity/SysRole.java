@@ -19,6 +19,7 @@ package dev.macula.cloud.system.pojo.entity;
 
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableLogic;
+import com.baomidou.mybatisplus.annotation.TableName;
 import dev.macula.boot.enums.DataScopeEnum;
 import dev.macula.boot.starter.mp.entity.BaseEntity;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -27,6 +28,7 @@ import lombok.Data;
 import java.util.List;
 
 @Data
+@TableName("sys_role_tenant")
 public class SysRole extends BaseEntity {
 
     private String name;
@@ -40,6 +42,9 @@ public class SysRole extends BaseEntity {
 
     /** 是否是反向角色 */
     private Boolean negative;
+
+    /** 是否是排他性角色 */
+    private Boolean exclusivity;
 
     private DataScopeEnum dataScope;
 

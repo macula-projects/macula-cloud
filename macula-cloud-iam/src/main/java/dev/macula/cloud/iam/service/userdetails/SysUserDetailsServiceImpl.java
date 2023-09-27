@@ -58,20 +58,22 @@ public class SysUserDetailsServiceImpl implements UserDetailsService, UserDetail
     @Override
     public UserDetails loadUserByUsername(String username) {
         String clientId = getClientId();
+        Long tenantId = 1L;
         UserAuthInfo userAuthInfo = null;
         // 根据客户端配置获取不同的用户类型，访问不同的身份提供源
         if (StrUtil.isNotBlank(clientId)) {
             SysOAuth2Client oauth2Client = sysOAuth2ClientService.getClientByClientId(clientId);
             if (oauth2Client != null) {
+                tenantId = oauth2Client.getTenantId();
                 if (userAuthInfoService != null) {
-                    userAuthInfo = userAuthInfoService.getUserAuthInfo(oauth2Client.getUserType(), username);
+                    userAuthInfo = userAuthInfoService.getUserAuthInfo(oauth2Client.getUserType(), tenantId, username);
                 }
             }
         }
 
         // 默认使用系统用户
         if (userAuthInfo == null) {
-            userAuthInfo = sysUserService.getUserAuthInfo(username);
+            userAuthInfo = sysUserService.getUserAuthInfo(tenantId, username);
         }
 
         Assert.isTrue(userAuthInfo != null, "用户不存在");
@@ -99,6 +101,9 @@ public class SysUserDetailsServiceImpl implements UserDetailsService, UserDetail
         HttpServletRequest request = getCurrentRequest();
         // 优先从HEADER中获取CLIENT_ID
         String clientId = request.getHeader(OAuth2ParameterNames.CLIENT_ID);
+        if (StrUtil.isBlank(clientId)) {
+            clientId = request.getParameter(OAuth2ParameterNames.CLIENT_ID);
+        }
         if (StrUtil.isBlank(clientId)) {
             // 找不到就从COOKIE中获取
             if (request.getCookies() != null) {

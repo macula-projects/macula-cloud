@@ -22,6 +22,8 @@ import cn.hutool.core.lang.Assert;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.baomidou.mybatisplus.core.plugins.IgnoreStrategy;
+import com.baomidou.mybatisplus.core.plugins.InterceptorIgnoreHelper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import dev.macula.boot.constants.SecurityConstants;
@@ -82,12 +84,17 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
 
     @Override
     public List<Option<Long>> listRoleOptions() {
+        // 开启忽略策略
+        InterceptorIgnoreHelper.handle(IgnoreStrategy.builder().tenantLine(true).build());
+
         // 查询数据
         List<SysRole> roleList = this.list(
             new LambdaQueryWrapper<SysRole>().ne(!SecurityUtils.isRoot(), SysRole::getCode,
                 SecurityConstants.ROOT_ROLE_CODE).orderByAsc(SysRole::getSort));
 
-        // List<SysRole> roleList = this.baseMapper.listDeptOptions(UserUtils.isRoot(),GlobalConstants.ROOT_ROLE_CODE);
+        // 关闭忽略策略
+        InterceptorIgnoreHelper.clearIgnoreStrategy();
+
         // 实体转换
         return roleConverter.roles2Options(roleList);
     }

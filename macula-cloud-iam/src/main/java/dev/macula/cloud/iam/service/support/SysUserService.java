@@ -34,6 +34,6 @@ public interface SysUserService extends IService<SysUser> {
      * @param username 用户名
      * @return 认证信息
      */
-    UserAuthInfo getUserAuthInfo(String username);
+    UserAuthInfo getUserAuthInfo(Long tenantId, String username);
 
 }

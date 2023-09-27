@@ -48,8 +48,8 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
      * @return UserAuthInfo
      */
     @Override
-    public UserAuthInfo getUserAuthInfo(String username) {
-        UserAuthInfo userAuthInfo = this.baseMapper.getUserAuthInfo(username);
+    public UserAuthInfo getUserAuthInfo(Long tenantId, String username) {
+        UserAuthInfo userAuthInfo = this.baseMapper.getUserAuthInfo(tenantId, username);
         if (userAuthInfo != null) {
             Set<String> roles = userAuthInfo.getRoles();
             if (CollectionUtil.isNotEmpty(roles)) {

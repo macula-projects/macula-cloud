@@ -17,6 +17,7 @@
 
 package dev.macula.cloud.system.mapper;
 
+import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import dev.macula.cloud.system.pojo.entity.SysRole;
 import org.apache.ibatis.annotations.Mapper;
@@ -32,5 +33,6 @@ public interface SysRoleMapper extends BaseMapper<SysRole> {
      * @param roles 角色CODE集合
      * @return 数据权限DataScope
      */
+    @InterceptorIgnore(tenantLine = "true")
     Integer getMaximumDataScope(Set<String> roles);
 }

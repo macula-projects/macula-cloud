@@ -17,6 +17,7 @@
 
 package dev.macula.cloud.system.mapper;
 
+import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import dev.macula.boot.starter.mp.annotation.DataPermission;
@@ -47,6 +48,7 @@ public interface SysUserMapper extends BaseMapper<SysUser> {
      * @return 用户列表
      */
     @DataPermission(deptAlias = "u", userAlias = "u")
+    @InterceptorIgnore(tenantLine = "true")
     Page<UserBO> listUserPages(Page<UserBO> page, UserPageQuery queryParams);
 
     /**
@@ -56,6 +58,7 @@ public interface SysUserMapper extends BaseMapper<SysUser> {
      * @param queryParams 查询条件
      * @return 用户列表
      */
+    @InterceptorIgnore(tenantLine = "true")
     Page<UserBO> listUserPagesByIds(Page<UserBO> page, UserPageQuery queryParams);
 
     /**
@@ -72,7 +75,8 @@ public interface SysUserMapper extends BaseMapper<SysUser> {
      * @param username 用户名
      * @return 用户认证信息
      */
-    UserAuthInfo getUserAuthInfo(String username);
+    @InterceptorIgnore(tenantLine = "true")
+    UserAuthInfo getUserAuthInfo(Long tenantId, String username);
 
     /**
      * 获取导出用户列表

@@ -35,5 +35,5 @@ public interface UserAuthInfoService {
      * @param username 用户名
      * @return 返回指定用户类型和用户名的用户信息
      */
-    UserAuthInfo getUserAuthInfo(UserTypeEnum userType, String username);
+    UserAuthInfo getUserAuthInfo(UserTypeEnum userType, Long tenantId, String username);
 }

@@ -40,6 +40,9 @@ public class RolePageVO {
     @Schema(description = "反向角色（1-是，0-否）")
     private Boolean negative;
 
+    @Schema(description = "排他性角色（1-是，0-否）")
+    private Boolean exclusivity;
+
     @Schema(description = "角色状态")
     private Integer status;
 

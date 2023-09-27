@@ -24,7 +24,6 @@ import dev.macula.boot.starter.mp.handler.DurationTypeHandler;
 import dev.macula.cloud.iam.enums.UserTypeEnum;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
-import org.springframework.data.convert.Jsr310Converters;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -85,4 +84,6 @@ public class SysOAuth2Client extends BaseEntity {
     private String idTokenSignatureAlgorithm;
     /** 用户类型 */
     private UserTypeEnum userType;
+    /** 租户ID */
+    private Long tenantId;
 }

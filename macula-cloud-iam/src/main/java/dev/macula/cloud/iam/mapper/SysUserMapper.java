@@ -17,6 +17,7 @@
 
 package dev.macula.cloud.iam.mapper;
 
+import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import dev.macula.cloud.iam.pojo.dto.UserAuthInfo;
 import dev.macula.cloud.iam.pojo.entity.SysUser;
@@ -37,6 +38,7 @@ public interface SysUserMapper extends BaseMapper<SysUser> {
      * @param username 用户名
      * @return 用户认证信息
      */
-    UserAuthInfo getUserAuthInfo(String username);
+    @InterceptorIgnore(tenantLine = "true")
+    UserAuthInfo getUserAuthInfo(Long tenantId, String username);
 
 }

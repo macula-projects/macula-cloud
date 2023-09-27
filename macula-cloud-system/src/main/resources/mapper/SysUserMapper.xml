@@ -38,7 +38,7 @@
         sys_user u
         LEFT JOIN sys_dept d ON u.dept_id = d.id
         LEFT JOIN sys_user_role sr ON u.id = sr.user_id
-        LEFT JOIN sys_role r ON sr.role_id = r.id
+        LEFT JOIN sys_role_tenant r ON sr.role_id = r.id
         <where>
             u.deleted = 0 AND u.username != 'root'
             <if test='queryParams.keywords!=null and queryParams.keywords.trim() neq ""'>
@@ -75,7 +75,7 @@
         sys_user u
         LEFT JOIN sys_dept d ON u.dept_id = d.id
         LEFT JOIN sys_user_role sr ON u.id = sr.user_id
-        LEFT JOIN sys_role r ON sr.role_id = r.id
+        LEFT JOIN sys_role_tenant r ON sr.role_id = r.id
         <where>
             u.deleted = 0 AND u.username != 'root'
             <if test='queryParams.keywords!=null and queryParams.keywords.trim() neq ""'>
@@ -141,14 +141,32 @@
         <result property="username" column="username" jdbcType="VARCHAR"/>
         <result property="password" column="password" jdbcType="VARCHAR"/>
         <result property="status" column="status" jdbcType="BOOLEAN"/>
-        <result property="deptId" column="deptId" jdbcType="BIGINT"></result>
+        <result property="deptId" column="deptId" jdbcType="BIGINT"/>
         <collection property="roles" ofType="string" javaType="java.util.Set">
-            <result column="roleCode"></result>
+            <result column="roleCode"/>
         </collection>
     </resultMap>
 
-    <!-- 根据用户名获取认证信息, 过滤禁用的角色状态 -->
+    <!-- 根据用户名获取认证信息, 过滤禁用的角色状态，支持反向角色，支持独占角色 -->
     <select id="getUserAuthInfo" resultMap="UserAuthMap">
+        (SELECT t1.id                                                              userId,
+                t1.username,
+                t1.nickname,
+                t1.PASSWORD,
+                t1.STATUS,
+                t1.dept_id                                                         deptId,
+                case t3.negative when 0 then t3.CODE else CONCAT('!', t3.CODE) end roleCode
+         FROM sys_user t1
+                  LEFT JOIN sys_user_role t2 ON t2.user_id = t1.id
+                  LEFT JOIN sys_role_tenant t3 ON t3.id = t2.role_id
+         WHERE t1.username = #{username}
+           and t1.deleted = 0
+           and t3.status = 1
+           and t3.tenant_id = #{tenantId}
+           and t3.exclusivity = 1
+         order by t3.sort asc
+         limit 1)
+        union
         SELECT t1.id      userId,
                t1.username,
                t1.nickname,
@@ -158,10 +176,20 @@
                case t3.negative when 0 then t3.CODE else CONCAT('!', t3.CODE) end roleCode
         FROM sys_user t1
                  LEFT JOIN sys_user_role t2 ON t2.user_id = t1.id
-                 LEFT JOIN sys_role t3 ON t3.id = t2.role_id
+                 LEFT JOIN sys_role_tenant t3 ON t3.id = t2.role_id
         WHERE t1.username = #{username}
           and t1.deleted = 0
           and t3.status = 1
+          and t3.tenant_id = #{tenantId}
+          and not exists(SELECT 1
+                         FROM sys_user t1
+                                  LEFT JOIN sys_user_role t2 ON t2.user_id = t1.id
+                                  LEFT JOIN sys_role_tenant t3 ON t3.id = t2.role_id
+                         WHERE t1.username = #{username}
+                           and t1.deleted = 0
+                           and t3.status = 1
+                           and t3.tenant_id = #{tenantId}
+                           and t3.exclusivity = 1);
     </select>
 
     <!-- 获取用户导出列表 -->
