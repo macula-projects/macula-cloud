@@ -35,4 +35,13 @@ public interface SysRoleMapper extends BaseMapper<SysRole> {
      */
     @InterceptorIgnore(tenantLine = "true")
     Integer getMaximumDataScope(Set<String> roles);
+
+    /**
+     * 根据群组ID查询角色code
+     *
+     * @param groupIds 群组ID
+     * @return 角色code集合
+     */
+    @InterceptorIgnore(tenantLine = "true")
+    Set<String> listRolesByGroupIds(Long tenantId, Set<Long> groupIds);
 }

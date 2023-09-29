@@ -57,13 +57,14 @@ public interface SysUserService extends IService<SysUser> {
     UserLoginVO getLoginUserInfo();
 
     /**
-     * 根据用户名获取认证信息
+     * 根据用户名获取认证信息(给oauth2调用的，带了密码，不要给其他应用访问）
      *
-     * @param tennantId 租户ID
+     * @param tenantId 租户ID
      * @param username 用户名
-     * @return 认证信息
+     * @param groupIds 人群包ID集合
+     * @return UserAuthInfo
      */
-    UserAuthInfo getUserAuthInfo(Long tennantId, String username);
+    UserAuthInfo getUserAuthInfo(Long tenantId, String username, Set<Long> groupIds);
 
     /**
      * 用户分页列表

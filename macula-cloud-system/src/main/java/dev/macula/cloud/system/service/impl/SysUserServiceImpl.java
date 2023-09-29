@@ -32,6 +32,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import dev.macula.boot.base.IBaseEnum;
 import dev.macula.boot.constants.CacheConstants;
 import dev.macula.boot.constants.SecurityConstants;
+import dev.macula.boot.enums.DataScopeEnum;
 import dev.macula.boot.enums.GenderEnum;
 import dev.macula.boot.starter.security.utils.SecurityUtils;
 import dev.macula.cloud.system.converter.UserConverter;
@@ -60,10 +61,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -121,14 +119,39 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
     }
 
     @Override
-    public UserAuthInfo getUserAuthInfo(Long tenantId, String username) {
+    public UserAuthInfo getUserAuthInfo(Long tenantId, String username, Set<Long> groupIds) {
+        // 按照用户名和租户获取角色集合
         UserAuthInfo userAuthInfo = this.baseMapper.getUserAuthInfo(tenantId, username);
 
-        Set<String> roles = userAuthInfo.getRoles();
-        if (CollectionUtil.isNotEmpty(roles)) {
+        if (userAuthInfo != null) {
+            if (userAuthInfo.getRoles() == null) {
+                userAuthInfo.setRoles(new HashSet<>());
+            }
+
+            // 按照人群包ID和租户获取角色集合
+            Set<String> groupRoles = roleService.listRolesByGroupIds(tenantId, groupIds);
+            if (CollectionUtil.isNotEmpty(groupRoles)) {
+                userAuthInfo.getRoles().addAll(groupRoles);
+            }
+
+            // 处理排他角色（如果存在排他角色，则只取优先级最高的一个排他角色）
+            Optional<String> exclusivityRole = userAuthInfo.getRoles().stream().filter(s -> s.startsWith("@"))
+                .min(Comparator.comparing(s -> Long.parseLong(s.substring(1, s.indexOf("#")))))
+                .map(s -> s.substring(s.indexOf("#") + 1));
+
+            if (exclusivityRole.isPresent()) {
+                userAuthInfo.getRoles().clear();
+                userAuthInfo.getRoles().add(exclusivityRole.get());
+            }
+
             // 获取最大范围的数据权限
-            Integer dataScope = roleService.getMaximumDataScope(roles);
-            userAuthInfo.setDataScope(dataScope);
+            Set<String> roles = userAuthInfo.getRoles();
+            if (CollectionUtil.isNotEmpty(roles)) {
+                Integer dataScope = roleService.getMaximumDataScope(roles);
+                userAuthInfo.setDataScope(dataScope);
+            } else {
+                userAuthInfo.setDataScope(DataScopeEnum.ALL.getValue());
+            }
         }
         return userAuthInfo;
     }

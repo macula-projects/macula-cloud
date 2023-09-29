@@ -17,6 +17,7 @@
 
 package dev.macula.cloud.iam.service.support.impl;
 
+import cn.hutool.core.collection.CollectionUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import dev.macula.cloud.iam.mapper.SysRoleMapper;
 import dev.macula.cloud.iam.pojo.entity.SysRole;
@@ -24,6 +25,7 @@ import dev.macula.cloud.iam.service.support.SysRoleService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.HashSet;
 import java.util.Set;
 
 /**
@@ -36,14 +38,16 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> implements SysRoleService {
 
-    /**
-     * 获取最大范围的数据权限
-     *
-     * @param roles 角色编码
-     * @return 最大数据范围
-     */
     @Override
     public Integer getMaximumDataScope(Set<String> roles) {
         return this.baseMapper.getMaximumDataScope(roles);
+    }
+
+    @Override
+    public Set<String> listRolesByGroupIds(Long tenantId, Set<Long> groupIds) {
+        if (CollectionUtil.isNotEmpty(groupIds)) {
+            return this.baseMapper.listRolesByGroupIds(tenantId, groupIds);
+        }
+        return new HashSet<>();
     }
 }

@@ -38,4 +38,12 @@ public interface SysRoleService extends IService<SysRole> {
      */
     Integer getMaximumDataScope(Set<String> roles);
 
+    /**
+     * 根据群组ID查询角色code
+     *
+     * @param groupIds 群组ID
+     * @return 角色code集合
+     */
+    Set<String> listRolesByGroupIds(Long tenantId, Set<Long> groupIds);
+
 }

@@ -73,7 +73,8 @@ public class SysUserDetailsServiceImpl implements UserDetailsService, UserDetail
 
         // 默认使用系统用户
         if (userAuthInfo == null) {
-            userAuthInfo = sysUserService.getUserAuthInfo(tenantId, username);
+            // TODO 如果要支持人群包，这里需要获取该用户的groupIds
+            userAuthInfo = sysUserService.getUserAuthInfo(tenantId, username, null);
         }
 
         Assert.isTrue(userAuthInfo != null, "用户不存在");

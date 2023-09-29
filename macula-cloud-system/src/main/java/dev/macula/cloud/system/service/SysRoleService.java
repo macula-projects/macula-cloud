@@ -88,7 +88,7 @@ public interface SysRoleService extends IService<SysRole> {
     /**
      * 修改角色的资源权限
      *
-     * @param roleId 角色ID
+     * @param roleId  角色ID
      * @param menuIds 菜单ID集合
      * @return 更新是否成功
      */
@@ -103,9 +103,17 @@ public interface SysRoleService extends IService<SysRole> {
     Integer getMaximumDataScope(Set<String> roles);
 
     /**
+     * 根据群组ID查询角色code
+     *
+     * @param groupIds 群组ID
+     * @return 角色code集合
+     */
+    Set<String> listRolesByGroupIds(Long tenantId, Set<Long> groupIds);
+
+    /**
      * 验证角色是否可配置该角色code
      *
-     * @param id 角色ID
+     * @param id   角色ID
      * @param code 角色编码
      * @return 验证结果
      */
@@ -114,7 +122,7 @@ public interface SysRoleService extends IService<SysRole> {
     /**
      * 验证角色是否可配置该角色名称
      *
-     * @param id 角色ID
+     * @param id   角色ID
      * @param name 角色名称
      * @return 验证结果
      */

@@ -185,6 +185,14 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
     }
 
     @Override
+    public Set<String> listRolesByGroupIds(Long tenantId, Set<Long> groupIds) {
+        if (CollectionUtil.isNotEmpty(groupIds)) {
+            return this.baseMapper.listRolesByGroupIds(tenantId, groupIds);
+        }
+        return new HashSet<>();
+    }
+
+    @Override
     public boolean validatorForCode(Long id, String code) {
         long count = this.count(new LambdaQueryWrapper<SysRole>().ne(id != null, SysRole::getId, id)
             .and(wrapper -> wrapper.eq(SysRole::getCode, code)));

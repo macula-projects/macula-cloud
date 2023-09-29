@@ -21,6 +21,8 @@ import com.baomidou.mybatisplus.extension.service.IService;
 import dev.macula.cloud.iam.pojo.dto.UserAuthInfo;
 import dev.macula.cloud.iam.pojo.entity.SysUser;
 
+import java.util.Set;
+
 /**
  * 用户业务接口
  *
@@ -28,12 +30,15 @@ import dev.macula.cloud.iam.pojo.entity.SysUser;
  * @since 2022/1/14
  */
 public interface SysUserService extends IService<SysUser> {
+
     /**
-     * 根据用户名获取认证信息
+     * 根据用户名获取认证信息(给oauth2调用的，带了密码，不要给其他应用访问）
      *
+     * @param tenantId 租户ID
      * @param username 用户名
-     * @return 认证信息
+     * @param groupIds 人群包ID集合
+     * @return UserAuthInfo
      */
-    UserAuthInfo getUserAuthInfo(Long tenantId, String username);
+    UserAuthInfo getUserAuthInfo(Long tenantId, String username, Set<Long> groupIds);
 
 }

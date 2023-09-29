@@ -41,6 +41,27 @@
                 </otherwise>
             </choose>
         </where>
+    </select>
 
+    <select id="listRolesByGroupIds" resultType="java.lang.String">
+        select
+        IF(t3.negative = 1, CONCAT('!', t3.CODE), IF(t3.exclusivity = 1, CONCAT('@', t3.sort, '#', t3.code), t3.code))
+        roleCode
+        from sys_role_tenant r
+        inner join sys_group_role gr on gr.role_id = r.id
+        <where>
+            <choose>
+                <when test="groupIds!=null and groupIds.size>0">
+                    AND gr.group_id IN
+                    <foreach collection="groupIds" item="groupId" separator="," open="(" close=")">
+                        #{groupId}
+                    </foreach>
+                    AND r.tenant_id = #{tenantId}
+                </when>
+                <otherwise>
+                    r.id = -1
+                </otherwise>
+            </choose>
+        </where>
     </select>
 </mapper>
