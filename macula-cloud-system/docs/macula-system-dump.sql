@@ -4,17 +4,6 @@
 -- ------------------------------------------------------
 -- Server version	8.1.0
 
-/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
-/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
-/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
-/*!50503 SET NAMES utf8mb4 */;
-/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
-/*!40103 SET TIME_ZONE='+00:00' */;
-/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
-/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
-/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
-/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
-
 --
 -- Table structure for table `sys_application_tenant`
 --
@@ -22,7 +11,7 @@
 DROP TABLE IF EXISTS `sys_application_tenant`;
 CREATE TABLE `sys_application_tenant`
 (
-    `id`               int         NOT NULL AUTO_INCREMENT,
+    `id` bigint NOT NULL AUTO_INCREMENT,
     `tenant_id`        bigint      NOT NULL COMMENT '租户id',
     `application_name` varchar(55) NOT NULL,
     `code`             varchar(55) NOT NULL COMMENT '应用编码',
@@ -488,8 +477,8 @@ TABLES;
 DROP TABLE IF EXISTS `sys_role_permission`;
 CREATE TABLE `sys_role_permission`
 (
-    `role_id`       int NOT NULL,
-    `permission_id` int NOT NULL,
+    `role_id`       bigint NOT NULL,
+    `permission_id` bigint NOT NULL,
     PRIMARY KEY (`permission_id`, `role_id`)
 ) COMMENT='角色和权限关联表';
 
@@ -512,7 +501,7 @@ TABLES;
 DROP TABLE IF EXISTS `sys_tenant_info`;
 CREATE TABLE `sys_tenant_info`
 (
-    `id`               int         NOT NULL AUTO_INCREMENT,
+    `id` bigint NOT NULL AUTO_INCREMENT,
     `name`             varchar(50)          DEFAULT NULL,
     `create_by`        varchar(50) NOT NULL DEFAULT '*SYSADM' COMMENT '创建人',
     `create_time`      datetime    NOT NULL COMMENT '创建时间',
@@ -573,7 +562,7 @@ TABLES;
 DROP TABLE IF EXISTS `sys_user`;
 CREATE TABLE `sys_user`
 (
-    `id`               int         NOT NULL AUTO_INCREMENT,
+    `id` bigint NOT NULL AUTO_INCREMENT,
     `username`         varchar(64)          DEFAULT NULL COMMENT '用户名',
     `nickname`         varchar(64)          DEFAULT NULL COMMENT '昵称',
     `gender`           tinyint(1) DEFAULT '1' COMMENT '性别((1:男;2:女))',
@@ -616,8 +605,8 @@ TABLES;
 DROP TABLE IF EXISTS `sys_user_role`;
 CREATE TABLE `sys_user_role`
 (
-    `user_id` int NOT NULL COMMENT '用户ID',
-    `role_id` int NOT NULL COMMENT '角色ID',
+    `user_id` bigint NOT NULL COMMENT '用户ID',
+    `role_id` bigint NOT NULL COMMENT '角色ID',
     PRIMARY KEY (`user_id`, `role_id`)
 ) COMMENT='用户和角色关联表';
 
@@ -637,14 +626,11 @@ VALUES (1, 1),
        (136, 1);
 UNLOCK
 TABLES;
-/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
-/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
-/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
-/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
-/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
-/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
-/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
-/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
-
--- Dump completed on 2023-09-02 21:46:58
+DROP TABLE IF EXISTS `sys_group_role`;
+create table sys_group_role
+(
+    group_id bigint not null comment '人群包ID',
+    role_id  bigint not null comment '角色ID',
+    primary key (`group_id`, `role_id`)
+) comment '群组与角色关系表';
