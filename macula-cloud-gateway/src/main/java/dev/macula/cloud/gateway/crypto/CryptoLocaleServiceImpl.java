@@ -27,7 +27,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.stereotype.Component;
 
-import java.nio.charset.StandardCharsets;
 import java.security.KeyPair;
 
 /**
@@ -43,32 +42,28 @@ public class CryptoLocaleServiceImpl implements CryptoService, InitializingBean 
 
     @Override
     public String getSm2PublicKey() {
-        return HexUtil.encodeHexStr(sm2.getPublicKey().getEncoded());
+        return HexUtil.encodeHexStr(sm2.getQ(false));
     }
 
     @Override
     public String decryptSm4Key(String key) {
+        // TODO 缓存解密过后的密钥
         return sm2.decryptStr(key, KeyType.PrivateKey);
     }
 
     @Override
     public String encrypt(String plainText, String sm4Key) {
-        return SmUtil.sm4(sm4Key.getBytes(StandardCharsets.UTF_8)).encryptBase64(plainText);
+        return SmUtil.sm4(HexUtil.decodeHex(sm4Key)).encryptBase64(plainText);
     }
 
     @Override
     public String decrypt(String secretText, String sm4Key) {
-        return SmUtil.sm4(sm4Key.getBytes(StandardCharsets.UTF_8)).decryptStr(secretText);
+        return SmUtil.sm4(HexUtil.decodeHex(sm4Key)).decryptStr(secretText);
     }
 
     @Override
-    public void afterPropertiesSet() throws Exception {
+    public void afterPropertiesSet() {
         KeyPair pair = SecureUtil.generateKeyPair("SM2");
         sm2 = SmUtil.sm2(pair.getPrivate(), pair.getPublic());
-        if (log.isDebugEnabled()) {
-            log.debug("sm2 public key: {}", HexUtil.encodeHexStr(sm2.getPublicKey().getEncoded()));
-            log.debug("sm2 private key: {}", HexUtil.encodeHexStr(sm2.getPrivateKey().getEncoded()));
-            log.debug("sm4 encrypted key: {}", sm2.encryptBase64("1234567890abcdef", KeyType.PublicKey));
-        }
     }
 }

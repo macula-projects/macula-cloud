@@ -32,6 +32,15 @@ spring:
 
 macula:
   gateway:
+    sign-switch: true                       # 接口签名全局开关，默认true
+    force-sign: false                       # 是否强制校验指定URL的接口签名，默认false
+    crypto-switch: true                    # 接口加解密全局开关，默认true
+    force-crypto: false                    # 是否强制校验指定URL的接口要不要加解密，默认false
+    protect-urls: # 需要保护的URL，前端可通过/gateway/protect/urls获取
+      crypto: # 加密
+        - /system/api/v1/app
+      sign: # 签名
+        - /system/api/v1/app
     security:
       only-auth-urls: /mallapi/**
       ignore-urls:
