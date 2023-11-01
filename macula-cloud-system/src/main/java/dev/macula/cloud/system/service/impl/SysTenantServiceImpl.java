@@ -89,6 +89,7 @@ public class SysTenantServiceImpl extends ServiceImpl<SysTenantInfoMapper, SysTe
         Assert.isTrue(StrUtil.isNotBlank(idsStr), "删除的租户数据为空");
         // 逻辑删除
         List<Long> ids = Arrays.stream(idsStr.split(",")).map(Long::parseLong).collect(Collectors.toList());
+        tenantUserService.remove(new LambdaQueryWrapper<SysTenantUser>().in(SysTenantUser::getTenantId, ids));
         return this.removeByIds(ids);
     }
 
