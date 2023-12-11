@@ -11,8 +11,8 @@
         <result property="code" column="code" jdbcType="VARCHAR"/>
         <result property="description" column="description" jdbcType="VARCHAR"/>
         <result property="createTime" column="create_time" jdbcType="DATE"/>
-        <collection property="supervisor" ofType="dev.macula.cloud.system.pojo.bo.TenantUserBO" javaType="list">
-            <id property="id" column="userId" jdbcType="BIGINT"/>
+        <collection property="supervisor" column="id" ofType="dev.macula.cloud.system.pojo.bo.TenantUserBO" javaType="list" select="selectUserByTenantId">
+            <id property="id" column="id" jdbcType="BIGINT"/>
             <result property="username" column="username"/>
         </collection>
     </resultMap>
@@ -20,13 +20,15 @@
     <!-- 租户分页列表 -->
     <select id="listTenantPages" resultMap="TenantMap">
         SELECT
-        t.id,
-        t.name,
-        t.code,
-        t.description,
-        t.create_time,
-        u.id as userId,
-        u.username
+        id,
+        name,
+        code,
+        description,
+        create_time
+        FROM  sys_tenant_info t
+        WHERE t.id in (
+        SELECT
+        t.id
         FROM
         sys_tenant_info t
         LEFT JOIN
@@ -42,11 +44,17 @@
                 AND (
                 t.name LIKE CONCAT('%',#{queryParams.keywords},'%')
                 OR t.code LIKE CONCAT('%',#{queryParams.keywords},'%')
-                OR u.supervisor LIKE CONCAT('%',#{queryParams.keywords},'%')
+                OR u.username LIKE CONCAT('%',#{queryParams.keywords},'%')
                 )
             </if>
         </where>
+        group by t.id
+        )
         order by t.create_time desc
+    </select>
+
+    <select id="selectUserByTenantId" resultType="dev.macula.cloud.system.pojo.bo.TenantUserBO">
+        select id, username from sys_tenant_user tu left join sys_user u on tu.user_id = u.id where tu.tenant_id = #{id} and u.deleted = 0
     </select>
 
 </mapper>
