@@ -54,6 +54,7 @@
         <module>macula-cloud-rocketmq</module>
         <module>macula-cloud-sentinel</module>
         <module>macula-cloud-seata</module>
+        <module>macula-cloud-gpt</module>
     </modules>
 
     <dependencies>
