@@ -79,6 +79,14 @@
 该模块下面是可选择的一些加快开发周期的低代码应用，比如工作流、低代码、报表、
 API接口和DB结构的管理、数据订阅、批处理、资源中心、应用发布管理等应用
 
+## 编译说明
+
+通过pl指定需要编译的模块，api模块为必须要指定的模块，需要指定需要编译的profile.包括local、dev、stg、pet、prd等
+
+```shell
+mvn clean package -DskipTests=true -Pdev -pl macula-cloud-api,macula-cloud-api/macula-cloud-system-api,macula-cloud-system
+```
+
 ## License
 
 Macula Boot and Macula Cloud is Open Source software released under the Apache 2.0 license.
