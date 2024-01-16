@@ -28,11 +28,20 @@
 
     <artifactId>macula-cloud-gpt</artifactId>
 
+    <properties>
+        <langchain4j.version>0.25.0</langchain4j.version>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>com.alibaba</groupId>
             <artifactId>dashscope-sdk-java</artifactId>
             <version>2.9.2</version>
+        </dependency>
+        <dependency>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j</artifactId>
+            <version>${langchain4j.version}</version>
         </dependency>
     </dependencies>
 
