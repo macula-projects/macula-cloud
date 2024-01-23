@@ -85,10 +85,7 @@ public class GatewayApiControllerTest {
         repository.clearAll();
     }
 
-    @Test
-    public void testQueryApis() throws Exception {
-        String path = "/gateway/api/list.json";
-
+    private static List<ApiDefinitionEntity> getApiDefinitionEntities() {
         List<ApiDefinitionEntity> entities = new ArrayList<>();
 
         // Mock two entities
@@ -128,37 +125,21 @@ public class GatewayApiControllerTest {
 
         itemEntities2.add(itemEntity2);
         entities.add(entity2);
+        return entities;
+    }
 
-        CompletableFuture<List<ApiDefinitionEntity>> completableFuture = mock(CompletableFuture.class);
-        given(completableFuture.get()).willReturn(entities);
-        given(sentinelApiClient.fetchApis(TEST_APP, TEST_IP, TEST_PORT)).willReturn(completableFuture);
-
-        MockHttpServletRequestBuilder requestBuilder = MockMvcRequestBuilders.get(path);
-        requestBuilder.param("app", TEST_APP);
-        requestBuilder.param("ip", TEST_IP);
-        requestBuilder.param("port", String.valueOf(TEST_PORT));
-
-        // Do controller logic
-        MvcResult mvcResult = mockMvc.perform(requestBuilder).andExpect(MockMvcResultMatchers.status().isOk())
-            .andDo(MockMvcResultHandlers.print()).andReturn();
-
-        // Verify the fetchApis method has been called
-        verify(sentinelApiClient).fetchApis(TEST_APP, TEST_IP, TEST_PORT);
-
-        // Verify if two same entities are got
-        Result<List<ApiDefinitionEntity>> result = JSONObject.parseObject(mvcResult.getResponse().getContentAsString(),
-            new TypeReference<Result<List<ApiDefinitionEntity>>>() {
-            });
-        assertTrue(result.isSuccess());
-
-        List<ApiDefinitionEntity> data = result.getData();
-        assertEquals(2, data.size());
-        assertEquals(entities, data);
-
-        // Verify the entities are add into memory repository
-        List<ApiDefinitionEntity> entitiesInMem = repository.findAllByApp(TEST_APP);
-        assertEquals(2, entitiesInMem.size());
-        assertEquals(entities, entitiesInMem);
+    private static ApiDefinitionEntity getApiDefinitionEntity() {
+        ApiDefinitionEntity addEntity = new ApiDefinitionEntity();
+        addEntity.setApp(TEST_APP);
+        addEntity.setIp(TEST_IP);
+        addEntity.setPort(TEST_PORT);
+        addEntity.setApiName("ccc");
+        Date date = new Date();
+        addEntity.setGmtCreate(date);
+        addEntity.setGmtModified(date);
+        Set<ApiPredicateItemEntity> addRedicateItemEntities = new HashSet<>();
+        addEntity.setPredicateItems(addRedicateItemEntities);
+        return addEntity;
     }
 
     @Test
@@ -289,20 +270,50 @@ public class GatewayApiControllerTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
+    public void testQueryApis() throws Exception {
+        String path = "/gateway/api/list.json";
+
+        List<ApiDefinitionEntity> entities = getApiDefinitionEntities();
+
+        CompletableFuture<List<ApiDefinitionEntity>> completableFuture = mock(CompletableFuture.class);
+        given(completableFuture.get()).willReturn(entities);
+        given(sentinelApiClient.fetchApis(TEST_APP, TEST_IP, TEST_PORT)).willReturn(completableFuture);
+
+        MockHttpServletRequestBuilder requestBuilder = MockMvcRequestBuilders.get(path);
+        requestBuilder.param("app", TEST_APP);
+        requestBuilder.param("ip", TEST_IP);
+        requestBuilder.param("port", String.valueOf(TEST_PORT));
+
+        // Do controller logic
+        MvcResult mvcResult = mockMvc.perform(requestBuilder).andExpect(MockMvcResultMatchers.status().isOk())
+            .andDo(MockMvcResultHandlers.print()).andReturn();
+
+        // Verify the fetchApis method has been called
+        verify(sentinelApiClient).fetchApis(TEST_APP, TEST_IP, TEST_PORT);
+
+        // Verify if two same entities are got
+        Result<List<ApiDefinitionEntity>> result = JSONObject.parseObject(mvcResult.getResponse().getContentAsString(),
+            new TypeReference<Result<List<ApiDefinitionEntity>>>() {
+            });
+        assertTrue(result.isSuccess());
+
+        List<ApiDefinitionEntity> data = result.getData();
+        assertEquals(2, data.size());
+        assertEquals(entities, data);
+
+        // Verify the entities are add into memory repository
+        List<ApiDefinitionEntity> entitiesInMem = repository.findAllByApp(TEST_APP);
+        assertEquals(2, entitiesInMem.size());
+        assertEquals(entities, entitiesInMem);
+    }
+
+    @Test
     public void testDeleteApi() throws Exception {
         String path = "/gateway/api/delete.json";
 
         // Add one entity into memory repository for delete
-        ApiDefinitionEntity addEntity = new ApiDefinitionEntity();
-        addEntity.setApp(TEST_APP);
-        addEntity.setIp(TEST_IP);
-        addEntity.setPort(TEST_PORT);
-        addEntity.setApiName("ccc");
-        Date date = new Date();
-        addEntity.setGmtCreate(date);
-        addEntity.setGmtModified(date);
-        Set<ApiPredicateItemEntity> addRedicateItemEntities = new HashSet<>();
-        addEntity.setPredicateItems(addRedicateItemEntities);
+        ApiDefinitionEntity addEntity = getApiDefinitionEntity();
         ApiPredicateItemEntity addPredicateItemEntity = new ApiPredicateItemEntity();
         addPredicateItemEntity.setMatchStrategy(URL_MATCH_STRATEGY_EXACT);
         addPredicateItemEntity.setPattern("/user/add");

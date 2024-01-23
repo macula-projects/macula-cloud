@@ -16,6 +16,8 @@
 package com.alibaba.csp.sentinel.dashboard.datasource.entity.gateway;
 
 import com.alibaba.csp.sentinel.adapter.gateway.common.api.ApiPredicateItem;
+import lombok.Getter;
+import lombok.Setter;
 
 import java.util.Objects;
 
@@ -25,6 +27,8 @@ import java.util.Objects;
  * @author cdfive
  * @since 1.7.0
  */
+@Setter
+@Getter
 public class ApiPredicateItemEntity {
 
     private String pattern;
@@ -36,22 +40,6 @@ public class ApiPredicateItemEntity {
 
     public ApiPredicateItemEntity(String pattern, int matchStrategy) {
         this.pattern = pattern;
-        this.matchStrategy = matchStrategy;
-    }
-
-    public String getPattern() {
-        return pattern;
-    }
-
-    public void setPattern(String pattern) {
-        this.pattern = pattern;
-    }
-
-    public Integer getMatchStrategy() {
-        return matchStrategy;
-    }
-
-    public void setMatchStrategy(Integer matchStrategy) {
         this.matchStrategy = matchStrategy;
     }
 
