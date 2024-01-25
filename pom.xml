@@ -44,17 +44,17 @@
     </properties>
 
     <modules>
-        <module>macula-cloud-gateway</module>
         <module>macula-cloud-api</module>
+        <module>macula-cloud-gateway</module>
         <module>macula-cloud-iam</module>
-        <module>macula-cloud-tinyid</module>
         <module>macula-cloud-system</module>
+        <module>macula-cloud-tinyid</module>
         <module>macula-cloud-xxljob</module>
-        <module>macula-cloud-retry</module>
         <module>macula-cloud-rocketmq</module>
-        <module>macula-cloud-sentinel</module>
         <module>macula-cloud-seata</module>
+        <module>macula-cloud-powerjob</module>
         <module>macula-cloud-gpt</module>
+        <module>macula-cloud-sentinel</module>
     </modules>
 
     <dependencies>
