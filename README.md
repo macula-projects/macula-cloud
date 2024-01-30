@@ -46,9 +46,9 @@
 
 统一的租户、应用、用户、权限等管理
 
-### Macula Cloud PowerJob 任务中心
+### Macula Cloud Schedulerx 调度中心
 
-提供基于PowerJob的统一任务管理
+提供基于PowerJob/XxlJob的统一任务管理
 
 ### Macula Cloud RocketMQ MQ管理
 

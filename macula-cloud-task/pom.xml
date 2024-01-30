@@ -27,7 +27,7 @@
     </parent>
 
     <groupId>dev.macula.boot</groupId>
-    <artifactId>macula-cloud-powerjob</artifactId>
+    <artifactId>macula-cloud-task</artifactId>
 
     <properties>
 

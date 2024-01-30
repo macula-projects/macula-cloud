@@ -40,7 +40,7 @@
         <maven.source.skip>true</maven.source.skip>
         <skipNexusStagingDeployMojo>true</skipNexusStagingDeployMojo>
         <easyexcel.version>3.1.3</easyexcel.version>
-        <spring-security-auth-server.version>0.4.5</spring-security-auth-server.version>
+        <spring-security-auth-server.version>0.4.3</spring-security-auth-server.version>
     </properties>
 
     <modules>
@@ -52,7 +52,7 @@
         <module>macula-cloud-xxljob</module>
         <module>macula-cloud-rocketmq</module>
         <module>macula-cloud-seata</module>
-        <module>macula-cloud-powerjob</module>
+        <module>macula-cloud-task</module>
         <module>macula-cloud-gpt</module>
         <module>macula-cloud-sentinel</module>
     </modules>
