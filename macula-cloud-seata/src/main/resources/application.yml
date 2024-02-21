@@ -8,7 +8,7 @@ base:
       password:  #your mysql server password
 
 server:
-  port: 7091
+  port: 9091
 
 spring:
   application:
