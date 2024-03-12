@@ -29,7 +29,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Service
@@ -94,7 +93,6 @@ public class SysApplicationServiceImpl extends ServiceImpl<SysApplicationMapper,
                 String key = CacheConstants.SECURITY_SYSTEM_APPS + application.getCode();
                 redisTemplate.delete(key);
                 redisTemplate.opsForHash().putAll(key, apps);
-                redisTemplate.expire(key, 30, TimeUnit.DAYS);
             });
         });
         // 回退上下文默认租户id
