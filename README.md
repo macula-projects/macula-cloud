@@ -26,6 +26,14 @@
 
 基于Macula Boot的微服务应用开发平台，提供多租户、应用管理、权限、工作流、低代码、报表、批处理、数据订阅、资源中心、API管理、表结构管理和SQL审计等通用技术平台能力。
 
+### Macula Cloud Gateway 网关中心
+
+平台对外统一入口，提供统一认证、鉴权、接口加解密等服务
+
+### Macula Cloud API 平台对外API SDK
+
+提供各微服务给外部访问的接口定义
+
 ### Macula Cloud IAM 认证中心
 
 提供基于OAUTH/CAS/OIDC/SAML协议的统一认证服务，所有服务经过网站认证
@@ -34,19 +42,15 @@
 
 统一的ID生成服务
 
-### Macula Cloud API 平台对外API SDK
-
-提供各微服务给外部访问的接口定义
-
-### Macula Cloud Gateway 网关中心
-
-平台对外统一入口，提供统一认证、鉴权、接口加解密等服务
-
 ### Macula Cloud System 管理中心
 
 统一的租户、应用、用户、权限等管理
 
-### Macula Cloud Schedulerx 调度中心
+### Macula Cloud Seata 分布式事务管理
+
+分布式事务管理
+
+### Macula Cloud Task 调度中心
 
 提供基于PowerJob/XxlJob的统一任务管理
 
@@ -66,18 +70,17 @@
 
 资源管理服务
 
-### Macula Cloud Sentinel 服务治理
+### Macula Cloud Docs
 
-服务治理
+API接口文档和数据库结构文档服务
 
-### Macula Cloud Seata 分布式事务管理
+### Macula Cloud GPT
 
-分布式事务管理
+基于大模型的智能体服务
 
 ### Macula Cloud ...
 
-该模块下面是可选择的一些加快开发周期的低代码应用，比如工作流、低代码、报表、
-API接口和DB结构的管理、数据订阅、批处理、资源中心、应用发布管理等应用
+该模块下面是可选择的一些加快开发周期的低代码应用，比如低代码、报表、 工作流管理等应用
 
 ## 编译说明
 

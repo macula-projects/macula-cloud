@@ -54,7 +54,6 @@
         <module>macula-cloud-seata</module>
         <module>macula-cloud-task</module>
         <module>macula-cloud-gpt</module>
-        <module>macula-cloud-sentinel</module>
     </modules>
 
     <dependencies>
