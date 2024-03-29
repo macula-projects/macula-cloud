@@ -32,6 +32,29 @@
     <version>${revision}</version>
     <packaging>pom</packaging>
 
+    <name>macula-cloud</name>
+    <description>基于Spring Boot、Spring Cloud的微服务开发框架</description>
+    <url>https://macula.dev</url>
+    <developers>
+        <developer>
+            <name>rainsoft</name>
+            <email>rainsoft@163.com</email>
+        </developer>
+    </developers>
+
+    <scm>
+        <connection>scm:git:git@github.com:macula-projects/macula-cloud.git</connection>
+        <developerConnection>scm:git:git@github.com:macula-projects/macula-cloud.git</developerConnection>
+        <url>https://github.com/macula-projects/macula-cloud</url>
+    </scm>
+
+    <licenses>
+        <license>
+            <name>The Apache License</name>
+            <url>https://apache.org/licenses/LICENSE-2.0.txt</url>
+        </license>
+    </licenses>
+
     <properties>
         <revision>5.0.7-SNAPSHOT</revision>
         <maven.install.skip>true</maven.install.skip>
