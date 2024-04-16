@@ -29,7 +29,7 @@
     <artifactId>macula-cloud-seata</artifactId>
 
     <properties>
-        <seata.version>1.7.0</seata.version>
+        <seata.version>2.0.0</seata.version>
     </properties>
 
     <dependencies>
