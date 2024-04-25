@@ -58,6 +58,10 @@
 
 基于RocketMQ 和 RocketMQ Connect管理
 
+### Macula Cloud Docs
+
+API接口文档和数据库结构文档服务
+
 ### Macula Cloud Channel 渠道中心(TODO)
 
 移动生态应用的管理和微信能力对接服务
@@ -69,14 +73,6 @@
 ### Macula Cloud OSS 资源中心(TODO)
 
 资源管理服务
-
-### Macula Cloud Docs
-
-API接口文档和数据库结构文档服务
-
-### Macula Cloud GPT
-
-基于大模型的智能体服务
 
 ### Macula Cloud ...
 
