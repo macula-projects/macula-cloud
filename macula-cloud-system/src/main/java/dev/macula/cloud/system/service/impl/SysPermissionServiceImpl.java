@@ -162,21 +162,26 @@ public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, S
         }
         boolean result = saveOrUpdateBatch(savePerms);
 
-        if (result || savePerms.isEmpty()) {
-            // 更新role permission（看菜单与哪些角色关联，就把所有权限给关联到该角色上）
-            List<Long> roleIds = roleMenuService.listRoleIdsByMenuId(menuId);
-            // 根据角色IDs更新permission
-            if (CollectionUtil.isNotEmpty(roleIds)) {
-                // 先把原来该角色关联的所有权限ID删除
+        // 存在更新、插入或删除权限数据，则进行更新角色权限关联
+        if (result || !mPerm.isEmpty()) {
+            // perms是未更新菜单权限前查询到的结果集，清空存在旧权限的角色关联
+            List<Long> oldPermIds = perms.stream().map(SysPermission::getId).collect(Collectors.toList());
+            if(!oldPermIds.isEmpty()) {
                 rolePermissionService.remove(
-                    new LambdaQueryWrapper<SysRolePermission>().in(SysRolePermission::getRoleId, roleIds));
-                // 再把该菜单下所有权限ID关联上角色
-                List<SysPermission> newPerms =
-                    list(new LambdaQueryWrapper<SysPermission>().eq(SysPermission::getMenuId, menuId));
+                        new LambdaQueryWrapper<SysRolePermission>().in(SysRolePermission::getPermissionId, oldPermIds));
+            }
+            // 获取当前菜单绑定的角色id集合
+            List<Long> roleIds = roleMenuService.listRoleIdsByMenuId(menuId);
+            // 获取当前菜单存在的权限列表
+            List<SysPermission> permissions = list(new LambdaQueryWrapper<SysPermission>().eq(SysPermission::getMenuId,
+                    menuId));
+            // 菜单存在权限列表且菜单存在角色关系则进行角色权限关联
+            if (CollectionUtil.isNotEmpty(permissions) && CollectionUtil.isNotEmpty(roleIds)) {
+                List<Long> newPermIds = permissions.stream().map(SysPermission::getId).collect(Collectors.toList());
                 List<SysRolePermission> newRolePerms = new ArrayList<>();
-                roleIds.forEach(roleId -> {
-                    newPerms.forEach(perm -> {
-                        newRolePerms.add(new SysRolePermission(roleId, perm.getId()));
+                newPermIds.forEach(permId -> {
+                    roleIds.forEach(roleId -> {
+                        newRolePerms.add(new SysRolePermission(roleId, permId));
                     });
                 });
                 rolePermissionService.saveBatch(newRolePerms);
