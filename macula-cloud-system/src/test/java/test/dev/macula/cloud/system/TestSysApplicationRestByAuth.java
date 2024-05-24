@@ -83,9 +83,7 @@ public class TestSysApplicationRestByAuth {
 
     @BeforeAll
     public static void setup(){
-        // 不是所有类型的token都可以通过rest请求实时获取， 比如：
-        // 1、itp/bmo通过ad认证后获取到的token
-        // 2、uim与goauth互认请求下获取的token
+        // 不是所有类型的token都可以通过rest请求实时获取， 比如：通过授权码获取的token
         if(StringUtils.isNotBlank(tokenValue)){
             return;
         }
