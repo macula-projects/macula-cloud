@@ -198,6 +198,8 @@ public class MaculaOAuth2AuthorizationService implements OAuth2AuthorizationServ
     }
 
     private OAuth2Authorization toObject(Authorization entity) {
+        Assert.notNull(entity, "authorization cannot be null");
+
         RegisteredClient registeredClient =
             this.registeredClientRepository.findByClientId(entity.getRegisteredClientId());
         if (registeredClient == null) {
