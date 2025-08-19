@@ -48,7 +48,7 @@ public interface SysUserMapper extends BaseMapper<SysUser> {
      * @return 用户列表
      */
     @DataPermission(deptAlias = "u", userAlias = "u")
-    @InterceptorIgnore(tenantLine = "true")
+    @InterceptorIgnore(tenantLine = "true", dataPermission = "false")
     Page<UserBO> listUserPages(Page<UserBO> page, UserPageQuery queryParams);
 
     /**

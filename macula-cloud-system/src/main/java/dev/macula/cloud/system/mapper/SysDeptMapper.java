@@ -30,7 +30,6 @@ import java.util.List;
 @Mapper
 public interface SysDeptMapper extends BaseMapper<SysDept> {
 
-    @DataPermission(deptIdColumnName = "id")
     @Override
     List<SysDept> selectList(@Param(Constants.WRAPPER) Wrapper<SysDept> queryWrapper);
 }
