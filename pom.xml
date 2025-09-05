@@ -75,7 +75,6 @@
         <module>macula-cloud-xxljob</module>
         <module>macula-cloud-rocketmq</module>
         <module>macula-cloud-seata</module>
-        <module>macula-cloud-task</module>
     </modules>
 
     <dependencies>
