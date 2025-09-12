@@ -60,17 +60,17 @@ public class DefaultSecurityConfiguration {
         AuthenticationEntryPointFailureHandler authenticationFailureHandler = new AuthenticationEntryPointFailureHandler(authenticationEntryPoint);
         RedirectLoginAuthenticationSuccessHandler loginAuthenticationSuccessHandler = new RedirectLoginAuthenticationSuccessHandler();
 
-        http.authorizeRequests()
-                .antMatchers("/component/**").permitAll()
-                .antMatchers("/actuator/health").permitAll()
-                .antMatchers("/h2-console/**").permitAll()
-                .antMatchers("/pear.config.json").permitAll()
-                .antMatchers("/pear.config.yml").permitAll()
-                .antMatchers("/admin/css/**").permitAll()
-                .antMatchers("/admin/fonts/**").permitAll()
-                .antMatchers("/admin/js/**").permitAll()
-                .antMatchers("/admin/images/**").permitAll()
-                .antMatchers("/favicon.ico").permitAll()
+        http.authorizeHttpRequests()
+                .requestMatchers("/component/**").permitAll()
+                .requestMatchers("/actuator/health").permitAll()
+                .requestMatchers("/h2-console/**").permitAll()
+                .requestMatchers("/pear.config.json").permitAll()
+                .requestMatchers("/pear.config.yml").permitAll()
+                .requestMatchers("/admin/css/**").permitAll()
+                .requestMatchers("/admin/fonts/**").permitAll()
+                .requestMatchers("/admin/js/**").permitAll()
+                .requestMatchers("/admin/images/**").permitAll()
+                .requestMatchers("/favicon.ico").permitAll()
                 .anyRequest().authenticated().and()
             .userDetailsService(userDetailsService)
             .csrf(AbstractHttpConfigurer::disable);
