@@ -78,6 +78,7 @@
         <module>macula-cloud-seata</module>
         <module>macula-cloud-oss</module>
         <module>macula-cloud-docs</module>
+        <module>macula-cloud-snailjob</module>
     </modules>
 
     <dependencies>
