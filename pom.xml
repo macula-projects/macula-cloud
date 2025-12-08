@@ -64,6 +64,7 @@
         <skipNexusStagingDeployMojo>true</skipNexusStagingDeployMojo>
         <easyexcel.version>3.1.3</easyexcel.version>
         <spring-security-auth-server.version>0.4.3</spring-security-auth-server.version>
+        <xxl-sso.version>2.2.0</xxl-sso.version>
         <java.version>17</java.version>
     </properties>
 
@@ -78,6 +79,7 @@
         <module>macula-cloud-seata</module>
         <module>macula-cloud-oss</module>
         <module>macula-cloud-docs</module>
+        <module>macula-cloud-snailjob</module>
     </modules>
 
     <dependencies>
@@ -99,7 +101,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.14.0</version>
+                <version>3.14.1</version>
                 <configuration>
                     <source>${java.version}</source>
                     <target>${java.version}</target>

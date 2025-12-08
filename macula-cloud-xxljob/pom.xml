@@ -57,6 +57,13 @@
             <artifactId>xxl-job-core</artifactId>
         </dependency>
 
+		<!-- xxl-sso (xxl-tool、gson) -->
+		<dependency>
+			<groupId>com.xuxueli</groupId>
+			<artifactId>xxl-sso-core</artifactId>
+			<version>${xxl-sso.version}</version>
+		</dependency>
+
         <!--undertow容器-->
         <dependency>
             <groupId>org.springframework.boot</groupId>

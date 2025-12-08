@@ -9,7 +9,7 @@ management:
     base-path: /actuator
 
 mybatis:
-  mapper-locations: classpath:/mybatis-mapper/*Mapper.xml
+  mapper-locations: classpath:/mapper/*Mapper.xml
 
 spring:
   datasource:
@@ -33,6 +33,7 @@ spring:
     request-context-attribute: request
     settings:
       number_format: 0.##########
+      new_builtin_class_resolver: safer
     suffix: .ftl
     templateLoaderPath: classpath:/templates/
   mail:
@@ -58,6 +59,8 @@ spring:
     resources:
       static-locations: classpath:/static/
   cloud:
+    compatibility-verifier:
+      enabled: false
     nacos:
       discovery:
         enabled: true
@@ -69,6 +72,7 @@ spring:
 xxl:
   job:
     accessToken: default_token
+    timeout: 3
     i18n: zh_CN
     logretentiondays: 30
     triggerpool:
@@ -76,6 +80,15 @@ xxl:
         max: 200
       slow:
         max: 100
+xxl-sso:
+  token:
+    key: xxl_job_login_token
+    timeout: 604800000
+  client:
+    login:
+      path: /auth/login
+    excluded:
+      paths:
 
 logging:
   level:

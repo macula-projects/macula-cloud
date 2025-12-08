@@ -14,5 +14,4 @@ public class MaculaXxlJobAdminApplication {
     public static void main(String[] args) {
         SpringApplication.run(MaculaXxlJobAdminApplication.class, args);
     }
-
 }

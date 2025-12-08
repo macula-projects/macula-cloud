@@ -50,6 +50,14 @@
 
 分布式事务管理
 
+### Macula Cloud XxlJob 任务管理
+
+xxljob任务调度
+
+### Macula Cloud SnailJob 任务管理
+
+Snail Job任务管理和重试管理
+
 ### Macula Cloud RocketMQ MQ管理（TODO）
 
 基于RocketMQ 和 RocketMQ Connect管理
