@@ -106,12 +106,12 @@ public class PasswordEncoderConfig {
         encoders.put("MD4", new org.springframework.security.crypto.password.Md4PasswordEncoder());
         encoders.put("MD5", new MessageDigestPasswordEncoder("MD5"));
         encoders.put("noop", org.springframework.security.crypto.password.NoOpPasswordEncoder.getInstance());
-        encoders.put("pbkdf2", new org.springframework.security.crypto.password.Pbkdf2PasswordEncoder());
-        encoders.put("scrypt", new org.springframework.security.crypto.scrypt.SCryptPasswordEncoder());
+        encoders.put("pbkdf2", org.springframework.security.crypto.password.Pbkdf2PasswordEncoder.defaultsForSpringSecurity_v5_8());
+        encoders.put("scrypt", org.springframework.security.crypto.scrypt.SCryptPasswordEncoder.defaultsForSpringSecurity_v5_8());
         encoders.put("SHA-1", new MessageDigestPasswordEncoder("SHA-1"));
         encoders.put("SHA-256", new MessageDigestPasswordEncoder("SHA-256"));
         encoders.put("sha256", new org.springframework.security.crypto.password.StandardPasswordEncoder());
-        encoders.put("argon2", new org.springframework.security.crypto.argon2.Argon2PasswordEncoder());
+        encoders.put("argon2", org.springframework.security.crypto.argon2.Argon2PasswordEncoder.defaultsForSpringSecurity_v5_8());
         encoders.put("SM3", sm3PasswordEncoder);
 
         Assert.isTrue(encoders.containsKey(encodingId), encodingId + " is not found in idToPasswordEncoder");

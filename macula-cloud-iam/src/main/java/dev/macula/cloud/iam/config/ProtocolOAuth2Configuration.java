@@ -84,8 +84,8 @@ public class ProtocolOAuth2Configuration {
 
         // 拦截 授权服务器相关的请求端点
         http
-            .requestMatcher(endpointsMatcher)
-            .authorizeRequests()
+            .securityMatcher(endpointsMatcher)
+            .authorizeHttpRequests()
                 .anyRequest().authenticated().and()
             // 忽略掉相关端点的csrf
             .csrf().ignoringRequestMatchers(endpointsMatcher).and()

@@ -17,22 +17,21 @@
 
 package dev.macula.cloud.system.handler;
 
-import com.alibaba.csp.sentinel.adapter.spring.webmvc.callback.BlockExceptionHandler;
+import com.alibaba.csp.sentinel.adapter.spring.webmvc_v6x.callback.BlockExceptionHandler;
 import com.alibaba.csp.sentinel.slots.block.BlockException;
 import com.alibaba.csp.sentinel.slots.block.degrade.DegradeException;
 import com.alibaba.csp.sentinel.slots.block.flow.FlowException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.macula.boot.result.ApiResultCode;
 import dev.macula.boot.result.Result;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
 /**
- *
  * 自定义流控异常
+ *
  * @author haoxr
  * @since 2021/4/12 22:57
  */
@@ -40,7 +39,7 @@ import javax.servlet.http.HttpServletResponse;
 public class DefaultBlockExceptionHandler implements BlockExceptionHandler {
 
     @Override
-    public void handle(HttpServletRequest request, HttpServletResponse response, BlockException e) throws Exception {
+    public void handle(HttpServletRequest request, HttpServletResponse response, String resourceName, BlockException e) throws Exception {
         response.setStatus(HttpStatus.OK.value());
         response.setCharacterEncoding("UTF-8");
         response.setContentType("application/json;charset=utf-8");
@@ -54,4 +53,5 @@ public class DefaultBlockExceptionHandler implements BlockExceptionHandler {
             objectMapper.writeValue(response.getWriter(), Result.failed(ApiResultCode.DEGRADATION));
         }
     }
+
 }
