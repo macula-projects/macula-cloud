@@ -50,10 +50,6 @@
 
 分布式事务管理
 
-### Macula Cloud Task 调度中心
-
-提供基于PowerJob/XxlJob的统一任务管理
-
 ### Macula Cloud RocketMQ MQ管理
 
 基于RocketMQ 和 RocketMQ Connect管理
@@ -61,14 +57,6 @@
 ### Macula Cloud Docs
 
 API接口文档和数据库结构文档服务
-
-### Macula Cloud Channel 渠道中心(TODO)
-
-移动生态应用的管理和微信能力对接服务
-
-### Macula Cloud Msg 消息中心(TODO)
-
-消息发送服务
 
 ### Macula Cloud OSS 资源中心(TODO)
 
