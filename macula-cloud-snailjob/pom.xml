@@ -15,7 +15,7 @@
         <dependency>
             <groupId>com.aizuda</groupId>
             <artifactId>snail-job-server-starter</artifactId>
-            <version>1.8.1</version>
+            <version>${snail-job.version}</version>
         </dependency>
     </dependencies>
 
