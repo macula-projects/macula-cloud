@@ -5,7 +5,7 @@ spring:
     name: snail_job
     ## mysql
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/macula_snail_job?useSSL=false&characterEncoding=utf8&useUnicode=true
+    url: jdbc:mysql://localhost:3306/macula-snailjob?useSSL=false&characterEncoding=utf8&useUnicode=true
     username: root
     password:
     ## postgres
