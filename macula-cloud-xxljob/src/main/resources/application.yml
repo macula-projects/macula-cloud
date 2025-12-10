@@ -6,7 +6,7 @@ management:
     base-path: /actuator
 
 mybatis:
-  mapper-locations: classpath:/mapper/*Mapper.xml
+  mapper-locations: classpath:/mybatis-mapper/*Mapper.xml
 
 spring:
   datasource:
