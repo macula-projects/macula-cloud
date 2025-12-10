@@ -1,9 +1,9 @@
 package com.xxl.job.admin.service;
 
-import com.xxl.job.admin.model.XxlJobInfo;
-import com.xxl.sso.core.model.LoginInfo;
-import com.xxl.tool.response.PageModel;
-import com.xxl.tool.response.Response;
+
+import com.xxl.job.admin.core.model.XxlJobInfo;
+import com.xxl.job.admin.core.model.XxlJobUser;
+import com.xxl.job.core.biz.model.ReturnT;
 
 import java.util.Date;
 import java.util.Map;
@@ -17,47 +17,82 @@ public interface XxlJobService {
 
 	/**
 	 * page list
+	 *
+	 * @param start
+	 * @param length
+	 * @param jobGroup
+	 * @param jobDesc
+	 * @param executorHandler
+	 * @param author
+	 * @return
 	 */
-	public Response<PageModel<XxlJobInfo>> pageList(int offset, int pagesize, int jobGroup, int triggerStatus, String jobDesc, String executorHandler, String author);
+	public Map<String, Object> pageList(int start, int length, int jobGroup, int triggerStatus, String jobDesc, String executorHandler, String author);
 
 	/**
 	 * add job
+	 *
+	 * @param jobInfo
+	 * @return
 	 */
-	public Response<String> add(XxlJobInfo jobInfo, LoginInfo loginInfo);
+	public ReturnT<String> add(XxlJobInfo jobInfo, XxlJobUser loginUser);
 
 	/**
 	 * update job
+	 *
+	 * @param jobInfo
+	 * @return
 	 */
-	public Response<String> update(XxlJobInfo jobInfo, LoginInfo loginInfo);
+	public ReturnT<String> update(XxlJobInfo jobInfo, XxlJobUser loginUser);
 
 	/**
 	 * remove job
+	 * 	 *
+	 * @param id
+	 * @return
 	 */
-	public Response<String> remove(int id, LoginInfo loginInfo);
+	public ReturnT<String> remove(int id);
 
 	/**
 	 * start job
+	 *
+	 * @param id
+	 * @return
 	 */
-	public Response<String> start(int id, LoginInfo loginInfo);
+	public ReturnT<String> start(int id);
 
 	/**
 	 * stop job
+	 *
+	 * @param id
+	 * @return
 	 */
-	public Response<String> stop(int id, LoginInfo loginInfo);
+	public ReturnT<String> stop(int id);
 
 	/**
 	 * trigger
+	 *
+	 * @param loginUser
+	 * @param jobId
+	 * @param executorParam
+	 * @param addressList
+	 * @return
 	 */
-	public Response<String> trigger(LoginInfo loginInfo, int jobId, String executorParam, String addressList);
+	public ReturnT<String> trigger(XxlJobUser loginUser, int jobId, String executorParam, String addressList);
 
 	/**
 	 * dashboard info
+	 *
+	 * @return
 	 */
 	public Map<String,Object> dashboardInfo();
 
 	/**
 	 * chart info
+	 *
+	 * @param startDate
+	 * @param endDate
+	 * @return
 	 */
-	public Response<Map<String,Object>> chartInfo(Date startDate, Date endDate);
+	public ReturnT<Map<String,Object>> chartInfo(Date startDate, Date endDate);
 
 }

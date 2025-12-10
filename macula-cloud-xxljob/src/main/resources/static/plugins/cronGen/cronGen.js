@@ -1,4 +1,4 @@
-﻿(function ($) {
+(function ($) {
     // var resultsName = "";
     var inputElement;
     var displayElement;
@@ -650,7 +650,7 @@
             dataType : "json",
             success : function(data){
                 if (data.code === 200) {
-                    $('#runTime').val(data.data.join("\n"));
+                    $('#runTime').val(data.content.join("\n"));
                 } else {
                     $('#runTime').val(data.msg);
                 }

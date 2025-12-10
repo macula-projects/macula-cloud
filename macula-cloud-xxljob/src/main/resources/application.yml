@@ -75,15 +75,6 @@ xxl:
         max: 200
       slow:
         max: 100
-xxl-sso:
-  token:
-    key: xxl_job_login_token
-    timeout: 604800000
-  client:
-    login:
-      path: /auth/login
-    excluded:
-      paths:
 
 logging:
   level:
