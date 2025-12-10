@@ -13,6 +13,10 @@
 
     <dependencies>
         <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-bootstrap</artifactId>
+        </dependency>
+        <dependency>
             <groupId>com.aizuda</groupId>
             <artifactId>snail-job-server-starter</artifactId>
             <version>${snail-job.version}</version>

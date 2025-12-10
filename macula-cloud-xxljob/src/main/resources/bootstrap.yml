@@ -1,12 +1,15 @@
 server:
   port: 9084
-
+  servlet:
+    context-path: /${spring.application.name}
 spring:
   profiles:
     active: @profile.active@
   application:
     name: macula-cloud-xxljob
   cloud:
+    compatibility-verifier:
+      enabled: false
     nacos:
       username: ${nacos.username}
       password: ${nacos.password}

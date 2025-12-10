@@ -1,20 +1,13 @@
-server:
-  port: 8080
-  servlet:
-    context-path: /snail-job
-
 spring:
   main:
     banner-mode: off
-  profiles:
-    active: dev
   datasource:
     name: snail_job
     ## mysql
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/snail_job?useSSL=false&characterEncoding=utf8&useUnicode=true
+    url: jdbc:mysql://localhost:3306/macula_snail_job?useSSL=false&characterEncoding=utf8&useUnicode=true
     username: root
-    password: root
+    password:
     ## postgres
     #    driver-class-name: org.postgresql.Driver
     #    url: jdbc:postgresql://localhost:5432/snail_job?useUnicode=true&characterEncoding=utf8&useSSL=true&autoReconnect=true&reWriteBatchedInserts=true
@@ -71,7 +64,7 @@ mybatis-plus:
     cache-enabled: true
 
 logging:
-  config: classpath:logback-boot.xml
+  config: classpath:logback-spring.xml
 #    level:
 #    ## 方便调试 SQL
 #        com.aizuda.snailjob.template.datasource.persistence.mapper: debug
