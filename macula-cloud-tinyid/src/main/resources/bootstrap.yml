@@ -1,5 +1,9 @@
 server:
   port: 9082
+  servlet:
+    encoding:
+      force: true
+    context-path: /tinyid
 
 spring:
   profiles:
