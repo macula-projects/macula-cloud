@@ -7,6 +7,8 @@ spring:
   application:
     name: macula-cloud-iam
   cloud:
+    compatibility-verifier:
+      enabled: false
     nacos:
       username: ${nacos.username}
       password: ${nacos.password}
