@@ -24,11 +24,12 @@
     <parent>
         <groupId>dev.macula.boot</groupId>
         <artifactId>macula-boot-parent</artifactId>
-        <version>${revision}</version>
+        <version>6.0.1-SNAPSHOT</version>
     </parent>
 
     <groupId>dev.macula.cloud</groupId>
     <artifactId>macula-cloud</artifactId>
+    <version>${revision}</version>
     <packaging>pom</packaging>
 
     <name>macula-cloud</name>
@@ -76,7 +77,6 @@
         <module>macula-cloud-xxljob</module>
         <module>macula-cloud-rocketmq</module>
         <module>macula-cloud-seata</module>
-        <module>macula-cloud-oss</module>
         <module>macula-cloud-docs</module>
         <module>macula-cloud-snailjob</module>
     </modules>
