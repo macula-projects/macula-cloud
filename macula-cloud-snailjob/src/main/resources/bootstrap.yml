@@ -8,8 +8,6 @@ spring:
   application:
     name: macula-cloud-snailjob
   cloud:
-    compatibility-verifier:
-      enabled: false
     nacos:
       username: ${nacos.username}
       password: ${nacos.password}

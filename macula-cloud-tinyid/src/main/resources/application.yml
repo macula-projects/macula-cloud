@@ -9,9 +9,6 @@ spring:
         maxActive: 20
         minIdle: 2
         maxWait: 10000
-  cloud:
-    compatibility-verifier:
-      enabled: false
 
 logging:
   level:
