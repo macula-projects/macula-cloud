@@ -23,6 +23,7 @@
         <groupId>dev.macula.cloud</groupId>
         <artifactId>macula-cloud</artifactId>
         <version>${revision}</version>
+        <relativePath>../pom.xml</relativePath>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 

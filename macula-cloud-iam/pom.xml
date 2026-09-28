@@ -23,6 +23,7 @@
         <artifactId>macula-cloud</artifactId>
         <groupId>dev.macula.cloud</groupId>
         <version>${revision}</version>
+        <relativePath>../pom.xml</relativePath>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
@@ -32,7 +33,6 @@
         <dependency>
             <groupId>org.springframework.security</groupId>
             <artifactId>spring-security-oauth2-authorization-server</artifactId>
-            <version>${spring-security-auth-server.version}</version>
         </dependency>
 
         <dependency>
