@@ -38,7 +38,7 @@
 
 提供基于OAUTH/CAS/OIDC/SAML协议的统一认证服务，所有服务经过网站认证
 
-### Macula Cloud ID ID中心
+### Macula Cloud TinyID ID中心
 
 统一的ID生成服务
 
@@ -49,10 +49,6 @@
 ### Macula Cloud Seata 分布式事务管理
 
 分布式事务管理
-
-### Macula Cloud XxlJob 任务管理
-
-xxljob任务调度
 
 ### Macula Cloud SnailJob 任务管理
 
