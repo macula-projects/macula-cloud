@@ -1,73 +1,67 @@
-# Spec: 开发与 Kubernetes 部署支持 (from intent.md 2026-09-30)
+# Spec: 开发与 Docker Compose 部署支持 (from intent.md 2026-09-30)
 Status: accepted
 
 ## Source intent
-[已接受的 intent.md](./intent.md)：为本机 IDE 调试提供可快速启动、可重复初始化的基础设施，并提供原生 Kubernetes YAML 部署入口。
+[已接受的 intent.md](./intent.md)：用简单、清晰的 Docker Compose 同时支持中间件初始化、IDE 调试和完整容器化运行；每个模块就近提供 Dockerfile，不再提供 Kubernetes。
 
 ## Requirements
-1. `deploy/docker-compose.yml` 必须只编排开发基础设施，不容器化启动 Macula Cloud 后端模块或管理端；默认基础设施范围为 MySQL、Redis、Nacos 和 RocketMQ。
-2. 开发人员必须能够用一条文档化命令启动完整基础设施；同时必须能够显式选择单个或部分中间件进行启动、停止和状态检查。
-3. Compose 暴露给本机 IDE 的端口必须默认绑定 `127.0.0.1`，允许通过示例环境文件覆盖，且不得与仓库已有应用端口冲突。
-4. MySQL、Redis、Nacos 和 RocketMQ 必须有持久化卷、健康检查和明确的启动依赖；初始化任务必须等待依赖健康后再执行，并以可观察的成功或失败状态退出。
-5. MySQL 初始化必须创建并初始化 `macula-system`、`macula-tinyid`、`seata`、`macula-snailjob` 和 Nacos 所需数据库；System 与 TinyID 使用仓库现有 SQL，其他数据库使用与实际组件版本匹配且记录来源的初始化材料。
-6. 数据与配置初始化必须可重复执行：已有数据不得因普通启动或重复初始化被删除；破坏性重置必须使用单独、显式且带警告的命令。
-7. Nacos 初始化必须创建或确认本地默认 namespace，并提供 Seata 等模块启动所需的最小配置；重复执行不得产生冲突或覆盖用户已修改的配置，除非调用明确的强制更新命令。
-8. 本机开发配置必须使 Gateway、IAM、System、TinyID、Seata、SnailJob、RocketMQ 管理服务和 Docs 服务能够使用 `local` profile 在 IDE 中以互不冲突的端口启动；管理端使用 Vite 在本机启动并访问本机 Gateway/IAM。
-9. SnailJob 和 Seata 必须作为 Macula Cloud 应用模块由 IDE 启动，不得作为 Compose 中间件服务启动；RocketMQ broker 属于中间件，`macula-cloud-rocketmq` 属于 Cloud 管理服务，两者必须明确区分。
-10. 对当前缺少完整启动配置的 Cloud 模块，只允许补充实现“可启动、可配置端口、可探测”所需的最小装配，不得在本变更中实现其尚未完成的业务能力。
-11. 所有需要部署到 Kubernetes 的后端模块及管理端必须有可重复构建的容器镜像定义；Java 镜像保持 Java 17 兼容、使用非 root 用户运行，前端镜像提供静态资源服务和 SPA 路由回退。
-12. `deploy/k8s/` 必须提供可直接审阅的原生 Kubernetes YAML，不依赖 Helm 或 Kustomize，并按 namespace、配置、Secret 引用、持久化、中间件、初始化任务、Cloud 应用、管理端和可选入口分层组织。
-13. Kubernetes 中间件必须使用持久化声明和稳定服务名；Cloud 应用及管理端必须使用 Deployment/Service，并配置资源 requests/limits、startup/readiness/liveness 探针及滚动更新策略。
-14. Kubernetes 配置必须通过 ConfigMap、Secret 引用和环境变量注入；仓库只提供无敏感信息的示例，真实密码、token、私钥、镜像仓库凭据和集群地址不得进入版本库。
-15. Kubernetes 部署脚本必须支持预检、部署、等待就绪、查看状态和删除工作负载；删除持久化数据必须是独立的显式操作，不能随普通卸载执行。
-16. Kubernetes 镜像仓库、镜像 tag、namespace、Ingress host 和 StorageClass 必须可由部署者配置；脚本应在缺少必需值时快速失败，不得静默使用共享或生产环境默认值。
-17. 必须提供中文部署文档，覆盖前置条件、端口、默认示例账号的适用范围、首次启动、重复初始化、IDE 启动顺序、管理端启动、故障诊断、数据重置、Kubernetes 操作和已知限制。
-18. Compose 与 Kubernetes 的服务名、数据库名、端口、配置键、镜像名和启动顺序必须保持一致，并以文档化部署契约为单一核对清单。
+1. 删除本变更产生的全部 Kubernetes 模板、脚本、示例配置和文档，不提供 Helm、Kustomize 或其他集群部署入口。
+2. Gateway、IAM、System、TinyID、Seata、SnailJob、RocketMQ 管理服务、Docs 服务和 Admin 必须分别在自身模块目录提供 `Dockerfile`。
+3. 每个 Java 模块必须能够从仓库根目录以 `docker build -f <module>/Dockerfile .` 独立构建；构建阶段使用 Java 17/Maven，运行阶段使用 Java 17 JRE 和非 root 用户。
+4. 模块 Dockerfile 保持相同、可直接阅读的构建约定，只允许模块路径、应用端口等必要差异；不引入需要预先发布的自定义基础镜像。Compose 中的重复配置使用 YAML anchor 适度提炼。
+5. Admin Dockerfile 必须执行可重复的 `npm ci` 和生产构建，并用非 root Web Server 提供静态资源、SPA 路由回退及 Gateway/IAM 反向代理。
+6. `deploy/docker-compose.yml` 必须统一编排 MySQL、Redis、Nacos、RocketMQ、初始化任务、八个后端模块和 Admin；SnailJob、Seata 是应用服务，不能归入中间件。
+7. Compose 默认只启动 MySQL、Redis、Nacos、RocketMQ 及初始化任务，供源码在 IDE 中调试；使用明确的 `apps` profile 时启动全部应用容器和 Admin。
+8. Compose 必须提供固定镜像版本、持久化卷、健康检查、启动依赖和默认绑定 `127.0.0.1` 的开发端口；应用容器之间通过 Compose 服务名通信。
+9. MySQL bootstrap 负责幂等创建应用账号及 `macula-system`、`macula-tinyid`、`seata`、`macula-snailjob`、`nacos` 五个数据库，并使用 Nacos 官方 SQL 初始化 Nacos 中间件数据库；Nacos 数据库不由 Flyway 管理。
+10. System、TinyID、Seata、SnailJob 四个拥有关系数据库的 Cloud 模块必须在模块内集成 Flyway，并分别管理 `macula-system`、`macula-tinyid`、`seata`、`macula-snailjob`。IAM 与 System 共用数据库，但数据库迁移所有权只属于 System，IAM 不得重复执行 migration。
+11. 四个模块的现有初始化 SQL 必须作为各自 `src/main/resources/db/migration/` 下的 `V1__baseline.sql`；后续数据库变更只能新增有序 migration，不得修改已执行的 migration。已有数据库若存在关键表但没有 Flyway history，使用明确的 baseline-on-migrate 策略接管，不能重放旧 dump。
+12. Nacos 初始化必须在 Nacos 服务健康后幂等创建 namespace 和 Seata 最小配置。普通启动不得删除、覆盖或重建已有数据，重置必须显式确认。
+13. 应用配置必须支持本机 IDE 的 `127.0.0.1` 默认值和 Compose 环境变量覆盖；Gateway、IAM、System、TinyID、Seata、SnailJob、RocketMQ 管理服务、Docs 和 Admin 的端口不得冲突。
+14. 为实现容器干净构建和启动，只允许修复已确认的最小装配或依赖兼容问题；不得修改业务规则、公共 API、数据库领域结构、租户或权限行为。
+15. `deploy/scripts/compose.sh` 必须提供基础设施启动、完整应用启动、部分服务启动、状态、日志、停止、构建和显式数据重置入口；Flyway 的 migrate/info/validate 由对应模块或 Maven 命令执行，不创建通用 Flyway 容器。
+16. 仓库只提交本地开发示例值；实际 `.env`、凭据、token、私钥及构建产物必须被忽略，不得烘焙进镜像。
+17. 中文部署文档必须说明版本、端口、数据库所有权、模块内 Flyway migration 规范、已有数据库 baseline、服务分组、IDE 启动、完整容器启动、模块独立构建、重复启动、重置和已知限制。
 
 ## Non-goals
-本变更不实现 RocketMQ 管理服务或 Docs 服务尚未完成的业务功能，不修改公共 REST/Feign 契约，不改变租户、认证或授权规则，不升级 Java、Macula Boot、Spring Boot、Spring Cloud、Seata 或 SnailJob 版本，不提供 Helm/Kustomize，不发布镜像、不连接或修改远端集群，也不声称提供生产级高可用、备份恢复、跨可用区容灾或完整可观测性方案。
+不提供 Kubernetes、Helm、Kustomize、生产级高可用、证书、备份恢复或跨可用区方案；不发布镜像、不部署远端环境；不实现 RocketMQ 管理服务或 Docs 服务缺失的业务功能；不升级 Java、Macula Boot、Spring Boot、Spring Cloud、Seata、SnailJob 或其他既有依赖版本；不为 Nacos 等中间件数据库引入 Flyway；不修改公共 REST/Feign 契约、租户、认证或授权规则。
 
 ## Design
-适用政策包括根目录 `AGENTS.md` 的 Java 17、配置分层、秘密管理和 AI-SDLC 门禁；`.agents/rules/architecture.md` 的模块职责与安全边界；`.agents/rules/dependencies-release.md` 的部署、启动顺序、健康检查和发布安全要求；`.agents/rules/testing.md` 的外部依赖验证与结果报告要求；`REVIEW.md` 的 Bugs、Security、Compliance 三轮审查要求。`bands.yaml` 目前是示例基线，不作为本次部署 SLO。
+保留单个 `deploy/docker-compose.yml`。MySQL、Redis、Nacos、RocketMQ 与初始化任务不设置 profile，因此默认 `docker compose up` 即得到 IDE 调试环境；八个后端模块和 Admin 设置 `apps` profile，通过 `docker compose --profile apps up` 启动完整容器环境。辅助脚本把这两个入口封装成简短命令。
 
-开发路径采用“基础设施容器 + 本机应用”的双层结构：
+每个 Java 模块目录放置独立 Dockerfile，构建上下文统一为仓库根目录。Dockerfile 使用相同的多阶段结构并明确写出自身 Maven module 和端口。由于 Dockerfile 没有可靠的 include 机制，本次优先保持模块独立、直观和可复制，不再使用集中式参数化 Dockerfile或自定义基础镜像；Compose 通过 extension fields/YAML anchors 复用公共环境变量、重启策略和日志/资源约定。
 
-1. `deploy/docker-compose.yml` 仅启动 MySQL、Redis、Nacos、RocketMQ NameServer/Broker，以及完成数据库和 Nacos 初始化的一次性任务。应用进程不加入 Compose 网络，而是通过发布到 `127.0.0.1` 的端口连接基础设施。
-2. `deploy/.env.example` 保存可公开的本地默认值和端口覆盖项；实际 `deploy/.env` 不提交。所有镜像使用固定版本而非 floating tag，最终版本在实施计划中依据当前依赖兼容矩阵锁定。
-3. 初始化材料放在 `deploy/init/`，按数据库和配置中心分类。初始化过程记录 schema/config 版本或校验标记，普通重复执行只补齐缺失项；显式 reset 流程才允许删除 volume 或重建数据库。
-4. IDE 启动顺序为基础设施及初始化完成后，依次启动数据/平台服务、IAM/System、Gateway，再启动 Vite 管理端；实际可并行项和健康检查地址在实施计划中由模块装配验证确定。
-5. 后端端口沿用已存在的 Gateway `9000`、IAM `9010`、System `9081`、TinyID `9082`、Seata HTTP `9091`、SnailJob HTTP `9086` 和 SnailJob gRPC `17888`。RocketMQ 管理服务与 Docs 服务必须分配未占用且可覆盖的本地端口；管理端沿用 Vite 配置的 `5900`。所有服务地址通过环境变量覆盖，避免把容器内地址写死到本机配置。
-6. 后端容器镜像采用共享的 Java 17 多阶段构建约定，但每个可运行模块保留明确的构建目标、入口类、暴露端口和健康契约；管理端采用 Node 构建阶段与非 root 静态服务器运行阶段。镜像不携带环境 Secret。
+基础设施继续使用固定版本和命名卷。MySQL 健康后运行 bootstrap，创建账号和五个数据库，并只对 Nacos 数据库执行与固定 Nacos 版本匹配的官方 schema。Nacos 服务随后启动，namespace 与 Seata 配置仍由 Nacos 初始化任务处理。
 
-Kubernetes 路径采用原生清单加小型 shell 驱动脚本：
+System、TinyID、Seata、SnailJob 分别在自身 POM 中引入由父依赖管理的 Flyway 核心与 MySQL 支持，并在自身资源目录维护 migration。应用启动时由 Spring Boot Flyway 自动配置先迁移所属数据库，再完成模块装配。IAM 虽访问 `macula-system`，但不包含 migration；Compose 完整启动顺序确保 System 完成迁移后再启动 IAM。IDE 调试文档同样要求首次启动 System 后再启动 IAM。
 
-1. `deploy/k8s/` 中的 YAML 按可预测顺序拆分，使用一个可配置 namespace。MySQL、Nacos、RocketMQ broker 使用有状态工作负载或等价的持久化模式；Redis 根据本次开发/验证定位使用单实例持久化部署。初始化使用 Job，并通过重试与明确退出码体现结果。
-2. Gateway、IAM、System、TinyID、Seata、SnailJob、RocketMQ 管理服务、Docs 服务和 Admin 分别使用 Deployment/Service。内部调用使用 Kubernetes Service DNS；仅 Gateway、Admin、TinyID 的外部访问按现有职责提供可选 Ingress/Service 暴露，默认不生成真实域名或公网负载均衡。
-3. 非敏感配置进入 ConfigMap；数据库、Nacos、OAuth/Seata 等凭据只通过 Secret key 引用。仓库提供 Secret 创建说明或不含真实值的模板，部署脚本必须检查必需 Secret 是否存在。
-4. 镜像仓库与 tag 由部署脚本参数或环境文件传入。脚本只把渲染结果写入临时目录，执行前运行客户端 dry-run；不把生成的敏感清单写回仓库。
-5. 探针优先使用模块已有健康端点；没有可靠 HTTP 健康端点时先使用与模块协议匹配的 TCP/startup 探针，并在文档中标明其证明范围，不能把端口可连通描述为业务健康。
+为兼容当前已经由旧初始化脚本创建的 volume，四个模块对非空且没有 `flyway_schema_history` 的数据库启用明确的 V1 baseline 接管策略；空数据库执行 V1 migration。状态不明确或 migration checksum 不一致时必须失败，不自动修复或清库。
+
+应用服务使用 Compose DNS 地址连接 MySQL、Redis、Nacos、RocketMQ 及其他应用。Admin 通过自身 Nginx 将 `/api/` 和 `/iam/` 转发到 Gateway/IAM。
+
+模块运行配置采用环境变量覆盖，不新增远程配置协议。Docs 与 RocketMQ 管理服务只补最小 Spring Boot 装配、端口和进程级探测。若干净构建暴露当前依赖与源码命名空间不兼容，仅允许最小机械兼容修复，并单独验证无业务行为变化。
 
 ## Data and interfaces
-本变更不新增公共 API，也不改变现有领域表结构。部署数据契约包括五个 MySQL 数据库：`macula-system`、`macula-tinyid`、`seata`、`macula-snailjob` 和 Nacos 数据库；现有 System/TinyID dump 继续作为其 schema 与种子数据来源，Seata 2.0.0、SnailJob 1.9.0 和所选 Nacos 固定版本必须使用对应官方 schema，并记录来源与版本。
+不新增公共 API 或新的领域表。部署数据仍为 `macula-system`、`macula-tinyid`、`seata`、`macula-snailjob`、`nacos` 五个数据库。System/TinyID 使用仓库现有 SQL作为模块 V1 migration；Seata/SnailJob 使用与锁定组件版本一致并记录来源的 SQL 作为模块 V1 migration；Nacos 继续使用中间件官方初始化 SQL，不生成 Flyway 元数据。四个应用数据库新增 `flyway_schema_history`，它只记录迁移版本、checksum 和执行状态。
 
-新增或标准化的运行配置接口包括数据库连接、Redis 地址、Nacos地址/namespace/凭据、RocketMQ NameServer、Seata registry/config/store、SnailJob 数据源、服务端口、前端 Gateway/IAM 地址、镜像仓库/tag、Kubernetes namespace/Ingress/StorageClass。配置必须支持“本机 `127.0.0.1`”和“Kubernetes Service DNS”两套值，但配置键语义保持一致。
-
-Compose 服务名、Kubernetes Service 名和数据库名形成部署契约；README 中必须列出映射关系。任何为 Docs/RocketMQ 管理模块增加的启动注解或端口配置只属于进程装配，不新增业务接口。
+新增部署接口包括各模块 Dockerfile、Compose `apps` profile、四个模块内的 Flyway migration 目录、标准环境变量、固定服务名和 `compose.sh` 命令。端口沿用 Gateway 9000、IAM 9010、System 9081、TinyID 9082、RocketMQ 管理服务 9083、Docs 9084、SnailJob 9086/17888、Seata 9091/8091、Admin 5900/8080。
 
 ## Flagged concerns
-- Cloud 模块完整范围：`macula-cloud-docs` 当前启动类缺少完整 Spring Boot 装配，`macula-cloud-rocketmq` 仍标记为 TODO；为满足“工程内模块均可 IDE 启动”，规格包含最小启动修复和独立端口，但不补业务功能，需要 Reviewer 明确接受部署任务包含这部分最小源码/配置变更，blocking
-- Kubernetes 定位：intent 未要求生产级高可用，因此本规格将原生 YAML 定位为开发、集成和部署基线；进入共享或生产环境前仍需组织确定副本数、SLO、备份、证书、网络策略、Pod 安全、镜像签名和灾备方案，non-blocking
-- 镜像构建范围：仓库当前后端 Dockerfile 和管理端 Dockerfile 均无可用内容；Kubernetes 可部署性要求本变更新增各运行模块的镜像构建定义，这超出只填写两个现有空清单文件的最窄理解，但属于已接受结果的必要条件，non-blocking
-- 上游初始化材料：仓库缺少 Nacos、Seata 和 SnailJob 的完整初始化 SQL；实施必须使用与锁定版本匹配的官方材料并保留来源/许可证信息，未经版本核对不得复制任意网上脚本，blocking
-- Secret 与旧配置：现有源码中包含空数据库密码、本地示例凭据、Seata 静态 secret 以及 `dev` profile 内网地址；本规格要求新部署路径覆盖而不传播这些值，但全面清理历史配置不在本次范围，non-blocking
-- 健康端点：仓库未发现统一 Actuator 健康契约；TCP 探针只能证明监听状态，实施计划必须逐模块确认可用的无副作用健康端点或明确验证局限，non-blocking
-- 容器与集群运行条件：完整运行验证需要可用的 Docker Compose 环境以及一个一次性本地 Kubernetes 测试集群；如果执行环境缺失，只能完成渲染和客户端 dry-run，不能宣称运行通过，non-blocking
+- System 干净构建：当前父依赖中的 MyBatis-Plus 3.5.17 已将 `IService`/`ServiceImpl` 从 `extension.service` 移至 `spring.service`，而 System 源码仍使用旧包名；完整镜像构建需要授权机械迁移相关 import，不能把旧 `target` 产物当作通过，blocking
+- TinyID 启动：当前完整测试曾因 Druid 自动配置引用 Spring Boot 4 已不存在的 `DataSourceProperties` 而失败；本规格不允许自行升级依赖，实施应先确认是否为实际启动阻断，若需要改依赖版本则必须暂停并另行确认，blocking
+- Dockerfile 重复：八个 Java Dockerfile 会有少量结构性重复，但使用自定义基础镜像、生成脚本或符号链接会增加使用门槛；本规格选择可读、模块独立的重复，并只在 Compose 中提炼公共项，non-blocking
+- Flyway 历史接管：已有应用数据库的实际 schema 可能与仓库 V1 SQL 不完全一致；baseline-on-migrate 只能避免重放，不能证明 schema 完全一致，因此首次接管前仍应备份并核对，non-blocking
+- 共享数据库所有权：IAM 与 System 共用 `macula-system`，只有 System 执行 migration；独立启动 IAM 前必须保证 System 已完成迁移，否则 IAM 可能因缺表启动失败，non-blocking
+- 上游 SQL 演进：Seata、SnailJob 升级时必须在所属模块新增 migration，而不是替换 V1；本变更锁定当前组件版本，不处理未来升级脚本，non-blocking
+- 完整运行验证：需要可用 Docker daemon 和足够内存；若当前环境仍无法连接 Docker，只能完成 Compose 解析、模块构建和静态检查，不能声称完整容器环境已运行，non-blocking
+- Docs/RocketMQ 管理服务：两者只验证最小进程装配，不代表业务功能完整，non-blocking
 
 ## Verification strategy
-1. 对 Compose 运行 `docker compose config`，检查固定镜像版本、端口绑定、volume、健康检查、依赖和 profile；在干净 volume 上执行完整启动，验证所有长期服务健康、初始化任务成功退出、五个数据库及关键表存在、Nacos namespace/config 可读取、RocketMQ broker 可用。
-2. 在不删除 volume 的情况下重复启动和初始化，验证数据保留、无重复错误；单独验证显式 reset 后可从零恢复。分别启动单个和部分中间件，确认命令契约有效。
-3. 使用 `local` profile 对全部可运行后端模块做打包和 IDE 等价启动冒烟，确认端口无冲突、能连接基础设施、Gateway/IAM/System 基本调用链可达；运行 `npm ci`、前端构建及本机 API 地址检查。外部依赖导致的失败必须与代码失败分开报告。
-4. 构建所有后端和 Admin 镜像，检查 Java 17 运行时、非 root 用户、入口、暴露端口、镜像内无 Secret，并对启动后的进程执行对应健康检查。
-5. 对全部 Kubernetes YAML 执行 YAML 解析、`kubectl apply --dry-run=client` 及可用时的 schema 校验；对部署脚本执行 shell 静态检查，验证缺参失败、Secret 缺失失败、等待就绪、状态查询、普通卸载保留 PVC、显式数据清理等路径。
-6. 条件允许时在一次性本地 Kubernetes 集群执行从空 namespace 部署、初始化、应用就绪、Admin/Gateway/TinyID 访问和卸载重装；若未实际运行集群，验证报告必须明确标记为未验证。
-7. 最后运行 `git diff --check`，核对 README、Compose、Kubernetes、Dockerfile、初始化材料和应用配置描述的是同一套版本、端口、服务名和启动顺序，并按 `REVIEW.md` 完成 Bugs、Security、Compliance 三轮审查。
+1. 对 Compose 执行 `docker compose config`，分别解析默认服务集合和 `apps` profile，核对固定镜像、端口、卷、健康检查、数据库迁移所有权、依赖、服务 DNS 和环境变量。
+2. 对每个模块 Dockerfile执行构建；检查 Java 17、非 root 用户、可执行 JAR、暴露端口和镜像中无 Secret。Admin 额外验证 `npm ci`、生产构建和 SPA/代理配置。
+3. 在干净 volume 启动默认基础设施，确认五个数据库已创建、Nacos 官方 schema 已导入、Nacos namespace/Seata 配置和 RocketMQ 可用；确认默认中间件路径不创建任何 Flyway history。
+4. 分别启动 System、TinyID、Seata、SnailJob，确认四个模块执行 V1、创建各自 `flyway_schema_history` 和关键表；重复启动确认无待执行 migration 且数据保留。
+5. 用已有关键表但没有 Flyway history 的应用数据库验证 baseline 接管路径；验证 migration checksum 被修改时启动或 validate 失败，失败 migration 不会被静默忽略。
+6. 使用 `apps` profile 启动完整环境，确认 System 迁移先于 IAM，检查八个后端进程、Admin、端口、服务注册及 Gateway/IAM/System 基本调用链；未实现业务的模块只检查进程与端口。
+7. 运行四个 Flyway 模块的相关测试和打包、Docs/RocketMQ 最小装配测试、管理端 `npm ci`/build；System/TinyID 的既有兼容问题必须与部署变更失败分开报告。
+8. 运行 `sh -n`、可用时的 `shellcheck`、`git diff --check`，扫描真实 Secret、内网地址、floating tag、Kubernetes 遗留、构建产物及范围外 API/业务修改。
