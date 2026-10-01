@@ -9,7 +9,7 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.authentication.AbstractAuthenticationProcessingFilter;
-import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import org.springframework.util.Assert;
 
 import jakarta.servlet.ServletException;
@@ -19,19 +19,19 @@ import java.io.BufferedReader;
 import java.io.IOException;
 
 public class WeappAuthenticationFilter extends AbstractAuthenticationProcessingFilter {
-    private static final AntPathRequestMatcher DEFAULT_ANT_PATH_REQUEST_MATCHER =
-        new AntPathRequestMatcher("/login/weapp", "POST");
+    private static final PathPatternRequestMatcher DEFAULT_REQUEST_MATCHER =
+        PathPatternRequestMatcher.pathPattern(HttpMethod.POST, "/login/weapp");
     private final ObjectMapper om = new ObjectMapper();
     private Converter<HttpServletRequest, WeappAuthenticationToken> weappAuthenticationTokenConverter;
     private boolean postOnly = true;
 
     public WeappAuthenticationFilter() {
-        super(DEFAULT_ANT_PATH_REQUEST_MATCHER);
+        super(DEFAULT_REQUEST_MATCHER);
         this.weappAuthenticationTokenConverter = defaultConverter();
     }
 
     public WeappAuthenticationFilter(AuthenticationManager authenticationManager) {
-        super(DEFAULT_ANT_PATH_REQUEST_MATCHER, authenticationManager);
+        super(DEFAULT_REQUEST_MATCHER, authenticationManager);
         this.weappAuthenticationTokenConverter = defaultConverter();
     }
 

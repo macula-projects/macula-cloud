@@ -1,13 +1,79 @@
+server:
+  port: ${SERVER_PORT:9086}
+  servlet:
+    context-path: /snail-job
+
 spring:
+  profiles:
+    active: @profile.active@
+    group:
+      docker: local
+  application:
+    name: macula-cloud-snailjob
+  config:
+    import:
+      - optional:nacos:${spring.application.name}.yml?refreshEnabled=true
+      - optional:nacos:${spring.application.name}-${spring.profiles.active}.yml?refreshEnabled=true
   main:
     banner-mode: off
   datasource:
     name: snail_job
-    ## mysql
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/macula-snailjob?useSSL=false&characterEncoding=utf8&useUnicode=true
-    username: root
-    password:
+    type: com.zaxxer.hikari.HikariDataSource
+    hikari:
+      connection-timeout: 30000
+      minimum-idle: 5
+      maximum-pool-size: 100
+      auto-commit: true
+      idle-timeout: 30000
+      pool-name: snail_job
+      max-lifetime: 1800000
+  web:
+    resources:
+      static-locations: classpath:admin/
+  cloud:
+    nacos:
+      server-addr: ${spring.config.nacos.server-addr}
+      namespace: ${spring.config.nacos.namespace}
+      username: ${spring.config.nacos.username}
+      password: ${spring.config.nacos.password}
+      discovery:
+        namespace: ${spring.cloud.nacos.namespace}
+
+mybatis-plus:
+  typeAliasesPackage: com.aizuda.snailjob.template.datasource.persistence.po
+  global-config:
+    db-config:
+      where-strategy: NOT_EMPTY
+      capital-mode: false
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+  configuration:
+    map-underscore-to-camel-case: true
+    cache-enabled: true
+
+snail-job:
+  retry-pull-page-size: 1000 # 拉取重试数据的每批次的大小
+  job-pull-page-size: 1000 # 拉取重试数据的每批次的大小
+  server-port: ${SNAILJOB_GRPC_PORT:17888}  # 服务器端口
+  log-storage: 7 # 日志保存时间(单位: day)
+  rpc-type: grpc
+---
+# local Profile 包含 IDE 本地开发所需的全部默认配置
+spring:
+  config:
+    activate:
+      on-profile: local
+    nacos:
+      server-addr: "${NACOS_SERVER_ADDR:127.0.0.1:${NACOS_SERVER_PORT:8848}}"
+      namespace: ${NACOS_NAMESPACE:MACULA5}
+      username: ${NACOS_USERNAME:nacos}
+      password: ${NACOS_PASSWORD:nacos}
+  datasource:
+    ## mysql
+    url: jdbc:mysql://127.0.0.1:${MYSQL_PORT:3306}/macula-snailjob?useSSL=false&allowPublicKeyRetrieval=true&characterEncoding=utf8&useUnicode=true&serverTimezone=Asia/Shanghai
+    username: ${MYSQL_APP_USER:macula}
+    password: ${MYSQL_APP_PASSWORD:macula}
     ## postgres
     #    driver-class-name: org.postgresql.Driver
     #    url: jdbc:postgresql://localhost:5432/snail_job?useUnicode=true&characterEncoding=utf8&useSSL=true&autoReconnect=true&reWriteBatchedInserts=true
@@ -38,34 +104,71 @@ spring:
     #    url: jdbc:kingbase8://localhost:54321/test
     #    username: root
     #    password: root
-    type: com.zaxxer.hikari.HikariDataSource
-    hikari:
-      connection-timeout: 30000
-      minimum-idle: 5
-      maximum-pool-size: 100
-      auto-commit: true
-      idle-timeout: 30000
-      pool-name: snail_job
-      max-lifetime: 1800000
-  web:
-    resources:
-      static-locations: classpath:admin/
+  flyway:
+    enabled: ${FLYWAY_ENABLED:true}
+    baseline-on-migrate: ${FLYWAY_BASELINE_ON_MIGRATE:true}
+    baseline-version: 1
+    validate-on-migrate: true
+    clean-disabled: true
+    locations: classpath:db/migration
 
-mybatis-plus:
-  typeAliasesPackage: com.aizuda.snailjob.template.datasource.persistence.po
-  global-config:
-    db-config:
-      where-strategy: NOT_EMPTY
-      capital-mode: false
-      logic-delete-value: 1
-      logic-not-delete-value: 0
-  configuration:
-    map-underscore-to-camel-case: true
-    cache-enabled: true
+---
+# Docker Profile 覆盖容器内 DNS 连接信息，其余沿用 local 默认配置
+spring:
+  config:
+    activate:
+      on-profile: docker
+    nacos:
+      server-addr: ${NACOS_SERVER_ADDR:nacos:8848}
+      namespace: ${NACOS_NAMESPACE:MACULA5}
+      username: ${NACOS_USERNAME:nacos}
+      password: ${NACOS_PASSWORD:nacos}
+  datasource:
+    url: jdbc:mysql://mysql:3306/macula-snailjob?useSSL=false&allowPublicKeyRetrieval=true&characterEncoding=utf8&useUnicode=true&serverTimezone=Asia/Shanghai
+    username: ${MYSQL_APP_USER}
+    password: ${MYSQL_APP_PASSWORD}
 
-snail-job:
-  retry-pull-page-size: 1000 # 拉取重试数据的每批次的大小
-  job-pull-page-size: 1000 # 拉取重试数据的每批次的大小
-  server-port: 17888  # 服务器端口
-  log-storage: 7 # 日志保存时间(单位: day)
-  rpc-type: grpc
+---
+# 共享环境只保留配置中心连接信息，其余配置由 Nacos Data ID 提供
+spring:
+  config:
+    activate:
+      on-profile: dev
+    nacos:
+      server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+      namespace: ${NACOS_NAMESPACE:MACULA5}
+      username: ${NACOS_USERNAME:nacos}
+      password: ${NACOS_PASSWORD:nacos}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: stg
+    nacos:
+      server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+      namespace: ${NACOS_NAMESPACE:MACULA5}
+      username: ${NACOS_USERNAME:nacos}
+      password: ${NACOS_PASSWORD:nacos}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: pet
+    nacos:
+      server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+      namespace: ${NACOS_NAMESPACE:MACULA5}
+      username: ${NACOS_USERNAME:nacos}
+      password: ${NACOS_PASSWORD:nacos}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: prd
+    nacos:
+      server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+      namespace: ${NACOS_NAMESPACE:MACULA5}
+      username: ${NACOS_USERNAME:nacos}
+      password: ${NACOS_PASSWORD:nacos}

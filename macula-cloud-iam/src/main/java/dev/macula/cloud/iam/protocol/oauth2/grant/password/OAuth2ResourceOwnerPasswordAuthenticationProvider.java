@@ -22,11 +22,9 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2ErrorCodes;
 import org.springframework.security.oauth2.core.OAuth2Token;
-import org.springframework.security.oauth2.core.endpoint.OAuth2ParameterNames;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenGenerator;
@@ -59,8 +57,8 @@ public class OAuth2ResourceOwnerPasswordAuthenticationProvider
 
     @Override
     public UsernamePasswordAuthenticationToken buildToken(Map<String, Object> reqParameters) {
-        String username = (String)reqParameters.get(OAuth2ParameterNames.USERNAME);
-        String password = (String)reqParameters.get(OAuth2ParameterNames.PASSWORD);
+        String username = (String)reqParameters.get(OAuth2ResourceOwnerPasswordAuthenticationConverter.USERNAME_PARAMETER);
+        String password = (String)reqParameters.get(OAuth2ResourceOwnerPasswordAuthenticationConverter.PASSWORD_PARAMETER);
         return new UsernamePasswordAuthenticationToken(username, password);
     }
 
@@ -74,7 +72,8 @@ public class OAuth2ResourceOwnerPasswordAuthenticationProvider
     @Override
     public void checkClient(RegisteredClient registeredClient) {
         assert registeredClient != null;
-        if (!registeredClient.getAuthorizationGrantTypes().contains(AuthorizationGrantType.PASSWORD)) {
+        if (!registeredClient.getAuthorizationGrantTypes()
+            .contains(OAuth2ResourceOwnerPasswordAuthenticationConverter.PASSWORD_GRANT_TYPE)) {
             throw new OAuth2AuthenticationException(OAuth2ErrorCodes.UNAUTHORIZED_CLIENT);
         }
     }

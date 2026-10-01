@@ -22,7 +22,6 @@ import dev.macula.cloud.iam.utils.OAuth2EndpointUtils;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.OAuth2ErrorCodes;
-import org.springframework.security.oauth2.core.endpoint.OAuth2ParameterNames;
 import org.springframework.util.MultiValueMap;
 import org.springframework.util.StringUtils;
 
@@ -39,6 +38,12 @@ import java.util.Set;
 public class OAuth2ResourceOwnerPasswordAuthenticationConverter
     extends OAuth2ResourceOwnerBaseAuthenticationConverter<OAuth2ResourceOwnerPasswordAuthenticationToken> {
 
+    static final AuthorizationGrantType PASSWORD_GRANT_TYPE = new AuthorizationGrantType("password");
+
+    static final String USERNAME_PARAMETER = "username";
+
+    static final String PASSWORD_PARAMETER = "password";
+
     /**
      * 支持密码模式
      *
@@ -46,13 +51,13 @@ public class OAuth2ResourceOwnerPasswordAuthenticationConverter
      */
     @Override
     public boolean support(String grantType) {
-        return AuthorizationGrantType.PASSWORD.getValue().equals(grantType);
+        return PASSWORD_GRANT_TYPE.getValue().equals(grantType);
     }
 
     @Override
     public OAuth2ResourceOwnerPasswordAuthenticationToken buildToken(Authentication clientPrincipal,
         Set<String> requestedScopes, Map<String, Object> additionalParameters) {
-        return new OAuth2ResourceOwnerPasswordAuthenticationToken(AuthorizationGrantType.PASSWORD, clientPrincipal,
+        return new OAuth2ResourceOwnerPasswordAuthenticationToken(PASSWORD_GRANT_TYPE, clientPrincipal,
             requestedScopes, additionalParameters);
     }
 
@@ -65,16 +70,16 @@ public class OAuth2ResourceOwnerPasswordAuthenticationConverter
     public void checkParams(HttpServletRequest request) {
         MultiValueMap<String, String> parameters = OAuth2EndpointUtils.getParameters(request);
         // username (REQUIRED)
-        String username = parameters.getFirst(OAuth2ParameterNames.USERNAME);
-        if (!StringUtils.hasText(username) || parameters.get(OAuth2ParameterNames.USERNAME).size() != 1) {
-            OAuth2EndpointUtils.throwError(OAuth2ErrorCodes.INVALID_REQUEST, OAuth2ParameterNames.USERNAME,
+        String username = parameters.getFirst(USERNAME_PARAMETER);
+        if (!StringUtils.hasText(username) || parameters.get(USERNAME_PARAMETER).size() != 1) {
+            OAuth2EndpointUtils.throwError(OAuth2ErrorCodes.INVALID_REQUEST, USERNAME_PARAMETER,
                 OAuth2EndpointUtils.ACCESS_TOKEN_REQUEST_ERROR_URI);
         }
 
         // password (REQUIRED)
-        String password = parameters.getFirst(OAuth2ParameterNames.PASSWORD);
-        if (!StringUtils.hasText(password) || parameters.get(OAuth2ParameterNames.PASSWORD).size() != 1) {
-            OAuth2EndpointUtils.throwError(OAuth2ErrorCodes.INVALID_REQUEST, OAuth2ParameterNames.PASSWORD,
+        String password = parameters.getFirst(PASSWORD_PARAMETER);
+        if (!StringUtils.hasText(password) || parameters.get(PASSWORD_PARAMETER).size() != 1) {
+            OAuth2EndpointUtils.throwError(OAuth2ErrorCodes.INVALID_REQUEST, PASSWORD_PARAMETER,
                 OAuth2EndpointUtils.ACCESS_TOKEN_REQUEST_ERROR_URI);
         }
     }

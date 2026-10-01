@@ -5,7 +5,8 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.config.annotation.web.HttpSecurityBuilder;
 import org.springframework.security.web.authentication.logout.LogoutFilter;
-import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
+import org.springframework.http.HttpMethod;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.util.Assert;
 
@@ -37,7 +38,7 @@ public class WeappLoginFilterConfigurer<H extends HttpSecurityBuilder<H>>
     }
 
     @Override
-    public void init(H http) throws Exception {
+    public void init(H http) {
         super.init(http);
         initPreAuthenticationFilter(http);
     }
@@ -70,6 +71,6 @@ public class WeappLoginFilterConfigurer<H extends HttpSecurityBuilder<H>>
 
     @Override
     protected RequestMatcher createLoginProcessingUrlMatcher(String loginProcessingUrl) {
-        return new AntPathRequestMatcher(loginProcessingUrl, "POST");
+        return PathPatternRequestMatcher.pathPattern(HttpMethod.POST, loginProcessingUrl);
     }
 }

@@ -22,7 +22,7 @@ import cn.hutool.core.collection.CollectionUtil;
 import cn.hutool.core.lang.Validator;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import dev.macula.boot.constants.SecurityConstants;
 import dev.macula.boot.enums.StatusEnum;
 import dev.macula.boot.result.Option;

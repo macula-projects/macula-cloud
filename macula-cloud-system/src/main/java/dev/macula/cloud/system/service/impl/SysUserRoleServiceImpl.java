@@ -19,7 +19,7 @@ package dev.macula.cloud.system.service.impl;
 
 import cn.hutool.core.collection.CollectionUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import dev.macula.cloud.system.mapper.SysUserRoleMapper;
 import dev.macula.cloud.system.pojo.entity.SysUserRole;
 import dev.macula.cloud.system.service.SysUserRoleService;

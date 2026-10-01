@@ -5,7 +5,8 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.config.annotation.web.HttpSecurityBuilder;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
+import org.springframework.http.HttpMethod;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.util.Assert;
 
@@ -33,7 +34,7 @@ public class CaptchaLoginFilterConfigurer<H extends HttpSecurityBuilder<H>>
 
     @Override
     protected RequestMatcher createLoginProcessingUrlMatcher(String loginProcessingUrl) {
-        return new AntPathRequestMatcher(loginProcessingUrl, "POST");
+        return PathPatternRequestMatcher.pathPattern(HttpMethod.POST, loginProcessingUrl);
     }
 
     @Override
@@ -52,7 +53,7 @@ public class CaptchaLoginFilterConfigurer<H extends HttpSecurityBuilder<H>>
     }
 
     @Override
-    public void configure(H http) throws Exception {
+    public void configure(H http) {
         http.addFilterAfter(this.getAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class);
         super.configure(http);
     }

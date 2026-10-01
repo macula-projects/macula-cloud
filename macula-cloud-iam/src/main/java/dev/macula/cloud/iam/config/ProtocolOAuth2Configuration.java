@@ -43,7 +43,7 @@ import org.springframework.security.oauth2.core.OAuth2Token;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsentService;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
-import org.springframework.security.oauth2.server.authorization.config.annotation.web.configurers.OAuth2AuthorizationServerConfigurer;
+import org.springframework.security.config.annotation.web.configurers.oauth2.server.authorization.OAuth2AuthorizationServerConfigurer;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
 import org.springframework.security.oauth2.server.authorization.token.*;
 import org.springframework.security.web.SecurityFilterChain;
@@ -85,14 +85,14 @@ public class ProtocolOAuth2Configuration {
         // 拦截 授权服务器相关的请求端点
         http
             .securityMatcher(endpointsMatcher)
-            .authorizeHttpRequests()
-                .anyRequest().authenticated().and()
+            .authorizeHttpRequests(authorize -> authorize
+                .anyRequest().authenticated())
             // 忽略掉相关端点的csrf
-            .csrf().ignoringRequestMatchers(endpointsMatcher).and()
-            .exceptionHandling()
-                .authenticationEntryPoint(new OAuth2AuthenticationExceptionEntryPoint("/login")).and()
+            .csrf(csrf -> csrf.ignoringRequestMatchers(endpointsMatcher))
+            .exceptionHandling(exceptions -> exceptions
+                .authenticationEntryPoint(new OAuth2AuthenticationExceptionEntryPoint("/login")))
             // 应用 授权服务器的配置
-            .apply(authorizationServerConfigurer);
+            .with(authorizationServerConfigurer, Customizer.withDefaults());
 
         SecurityFilterChain securityFilterChain = http.build();
 

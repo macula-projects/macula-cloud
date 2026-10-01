@@ -24,7 +24,7 @@ import org.redisson.api.RedissonClient;
 import org.redisson.config.Config;
 import org.redisson.spring.data.connection.RedissonConnectionFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.boot.autoconfigure.data.redis.RedisProperties;
+import org.springframework.boot.data.redis.autoconfigure.DataRedisProperties;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
@@ -42,27 +42,29 @@ import org.springframework.data.redis.serializer.RedisSerializer;
 @Configuration
 public class RedisConfiguration {
     @Bean
+    @Primary
     @ConfigurationProperties(prefix = "spring.redis")
-    public RedisProperties redisProperties() {
-        return new RedisProperties();
+    public DataRedisProperties redisProperties() {
+        return new DataRedisProperties();
     }
 
     @Bean
     @ConfigurationProperties(prefix = "spring.redis.system")
-    public RedisProperties sysRedisProperties() {
-        return new RedisProperties();
+    public DataRedisProperties sysRedisProperties() {
+        return new DataRedisProperties();
     }
 
     @Primary
     @Bean(destroyMethod = "shutdown")
-    public RedissonClient redissonClient(ApplicationContext ctx, RedisProperties redisProperties) throws Exception {
+    public RedissonClient redissonClient(ApplicationContext ctx,
+        @Qualifier("redisProperties") DataRedisProperties redisProperties) throws Exception {
         Config config = RedissonConfigBuilder.create().build(ctx, redisProperties, new RedissonProperties());
         return Redisson.create(config);
     }
 
     @Bean(destroyMethod = "shutdown")
-    public RedissonClient sysRedissonClient(ApplicationContext ctx, RedisProperties sysRedisProperties)
-        throws Exception {
+    public RedissonClient sysRedissonClient(ApplicationContext ctx,
+        @Qualifier("sysRedisProperties") DataRedisProperties sysRedisProperties) throws Exception {
         Config config = RedissonConfigBuilder.create().build(ctx, sysRedisProperties, new RedissonProperties());
         return Redisson.create(config);
     }

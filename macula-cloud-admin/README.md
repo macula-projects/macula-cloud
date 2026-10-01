@@ -45,6 +45,24 @@ npm i
 npm run dev
 ```
 
+## 环境模式
+
+浏览器通过同源路径 `/api` 访问 Gateway，通过 `/iam` 访问 IAM。开发服务器和容器 Nginx 分别代理这两个前缀，避免浏览器跨域并保持各环境访问方式一致：
+
+```sh
+# local：Vite 开发服务器代理到本机 Gateway/IAM
+npm run dev
+
+# Docker Compose、开发、预发、性能测试、生产构建
+npm run build:docker
+npm run build:dev
+npm run build:stg
+npm run build:pet
+npm run build:prd
+```
+
+本地 Vite 默认把 `/api` 代理到 `127.0.0.1:9000`、把 `/iam` 代理到 `127.0.0.1:9010`，可分别通过 `VITE_APP_GATEWAY_PROXY_TARGET`、`VITE_APP_IAM_PROXY_TARGET` 覆盖。Docker 镜像内置 Nginx 将 `/api`、`/iam` 代理到 Compose 中的 Gateway、IAM 服务。共享环境的入口代理也应提供这两个同源前缀；如部署拓扑确实不同，可在构建产物的 `config.js` 中覆盖 `API_URL`、`IAM_URL`。
+
 ## License
 
 MMacula Cloud Admin is Open Source software released under the Apache 2.0 license.

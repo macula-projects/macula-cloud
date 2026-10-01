@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import { fileURLToPath, URL } from 'node:url';
 import vue from "@vitejs/plugin-vue";
 import vueJsx from "@vitejs/plugin-vue-jsx";
@@ -25,7 +25,10 @@ import { ElementPlusResolver } from "unplugin-vue-components/resolvers";
 import Inspect from 'vite-plugin-inspect';
 
 // https://vitejs.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), 'VITE_APP_');
+
+  return {
  
   define: { 
     __VUE_I18N_FULL_INSTALL__: true, 
@@ -77,9 +80,14 @@ export default defineConfig({
     proxy: {
       // https://cn.vitejs.dev/config/#server-proxy
       '/api': {
-        target: 'https://www.fastmock.site/mock/5039c4361c39a7e3252c5b55971f1bd3/api',
+        target: env.VITE_APP_GATEWAY_PROXY_TARGET || 'http://127.0.0.1:9000',
         changeOrigin: true,
         rewrite: (p) => p.replace(/^\/api/, '')
+      },
+      '/iam': {
+        target: env.VITE_APP_IAM_PROXY_TARGET || 'http://127.0.0.1:9010',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/iam/, '')
       }
     },
   },
@@ -99,4 +107,5 @@ export default defineConfig({
       ],
     },
   },
+  };
 });

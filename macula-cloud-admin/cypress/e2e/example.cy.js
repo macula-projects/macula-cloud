@@ -17,9 +17,28 @@
 
 // https://docs.cypress.io/api/introduction/api.html
 
-describe("My First Test", () => {
-  it("visits the app root url", () => {
+describe("Admin login", () => {
+  it("redirects the app root to the login page", () => {
     cy.visit("/");
-    cy.contains("h1", "You did it!");
+    cy.location("hash").should("eq", "#/login");
+    cy.contains("账号登录").should("be.visible");
+    cy.contains("button", "登录").should("be.visible");
+  });
+
+  it("shows the IAM response message when password authentication fails", () => {
+    cy.intercept("POST", "**/oauth2/token", {
+      statusCode: 400,
+      body: {
+        error_description: "Bad credentials",
+        error: "bad_credentials",
+      },
+    }).as("tokenRequest");
+
+    cy.visit("/#/login");
+    cy.contains("button", "登录").click();
+
+    cy.wait("@tokenRequest");
+    cy.contains(".el-message", "Bad credentials").should("be.visible");
+    cy.contains("button", "登录").should("not.be.disabled");
   });
 });

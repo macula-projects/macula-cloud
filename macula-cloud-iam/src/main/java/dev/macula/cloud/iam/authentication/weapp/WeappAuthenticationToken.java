@@ -16,7 +16,7 @@ public class WeappAuthenticationToken extends AbstractAuthenticationToken {
     private final Object principal;
 
     public WeappAuthenticationToken(Object principal) {
-        super(null);
+        super((Collection<? extends GrantedAuthority>)null);
         this.principal = principal;
         setAuthenticated(false);
     }

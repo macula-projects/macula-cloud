@@ -185,7 +185,7 @@ public abstract class AbstractLoginFilterConfigurer<H extends HttpSecurityBuilde
     }
 
     @Override
-    public void init(H http) throws Exception {
+    public void init(H http) {
         updateAccessDefaults(http);
         updateAuthenticationDefaults();
         registerDefaultAuthenticationEntryPoint(http);
@@ -194,7 +194,7 @@ public abstract class AbstractLoginFilterConfigurer<H extends HttpSecurityBuilde
     }
 
     @Override
-    public void configure(H http) throws Exception {
+    public void configure(H http) {
         PortMapper portMapper = http.getSharedObject(PortMapper.class);
         if (portMapper != null && this.authenticationEntryPoint instanceof LoginUrlAuthenticationEntryPoint) {
             ((LoginUrlAuthenticationEntryPoint)this.authenticationEntryPoint).setPortMapper(portMapper);

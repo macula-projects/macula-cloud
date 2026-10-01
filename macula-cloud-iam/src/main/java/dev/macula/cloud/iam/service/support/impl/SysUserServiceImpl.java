@@ -18,7 +18,7 @@
 package dev.macula.cloud.iam.service.support.impl;
 
 import cn.hutool.core.collection.CollectionUtil;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import dev.macula.boot.enums.DataScopeEnum;
 import dev.macula.cloud.iam.mapper.SysUserMapper;
 import dev.macula.cloud.iam.pojo.dto.UserAuthInfo;

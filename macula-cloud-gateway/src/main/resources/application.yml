@@ -1,43 +1,44 @@
+server:
+  port: ${SERVER_PORT:9000}
+
 spring:
+  profiles:
+    active: @profile.active@
+    group:
+      docker: local
+  application:
+    name: macula-cloud-gateway
+  config:
+    import:
+      - optional:nacos:${spring.application.name}.yml?refreshEnabled=true
+      - optional:nacos:${spring.application.name}-${spring.profiles.active}.yml?refreshEnabled=true
   cloud:
     nacos:
+      server-addr: ${spring.config.nacos.server-addr}
+      namespace: ${spring.config.nacos.namespace}
+      username: ${spring.config.nacos.username}
+      password: ${spring.config.nacos.password}
       discovery:
-        enabled: true
-        server-addr: ${nacos.config.server-addr}
-        namespace: ${nacos.config.namespace}
-        # group:
+        namespace: ${spring.cloud.nacos.namespace}
     gateway:
-      globalcors:
-        cors-configurations:
-          '[/**]':
-            allowed-origin-patterns: "*"
-            allowed-methods: "*"
-            allowed-headers: "*"
-            allow-credentials: true
-            max-age: 1800
-        add-to-simple-url-handler-mapping: true
-      routes:
-        - id: macula-cloud-system
-          uri: lb://macula-cloud-system
-          predicates:
-            - Path=/system/**
-          filters:
-            - StripPrefix=1
-  security:
-    oauth2:
-      resourceserver:
-        opaquetoken:
-          client-id: e4da4a32-592b-46f0-ae1d-784310e88423
-          client-secret: secret
-          introspection-uri: http://127.0.0.1:9010/oauth2/introspect
-  redis:
-    database: 0
-    host: 127.0.0.1
-    port: 6379
-    system:
-      database: 0
-      host: 127.0.0.1
-      port: 6379
+      server:
+        webflux:
+          globalcors:
+            cors-configurations:
+              '[/**]':
+                allowed-origin-patterns: "*"
+                allowed-methods: "*"
+                allowed-headers: "*"
+                allow-credentials: true
+                max-age: 1800
+            add-to-simple-url-handler-mapping: true
+          routes:
+            - id: macula-cloud-system
+              uri: lb://macula-cloud-system
+              predicates:
+                - Path=/system/**
+              filters:
+                - StripPrefix=1
 
 macula:
   gateway:
@@ -56,9 +57,104 @@ macula:
         - /system/api/token
         - /system/api/token/introspect
 
+---
+# local Profile 包含 IDE 本地开发所需的全部默认配置
+spring:
+  config:
+    activate:
+      on-profile: local
+    nacos:
+      server-addr: 127.0.0.1:${NACOS_SERVER_PORT:8848}
+      namespace: ${NACOS_NAMESPACE:MACULA5}
+      username: ${NACOS_USERNAME:nacos}
+      password: ${NACOS_PASSWORD:nacos}
+  security:
+    oauth2:
+      resourceserver:
+        opaquetoken:
+          client-id: e4da4a32-592b-46f0-ae1d-784310e88423
+          client-secret: secret
+          introspection-uri: http://127.0.0.1:${IAM_HOST_PORT:9010}/oauth2/introspect
+  redis:
+    host: 127.0.0.1
+    port: ${REDIS_PORT:6379}
+    database: 0
+    system:
+      host: 127.0.0.1
+      port: ${REDIS_PORT:6379}
+      database: 0
+
 logging:
   level:
     root: info
     dev.macula.cloud: debug
   file:
     name: ${user.home}/logs/${spring.application.name}/${spring.application.name}.log
+
+---
+# Docker Profile 覆盖容器内 DNS 连接信息，其余沿用 local 默认配置
+spring:
+  config:
+    activate:
+      on-profile: docker
+    nacos:
+      server-addr: ${NACOS_SERVER_ADDR:nacos:8848}
+      namespace: ${NACOS_NAMESPACE:MACULA5}
+      username: ${NACOS_USERNAME:nacos}
+      password: ${NACOS_PASSWORD:nacos}
+  security:
+    oauth2:
+      resourceserver:
+        opaquetoken:
+          introspection-uri: http://macula-cloud-iam:9010/oauth2/introspect
+  redis:
+    host: redis
+    port: 6379
+    system:
+      host: redis
+      port: 6379
+
+---
+# 共享环境只保留配置中心连接信息，其余配置由 Nacos Data ID 提供
+spring:
+  config:
+    activate:
+      on-profile: dev
+    nacos:
+      server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+      namespace: ${NACOS_NAMESPACE:MACULA5}
+      username: ${NACOS_USERNAME:nacos}
+      password: ${NACOS_PASSWORD:nacos}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: stg
+    nacos:
+      server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+      namespace: ${NACOS_NAMESPACE:MACULA5}
+      username: ${NACOS_USERNAME:nacos}
+      password: ${NACOS_PASSWORD:nacos}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: pet
+    nacos:
+      server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+      namespace: ${NACOS_NAMESPACE:MACULA5}
+      username: ${NACOS_USERNAME:nacos}
+      password: ${NACOS_PASSWORD:nacos}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: prd
+    nacos:
+      server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+      namespace: ${NACOS_NAMESPACE:MACULA5}
+      username: ${NACOS_USERNAME:nacos}
+      password: ${NACOS_PASSWORD:nacos}

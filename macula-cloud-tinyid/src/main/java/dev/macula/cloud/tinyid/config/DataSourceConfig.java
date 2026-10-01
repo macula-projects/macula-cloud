@@ -18,9 +18,6 @@
 package dev.macula.cloud.tinyid.config;
 
 import com.alibaba.druid.pool.DruidDataSource;
-import com.alibaba.druid.spring.boot.autoconfigure.DruidDataSourceBuilder;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -33,17 +30,18 @@ import java.util.List;
 import java.util.Map;
 
 /**
+ * Configures TinyID's Druid master datasource and dynamic routing datasource.
+ *
  * @author du_imba
+ * @since 6.1.0
  */
 @Configuration
 public class DataSourceConfig {
 
-    private static final Logger logger = LoggerFactory.getLogger(DataSourceConfig.class);
-
     @Bean
     @ConfigurationProperties(prefix = "spring.datasource.druid.master")
     public DataSource master() {
-        return DruidDataSourceBuilder.create().build();
+        return new DruidDataSource();
     }
 
     @Bean

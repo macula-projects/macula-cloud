@@ -104,9 +104,16 @@ export default {
 				scope: 'message.read message.write userinfo'
 			}
 			//获取token
-			var user = await this.$API.common_auth.systemToken.post({}, {
-				params: data
-			})
+			var user
+			try {
+				user = await this.$API.common_auth.systemToken.post(data)
+			} catch (error) {
+				this.islogin = false
+				var errorData = error?.data || {}
+				ElMessage.warning(errorData.msg || errorData.message || errorData.error_description ||
+					errorData.error || '登录失败，请检查用户名和密码')
+				return false
+			}
 			if (user.access_token) {
 				this.$TOOL.cookie.set("TOKEN", user.access_token, {
 					expires: 24 * 60 * 60

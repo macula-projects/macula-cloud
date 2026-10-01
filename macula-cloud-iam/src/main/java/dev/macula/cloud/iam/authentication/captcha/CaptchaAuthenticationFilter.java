@@ -7,7 +7,7 @@ import org.springframework.security.authentication.AuthenticationServiceExceptio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.authentication.AbstractAuthenticationProcessingFilter;
-import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import org.springframework.util.Assert;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -21,8 +21,8 @@ public class CaptchaAuthenticationFilter extends AbstractAuthenticationProcessin
 
     public static final String SPRING_SECURITY_FORM_CAPTCHA_KEY = "captcha";
 
-    private static final AntPathRequestMatcher DEFAULT_ANT_PATH_REQUEST_MATCHER =
-        new AntPathRequestMatcher("/login/captcha", "POST");
+    private static final PathPatternRequestMatcher DEFAULT_REQUEST_MATCHER =
+        PathPatternRequestMatcher.pathPattern(HttpMethod.POST, "/login/captcha");
 
     private String usernameParameter = SPRING_SECURITY_FORM_USERNAME_KEY;
 
@@ -33,12 +33,12 @@ public class CaptchaAuthenticationFilter extends AbstractAuthenticationProcessin
     private boolean postOnly = true;
 
     public CaptchaAuthenticationFilter() {
-        super(DEFAULT_ANT_PATH_REQUEST_MATCHER);
+        super(DEFAULT_REQUEST_MATCHER);
         this.captchaAuthenticationTokenConverter = defaultConverter();
     }
 
     public CaptchaAuthenticationFilter(AuthenticationManager authenticationManager) {
-        super(DEFAULT_ANT_PATH_REQUEST_MATCHER, authenticationManager);
+        super(DEFAULT_REQUEST_MATCHER, authenticationManager);
         this.captchaAuthenticationTokenConverter = defaultConverter();
     }
 

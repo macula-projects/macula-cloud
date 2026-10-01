@@ -1,0 +1,36 @@
+server:
+  port: ${SERVER_PORT:9083}
+
+spring:
+  profiles:
+    active: @profile.active@
+    group:
+      docker: local
+  application:
+    name: macula-cloud-rocketmq
+---
+# local Profile 包含 IDE 本地开发所需的全部默认配置
+spring:
+  config:
+    activate:
+      on-profile: local
+
+rocketmq:
+  name-server: 127.0.0.1:${ROCKETMQ_NAMESRV_PORT:9876}
+
+logging:
+  level:
+    root: info
+    dev.macula.cloud: debug
+  file:
+    name: ${user.home}/logs/${spring.application.name}/${spring.application.name}.log
+
+---
+# Docker Profile 使用容器监听端口和 Compose DNS
+spring:
+  config:
+    activate:
+      on-profile: docker
+
+rocketmq:
+  name-server: ${ROCKETMQ_NAME_SERVER:rocketmq-namesrv:9876}

@@ -65,6 +65,8 @@ public abstract class OAuth2ResourceOwnerBaseAuthenticationProvider<T extends OA
 
     private static final String ERROR_URI = "https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.2.1";
 
+    protected static final AuthorizationGrantType PASSWORD_GRANT_TYPE = new AuthorizationGrantType("password");
+
     private final OAuth2AuthorizationService authorizationService;
 
     private final OAuth2TokenGenerator<? extends OAuth2Token> tokenGenerator;
@@ -158,14 +160,14 @@ public abstract class OAuth2ResourceOwnerBaseAuthenticationProvider<T extends OA
                     .principal(usernamePasswordAuthentication)
                     .authorizationServerContext(AuthorizationServerContextHolder.getContext())
                     .authorizedScopes(authorizedScopes)
-                    .authorizationGrantType(AuthorizationGrantType.PASSWORD)
+                    .authorizationGrantType(PASSWORD_GRANT_TYPE)
                     .authorizationGrant(resourceOwnerBaseAuthentication);
             // @formatter:on
 
             OAuth2Authorization.Builder authorizationBuilder =
                 OAuth2Authorization.withRegisteredClient(registeredClient)
                     .principalName(usernamePasswordAuthentication.getName())
-                    .authorizationGrantType(AuthorizationGrantType.PASSWORD)
+                    .authorizationGrantType(PASSWORD_GRANT_TYPE)
                     // 0.4.0 新增的方法
                     .authorizedScopes(authorizedScopes);
 
