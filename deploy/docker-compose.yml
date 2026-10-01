@@ -305,6 +305,8 @@ services:
     build:
       context: ../macula-cloud-admin
       dockerfile: Dockerfile
+      args:
+        VITE_MODE: docker
     image: ${IMAGE_REGISTRY:-macula}/macula-cloud-admin:${IMAGE_TAG:-6.1.0-SNAPSHOT}
     ports:
       - "${BIND_ADDRESS:-127.0.0.1}:${ADMIN_HOST_PORT:-5900}:8080"

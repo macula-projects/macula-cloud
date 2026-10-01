@@ -21,22 +21,24 @@ spring:
       discovery:
         namespace: ${spring.cloud.nacos.namespace}
     gateway:
-      globalcors:
-        cors-configurations:
-          '[/**]':
-            allowed-origin-patterns: "*"
-            allowed-methods: "*"
-            allowed-headers: "*"
-            allow-credentials: true
-            max-age: 1800
-        add-to-simple-url-handler-mapping: true
-      routes:
-        - id: macula-cloud-system
-          uri: lb://macula-cloud-system
-          predicates:
-            - Path=/system/**
-          filters:
-            - StripPrefix=1
+      server:
+        webflux:
+          globalcors:
+            cors-configurations:
+              '[/**]':
+                allowed-origin-patterns: "*"
+                allowed-methods: "*"
+                allowed-headers: "*"
+                allow-credentials: true
+                max-age: 1800
+            add-to-simple-url-handler-mapping: true
+          routes:
+            - id: macula-cloud-system
+              uri: lb://macula-cloud-system
+              predicates:
+                - Path=/system/**
+              filters:
+                - StripPrefix=1
 
 macula:
   gateway:

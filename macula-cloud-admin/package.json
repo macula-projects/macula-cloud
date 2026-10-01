@@ -4,7 +4,11 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:docker": "vite build --mode docker",
     "build:dev": "vite build --mode dev",
+    "build:stg": "vite build --mode stg",
+    "build:pet": "vite build --mode pet",
+    "build:prd": "vite build --mode prd",
     "preview": "vite preview --port 4173",
     "test:unit": "vitest --environment jsdom",
     "test:e2e": "start-server-and-test preview http://localhost:4173/ 'cypress open --e2e'",

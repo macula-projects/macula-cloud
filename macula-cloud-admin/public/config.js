@@ -24,5 +24,8 @@ const APP_CONFIG = {
 	//APP_NAME: "SCUI",
 
 	//接口地址，如遇跨域需使用nginx代理
-	//API_URL: "https://www.fastmock.site/mock/5039c4361c39a7e3252c5b55971f1bd3/api"
+	//API_URL: "/api",
+
+	//IAM地址
+	//IAM_URL: "/iam"
 }

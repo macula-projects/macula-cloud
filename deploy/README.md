@@ -103,6 +103,7 @@ IAM 与 System 共用 `macula-system`，但只有 System 管理 migration。新�
 6. 在 `macula-cloud-admin/` 执行 `npm ci && npm run dev`
 
 System 首次启动完成 Flyway migration 后再启动 IAM。
+Admin 的 `development` mode 对应本地 `local` 环境：`/api`、`/iam` 由 Vite 分别代理到本机 Gateway、IAM。容器构建固定使用 `docker` mode，内置 Nginx 将相同前缀代理到 Compose 服务，因此浏览器始终使用同源地址。
 
 ## 常用命令
 
