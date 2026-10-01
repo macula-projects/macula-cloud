@@ -2,6 +2,7 @@
 
 ## Files that change
 - SDLC 工件：`.sdlc/development-deployment/plan.md`；本计划替换已废弃的 Kubernetes 实施计划，后续实际偏差继续记录在本文件。
+- 验收范围修订（2026-10-01，经用户明确批准）：实现代码和 Compose 入口保持不变；阻断性验收缩小为基础设施、Gateway、IAM、System、TinyID 和 Admin。Seata、SnailJob、Docs、RocketMQ 管理应用只做 Dockerfile 静态存在性与明显 Secret 检查，不执行构建、测试、启动或 Flyway 验证；RocketMQ NameServer/Broker 仍属于基础设施验证范围。
 - 仓库入口与忽略规则：修改 `.gitignore`、根 `.dockerignore`、根 `README.md`，只保留 Compose、本地环境文件和镜像构建相关入口/忽略项。
 - 删除 Kubernetes 与集中式 Dockerfile：删除空入口 `deploy/k8s.yml`、整个 `deploy/k8s/`、`deploy/docker/Dockerfile.java`；不新增任何集群部署文件。
 - Compose 编排：重写 `deploy/docker-compose.yml`；更新 `deploy/.env.example`、`deploy/scripts/compose.sh`、`deploy/README.md`，增加默认中间件模式、`apps` profile、八个后端服务、Admin、构建命令和显式重置。
@@ -52,8 +53,8 @@
 6. 完成 Admin 镜像：保留模块本地构建上下文，验证生产环境变量、Nginx `/api/`、`/iam/` 代理和 SPA fallback。
 7. 重写 Compose：基础设施和初始化任务不设 profile；八个后端与 Admin 使用 `apps` profile。使用 YAML anchors 复用公共应用环境、日志和重启策略，并按 MySQL/Nacos/RocketMQ、System migration、IAM/Gateway/Admin 的依赖关系组织启动顺序。
 8. 更新脚本与文档，并完成用户追加的 IAM Spring Security 7 最小兼容迁移及五个 Cloud 服务的单一 `application.yml` 配置结构：`compose.sh` 提供 `up`、`up-apps`、`build`、`status`、`logs`、`down`、`reset --confirm` 和显式服务参数；README 记录数据库所有权、Flyway 新增 migration 规则、IDE 顺序、Nacos 覆盖方式、Compose 全栈启动和故障诊断；IAM 保持原认证端点与安全语义并恢复干净编译。
-9. 执行静态与构建证明：检查 Compose 默认/`apps` profile、Shell、Dockerfile、敏感信息和 K8s 遗留；运行四个数据库模块及最小装配模块的 Maven 测试/打包和 Admin 构建。
-10. Docker daemon 可用时执行运行证明：从空 volume 启动中间件，确认只有 Nacos schema 已初始化；启动 `apps` profile，验证四个应用库的 Flyway V1/history、重复启动、基本服务状态和显式 reset。若 daemon 仍不可用，明确标记运行项未验证。
+9. 执行缩小范围后的静态与构建证明：检查 Compose 默认/`apps` profile、Shell、Dockerfile、敏感信息和 K8s 遗留；运行 Gateway、IAM、System、TinyID 的 Maven 测试/打包以及 Admin 的 `npm ci`、build 和 E2E。延后模块不执行构建或测试。
+10. Docker daemon 可用时执行运行证明：使用当前 `deploy/.env` 从干净 volume 启动基础设施，确认只有 Nacos schema 已初始化；再以显式服务列表启动 Gateway、IAM、System、TinyID、Admin，验证 System/TinyID 的 Flyway V1/history、重复启动、基本链路和显式 reset。Seata、SnailJob、Docs、RocketMQ 管理应用不启动。
 
 ## Risks
 - System V1 dump 含 `DROP TABLE` 和种子数据，只能在空库执行；`baseline-on-migrate` 可避免已有库重放，但不能证明已有 schema 与 V1 一致，接管前需备份并核对。
@@ -70,11 +71,12 @@
 
 ## Proof
 - 范围与静态质量：`git diff --check`；`sh -n`，可用时运行 `shellcheck`；搜索并确认没有 `deploy/k8s`、`k8s.yml`、Helm/Kustomize 引用、真实 Secret、共享内网地址、floating image tag、target/dist 或范围外 API/业务修改。
-- Flyway 依赖与资源：检查四个模块的依赖树包含 Spring Boot Flyway 自动配置、父管理的 Flyway 11.14.1 core/MySQL support；打包后检查 JAR 内存在各自 `db/migration/V1__baseline.sql`，Nacos SQL只存在于部署初始化路径且无 `flyway_schema_history`。
-- Flyway 行为：空库分别启动 System、TinyID、Seata、SnailJob，确认 V1 成功及关键表/history；重复启动无待执行项；对已有关键表无 history 的库验证 baseline 接管；修改 migration checksum 的临时验证必须失败且不提交修改。
+- Flyway 依赖与资源：检查 System、TinyID 的依赖树包含 Spring Boot Flyway 自动配置、父管理的 Flyway 11.14.1 core/MySQL support；打包后检查两个 JAR 内存在各自 `db/migration/V1__baseline.sql`，Nacos SQL 只存在于部署初始化路径且无 `flyway_schema_history`。Seata、SnailJob 的现有 migration 不作本次结论。
+- Flyway 行为：空库分别启动 System、TinyID，确认 V1 成功及关键表/history；重复启动无待执行项；对已有关键表无 history 的两个数据库验证 baseline 接管；修改 migration checksum 的临时验证必须失败且不提交修改。
 - System/TinyID/IAM 兼容：System 与 IAM 完整重新编译，确认不再引用旧 `extension.service`；运行 System 目标测试；为 captcha/weapp matcher 和 converter 增加或运行针对性测试。TinyID 运行目标测试与启动冒烟，明确区分 Druid 基线兼容失败和本次 Flyway 配置失败。
 - Compose 合约：运行 `docker compose --env-file deploy/.env.example -f deploy/docker-compose.yml config` 以及 `--profile apps config`，核对默认集合不包含应用、apps 集合完整、应用发布端口由 `*_HOST_PORT` 控制且容器内端口固定、端口只默认绑定 `127.0.0.1`、卷/健康检查/依赖/环境变量一致。
 - 配置来源：确认 Gateway、IAM、System、TinyID、SnailJob 不再包含 `bootstrap.yml` 或 `spring-cloud-starter-bootstrap`，所有模块过滤后的 `application.yml` 能被 YAML 解析；`server.port`、`spring.cloud.nacos` 及环境无关配置位于公共文档，八个模块的 `server.port` 使用 `SERVER_PORT`，`*_HOST_PORT` 仅存在于 Compose 发布映射；各 Profile 的 Nacos 变量位于 `spring.config.nacos`，`local` 包含本机依赖连接/调试差异并使用宿主机端口，各模块的 Flyway、Feign、Seata 客户端、SpringDoc 和完整 logging 仅位于实际需要它们的模块 `local` 文档，`docker` 通过 profile group 继承 `local` 并覆盖依赖的容器 DNS/端口，基础文档包含两个 Nacos Data ID import；Compose 渲染结果显式激活 `docker`，仅向五个数据库应用传递 MySQL 账号密码，不向应用传递 MySQL 地址/库名、Redis、IAM 或 Nacos 连接环境变量。
-- 模块构建：对八个模块分别执行与 Dockerfile一致的 `mvn -pl <module> -am package -DskipTests -Plocal`，检查可执行 JAR；Docker 可用时逐个构建镜像并检查 Java 17、非 root 用户、入口和端口。
-- Java/前端验证：运行四个数据库模块的相关 `-am test -Plocal`，运行 Docs/RocketMQ 最小装配测试；在 Admin 执行 `npm ci` 和 `npm run build`，检查 Nginx SPA/代理配置。全量测试失败必须区分既有依赖问题、外部环境问题与本次回归。
-- 运行集成：从空 Compose volume 启动默认基础设施，确认 MySQL/Redis/Nacos/RocketMQ 健康、Nacos schema/config 已初始化且四个应用库仍为空；再启用 `apps` profile，确认四个应用库由各自模块迁移、八个后端/Admin 状态及 Gateway/IAM/System 基本链路；重复启动和 `reset --confirm` 分别证明数据保留与显式重建。
+- 模块构建：分别构建 Gateway、IAM、System、TinyID 和 Admin 镜像，检查 Java 17、非 root 用户、可执行 JAR、入口、端口和镜像中无 Secret；Seata、SnailJob、Docs、RocketMQ 管理应用只检查 Dockerfile 静态内容。
+- Java/前端验证：使用当前 `deploy/.env` 运行 Gateway、IAM、System、TinyID 及其依赖的 Maven 测试和打包；在 Admin 执行 `npm ci`、无测试文件时显式记录、`npm run build` 和 `npm run test:e2e:ci`，检查 Nginx SPA/代理配置。
+- 运行集成：应用当前 `deploy/.env` 的 MySQL `13306`、Redis `16379` 等宿主机端口，从干净 Compose volume 启动 MySQL/Redis/Nacos/RocketMQ 基础设施，确认健康、Nacos schema/config 已初始化且应用库未出现 Flyway history；再显式启动 Gateway、IAM、System、TinyID、Admin，确认两个应用库完成迁移、System 先于 IAM、基本调用链可用；重复启动和 `reset --confirm` 分别证明数据保留与显式重建。明确不启动四个延后应用。
+- 配置/Eval：本次不修改 `CLAUDE.md`、Skill 或 Hook，因此没有适用的配置 eval；若仓库没有其他固定 eval suite，报告为未发现，不自行创建。
