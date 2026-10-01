@@ -21,7 +21,7 @@ import cn.hutool.core.lang.Assert;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import dev.macula.cloud.system.converter.DictItemConverter;
 import dev.macula.cloud.system.form.DictItemForm;
 import dev.macula.cloud.system.mapper.SysDictItemMapper;

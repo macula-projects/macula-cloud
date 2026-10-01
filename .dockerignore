@@ -1,0 +1,8 @@
+.git
+.idea
+.sdlc
+**/target
+**/node_modules
+**/dist
+**/.DS_Store
+deploy/.env

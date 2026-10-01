@@ -28,3 +28,6 @@ nbdist/
 .nb-gradle/
 
 .DS_Store
+
+# Local deployment overrides
+deploy/.env

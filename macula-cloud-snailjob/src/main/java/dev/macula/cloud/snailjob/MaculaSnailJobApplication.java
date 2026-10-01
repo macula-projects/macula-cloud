@@ -1,6 +1,5 @@
 package dev.macula.cloud.snailjob;
 
-import com.aizuda.snailjob.server.SnailJobServerApplication;
 import com.aizuda.snailjob.server.common.rpc.server.grpc.GrpcServer;
 import lombok.Generated;
 import org.slf4j.Logger;
@@ -9,8 +8,10 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.ExitCodeGenerator;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.autoconfigure.web.ServerProperties;
+import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.web.servlet.ServletContextInitializer;
-import org.springframework.boot.web.servlet.server.ServletWebServerFactory;
+import org.springframework.boot.web.server.servlet.ServletWebServerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 import org.springframework.web.client.RestTemplate;
@@ -36,12 +37,18 @@ public class MaculaSnailJobApplication {
 
     public static void main(String[] args) {
         TimeZone.setDefault(TimeZone.getTimeZone("Asia/Shanghai"));
-        SpringApplication.run(SnailJobServerApplication.class, args);
+        SpringApplication.run(MaculaSnailJobApplication.class, args);
     }
 
     @Bean
     public RestTemplate restTemplate() {
         return new RestTemplate();
+    }
+
+    @Bean
+    @ConfigurationProperties(prefix = "server")
+    public ServerProperties legacyServerProperties() {
+        return new ServerProperties();
     }
 
     @Bean
@@ -58,7 +65,7 @@ public class MaculaSnailJobApplication {
             if (!started) {
                 log.error("--------> snail-job server startup failure.");
                 serverFactory.getWebServer(new ServletContextInitializer[0]).stop();
-                SpringApplication.exit(SpringApplication.run(SnailJobServerApplication.class, new String[0]),
+                SpringApplication.exit(SpringApplication.run(MaculaSnailJobApplication.class, new String[0]),
                     new ExitCodeGenerator[0]);
             }
 

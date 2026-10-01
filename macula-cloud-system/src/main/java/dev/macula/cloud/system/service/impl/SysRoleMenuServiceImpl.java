@@ -17,7 +17,7 @@
 
 package dev.macula.cloud.system.service.impl;
 
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import dev.macula.cloud.system.mapper.SysRoleMenuMapper;
 import dev.macula.cloud.system.pojo.entity.SysRoleMenu;
 import dev.macula.cloud.system.service.SysRoleMenuService;

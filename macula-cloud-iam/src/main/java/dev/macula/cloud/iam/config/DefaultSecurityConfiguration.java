@@ -32,6 +32,7 @@ import dev.macula.cloud.iam.service.support.UserAuthInfoService;
 import dev.macula.cloud.iam.service.userdetails.*;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -50,6 +51,7 @@ import org.springframework.security.web.authentication.AuthenticationEntryPointF
  * @since 2023/3/11 22:25
  */
 @EnableWebSecurity
+@Configuration(proxyBeanMethods = false)
 public class DefaultSecurityConfiguration {
     @Bean
     @Order(Ordered.HIGHEST_PRECEDENCE + 2)
@@ -60,7 +62,7 @@ public class DefaultSecurityConfiguration {
         AuthenticationEntryPointFailureHandler authenticationFailureHandler = new AuthenticationEntryPointFailureHandler(authenticationEntryPoint);
         RedirectLoginAuthenticationSuccessHandler loginAuthenticationSuccessHandler = new RedirectLoginAuthenticationSuccessHandler();
 
-        http.authorizeHttpRequests()
+        http.authorizeHttpRequests(authorize -> authorize
                 .requestMatchers("/component/**").permitAll()
                 .requestMatchers("/actuator/health").permitAll()
                 .requestMatchers("/h2-console/**").permitAll()
@@ -71,28 +73,28 @@ public class DefaultSecurityConfiguration {
                 .requestMatchers("/admin/js/**").permitAll()
                 .requestMatchers("/admin/images/**").permitAll()
                 .requestMatchers("/favicon.ico").permitAll()
-                .anyRequest().authenticated().and()
+                .anyRequest().authenticated())
             .userDetailsService(userDetailsService)
             .csrf(AbstractHttpConfigurer::disable);
 
         // FORM登录
-        http.formLogin()
+        http.formLogin(form -> form
             .loginPage("/login")
             .successHandler(loginAuthenticationSuccessHandler)
             .failureHandler(authenticationFailureHandler)
-            .permitAll();
+            .permitAll());
 
         // 短信验证码登录
-        http.apply(new CaptchaLoginFilterConfigurer<>())
+        http.with(new CaptchaLoginFilterConfigurer<>(), captcha -> captcha
             .successHandler(loginAuthenticationSuccessHandler)
             .failureHandler(authenticationFailureHandler)
-            .permitAll();
+            .permitAll());
 
         // 微信小程序登录
-        http.apply(new WeappLoginFilterConfigurer<>())
+        http.with(new WeappLoginFilterConfigurer<>(), weapp -> weapp
             .successHandler(loginAuthenticationSuccessHandler)
             .failureHandler(authenticationFailureHandler)
-            .permitAll();
+            .permitAll());
         return http.build();
         // @formatter:on
     }

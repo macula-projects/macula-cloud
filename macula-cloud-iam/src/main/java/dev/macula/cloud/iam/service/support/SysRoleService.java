@@ -17,7 +17,7 @@
 
 package dev.macula.cloud.iam.service.support;
 
-import com.baomidou.mybatisplus.extension.service.IService;
+import com.baomidou.mybatisplus.spring.service.IService;
 import dev.macula.cloud.iam.pojo.entity.SysRole;
 
 import java.util.Set;

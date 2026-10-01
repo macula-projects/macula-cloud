@@ -1,0 +1,328 @@
+name: ${COMPOSE_PROJECT_NAME:-macula-cloud-dev}
+
+x-app-environment: &app-environment
+  SPRING_PROFILES_ACTIVE: docker
+  JAVA_OPTS: ${JAVA_OPTS:--XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom}
+  SEATA_SECRET_KEY: ${SEATA_SECRET_KEY:-U2VhdGFMb2NhbERldmVsb3BtZW50U2VjcmV0S2V5MDEyMzQ1Njc4OQ==}
+  SEATA_CONSOLE_USERNAME: ${SEATA_CONSOLE_USERNAME:-seata}
+  SEATA_CONSOLE_PASSWORD: ${SEATA_CONSOLE_PASSWORD:-seata}
+
+x-mysql-app-environment: &mysql-app-environment
+  MYSQL_APP_USER: ${MYSQL_APP_USER:-macula}
+  MYSQL_APP_PASSWORD: ${MYSQL_APP_PASSWORD:-macula}
+
+x-java-app: &java-app
+  profiles: [apps]
+  restart: unless-stopped
+  healthcheck:
+    test: [CMD-SHELL, "bash -c 'exec 3<>/dev/tcp/127.0.0.1/$$SERVER_PORT'"]
+    interval: 10s
+    timeout: 5s
+    retries: 30
+    start_period: 40s
+
+services:
+  mysql:
+    image: ${MYSQL_IMAGE:-mysql:8.4.6}
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-macula-root}
+      TZ: Asia/Shanghai
+    command: [--character-set-server=utf8mb4, --collation-server=utf8mb4_unicode_ci]
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: [CMD-SHELL, "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    restart: unless-stopped
+
+  mysql-init:
+    image: ${MYSQL_IMAGE:-mysql:8.4.6}
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-macula-root}
+      MYSQL_APP_USER: ${MYSQL_APP_USER:-macula}
+      MYSQL_APP_PASSWORD: ${MYSQL_APP_PASSWORD:-macula}
+    entrypoint: [/bin/sh, /init/init.sh]
+    volumes:
+      - ./init/mysql:/init:ro
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: "no"
+
+  redis:
+    image: ${REDIS_IMAGE:-redis:7.4.5-alpine}
+    command: [redis-server, --appendonly, "yes"]
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  rocketmq-init:
+    image: ${ROCKETMQ_IMAGE:-apache/rocketmq:5.3.1}
+    user: "0:0"
+    entrypoint: [sh, -c, "chown -R 3000:3000 /volumes/namesrv-logs /volumes/broker-logs /volumes/broker-store"]
+    volumes:
+      - rocketmq-namesrv-logs:/volumes/namesrv-logs
+      - rocketmq-broker-logs:/volumes/broker-logs
+      - rocketmq-broker-store:/volumes/broker-store
+    restart: "no"
+
+  nacos:
+    image: ${NACOS_IMAGE:-nacos/nacos-server:v3.2.4}
+    environment:
+      MODE: standalone
+      PREFER_HOST_MODE: hostname
+      SPRING_DATASOURCE_PLATFORM: mysql
+      MYSQL_SERVICE_HOST: mysql
+      MYSQL_SERVICE_PORT: "3306"
+      MYSQL_SERVICE_DB_NAME: nacos
+      MYSQL_SERVICE_USER: ${MYSQL_APP_USER:-macula}
+      MYSQL_SERVICE_PASSWORD: ${MYSQL_APP_PASSWORD:-macula}
+      MYSQL_SERVICE_DB_PARAM: characterEncoding=utf8&connectTimeout=1000&socketTimeout=3000&autoReconnect=true&useUnicode=true&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+      NACOS_AUTH_ENABLE: "false"
+      NACOS_AUTH_ADMIN_ENABLE: "false"
+      NACOS_AUTH_CONSOLE_ENABLE: "false"
+      NACOS_AUTH_TOKEN: ${NACOS_AUTH_TOKEN:-VGhpc0lzTG9jYWxEZXZlbG9wbWVudFRva2VuS2V5MDEyMzQ1Njc4OQ==}
+      NACOS_AUTH_IDENTITY_KEY: ${NACOS_AUTH_IDENTITY_KEY:-macula-local-key}
+      NACOS_AUTH_IDENTITY_VALUE: ${NACOS_AUTH_IDENTITY_VALUE:-macula-local-value}
+      JVM_XMS: 256m
+      JVM_XMX: 512m
+      JVM_XMN: 128m
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${NACOS_SERVER_PORT:-8848}:8848"
+      - "${BIND_ADDRESS:-127.0.0.1}:${NACOS_CONSOLE_PORT:-8080}:8080"
+      - "${BIND_ADDRESS:-127.0.0.1}:${NACOS_GRPC_PORT:-9848}:9848"
+    volumes:
+      - nacos-logs:/home/nacos/logs
+    healthcheck:
+      test: [CMD-SHELL, "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8848'"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 40s
+    depends_on:
+      mysql-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  nacos-init:
+    image: curlimages/curl:8.12.1
+    environment:
+      NACOS_BASE_URL: http://nacos:8080
+      NACOS_NAMESPACE: ${NACOS_NAMESPACE:-MACULA5}
+      FORCE_NACOS_CONFIG: ${FORCE_NACOS_CONFIG:-false}
+      MYSQL_APP_USER: ${MYSQL_APP_USER:-macula}
+      MYSQL_APP_PASSWORD: ${MYSQL_APP_PASSWORD:-macula}
+    entrypoint: [/bin/sh, /init/init.sh]
+    volumes:
+      - ./init/nacos:/init:ro
+    depends_on:
+      nacos:
+        condition: service_healthy
+    restart: "no"
+
+  rocketmq-namesrv:
+    image: ${ROCKETMQ_IMAGE:-apache/rocketmq:5.3.1}
+    command: [sh, mqnamesrv]
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${ROCKETMQ_NAMESRV_PORT:-9876}:9876"
+    volumes:
+      - rocketmq-namesrv-logs:/home/rocketmq/logs
+    healthcheck:
+      test: [CMD-SHELL, "bash -c 'exec 3<>/dev/tcp/127.0.0.1/9876'"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
+    depends_on:
+      rocketmq-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  rocketmq-broker:
+    image: ${ROCKETMQ_IMAGE:-apache/rocketmq:5.3.1}
+    environment:
+      NAMESRV_ADDR: rocketmq-namesrv:9876
+    command: [sh, mqbroker, -n, rocketmq-namesrv:9876, -c, /home/rocketmq/conf/broker.conf]
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${ROCKETMQ_FAST_PORT:-10909}:10909"
+      - "${BIND_ADDRESS:-127.0.0.1}:${ROCKETMQ_BROKER_PORT:-10911}:10911"
+      - "${BIND_ADDRESS:-127.0.0.1}:${ROCKETMQ_HA_PORT:-10912}:10912"
+    volumes:
+      - ./rocketmq/broker.conf:/home/rocketmq/conf/broker.conf:ro
+      - rocketmq-broker-logs:/home/rocketmq/logs
+      - rocketmq-broker-store:/home/rocketmq/store
+    healthcheck:
+      test: [CMD-SHELL, "sh mqadmin clusterList -n rocketmq-namesrv:9876 | grep -q broker-a"]
+      interval: 10s
+      timeout: 8s
+      retries: 30
+      start_period: 30s
+    depends_on:
+      rocketmq-namesrv:
+        condition: service_healthy
+    restart: unless-stopped
+
+  macula-cloud-system:
+    <<: *java-app
+    build:
+      context: ..
+      dockerfile: macula-cloud-system/Dockerfile
+    image: ${IMAGE_REGISTRY:-macula}/macula-cloud-system:${IMAGE_TAG:-6.1.0-SNAPSHOT}
+    environment:
+      <<: [*app-environment, *mysql-app-environment]
+      SERVER_PORT: "9081"
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${SYSTEM_HOST_PORT:-9081}:9081"
+    depends_on:
+      mysql-init: {condition: service_completed_successfully}
+      redis: {condition: service_healthy}
+      nacos-init: {condition: service_completed_successfully}
+
+  macula-cloud-tinyid:
+    <<: *java-app
+    build:
+      context: ..
+      dockerfile: macula-cloud-tinyid/Dockerfile
+    image: ${IMAGE_REGISTRY:-macula}/macula-cloud-tinyid:${IMAGE_TAG:-6.1.0-SNAPSHOT}
+    environment:
+      <<: [*app-environment, *mysql-app-environment]
+      SERVER_PORT: "9082"
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${TINYID_HOST_PORT:-9082}:9082"
+    depends_on:
+      mysql-init: {condition: service_completed_successfully}
+      nacos-init: {condition: service_completed_successfully}
+
+  macula-cloud-seata:
+    <<: *java-app
+    build:
+      context: ..
+      dockerfile: macula-cloud-seata/Dockerfile
+    image: ${IMAGE_REGISTRY:-macula}/macula-cloud-seata:${IMAGE_TAG:-6.1.0-SNAPSHOT}
+    environment:
+      <<: [*app-environment, *mysql-app-environment]
+      SERVER_PORT: "9091"
+      SEATA_SERVER_SERVICE_PORT: "8091"
+      SEATA_CONFIG_TYPE: file
+      SEATA_REGISTRY_TYPE: file
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${SEATA_HTTP_HOST_PORT:-9091}:9091"
+      - "${BIND_ADDRESS:-127.0.0.1}:${SEATA_SERVICE_HOST_PORT:-8091}:8091"
+    depends_on:
+      mysql-init: {condition: service_completed_successfully}
+      nacos-init: {condition: service_completed_successfully}
+
+  macula-cloud-snailjob:
+    <<: *java-app
+    build:
+      context: ..
+      dockerfile: macula-cloud-snailjob/Dockerfile
+    image: ${IMAGE_REGISTRY:-macula}/macula-cloud-snailjob:${IMAGE_TAG:-6.1.0-SNAPSHOT}
+    environment:
+      <<: [*app-environment, *mysql-app-environment]
+      SERVER_PORT: "9086"
+      SNAILJOB_GRPC_PORT: "17888"
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${SNAILJOB_HTTP_HOST_PORT:-9086}:9086"
+      - "${BIND_ADDRESS:-127.0.0.1}:${SNAILJOB_GRPC_HOST_PORT:-17888}:17888"
+    depends_on:
+      mysql-init: {condition: service_completed_successfully}
+      nacos-init: {condition: service_completed_successfully}
+
+  macula-cloud-iam:
+    <<: *java-app
+    build:
+      context: ..
+      dockerfile: macula-cloud-iam/Dockerfile
+    image: ${IMAGE_REGISTRY:-macula}/macula-cloud-iam:${IMAGE_TAG:-6.1.0-SNAPSHOT}
+    environment:
+      <<: [*app-environment, *mysql-app-environment]
+      SERVER_PORT: "9010"
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${IAM_HOST_PORT:-9010}:9010"
+    depends_on:
+      macula-cloud-system: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      nacos-init: {condition: service_completed_successfully}
+
+  macula-cloud-gateway:
+    <<: *java-app
+    build:
+      context: ..
+      dockerfile: macula-cloud-gateway/Dockerfile
+    image: ${IMAGE_REGISTRY:-macula}/macula-cloud-gateway:${IMAGE_TAG:-6.1.0-SNAPSHOT}
+    environment:
+      <<: *app-environment
+      SERVER_PORT: "9000"
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${GATEWAY_HOST_PORT:-9000}:9000"
+    depends_on:
+      macula-cloud-iam: {condition: service_healthy}
+      macula-cloud-system: {condition: service_healthy}
+      redis: {condition: service_healthy}
+
+  macula-cloud-rocketmq:
+    <<: *java-app
+    build:
+      context: ..
+      dockerfile: macula-cloud-rocketmq/Dockerfile
+    image: ${IMAGE_REGISTRY:-macula}/macula-cloud-rocketmq:${IMAGE_TAG:-6.1.0-SNAPSHOT}
+    environment:
+      <<: *app-environment
+      SERVER_PORT: "9083"
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${ROCKETMQ_ADMIN_HOST_PORT:-9083}:9083"
+    depends_on:
+      rocketmq-broker: {condition: service_healthy}
+
+  macula-cloud-docs:
+    <<: *java-app
+    build:
+      context: ..
+      dockerfile: macula-cloud-docs/Dockerfile
+    image: ${IMAGE_REGISTRY:-macula}/macula-cloud-docs:${IMAGE_TAG:-6.1.0-SNAPSHOT}
+    environment:
+      <<: *app-environment
+      SERVER_PORT: "9084"
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${DOCS_HOST_PORT:-9084}:9084"
+
+  macula-cloud-admin:
+    profiles: [apps]
+    build:
+      context: ../macula-cloud-admin
+      dockerfile: Dockerfile
+    image: ${IMAGE_REGISTRY:-macula}/macula-cloud-admin:${IMAGE_TAG:-6.1.0-SNAPSHOT}
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${ADMIN_HOST_PORT:-5900}:8080"
+    healthcheck:
+      test: [CMD-SHELL, "wget -q -O - http://127.0.0.1:8080/ >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    depends_on:
+      macula-cloud-gateway: {condition: service_healthy}
+      macula-cloud-iam: {condition: service_healthy}
+    restart: unless-stopped
+
+volumes:
+  mysql-data:
+  redis-data:
+  nacos-logs:
+  rocketmq-namesrv-logs:
+  rocketmq-broker-logs:
+  rocketmq-broker-store:

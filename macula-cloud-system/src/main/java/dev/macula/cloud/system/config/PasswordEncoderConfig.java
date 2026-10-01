@@ -23,7 +23,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.DelegatingPasswordEncoder;
-import org.springframework.security.crypto.password.MessageDigestPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.util.Assert;
 
@@ -40,10 +39,15 @@ import java.util.Map;
 @Configuration
 public class PasswordEncoderConfig {
 
-    private final MessageDigestPasswordEncoder md5Encoder = new MessageDigestPasswordEncoder("MD5") {
+    private final PasswordEncoder md5Encoder = new PasswordEncoder() {
         @Override
         public String encode(CharSequence rawPassword) {
             return md5(rawPassword);
+        }
+
+        @Override
+        public boolean matches(CharSequence rawPassword, String encodedPassword) {
+            return encodedPassword != null && encode(rawPassword).equals(encodedPassword);
         }
 
         /**

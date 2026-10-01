@@ -18,7 +18,7 @@
 package dev.macula.cloud.iam.service.support.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import dev.macula.cloud.iam.mapper.SysOAuth2ClientMapper;
 import dev.macula.cloud.iam.pojo.entity.SysOAuth2Client;
 import dev.macula.cloud.iam.service.support.SysOAuth2ClientService;

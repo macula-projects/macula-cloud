@@ -3,8 +3,8 @@ package dev.macula.cloud.iam.handler;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import dev.macula.boot.result.Result;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.web.WebAttributes;
@@ -26,7 +26,7 @@ import java.util.Collections;
  * @since 1.0.0
  */
 public class RedirectLoginAuthenticationSuccessHandler implements AuthenticationSuccessHandler {
-    protected final Log logger = LogFactory.getLog(this.getClass());
+    protected final Logger logger = LoggerFactory.getLogger(this.getClass());
     private final ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
     private RequestCache requestCache;
     private static final String defaultTargetUrl = "/";

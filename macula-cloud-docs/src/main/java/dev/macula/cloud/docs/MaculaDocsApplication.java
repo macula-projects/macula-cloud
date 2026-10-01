@@ -1,6 +1,7 @@
 package dev.macula.cloud.docs;
 
 import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 /**
  * {@code MaculaDocsApplication} is API和数据库文档服务启动类
@@ -8,6 +9,7 @@ import org.springframework.boot.SpringApplication;
  * @author Rain
  * @since 2026/6/9 18:52
  */
+@SpringBootApplication
 public class MaculaDocsApplication {
     public static void main(String[] args) {
         SpringApplication.run(MaculaDocsApplication.class, args);

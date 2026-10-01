@@ -5,7 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.macula.boot.result.Result;
 import dev.macula.cloud.iam.handler.ResponseWriter;
 import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
+import org.springframework.http.HttpMethod;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -34,7 +35,7 @@ public class WeappPreAuthenticationFilter extends OncePerRequestFilter {
     private static final String JS_CODE_KEY = "jsCode";
     private static final String ATTRIBUTE_KEY = "weappAuth";
     private final RequestMatcher requiresAuthenticationRequestMatcher =
-        new AntPathRequestMatcher("/weapp/preauth", "POST");
+        PathPatternRequestMatcher.pathPattern(HttpMethod.POST, "/weapp/preauth");
     private final PreAuthResponseWriter preAuthResponseWriter = new PreAuthResponseWriter();
     private final ObjectMapper om = new ObjectMapper();
     private final WeappClientService weappClientService;
@@ -100,7 +101,7 @@ public class WeappPreAuthenticationFilter extends OncePerRequestFilter {
         queryParams.add("js_code", jsCode);
         queryParams.add("grant_type", "authorization_code");
 
-        URI uri = UriComponentsBuilder.fromHttpUrl(ENDPOINT).queryParams(queryParams).build().toUri();
+        URI uri = UriComponentsBuilder.fromUriString(ENDPOINT).queryParams(queryParams).build().toUri();
         String response = restOperations.getForObject(uri, String.class);
 
         if (Objects.isNull(response)) {

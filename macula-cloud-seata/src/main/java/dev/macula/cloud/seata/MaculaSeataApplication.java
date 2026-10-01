@@ -19,6 +19,10 @@ package dev.macula.cloud.seata;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.autoconfigure.web.ServerProperties;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.FilterType;
 
 /**
  * {@code MaculaSeataApplication} Seata服务端启动
@@ -26,9 +30,18 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  * @author rain
  * @since 2023/8/24 15:33
  */
-@SpringBootApplication(scanBasePackages = {"io.seata"})
+@SpringBootApplication
+@ComponentScan(basePackages = "io.seata", excludeFilters = {
+    @ComponentScan.Filter(type = FilterType.REGEX, pattern = "io\\.seata\\.console\\..*"),
+    @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, classes = io.seata.server.ServerApplication.class)
+})
 public class MaculaSeataApplication {
 	public static void main(String[] args) {
-		SpringApplication.run(io.seata.server.ServerApplication.class, args);
+		SpringApplication.run(MaculaSeataApplication.class, args);
 	}
+
+    @Bean
+    ServerProperties legacyServerProperties() {
+        return new ServerProperties();
+    }
 }

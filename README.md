@@ -78,6 +78,10 @@ API接口文档和数据库结构文档服务
 mvn clean package -DskipTests=true -Pdev -pl macula-cloud-api,macula-cloud-api/macula-cloud-system-api,macula-cloud-system
 ```
 
+## 本地开发与 Docker Compose 部署
+
+开发基础设施、Flyway 数据库迁移、IDE 启动顺序、模块镜像和 Docker Compose 全栈运行参见 [deploy/README.md](deploy/README.md)。
+
 ## License
 
 Macula Boot and Macula Cloud is Open Source software released under the Apache 2.0 license.
