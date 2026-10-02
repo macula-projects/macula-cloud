@@ -33,6 +33,16 @@ const DEFAULT_CONFIG = {
 
     // IAM的地址
     IAM_URL: import.meta.env.VITE_APP_IAM_URL,
+
+    OAUTH_CLIENT_ID: import.meta.env.VITE_APP_OAUTH_CLIENT_ID,
+
+    OAUTH_CLIENT_SECRET: import.meta.env.VITE_APP_OAUTH_CLIENT_SECRET,
+
+    OAUTH_SCOPE: import.meta.env.VITE_APP_OAUTH_SCOPE,
+
+    DEMO_USERNAME: import.meta.env.VITE_APP_DEMO_USERNAME,
+
+    DEMO_PASSWORD: import.meta.env.VITE_APP_DEMO_PASSWORD,
     
     //请求超时
     TIMEOUT: 10000,
@@ -100,10 +110,12 @@ const DEFAULT_CONFIG = {
 import MY_CONFIG from "./myConfig"
 Object.assign(DEFAULT_CONFIG, MY_CONFIG)
 
+export const mergeRuntimeConfig = (config, runtimeConfig = {}) => Object.assign(config, runtimeConfig)
+
 // 如果生产模式，就合并动态的APP_CONFIG
 // public/config.js
 if(process.env.NODE_ENV === 'production'){
-	Object.assign(DEFAULT_CONFIG, APP_CONFIG)
+	mergeRuntimeConfig(DEFAULT_CONFIG, APP_CONFIG)
 }
 
 export default DEFAULT_CONFIG

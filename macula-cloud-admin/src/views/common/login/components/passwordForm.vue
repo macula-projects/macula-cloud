@@ -50,6 +50,7 @@
 </template>
 
 <script>
+import config from '@/config';
 import { useTenantStore } from '@/stores/tenant';
 import { mapActions } from 'pinia';
 
@@ -58,8 +59,8 @@ export default {
 		return {
 			userType: 'admin',
 			form: {
-				user: "admin",
-				password: "admin",
+				user: config.DEMO_USERNAME,
+				password: config.DEMO_PASSWORD,
 				autologin: false
 			},
 			rules: {
@@ -76,8 +77,8 @@ export default {
 	watch: {
 		userType(val) {
 			if (val == 'admin') {
-				this.form.user = 'admin'
-				this.form.password = 'admin'
+				this.form.user = config.DEMO_USERNAME
+				this.form.password = config.DEMO_PASSWORD
 			} else if (val == 'user') {
 				this.form.user = 'user'
 				this.form.password = 'user'
@@ -99,9 +100,9 @@ export default {
 				username: this.form.user,
 				password: this.form.password,
 				grant_type: 'password',
-				client_id: 'e4da4a32-592b-46f0-ae1d-784310e88423',
-				client_secret: 'secret',
-				scope: 'message.read message.write userinfo'
+				client_id: config.OAUTH_CLIENT_ID,
+				client_secret: config.OAUTH_CLIENT_SECRET,
+				scope: config.OAUTH_SCOPE
 			}
 			//获取token
 			var user

@@ -310,6 +310,12 @@ services:
       args:
         VITE_MODE: docker
     image: ${IMAGE_REGISTRY:-macula}/macula-cloud-admin:${IMAGE_TAG:-6.1.0-SNAPSHOT}
+    environment:
+      VITE_APP_OAUTH_CLIENT_ID: ${VITE_APP_OAUTH_CLIENT_ID:-e4da4a32-592b-46f0-ae1d-784310e88423}
+      VITE_APP_OAUTH_CLIENT_SECRET: ${VITE_APP_OAUTH_CLIENT_SECRET:-secret}
+      VITE_APP_OAUTH_SCOPE: ${VITE_APP_OAUTH_SCOPE:-message.read message.write userinfo}
+      VITE_APP_DEMO_USERNAME: ${VITE_APP_DEMO_USERNAME:-admin}
+      VITE_APP_DEMO_PASSWORD: ${VITE_APP_DEMO_PASSWORD:-admin}
     ports:
       - "${BIND_ADDRESS:-127.0.0.1}:${ADMIN_HOST_PORT:-5900}:8080"
     healthcheck:

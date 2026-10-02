@@ -63,6 +63,29 @@ npm run build:prd
 
 本地 Vite 默认把 `/api` 代理到 `127.0.0.1:9000`、把 `/iam` 代理到 `127.0.0.1:9010`，可分别通过 `VITE_APP_GATEWAY_PROXY_TARGET`、`VITE_APP_IAM_PROXY_TARGET` 覆盖。Docker 镜像内置 Nginx 将 `/api`、`/iam` 代理到 Compose 中的 Gateway、IAM 服务。共享环境的入口代理也应提供这两个同源前缀；如部署拓扑确实不同，可在构建产物的 `config.js` 中覆盖 `API_URL`、`IAM_URL`。
 
+## 登录配置
+
+OAuth public client 和本地示例账号由以下配置项提供：
+
+```dotenv
+VITE_APP_OAUTH_CLIENT_ID=e4da4a32-592b-46f0-ae1d-784310e88423
+VITE_APP_OAUTH_CLIENT_SECRET=secret
+VITE_APP_OAUTH_SCOPE=message.read message.write userinfo
+VITE_APP_DEMO_USERNAME=admin
+VITE_APP_DEMO_PASSWORD=admin
+```
+
+通过 IDE 或 `npm run dev` 启动时，Vite 自动加载根 `.env`，无需读取 `deploy/.env`。覆盖优先级为根 `.env`、当前 mode 的 `.env.<mode>`、启动命令的进程环境，后者优先级最高。例如：
+
+```sh
+VITE_APP_DEMO_USERNAME=local-admin npm run dev
+VITE_APP_OAUTH_CLIENT_ID=dev-client npm run build:dev
+```
+
+Docker 镜像构建时仍使用 Vite 配置生成静态资源；容器启动时，`deploy/docker-compose.yml` 把同名变量传入 Admin 容器，entrypoint 据此重新生成 `config.js`。运行时 `APP_CONFIG` 对以上五项具有最终优先级，因此修改部署变量后只需重建容器，不需要重新构建镜像。`/api` 和 `/iam` 仍由 Nginx 分别代理到 Compose 内的 Gateway 和 IAM，不使用这些登录变量改变服务地址。
+
+> `client_secret`、示例用户名和密码最终都会发送到浏览器，Base64 只用于安全生成 JavaScript，并不提供加密或保密能力。这里仅允许使用 public/demo client 和本地示例账号；不得把生产 confidential client secret 或真实账号密码放入前端环境变量、构建产物或 `config.js`。
+
 ## License
 
 MMacula Cloud Admin is Open Source software released under the Apache 2.0 license.
