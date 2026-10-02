@@ -27,5 +27,12 @@ const APP_CONFIG = {
 	//API_URL: "/api",
 
 	//IAM地址
-	//IAM_URL: "/iam"
+	//IAM_URL: "/iam",
+
+	// 以下配置只能使用 public/demo client，浏览器无法保护 client secret
+	//OAUTH_CLIENT_ID: "demo-client",
+	//OAUTH_CLIENT_SECRET: "demo-secret",
+	//OAUTH_SCOPE: "message.read message.write userinfo",
+	//DEMO_USERNAME: "admin",
+	//DEMO_PASSWORD: "admin"
 }

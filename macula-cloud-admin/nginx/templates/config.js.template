@@ -1,0 +1,11 @@
+const decodeConfigValue = (value) => new TextDecoder().decode(
+    Uint8Array.from(atob(value), (character) => character.charCodeAt(0))
+)
+
+const APP_CONFIG = {
+    OAUTH_CLIENT_ID: decodeConfigValue("${ADMIN_OAUTH_CLIENT_ID_B64}"),
+    OAUTH_CLIENT_SECRET: decodeConfigValue("${ADMIN_OAUTH_CLIENT_SECRET_B64}"),
+    OAUTH_SCOPE: decodeConfigValue("${ADMIN_OAUTH_SCOPE_B64}"),
+    DEMO_USERNAME: decodeConfigValue("${ADMIN_DEMO_USERNAME_B64}"),
+    DEMO_PASSWORD: decodeConfigValue("${ADMIN_DEMO_PASSWORD_B64}")
+}

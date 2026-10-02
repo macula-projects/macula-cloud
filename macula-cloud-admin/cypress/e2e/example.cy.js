@@ -41,4 +41,37 @@ describe("Admin login", () => {
     cy.contains(".el-message", "Bad credentials").should("be.visible");
     cy.contains("button", "登录").should("not.be.disabled");
   });
+
+  it("uses runtime OAuth and demo account configuration", () => {
+    cy.intercept("GET", "**/config.js*", {
+      headers: {"content-type": "application/javascript"},
+      body: `const APP_CONFIG = {
+        OAUTH_CLIENT_ID: "runtime-client",
+        OAUTH_CLIENT_SECRET: "runtime-secret",
+        OAUTH_SCOPE: "runtime.scope",
+        DEMO_USERNAME: "runtime-admin",
+        DEMO_PASSWORD: "runtime-password"
+      }`,
+    });
+    cy.intercept("POST", "**/oauth2/token", (request) => {
+      const body = new URLSearchParams(request.body);
+      expect(body.get("username")).to.eq("runtime-admin");
+      expect(body.get("password")).to.eq("runtime-password");
+      expect(body.get("client_id")).to.eq("runtime-client");
+      expect(body.get("client_secret")).to.eq("runtime-secret");
+      expect(body.get("scope")).to.eq("runtime.scope");
+      request.reply({
+        statusCode: 400,
+        body: {error_description: "Runtime credentials checked"},
+      });
+    }).as("runtimeTokenRequest");
+
+    cy.visit("/#/login");
+    cy.get('input[type="text"]').first().should("have.value", "runtime-admin");
+    cy.get('input[type="password"]').should("have.value", "runtime-password");
+    cy.contains("button", "登录").click();
+
+    cy.wait("@runtimeTokenRequest");
+    cy.contains(".el-message", "Runtime credentials checked").should("be.visible");
+  });
 });
