@@ -3,13 +3,15 @@ name: ${COMPOSE_PROJECT_NAME:-macula-cloud-dev}
 x-app-environment: &app-environment
   SPRING_PROFILES_ACTIVE: docker
   JAVA_OPTS: ${JAVA_OPTS:--XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom}
+  NACOS_SERVER_ADDR: nacos:8848
+  NACOS_NAMESPACE: ${symbol_dollar}{NACOS_NAMESPACE:-MACULA5}
+  NACOS_USERNAME: ${symbol_dollar}{NACOS_USERNAME:-nacos}
+  NACOS_PASSWORD: ${symbol_dollar}{NACOS_PASSWORD:-nacos}
+  MYSQL_APP_USER: ${MYSQL_APP_USER:-macula}
+  MYSQL_APP_PASSWORD: ${MYSQL_APP_PASSWORD:-macula}
   SEATA_SECRET_KEY: ${SEATA_SECRET_KEY:-U2VhdGFMb2NhbERldmVsb3BtZW50U2VjcmV0S2V5MDEyMzQ1Njc4OQ==}
   SEATA_CONSOLE_USERNAME: ${SEATA_CONSOLE_USERNAME:-seata}
   SEATA_CONSOLE_PASSWORD: ${SEATA_CONSOLE_PASSWORD:-seata}
-
-x-mysql-app-environment: &mysql-app-environment
-  MYSQL_APP_USER: ${MYSQL_APP_USER:-macula}
-  MYSQL_APP_PASSWORD: ${MYSQL_APP_PASSWORD:-macula}
 
 x-java-app: &java-app
   profiles: [apps]
@@ -182,7 +184,7 @@ services:
       dockerfile: macula-cloud-system/Dockerfile
     image: ${IMAGE_REGISTRY:-macula}/macula-cloud-system:${IMAGE_TAG:-6.1.0-SNAPSHOT}
     environment:
-      <<: [*app-environment, *mysql-app-environment]
+      <<: *app-environment
       SERVER_PORT: "9081"
     ports:
       - "${BIND_ADDRESS:-127.0.0.1}:${SYSTEM_HOST_PORT:-9081}:9081"
@@ -198,7 +200,7 @@ services:
       dockerfile: macula-cloud-tinyid/Dockerfile
     image: ${IMAGE_REGISTRY:-macula}/macula-cloud-tinyid:${IMAGE_TAG:-6.1.0-SNAPSHOT}
     environment:
-      <<: [*app-environment, *mysql-app-environment]
+      <<: *app-environment
       SERVER_PORT: "9082"
     ports:
       - "${BIND_ADDRESS:-127.0.0.1}:${TINYID_HOST_PORT:-9082}:9082"
@@ -213,7 +215,7 @@ services:
       dockerfile: macula-cloud-seata/Dockerfile
     image: ${IMAGE_REGISTRY:-macula}/macula-cloud-seata:${IMAGE_TAG:-6.1.0-SNAPSHOT}
     environment:
-      <<: [*app-environment, *mysql-app-environment]
+      <<: *app-environment
       SERVER_PORT: "9091"
       SEATA_SERVER_SERVICE_PORT: "8091"
       SEATA_CONFIG_TYPE: file
@@ -232,7 +234,7 @@ services:
       dockerfile: macula-cloud-snailjob/Dockerfile
     image: ${IMAGE_REGISTRY:-macula}/macula-cloud-snailjob:${IMAGE_TAG:-6.1.0-SNAPSHOT}
     environment:
-      <<: [*app-environment, *mysql-app-environment]
+      <<: *app-environment
       SERVER_PORT: "9086"
       SNAILJOB_GRPC_PORT: "17888"
     ports:
@@ -249,7 +251,7 @@ services:
       dockerfile: macula-cloud-iam/Dockerfile
     image: ${IMAGE_REGISTRY:-macula}/macula-cloud-iam:${IMAGE_TAG:-6.1.0-SNAPSHOT}
     environment:
-      <<: [*app-environment, *mysql-app-environment]
+      <<: *app-environment
       SERVER_PORT: "9010"
     ports:
       - "${BIND_ADDRESS:-127.0.0.1}:${IAM_HOST_PORT:-9010}:9010"
