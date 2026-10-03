@@ -129,7 +129,7 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          jwk-set-uri: http://macula-cloud-iam:9010/oauth2/jwks
+          jwk-set-uri: http://macula-cloud-gateway:9000/oauth2/jwks
 
 ---
 # 共享环境只保留配置中心连接信息，其余配置由 Nacos Data ID 提供

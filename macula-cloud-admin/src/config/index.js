@@ -31,8 +31,8 @@ const DEFAULT_CONFIG = {
     //接口地址
     API_URL: import.meta.env.NODE_ENV === 'development' && import.meta.env.VITE_APP_PROXY === 'true' ? "/api" : import.meta.env.VITE_APP_API_BASEURL,
 
-    // IAM的地址
-    IAM_URL: import.meta.env.VITE_APP_IAM_URL,
+    //外部 Macula Cloud IAM 地址，不经过 Vite/Nginx 代理
+    IAM_URL: import.meta.env.MACULA_CLOUD_IAM_URL || "http://127.0.0.1:9010",
 
     OAUTH_CLIENT_ID: import.meta.env.VITE_APP_OAUTH_CLIENT_ID,
 
