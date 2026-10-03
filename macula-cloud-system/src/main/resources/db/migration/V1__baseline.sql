@@ -281,7 +281,9 @@ VALUES (1, 1, 0, 2, '系统管理', '/system', 'Layout', '', 'el-icon-setting', 
        (227, 12, 0, 2, '首页', '/home', 'Layout', '', 'el-icon-home-filled', 1, 1, '', 'admin', '2023-09-01 22:09:50',
         'admin', '2023-09-01 22:15:59', NULL),
        (228, 12, 227, 1, '控制台', '/dashboard', 'common/home', '', 'el-icon-menu', 0, 1, '', 'admin',
-        '2023-09-01 22:10:18', 'admin', '2023-09-01 22:12:09', NULL);
+        '2023-09-01 22:10:18', 'admin', '2023-09-01 22:12:09', NULL),
+       (229, 12, 174, 1, '应用DEMO', '/service1/application', 'service1/application', '', 'el-icon-briefcase', 0, 1, '', 'admin',
+        '2026-10-03 07:13:06', 'admin', '2026-10-03 07:27:07', NULL);
 UNLOCK
 TABLES;
 
