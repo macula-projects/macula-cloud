@@ -11,20 +11,21 @@ Status: accepted
 4. 超级管理员可以分页查询接入应用；每个应用以唯一 Token 标识，以 `remark` 描述应用，并展示其已获授权的 `biz_type` 集合。
 5. 超级管理员可以创建接入应用。Token 必须由服务端使用密码学安全随机源生成，不接受客户端指定；创建时至少关联一个已存在的 `biz_type`。
 6. 超级管理员可以随时查看和复制完整 Token；Token 不得向非超级管理员返回，不得出现在应用日志、审计请求参数、审计响应内容或错误消息中。
-7. 超级管理员可以修改应用的 `remark`、为应用新增业务授权或删除整个接入应用。删除应用必须清理该 Token 在所有已配置数据源中的全部授权，并在全部删除成功后立即刷新 Token 缓存；不得提供单条业务授权撤销、应用停用或 Token 轮换能力。
+7. 超级管理员可以修改应用的 `remark`、为应用新增业务授权或删除整个接入应用。删除应用必须清理该 Token 在所有已配置数据源中的全部授权，并在全部删除成功后立即刷新处理请求实例的 Token 缓存；不得提供单条业务授权撤销、应用停用或 Token 轮换能力。
 8. 超级管理员分页查询聚合后的发号业务，结果必须展示各数据源的 `biz_type`、`step`、`delta`、只读 `remainder`、当前 `max_id`、版本和更新时间，以及跨数据源一致性状态；不提供按数据源切换维护入口。
 9. 创建发号业务必须一次性写入全部当前可管理数据源。`begin_id` 和 `max_id` 由服务端固定初始化为 `0`，不得由请求覆盖。
 10. 创建发号业务时，`biz_type` 必须非空，`step` 必须大于 `0`，`delta` 默认为 `10` 且允许创建时修改；`delta` 必须大于当前数据源的最大持久化顺序号。请求不得设置 `remainder`。
 11. 所有数据源使用相同的 `step` 和 `delta`；每个数据源的 `remainder` 必须等于其从 `0` 开始、只追加且不复用的持久化顺序号。扩展新实例时不得修改原数据源的 `remainder`，数据源顺序号不得达到或超过 `delta`。
 12. `biz_type`、`step`、`delta`、`remainder`、`begin_id` 和 `max_id` 创建后均不得通过管理 API 修改；页面只读展示这些字段。
-13. 超级管理员可以删除尚未使用的发号业务。服务端必须确认该 `biz_type` 在所有已配置数据源中均存在且每个数据源的 `max_id=0`，任一数据源缺失、不可用或 `max_id` 非 `0` 都必须拒绝删除；删除时必须在数据库侧再次以 `max_id=0` 为条件删除各库业务记录，清理所有数据源中该 `biz_type` 的应用授权，并在全部成功后立即刷新 Token 缓存。管理 API 和页面不得提供发号业务停用能力。
-14. 应用创建、新增授权或删除成功后，全部 TinyID 服务实例中的 Token 授权状态必须立即生效；不允许依赖现有一分钟定时刷新。删除应用时，即使全量缓存刷新失败，当前实例也必须先原子撤销该 Token；多实例部署必须通过平台统一的失效传播机制通知其他实例。
+13. 超级管理员可以删除尚未使用的发号业务。服务端必须确认该 `biz_type` 在所有已配置数据源中均存在且每个数据源的 `max_id=0`，任一数据源缺失、不可用或 `max_id` 非 `0` 都必须拒绝删除；删除时必须在数据库侧再次以 `max_id=0` 为条件删除各库业务记录，清理所有数据源中该 `biz_type` 的应用授权，并在全部成功后立即刷新处理请求实例的 Token 缓存。管理 API 和页面不得提供发号业务停用能力。
+14. 应用创建、新增授权或删除成功后，处理请求的 TinyID 实例必须立即刷新本地 Token 授权缓存；不新增 Redis 发布订阅或其他跨实例失效传播机制。其他 TinyID 实例允许继续使用旧缓存，直到既有定时刷新成功或进程重启后重新加载；多实例部署必须接受这一最终一致性窗口。
 15. TinyID 管理操作使用 `macula-boot-starter-auditlog` 的 `@AuditLog` 标准切面发布 `OperLogEvent`，并关闭请求与响应正文记录，确保完整 Token 不进入审计事件。TinyID 参考 `macula-cloud-system` 的 `AuditLogEventListener`，仅以 `@Async + @EventListener` 将标准事件映射到 `tiny_id_audit_log`，并提供 ROOT 查询 API；不自建另一套审计注解、切面、Servlet Filter 或事件模型，审计落库失败不得改变业务 API 已完成操作的结果。
 16. 管理 API 必须使用有界分页和白名单排序；不允许无限列表、任意 SQL 排序或将数据库 Entity 直接作为 REST 契约。
 17. 新增的数据库迁移必须兼容现有 `tiny_id_info`、`tiny_id_token` 数据，并在每个业务数据源中保证 `(token, biz_type)` 不重复；迁移不得修改或删除已有 Token 和已发放的 ID 进度。
 18. Gateway 只代理 `/tinyid/api/v1/admin/**` 到 `macula-cloud-tinyid`，不得代理 `/api/v1/id/**` 发号接口；接入应用通过 Starter 配置的 TinyID 地址直连发号服务，以减少发号链路对 Gateway 的依赖。System 权限数据必须只向 `ROOT` 角色发布 TinyID 管理菜单和管理 API 权限；TinyID 服务本身仍须执行 `ROOT` 角色校验，避免绕过 Gateway 直连管理端口。
 19. 现有请求日志必须对名为 `token` 的请求参数进行脱敏，验证失败日志只能记录业务类型、结果和关联标识，不得记录原始 Token。
 20. README 和数据库迁移说明必须同步描述管理入口、字段语义、多数据库约束、安全边界、审计行为、应用删除语义、业务删除前置条件及不支持的停用、轮换操作。
+21. TinyID 管理功能新增的 Form、Query、VO 分别统一放入 `dev.macula.cloud.tinyid.pojo.form`、`dev.macula.cloud.tinyid.pojo.query`、`dev.macula.cloud.tinyid.pojo.vo`，Controller、Service、测试和文档不得继续引用旧的顶层 `form`、`query`、`vo` 包。
 
 ## Non-goals
 - 不改变 TinyID 的号段生成算法、客户端协议或现有四个发号接口。
@@ -39,7 +40,7 @@ Status: accepted
 ## Design
 约束来源：仓库根 `AGENTS.md`；`.agents/rules/architecture.md`、`backend-development.md`、`frontend-development.md`、`testing.md`、`dependencies-release.md`；根 `REVIEW.md` 的 Bugs/Security/Compliance 三类审查；根 `bands.yaml`（当前仅为待批准的示例控制带）；以及已接受的 `intent.md`。当前没有发现额外的组织级品牌规范或独立数据分类政策。
 
-管理能力留在 `macula-cloud-tinyid`，数据仍由 TinyID 自己拥有。新增管理 Controller、Service、DAO、Form/Query/VO；Controller 只负责协议、校验和编排，跨数据源写入、不可变规则、Token 生成、缓存刷新和事务补偿由 Service 负责，JdbcTemplate DAO 只执行参数化 SQL。
+管理能力留在 `macula-cloud-tinyid`，数据仍由 TinyID 自己拥有。新增管理 Controller、Service、DAO，以及位于 `pojo.form`、`pojo.query`、`pojo.vo` 下的 Form/Query/VO；Controller 只负责协议、校验和编排，跨数据源写入、不可变规则、Token 生成、缓存刷新和事务补偿由 Service 负责，JdbcTemplate DAO 只执行参数化 SQL。
 
 TinyID 引入仓库已管理版本的 `macula-boot-starter-security` 和 `macula-boot-starter-auditlog`。资源服务器复用平台 JWT/JWK 配置，现有发号路径加入明确的匿名白名单；管理 Controller 使用方法级 `hasRole('ROOT')` 校验。Gateway 只代理管理 API，并按现有权限模型校验管理 URL 权限，从而形成 Gateway 与服务端两层管理授权。发号接口不经过 Gateway，由接入应用使用 Starter 配置的服务地址直接调用 TinyID。
 
@@ -53,7 +54,7 @@ Token 使用 `SecureRandom` 生成至少 256 bit 随机值，并编码为 URL-sa
 
 多数据库访问由显式的数据源注册表完成，不通过当前随机路由选择器执行管理操作。命名为 `master` 的数据源作为管理数据源，保存数据源顺序和幂等请求记录。发号业务与 Token 授权作为全局配置写入全部业务数据源：Service 先执行连接、表结构、业务存在性、顺序容量和重复授权预检，再逐库提交；任一写入失败时，仅补偿删除本次操作新插入且尚未对调用方报告成功的记录。若补偿失败，返回专用一致性错误、禁止刷新内存缓存并等待运维修复后重试。所有创建接口使用全局幂等请求键防止客户端重试制造重复记录。
 
-现有 Token 缓存改为实例级、不可变快照并用原子引用替换。定时刷新和管理变更后的即时刷新复用同一加载逻辑；加载失败保留上一份完整快照，不发布半成品。删除应用成功后必须先在当前实例原子移除指定 Token，再通过平台统一机制向其他 TinyID 实例传播失效；其他实例收到通知后同样原子移除，不能等待定时刷新。多数据源读取取授权并集，但发现同一 Token 的 `remark` 不一致或同一业务配置不一致时记录不含 Token 原文的一致性告警。
+现有 Token 缓存改为实例级、不可变快照并用原子引用替换。定时刷新和管理变更后的即时刷新复用同一加载逻辑；加载失败保留上一份完整快照，不发布半成品。删除应用成功后必须先在当前实例原子移除指定 Token；不增加 Redis 依赖、发布订阅主题或其他跨实例通知，其他实例通过既有定时刷新或进程重启重新加载后收敛。多数据源读取取授权并集，但发现同一 Token 的 `remark` 不一致或同一业务配置不一致时记录不含 Token 原文的一致性告警。
 
 审计采集只使用 `macula-boot-starter-auditlog` 提供的 `@AuditLog` 切面和 `OperLogEvent`。所有 TinyID 管理方法关闭请求与响应正文记录，防止完整 Token 进入事件。TinyID 的监听器结构与 `macula-cloud-system/src/main/java/dev/macula/cloud/system/listener/AuditLogEventListener.java` 保持一致：使用 `@Async + @EventListener` 消费标准事件，将操作者、标题、方法、路径、结果、脱敏错误摘要、客户端地址和时间写入 `master` 的 `tiny_id_audit_log`。不再使用 Servlet Filter 重复捕获请求；异步审计失败记录错误但不反向改变业务 API 结果。审计查询 API 和页面只读取该表并仅向 ROOT 开放。
 
@@ -91,6 +92,13 @@ System 数据库增量迁移：
 - `GET /api/v1/admin/data-sources`：仅返回可管理的数据源键和健康状态，不返回 JDBC URL、用户名或密码。
 - `GET /api/v1/admin/audit-logs`：分页查询由 Starter 标准事件持久化的 TinyID 管理审计记录。
 
+TinyID 内部 REST 模型包：
+
+- 写入表单位于 `dev.macula.cloud.tinyid.pojo.form`。
+- 查询条件位于 `dev.macula.cloud.tinyid.pojo.query`。
+- 展示结果位于 `dev.macula.cloud.tinyid.pojo.vo`。
+- 上述类型仅为 TinyID 服务内部 REST 契约，不移动到 `macula-cloud-api`；数据库 Entity 仍保留在数据访问层包中。
+
 所有 Form 使用 Bean Validation；分页默认 20、最大 100。错误至少区分参数非法、未认证、非 ROOT、业务已存在、授权已存在、业务已使用不能删除、目标数据源不可用、跨库写入或删除失败及跨库补偿失败。错误响应不得包含 Token、数据库凭据或内部 SQL。
 
 Gateway 增加 `Path=/tinyid/api/v1/admin/**`、`lb://macula-cloud-tinyid` 路由，不配置发号接口匿名白名单，也不代理 `/tinyid/api/v1/id/**`。TinyID `application.yml` 增加与 System 一致的 JWT/JWK profile 配置，并仅在 TinyID 服务自身对白名单中的现有发号接口开放匿名访问；接入应用通过 Starter 配置的 TinyID 服务地址直连发号接口。
@@ -101,12 +109,14 @@ Gateway 增加 `Path=/tinyid/api/v1/admin/**`、`lb://macula-cloud-tinyid` 路�
 - 当前 `DynamicDataSource` 为每次发号随机选择数据源；本规格要求管理写入对全部当前数据源执行预检、逐库提交和精确补偿，并使用持久化顺序生成不可复用的 remainder。跨库写入仍不能提供严格分布式原子性，Reviewer 必须核对补偿只影响本次新增记录，blocking
 - 当前 Flyway 只明确迁移 `master` 数据源，多数据库场景下每个业务数据源如何执行同一 TinyID 增量迁移尚无现成机制；Build 计划必须落实可重复的逐数据源迁移与失败报告，不能只迁移 `master`，blocking
 - 参考 System 的 `@Async + @EventListener` 后，审计是异步尽力落库：审计数据库故障不会使已完成的管理操作回滚，认证或方法调用前被拒绝的请求也可能不会产生 `OperLogEvent`。这是复用平台现有审计机制的既有语义，需要 Reviewer 明确认可其与 intent 中“所有管理操作都需要审计”的边界，blocking
-- 当前 TinyID 没有跨实例 Token 失效传播机制；删除应用只刷新处理请求的 JVM 会让其他实例继续接受旧 Token。Build 前需要明确复用的统一传播能力及失败语义，不能以一分钟定时刷新替代，blocking
+- 不使用跨实例 Token 失效传播后，其他 TinyID 实例在既有定时刷新成功或进程重启前可能继续接受已删除应用的旧 Token；这是工程师明确接受的最终一致性窗口，README 和验证报告必须准确披露，non-blocking
 - `tiny_id_token` 需要以明文保存 Token，才能兼容现有等值校验和“超级管理员始终可查看完整 Token”的要求；本次不引入可逆加密或密钥托管，数据库访问控制仍是敏感数据保护边界，non-blocking
 - `bands.yaml` 仍是未批准的示例控制带，因此本功能只能提供功能、安全和审计验证，不能据此宣称生产 SLO 或控制带健康，non-blocking
 
 ## Verification strategy
-后端单元测试覆盖 Token 安全随机生成与碰撞重试、ROOT/非 ROOT/匿名授权、Form 边界、`begin_id/max_id` 强制初始化、参数不可变、只增授权、应用删除及缓存失效、业务删除的全库存在与 `max_id=0` 条件、级联授权清理、幂等重试、分页上限、Token 缓存原子刷新及刷新失败保留旧快照。
+后端单元测试覆盖 Token 安全随机生成与碰撞重试、ROOT/非 ROOT/匿名授权、Form 边界、`begin_id/max_id` 强制初始化、参数不可变、只增授权、应用删除及当前实例缓存失效、业务删除的全库存在与 `max_id=0` 条件、级联授权清理、幂等重试、分页上限、Token 缓存原子刷新及刷新失败保留旧快照；另以包扫描或编译引用证明 Form、Query、VO 已全部迁入 `pojo` 子包且旧包无残留类型。
+
+双实例缓存测试验证处理管理请求的实例立即生效，未收到跨实例通知的另一实例可暂时保留旧授权，并在定时刷新或重启加载后收敛；依赖检查证明未为此功能新增 Redis 发布订阅机制。
 
 DAO 与数据库集成测试使用 MySQL 验证应用聚合查询、唯一索引、全库查询和创建业务、稳定顺序生成 remainder、delta 容量校验、remark 全行更新、授权新增、应用全库删除、业务 `max_id=0` 条件删除、业务授权清理和迁移对既有数据的兼容；多数据源测试至少覆盖中间实例移除后顺序不复用、最大顺序号达到 delta 时拒绝、完整/冲突状态、Token 全库同步成功、第二库写入或删除失败且精确补偿成功、补偿失败等路径。
 
