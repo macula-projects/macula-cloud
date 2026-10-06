@@ -2,57 +2,55 @@
 Status: accepted
 
 ## Files that change
-- SDLC 合同：新增 `.sdlc/tinyid-application-management/plan.md`；Phase B 如发生偏差，仅在此文件记录原因、影响和补充证明。
-- TinyID 构建与配置：修改 `macula-cloud-tinyid/pom.xml`、`macula-cloud-tinyid/src/main/resources/application.yml`、`macula-cloud-tinyid/README.md`；增加 Security、AuditLog 和测试所需的父 POM 已管理依赖，配置 JWT/JWK、现有发号接口匿名白名单及多数据源迁移参数。
-- TinyID 数据库：新增 `macula-cloud-tinyid/src/main/resources/db/migration/V2__tinyid_management.sql`，增加 `(token,biz_type)` 唯一约束、管理审计表和幂等请求表；不得改写 `V1__baseline.sql` 或已有业务数据。
-- 数据源与迁移基础设施：修改 `macula-cloud-tinyid/src/main/java/dev/macula/cloud/tinyid/config/DataSourceConfig.java`、`DynamicDataSource.java`；新增 `TinyIdDataSourceRegistry.java`、`TinyIdFlywayMigrationRunner.java`，以 Spring Bean 名称作为白名单数据源键，保留 `master` 管理数据源并对每个业务数据源执行相同增量迁移。
-- 现有发号与敏感数据处理：修改 `controller/IdContronller.java`、`filter/RequestFilter.java`、`dao/TinyIdInfoDAO.java`、`dao/TinyIdTokenDAO.java`、`dao/impl/TinyIdInfoDAOImpl.java`、`dao/impl/TinyIdTokenDAOImpl.java`、`service/TinyIdTokenService.java`、`service/impl/TinyIdTokenServiceImpl.java`；保持四个发号接口兼容，移除 Token 日志暴露，并将授权缓存改为多数据源加载、不可变快照和即时刷新。
-- TinyID 管理数据层：新增 `dao/TinyIdManagementDAO.java`、`dao/impl/TinyIdManagementDAOImpl.java`、`dao/entity/TinyIdAuditLog.java`、`dao/entity/TinyIdManagementRequest.java`，集中实现参数化分页查询、按白名单数据源读写、全库 Token 同步、补偿和审计/幂等持久化。
-- TinyID 管理契约：新增 `form/CreateApplicationForm.java`、`UpdateApplicationRemarkForm.java`、`AddApplicationBusinessesForm.java`、`CreateBusinessForm.java`；新增 `query/ApplicationPageQuery.java`、`BusinessPageQuery.java`、`AuditLogPageQuery.java`；新增 `vo/PageVO.java`、`TinyIdApplicationVO.java`、`TinyIdBusinessVO.java`、`TinyIdBusinessConsistencyVO.java`、`TinyIdDataSourceVO.java`、`TinyIdAuditLogVO.java`。所有输入使用 Bean Validation，所有输出与 Entity 隔离。
-- TinyID 管理业务与接口：新增 `service/TinyIdManagementService.java`、`service/impl/TinyIdManagementServiceImpl.java`、`controller/TinyIdAdminController.java`、`listener/TinyIdAuditLogEventListener.java`。Controller 统一位于 `/api/v1/admin` 并要求 `hasRole('ROOT')`；Service 实现安全 Token 生成、应用聚合、备注更新、只增授权、按数据源业务维护、一致性状态、幂等与失败补偿；AuditLog 禁止记录请求和响应正文。
-- TinyID 后端测试：修改 `src/test/java/dev/macula/cloud/tinyid/ServerTest.java`，使其保留为轻量应用装配测试；新增 `filter/RequestFilterTest.java`、`service/impl/TinyIdTokenServiceImplTest.java`、`service/impl/TinyIdManagementServiceImplTest.java`、`controller/TinyIdAdminControllerTest.java`、`dao/impl/TinyIdManagementDAOIntegrationTest.java`、`config/TinyIdFlywayMigrationRunnerIntegrationTest.java`，覆盖安全、缓存、单库/多库、迁移、补偿和 Token 不泄露。
-- Gateway：修改 `macula-cloud-gateway/src/main/resources/application.yml`，增加 `/tinyid/**` 路由并保留现有 System 路由和认证行为。
-- System 权限数据：新增 `macula-cloud-system/src/main/resources/db/migration/V2__tinyid_management_menu.sql`，幂等地增加 TinyID 管理菜单、管理 API URL 权限及 ROOT 角色关联，不赋权给其他角色。
-- Admin API 与配置：修改 `macula-cloud-admin/src/config/index.js`；新增 `macula-cloud-admin/src/api/model/tinyid/management.js`，统一封装应用、业务、数据源、一致性和审计 API。
-- Admin 页面：新增 `macula-cloud-admin/src/views/tinyid/management/index.vue`、`ApplicationPanel.vue`、`BusinessPanel.vue`、`AuditLogPanel.vue`、`ApplicationCreateDialog.vue`、`ApplicationRemarkDialog.vue`、`ApplicationAuthorizationDialog.vue`、`BusinessCreateDialog.vue`。复用 Element Plus 与现有表格/对话框风格；多库时显示数据源切换器，切换后清理旧状态并重新加载。
-- Admin 测试：新增 `macula-cloud-admin/tests/unit/tinyid-management.test.js`、`macula-cloud-admin/cypress/e2e/tinyid-management.cy.js`，使用 mock API 验证 ROOT/非 ROOT、单库/多库、切换隔离、创建流程、完整 Token 展示复制和禁止删除/停用/轮换。
-- 不删除任何文件；不修改 `macula-cloud-api`、现有发号数据库基线、部署拓扑或前端依赖清单，除非实施中出现会使本计划失效的事实并先取得工程师确认。
+- SDLC 合同：修改 `.sdlc/tinyid-application-management/plan.md`；Phase B 仅在本文件记录实际偏差及其风险、证明影响。
+- TinyID 构建、配置与文档：修改 `macula-cloud-tinyid/pom.xml`、`src/main/resources/application.yml`、`README.md`；复用父 POM 管理的 Security、AuditLog、Flyway 和测试依赖，不增加 Redis 发布订阅依赖，文档明确跨实例缓存最终一致性窗口。
+- TinyID 数据源与迁移：修改 `config/DataSourceConfig.java`、`config/DynamicDataSource.java`；新增或完善 `config/TinyIdDataSourceProperties.java`、`TinyIdDataSourceRegistry.java`、`TinyIdDataSourceOrderCoordinator.java`、`TinyIdFlywayMigrationRunner.java`、`TinyIdBusinessDataSourceReconciler.java`。修改或新增 `src/main/resources/db/migration/V2__tinyid_management.sql`、`db/master/V3__tinyid_management_master.sql`、`V4__tinyid_datasource_order.sql`、`V5__tinyid_management_request_fingerprint.sql`；不改写 `V1__baseline.sql`。
+- TinyID 管理数据层：新增或完善 `dao/TinyIdManagementDAO.java`、`dao/impl/TinyIdManagementDAOImpl.java`、`dao/entity/TinyIdAuditLog.java`、`dao/entity/TinyIdManagementRequest.java`，实现全库应用授权、聚合业务、稳定数据源顺序、条件删除、精确补偿、幂等请求和审计持久化。
+- TinyID REST 模型：把 `form/AddApplicationBusinessesForm.java`、`CreateApplicationForm.java`、`CreateBusinessForm.java`、`UpdateApplicationRemarkForm.java` 移至 `pojo/form/`；把 `query/ApplicationPageQuery.java`、`AuditLogPageQuery.java`、`BusinessPageQuery.java` 移至 `pojo/query/`；把 `vo/ErrorCode.java`、`PageVO.java`、`TinyIdApplicationVO.java`、`TinyIdAuditLogVO.java`、`TinyIdBusinessAggregateVO.java`、`TinyIdBusinessConsistencyVO.java`、`TinyIdBusinessVO.java`、`TinyIdDataSourceVO.java` 移至 `pojo/vo/`。同步修改全部生产代码和测试 import，最终删除空的顶层 `form`、`query`、`vo` 包。
+- TinyID 管理业务与接口：新增或完善 `service/TinyIdManagementService.java`、`service/impl/TinyIdManagementServiceImpl.java`、`controller/TinyIdAdminController.java`；修改 `controller/IdContronller.java` 以引用迁移后的 `ErrorCode`。管理接口保持 `/api/v1/admin`、ROOT 方法鉴权、有界分页和 Bean Validation。
+- Token 缓存与请求日志：修改 `service/TinyIdTokenService.java`、`service/impl/TinyIdTokenServiceImpl.java`、`filter/RequestFilter.java`。缓存使用实例内不可变快照和原子替换，管理成功后只更新当前实例，其他实例依靠既有定时刷新或重启收敛；请求日志对 Token 脱敏。
+- 审计：修改 `listener/TinyIdAuditLogEventListener.java`，结构对齐 System 的 `@Async + @EventListener`，把 Starter 的 `OperLogEvent` 映射到 `tiny_id_audit_log`；删除 `filter/TinyIdManagementAuditFilter.java`，不保留第二套 Servlet Filter 审计路径。
+- TinyID 后端测试：修改 `src/test/java/dev/macula/cloud/tinyid/ServerTest.java`；新增或完善 `config/TinyIdDataSourceRegistryTest.java`、`TinyIdDataSourceOrderCoordinatorTest.java`、`TinyIdFlywayMigrationRunnerIntegrationTest.java`、`TinyIdBusinessDataSourceReconcilerTest.java`、`TinyIdBusinessDataSourceReconcilerIntegrationTest.java`、`controller/IdContronllerTest.java`、`TinyIdAdminControllerTest.java`、`dao/impl/TinyIdManagementDAOIntegrationTest.java`、`filter/RequestFilterTest.java`、`listener/TinyIdAuditLogEventListenerTest.java`、`service/impl/TinyIdManagementServiceImplTest.java`、`TinyIdTokenServiceImplTest.java`；删除 `filter/TinyIdManagementAuditFilterTest.java`。
+- Gateway 与 System 权限：修改 `macula-cloud-gateway/src/main/resources/application.yml`，仅代理 `/tinyid/api/v1/admin/**`；保留 `macula-cloud-system/src/main/resources/db/migration/V2__tinyid_management_menu.sql`，新增或完善前向迁移 `V3__move_tinyid_menu_under_system.sql`、`V4__tinyid_management_delete_permission.sql`，菜单名为“ID管理”、挂在“系统管理”下，权限只关联 ROOT。
+- Admin API、配置与页面：修改 `macula-cloud-admin/src/config/index.js`、`src/api/model/tinyid/management.js`；新增或完善 `src/views/tinyid/management/index.vue`、`ApplicationPanel.vue`、`BusinessPanel.vue`、`AuditLogPanel.vue`、`ApplicationCreateDialog.vue`、`ApplicationRemarkDialog.vue`、`ApplicationAuthorizationDialog.vue`、`BusinessCreateDialog.vue`。业务视图按所有数据源聚合展示，不提供数据源切换维护入口。
+- Admin 测试：新增或完善 `macula-cloud-admin/tests/unit/tinyid-management.test.js`、`cypress/e2e/tinyid-management.cy.js`，使用可控 mock 覆盖权限、空态、失败、全库业务创建、完整 Token 展示复制、授权、删除和审计。
+- 不修改 `macula-cloud-api`、`V1__baseline.sql`、部署拓扑或前端依赖清单；不发布、部署、推送或重建 Docker。
 
 ## Order of work
-1. 建立可测试的多数据源注册表：以 Bean 名称枚举、校验并选择数据源，固定 `master` 管理数据源；重构随机路由数据源只用于既有发号路径，管理 DAO 必须显式选库。
-2. 实现逐数据源 Flyway：在所有注册业务数据源上校验并应用 V2，确保重复 `(token,biz_type)` 时明确失败，任何数据源迁移失败都阻止应用进入可服务状态；先用双 MySQL 容器证明重复执行和失败报告。
-3. 建立安全边界：加入资源服务器配置和四个发号接口白名单，为管理 Controller 预留 ROOT 方法鉴权；修改 `RequestFilter` 统一脱敏 `token`，并确保异常与对象字符串不含原始 Token。
-4. 扩展 DAO 与缓存：实现按数据源的业务分页/详情/创建、跨库一致性摘要、应用聚合、全库 Token 授权同步、审计与幂等访问；将 Token 缓存改为多库读取后的不可变原子快照，失败时保留旧快照。
-5. 实现管理 Service：使用 `SecureRandom` 生成至少 256 bit Token；实现应用创建、备注修改、只增授权、即时缓存刷新、按选中数据源创建业务、跨库状态判定、预检、逐库提交、补偿和专用错误映射。
-6. 实现管理 Controller 与审计监听器：完成 spec 中全部 `/api/v1/admin` 接口、分页和 Bean Validation；所有接口要求 ROOT，所有成功和失败调用写入 `master` 审计表且关闭请求/响应正文审计。
-7. 接通平台入口：增加 Gateway TinyID 路由；增加 System V2 菜单、URL 权限和 ROOT 角色关系，并核对动态菜单组件路径与外部 `/tinyid` API 前缀。
-8. 实现 Admin：增加 TinyID API 模块和管理页三个面板；业务面板先探测数据源，单库自动选择、多库显示切换器，切换时取消旧请求影响并清空表格/表单；实现一致性提示、完整 Token 复制以及无删除/停用/轮换入口。
-9. 补齐后端单元、MockMvc 和 MySQL Testcontainers 集成测试；补齐前端 Vitest 与 Cypress mock 流程；测试数据只使用虚构 Token，断言日志、审计和错误响应均不出现哨兵 Token。
-10. 更新 TinyID README，执行格式与静态 diff 检查，核对实际文件集合和顺序；任何偏离本计划的实现先记录到 `plan.md`，若改变合同则暂停并请求工程师决定。
+1. 先整理模型包：移动全部 Form、Query、VO（包括既有 `ErrorCode`）到 `pojo.form`、`pojo.query`、`pojo.vo`，更新 Controller、Service、DAO、测试引用，并用搜索确认旧包声明和 import 清零。
+2. 校正数据源注册与稳定顺序：以 Bean 名称维护白名单，`master` 保存只追加且不复用的顺序号；业务创建和新数据源补齐都从持久化顺序读取 `remainder`，禁止使用当前列表下标，任一顺序号达到或超过业务 `delta` 时拒绝。
+3. 校正逐数据源迁移与启动协调：业务库执行公共 V2，master 依次执行 V3/V4/V5；保证重复迁移安全、重复授权明确失败、既有 Token 和发号进度不被修改，新实例只追加顺序并按既有业务参数补齐。
+4. 校正 DAO 跨库写入和补偿：应用、授权、业务创建及删除均先预检，再按数据源执行；只补偿本次实际插入或删除的精确记录。新增授权失败时不得由 Service 再按整个请求集合删除，避免误删调用前已经存在的授权。
+5. 校正业务规则：Token 使用 `SecureRandom` 生成；创建业务一次写入所有当前数据源，固定 `begin_id/max_id=0`、统一 `step/delta`、按稳定顺序设置只读 `remainder`；应用允许整体删除，业务只在所有数据源均存在且 `max_id=0` 时条件删除，同时清理相应授权。
+6. 校正当前实例缓存：保留启动加载和一分钟定时刷新，加载失败继续使用上一份完整快照；管理成功后以原子快照更新当前实例，删除应用或业务授权时先定向移除失效项。不新增 Redis、消息主题或跨实例监听，其他实例允许到定时刷新或重启后收敛。
+7. 统一审计：保留 Controller 上 Starter `@AuditLog` 且关闭请求、响应正文，删除自建审计 Filter；监听器按 System 示例使用 `@Async + @EventListener` 映射标准事件到 `tiny_id_audit_log`，异步失败不改变已完成的业务响应。
+8. 校正安全与平台入口：管理接口只允许 ROOT，发号接口保持直连和原协议；Gateway 只代理管理路径；System 以前向迁移提供“系统管理 > ID管理”菜单、管理 URL 权限和 DELETE 权限；请求日志、异常和审计均不得出现完整 Token。
+9. 校正 Admin：三个面板统一使用 TinyID 管理 API；发号业务按多数据源聚合展示，不显示切换器，创建操作一次提交并作用于全部数据源；保留完整 Token 的 ROOT 展示复制、应用删除、未使用业务删除、只增授权及无停用/轮换入口。
+10. 补齐和修正测试：覆盖稳定顺序存在空洞时 remainder 不复用、delta 容量、新实例追加、精确补偿不误删旧授权、全库 `max_id=0` 删除、当前实例即时缓存变化、另一实例最终收敛、Starter 审计监听、无自建 Filter、Token 不泄露、ROOT/拒绝路径及前端聚合交互。
+11. 更新 README 并做实施阶段静态核对：检查文件清单、包名、路由、迁移版本、Javadoc/Author、`git diff --check` 和敏感 Token 搜索；正式 Maven、Vitest、Cypress、构建和运行时验证留给 Stage 4。
 
 ## Risks
-- 多数据源 Bean 的现有发现逻辑依赖 `DruidDataSource.name`，该名称可能为空或重复；改为 Bean 名称后必须避免把路由 DataSource 自身再次注册并形成循环依赖。
-- V2 必须在每个业务数据源执行，而当前 Spring Boot Flyway 明确指向 `master`；自定义迁移协调器若与自动配置并存可能重复迁移或启动顺序错误，因此要么由协调器统一接管，要么明确排除重复初始化，不能混用。
-- 应用与 Token 授权跨库同步没有分布式事务；预检和补偿只能降低而不能消除部分提交风险。补偿失败必须阻止缓存刷新、返回一致性错误并留下不含 Token 的审计证据。
-- 业务按数据源逐库配置期间可能处于“配置中”；在所有库完成前，随机路由可能命中尚无该 `biz_type` 的数据库。页面必须明显提示，服务端必须拒绝会制造 `delta` 冲突或重复 `remainder` 的后续创建。
-- `tiny_id_token` 明文保存并向 ROOT 完整展示属于已接受风险；日志、审计、URL、异常、测试报告和前端非 ROOT 路径必须严格避免二次泄露。
-- 现有应用数据使用相同 Token 的多行表达一个应用，`appId=MIN(id)` 只在 `master` 中稳定；跨库更新必须先由 `master` 解析 Token，再按 Token 更新其他库，不能假设各库行 ID 相同。
-- Gateway URL 权限与 TinyID 服务 ROOT 鉴权必须同时生效；只实现一层会留下直连绕过或动态权限缓存遗漏。
-- Admin 当前测试基础较少，Cypress 流程需完全 mock 后端与登录状态；不得依赖真实共享环境或把生成物、视频、截图提交进仓库。
-- `npm run lint` 会自动改写文件，不在 Build 实施阶段作为只读检查使用；如后续测试阶段执行，必须在前后核对 diff。
-- 回滚代码和菜单迁移不能删除已创建的业务、Token、审计或幂等数据；数据库回滚采用停止新管理写入、恢复旧应用版本并保留新增表/索引的前向兼容方式。
+- 多数据源没有分布式事务；即使预检和精确补偿完善，补偿本身仍可能失败。失败必须返回明确的一致性错误、保留原异常及补偿异常证据，并禁止发布与数据库不一致的缓存快照。
+- 数据源稳定顺序是 `remainder` 的长期合同。若误用当前列表位置、重排或复用已移除实例的序号，会造成不同数据库生成重复 ID；迁移和扩容路径必须只追加，并以 `sequence < delta` 为硬约束。
+- 新数据源加入时需要补齐全部既有业务；若历史业务的 `step/delta` 已跨库不一致或新序号超出 delta，启动协调必须失败并给出可诊断信息，不能静默改写原实例配置。
+- 不做跨实例失效传播意味着删除应用或授权后，其他服务实例在下一次成功定时刷新或重启前仍可能接受旧 Token。该窗口是已接受风险，不能在 README、测试报告或交付说明中描述为全实例即时失效。
+- Token 明文存储且向 ROOT 完整展示是已接受边界；日志、审计、异常、URL、测试输出和非 ROOT 响应仍必须避免泄露。
+- `appId=MIN(id)` 只在 master 中稳定，跨库操作必须先由 master 解析 Token，再按 Token 处理其他数据源，不能假设各库自增 ID 相同。
+- Flyway 公共迁移与 master 专属迁移若混用 location 或启动顺序错误，可能重复执行或遗漏；测试需覆盖空库、既有 V1 数据库和重复启动。
+- Starter 审计采用异步尽力落库，审计数据库故障不会回滚已完成的管理操作，鉴权前拒绝也可能没有 Controller 审计事件；这是已接受的平台审计语义。
+- 已执行的 System Flyway 文件不能改写校验和；菜单移动和 DELETE 权限只能通过 V3/V4 前向迁移完成。
+- `npm run lint` 带 `--fix`，Stage 4 如执行必须前后核对 diff，避免夹带无关格式化。
+- 工作树已有大量本功能的 staged/unstaged 文件；实施必须保留用户改动和索引状态，不清理、不回滚、不覆盖无关内容。
 
 ## Proof
-- `TinyIdAdminControllerTest`：证明匿名请求为 401、非 ROOT 为 403、ROOT 可访问全部管理端点；验证分页上限、非法数据源和 Bean Validation 拒绝路径。
-- `RequestFilterTest`：使用唯一哨兵 Token 调用现有发号接口和失败路径，证明日志只出现脱敏值，原始 Token 不出现。
-- `TinyIdTokenServiceImplTest`：证明多库授权并集、不可变原子快照、即时刷新、定时刷新失败保留旧快照以及并发读取安全。
-- `TinyIdManagementServiceImplTest`：证明安全 Token 生成与碰撞重试、`begin_id/max_id=0`、参数创建后不可变、只增授权、备注全库更新、幂等重试、跨库一致性判定和补偿分支。
-- `TinyIdManagementDAOIntegrationTest`：在双 MySQL 数据源验证按源隔离查询/创建、唯一索引、应用聚合、全库 Token 同步、第二库失败后的补偿、审计落库及审计不含 Token。
-- `TinyIdFlywayMigrationRunnerIntegrationTest`：证明 V1 既有数据保留、V2 在每个数据源执行、重复执行安全、重复授权数据导致可诊断失败且不会静默删数据。
-- 现有发号兼容测试：覆盖四个原路径、合法/非法 `(token,biz_type)`、批量上限和号段获取，确认路由、安全配置和缓存改造未改变外部协议。
-- `tinyid-management.test.js`：证明单库自动选择、多库切换清空并重载、过期响应不覆盖新数据、表单边界、一致性状态、完整 Token 复制以及不存在删除/停用/轮换入口。
-- `tinyid-management.cy.js`：mock ROOT 登录、动态菜单和 TinyID API，覆盖切换两个数据源分别创建业务、创建应用、增加授权、查看审计；覆盖非 ROOT 无菜单且直接请求被拒绝。
-- Stage 4 运行最小后端命令 `mvn -pl macula-cloud-tinyid,macula-cloud-system -am test -Plocal`，再运行受影响范围 `mvn test -Plocal`；运行 Admin 相关 Vitest、`npm run build` 和 `npm run test:e2e:ci`。POM、Gateway、Flyway 与 profile 变化另做 `package`、`docker compose config --quiet`、多库迁移、服务启动、匿名发号兼容及 ROOT 管理链路冒烟验证，并明确报告任何环境未满足项。
-
-## Deviations
-- 2026-10-03：仓库不存在 `CLAUDE.md`，无法按 Build Phase B 步骤读取；实施继续遵循仓库 `AGENTS.md`、相关 `.agents/rules/*`、`REVIEW.md`、已接受 spec 与本计划，不影响文件范围和证明策略。
+- 包结构检查：`rg` 证明 `dev.macula.cloud.tinyid.form|query|vo` 的 package/import 为零，所有 Form、Query、VO 位于 `pojo` 子包，Maven 编译证明引用完整。
+- `TinyIdDataSourceRegistryTest`、`TinyIdDataSourceOrderCoordinatorTest`、`TinyIdBusinessDataSourceReconcilerTest` 及其集成测试：证明顺序号只追加不复用、列表空洞不会改变 remainder、新实例使用下一顺序、`sequence >= delta` 拒绝、既有实例配置不被改写。
+- `TinyIdFlywayMigrationRunnerIntegrationTest`：证明 V1 数据保留、公共与 master 迁移按正确 location 执行、重复启动安全、重复 `(token,biz_type)` 可诊断失败。
+- `TinyIdManagementDAOIntegrationTest`：双 MySQL 验证聚合查询、全库创建与删除、`begin_id/max_id=0`、稳定 remainder、统一 step/delta、条件删除、应用授权清理，以及第二库失败时只补偿本次变更且不删除预先存在的授权。
+- `TinyIdManagementServiceImplTest`：证明安全 Token、幂等指纹、只增授权、备注同步、应用删除、业务全库 `max_id=0` 前置条件、缓存调用顺序、补偿失败映射及不允许参数修改。
+- `TinyIdTokenServiceImplTest`：证明实例内不可变原子快照、并发读取、加载失败保留旧快照、当前实例定向更新/删除立即生效、独立实例在刷新或重新初始化前可以保留旧快照，且代码不存在 Redis 发布订阅路径。
+- `TinyIdAuditLogEventListenerTest` 与静态 Bean 检查：证明标准 `OperLogEvent` 通过 `@Async + @EventListener` 写入脱敏审计记录、请求和响应正文关闭、自建 `TinyIdManagementAuditFilter` 不再存在。
+- `TinyIdAdminControllerTest`、`IdContronllerTest`、`RequestFilterTest`：证明匿名 401、非 ROOT 403、ROOT 管理成功、四个既有发号接口兼容、有界分页和 Bean Validation 生效，日志、错误与审计不含哨兵 Token。
+- `tinyid-management.test.js`：证明加载、空态、错误态、重复提交、跨库聚合、一致性提示、只读 remainder、完整 Token 复制、应用删除、未使用业务删除，以及不存在数据源切换、停用和轮换入口。
+- `tinyid-management.cy.js`：mock ROOT 菜单与 API，覆盖“系统管理 > ID管理”进入、全库创建业务、创建应用、追加授权、删除未使用业务、删除应用和查看审计；覆盖非 ROOT 不显示菜单且直接请求被拒绝。
+- Stage 4 最小验证为 `mvn -pl macula-cloud-tinyid,macula-cloud-system -am test -Plocal`；随后扩大到 `mvn test -Plocal`，Admin 执行相关 Vitest、`npm run build`、`npm run test:e2e:ci`。POM、Gateway、Flyway 和 profile 另做目标模块 `package`、Compose 配置渲染、多库迁移/重启、TinyID 直连发号、Gateway 发号路径不可达及 ROOT 管理链路冒烟；环境缺失单独报告，不冒充测试通过。
