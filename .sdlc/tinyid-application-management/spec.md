@@ -14,8 +14,8 @@ Status: accepted
 7. 超级管理员可以修改应用的 `remark`、为应用新增业务授权或删除整个接入应用。删除应用必须清理该 Token 在所有已配置数据源中的全部授权，并在全部删除成功后立即刷新处理请求实例的 Token 缓存；不得提供单条业务授权撤销、应用停用或 Token 轮换能力。
 8. 超级管理员分页查询聚合后的发号业务，结果必须展示各数据源的 `biz_type`、`step`、`delta`、只读 `remainder`、当前 `max_id`、版本和更新时间，以及跨数据源一致性状态；不提供按数据源切换维护入口。
 9. 创建发号业务必须一次性写入全部当前可管理数据源。`begin_id` 和 `max_id` 由服务端固定初始化为 `0`，不得由请求覆盖。
-10. 创建发号业务时，`biz_type` 必须非空，`step` 必须大于 `0`，`delta` 默认为 `10` 且允许创建时修改；`delta` 必须大于当前数据源的最大持久化顺序号。请求不得设置 `remainder`。
-11. 所有数据源使用相同的 `step` 和 `delta`；每个数据源的 `remainder` 必须等于其从 `0` 开始、只追加且不复用的持久化顺序号。扩展新实例时不得修改原数据源的 `remainder`，数据源顺序号不得达到或超过 `delta`。
+10. 创建发号业务时，`biz_type` 必须非空，`step` 必须大于 `0`，`delta` 默认为 `10` 且允许创建时修改；`delta` 必须大于当前物理数据源列表的最大下标。请求不得设置 `remainder`。
+11. 所有数据源使用相同的 `step` 和 `delta`；每个数据源的 `remainder` 等于其在当前物理数据源列表中从 `0` 开始的下标。为保证既有业务的 `remainder` 不变，数据源配置不得重排或在中间插入，扩展新实例只能追加到列表末尾，数据源下标不得达到或超过 `delta`。
 12. `biz_type`、`step`、`delta`、`remainder`、`begin_id` 和 `max_id` 创建后均不得通过管理 API 修改；页面只读展示这些字段。
 13. 超级管理员可以删除尚未使用的发号业务。服务端必须确认该 `biz_type` 在所有已配置数据源中均存在且每个数据源的 `max_id=0`，任一数据源缺失、不可用或 `max_id` 非 `0` 都必须拒绝删除；删除时必须在数据库侧再次以 `max_id=0` 为条件删除各库业务记录，清理所有数据源中该 `biz_type` 的应用授权，并在全部成功后立即刷新处理请求实例的 Token 缓存。管理 API 和页面不得提供发号业务停用能力。
 14. 应用创建、新增授权或删除成功后，处理请求的 TinyID 实例必须立即刷新本地 Token 授权缓存；不新增 Redis 发布订阅或其他跨实例失效传播机制。其他 TinyID 实例允许继续使用旧缓存，直到既有定时刷新成功或进程重启后重新加载；多实例部署必须接受这一最终一致性窗口。
@@ -36,6 +36,7 @@ Status: accepted
 - 不在 TinyID 内实现独立于 `macula-boot-starter-auditlog` 的审计注解、切面、Servlet Filter 或事件模型。
 - 不引入新的前端框架、状态管理方案或组件库。
 - 不在本次变更中定义或调整生产 SLO、告警阈值、部署拓扑或数据保留策略。
+- 不持久化数据源顺序，不在服务启动时自动补齐新增数据源中的历史业务或授权，也不由 TinyID 服务编排全部物理库的 Flyway 迁移。
 
 ## Design
 约束来源：仓库根 `AGENTS.md`；`.agents/rules/architecture.md`、`backend-development.md`、`frontend-development.md`、`testing.md`、`dependencies-release.md`；根 `REVIEW.md` 的 Bugs/Security/Compliance 三类审查；根 `bands.yaml`（当前仅为待批准的示例控制带）；以及已接受的 `intent.md`。当前没有发现额外的组织级品牌规范或独立数据分类政策。
@@ -48,11 +49,11 @@ TinyID 引入仓库已管理版本的 `macula-boot-starter-security` 和 `macula
 
 Token 使用 `SecureRandom` 生成至少 256 bit 随机值，并编码为 URL-safe 字符串。写入前在所有目标数据源检查唯一性；极低概率碰撞时重新生成。Token 只在受 `ROOT` 保护的 VO 中完整返回，不写入 `toString` 日志、异常消息或审计载荷。
 
-发号业务按所有当前数据源聚合展示，不提供数据源切换维护。创建请求只包含 `bizType`、`step`、`delta` 和幂等键；`delta` 默认为 `10`，服务端覆盖 `begin_id=0`、`max_id=0`、`version=0` 和服务端时间，并按数据源注册表中的持久化顺序号自动设置只读 `remainder`。创建前要求所有数据源健康、目标业务均不存在且最大顺序号小于 `delta`，随后逐库创建；失败时精确补偿本次新增记录。创建完成后不提供更新和停用入口。删除业务时先聚合检查全部已配置数据源，要求每个数据源都存在且 `max_id=0`；实际删除使用 `DELETE ... WHERE biz_type=? AND max_id=0` 并校验每库影响一行，以避免检查后首次发号造成竞态。服务保存业务和授权快照，逐库删除业务及该 `biz_type` 的全部授权，部分失败时恢复已删除快照，只有全部成功后才刷新 Token 缓存。
+发号业务按所有当前数据源聚合展示，不提供数据源切换维护。创建请求只包含 `bizType`、`step`、`delta` 和幂等键；`delta` 默认为 `10`，服务端覆盖 `begin_id=0`、`max_id=0`、`version=0` 和服务端时间，并按物理数据源在管理 `JdbcTemplate` 列表中的下标自动设置只读 `remainder`。创建前要求所有数据源健康、目标业务均不存在且最大列表下标小于 `delta`，随后逐库创建；失败时精确补偿本次新增记录。创建完成后不提供更新和停用入口。删除业务时先聚合检查全部已配置数据源，要求每个数据源都存在且 `max_id=0`；实际删除使用 `DELETE ... WHERE biz_type=? AND max_id=0` 并校验每库影响一行，以避免检查后首次发号造成竞态。服务保存业务和授权快照，逐库删除业务及该 `biz_type` 的全部授权，部分失败时恢复已删除快照，只有全部成功后才刷新 Token 缓存。
 
-管理端查询同一 `biz_type` 在各数据源的摘要，以“完整”或“冲突”展示跨库一致性：所有当前数据源均存在、`step/delta` 一致且 `remainder` 与各自持久化顺序号一致时为完整；任一数据源缺失、参数不一致、余数重复或余数与持久化顺序不符时为冲突。创建业务为全库操作，不产生正常的“配置中”状态。
+管理端查询同一 `biz_type` 在各数据源的摘要，以“完整”或“冲突”展示跨库一致性：所有当前数据源均存在、`step/delta` 一致且 `remainder` 与当前管理 `JdbcTemplate` 列表下标一致时为完整；任一数据源缺失、参数不一致、余数重复或余数与列表下标不符时为冲突。创建业务为全库操作，不产生正常的“配置中”状态。
 
-多数据库访问由显式的数据源注册表完成，不通过当前随机路由选择器执行管理操作。命名为 `master` 的数据源作为管理数据源，保存数据源顺序和幂等请求记录。发号业务与 Token 授权作为全局配置写入全部业务数据源：Service 先执行连接、表结构、业务存在性、顺序容量和重复授权预检，再逐库提交；任一写入失败时，仅补偿删除本次操作新插入且尚未对调用方报告成功的记录。若补偿失败，返回专用一致性错误、禁止刷新内存缓存并等待运维修复后重试。所有创建接口使用全局幂等请求键防止客户端重试制造重复记录。
+多数据库定义沿用原有 `DataSourceConfig`：Spring 注入全部 `DruidDataSource`，`DynamicDataSource` 继续随机选择一个物理库服务发号请求。管理链路额外创建一个按相同顺序排列、命名限定的 `List<JdbcTemplate>`，管理 DAO 直接循环该列表读写全部物理库，不经过随机路由数据源，也不引入数据源注册表、持久化顺序表、启动补齐器或逐库 Flyway 启动编排器。列表中的第一个 `master` 数据源保存幂等请求和审计记录。Service 先执行连接、表结构、业务存在性、列表容量和重复授权预检，再逐库提交；任一写入失败时，仅补偿本次操作实际变更的记录。若补偿失败，返回专用一致性错误、禁止刷新内存缓存并等待运维修复后重试。所有创建接口使用全局幂等请求键防止客户端重试制造重复记录。
 
 现有 Token 缓存改为实例级、不可变快照并用原子引用替换。定时刷新和管理变更后的即时刷新复用同一加载逻辑；加载失败保留上一份完整快照，不发布半成品。删除应用成功后必须先在当前实例原子移除指定 Token；不增加 Redis 依赖、发布订阅主题或其他跨实例通知，其他实例通过既有定时刷新或进程重启重新加载后收敛。多数据源读取取授权并集，但发现同一 Token 的 `remark` 不一致或同一业务配置不一致时记录不含 Token 原文的一致性告警。
 
@@ -65,9 +66,9 @@ TinyID 数据库增量迁移：
 
 - 所有配置为业务数据源的 TinyID 数据库都为 `tiny_id_token` 增加唯一索引 `uk_tiny_id_token_token_biz_type(token, biz_type)`；迁移前先检测重复组合，存在重复时失败而不是静默删数据。
 - `master` 数据源新增 `tiny_id_management_request`，以数据源键与 `idempotency_key` 的唯一组合、操作类型、资源类型、资源标识、执行状态和时间保存创建请求结果；不重复保存完整 Token。
-- `master` 数据源保存稳定的数据源顺序；已有顺序只追加不重排，移除实例留下的顺序号不复用。
 - `master` 数据源使用 `tiny_id_audit_log` 保存 Starter 标准事件的必要脱敏字段，不保存请求正文、响应正文、Authorization Header 或原始 Token。
 - 不改变 `tiny_id_info` 和 `tiny_id_token` 的现有列语义，不回写已有 `begin_id`、`max_id`、Token 或 remark。
+- 公共 TinyID 增量 SQL 由部署流程按既有方式应用到每个物理数据库；服务启动不负责发现、迁移或补齐新增数据库。
 
 System 数据库增量迁移：
 
@@ -87,7 +88,7 @@ System 数据库增量迁移：
 - `GET /api/v1/admin/businesses`：分页查询聚合后的发号业务。
 - `GET /api/v1/admin/businesses/{bizType}`：查询该业务在所有数据源中的只读配置与当前进度。
 - `GET /api/v1/admin/businesses/{bizType}/consistency`：查询该业务在所有可管理数据源中的存在性、`delta/remainder` 摘要和一致性状态。
-- `POST /api/v1/admin/businesses`：提交 `bizType`、`step`、`delta` 和 `idempotencyKey`，在全部当前数据源创建业务，`remainder` 由服务端按稳定顺序自动配置。
+- `POST /api/v1/admin/businesses`：提交 `bizType`、`step`、`delta` 和 `idempotencyKey`，在全部当前数据源创建业务，`remainder` 由服务端按当前管理 `JdbcTemplate` 列表下标自动配置。
 - `DELETE /api/v1/admin/businesses/{bizType}`：仅当全部已配置数据源均存在该业务且 `max_id=0` 时，跨库删除业务和对应授权。
 - `GET /api/v1/admin/data-sources`：仅返回可管理的数据源键和健康状态，不返回 JDBC URL、用户名或密码。
 - `GET /api/v1/admin/audit-logs`：分页查询由 Starter 标准事件持久化的 TinyID 管理审计记录。
@@ -106,8 +107,9 @@ Gateway 增加 `Path=/tinyid/api/v1/admin/**`、`lb://macula-cloud-tinyid` 路�
 ## Flagged concerns
 - 现有 `RequestFilter` 会记录包括 Token 在内的全部请求参数，直接违反已接受的敏感数据约束；管理功能合并前必须完成脱敏并用测试证明日志不含 Token，blocking
 - 应用和业务删除跨多个独立数据库执行，没有分布式事务；实现必须保存恢复快照、使用业务 `max_id=0` 条件删除防止与首次发号竞态，并在部分失败时补偿，Reviewer 必须核对失败边界和恢复证明，blocking
-- 当前 `DynamicDataSource` 为每次发号随机选择数据源；本规格要求管理写入对全部当前数据源执行预检、逐库提交和精确补偿，并使用持久化顺序生成不可复用的 remainder。跨库写入仍不能提供严格分布式原子性，Reviewer 必须核对补偿只影响本次新增记录，blocking
-- 当前 Flyway 只明确迁移 `master` 数据源，多数据库场景下每个业务数据源如何执行同一 TinyID 增量迁移尚无现成机制；Build 计划必须落实可重复的逐数据源迁移与失败报告，不能只迁移 `master`，blocking
+- 当前 `DynamicDataSource` 为每次发号随机选择数据源；管理写入改为循环独立的 `List<JdbcTemplate>`，不能误把随机路由数据源加入管理列表而造成重复或漏写。跨库写入仍不能提供严格分布式原子性，Reviewer 必须核对列表来源和补偿只影响本次实际变更的记录，blocking
+- `remainder` 改为依赖当前物理数据源列表下标且不再持久化数据源顺序；运维若重排、删除或在中间插入数据源，会使既有业务的 remainder 与实例身份错位并产生重复 ID 风险。必须接受“配置顺序稳定、扩容只在末尾追加”作为部署硬约束，blocking
+- TinyID 服务不再自动对每个物理库执行 Flyway 或补齐历史业务；部署流程必须确保所有物理库在启动前应用相同公共迁移，并在扩容库投入随机发号前完成历史业务和授权初始化，blocking
 - 参考 System 的 `@Async + @EventListener` 后，审计是异步尽力落库：审计数据库故障不会使已完成的管理操作回滚，认证或方法调用前被拒绝的请求也可能不会产生 `OperLogEvent`。这是复用平台现有审计机制的既有语义，需要 Reviewer 明确认可其与 intent 中“所有管理操作都需要审计”的边界，blocking
 - 不使用跨实例 Token 失效传播后，其他 TinyID 实例在既有定时刷新成功或进程重启前可能继续接受已删除应用的旧 Token；这是工程师明确接受的最终一致性窗口，README 和验证报告必须准确披露，non-blocking
 - `tiny_id_token` 需要以明文保存 Token，才能兼容现有等值校验和“超级管理员始终可查看完整 Token”的要求；本次不引入可逆加密或密钥托管，数据库访问控制仍是敏感数据保护边界，non-blocking
@@ -118,7 +120,7 @@ Gateway 增加 `Path=/tinyid/api/v1/admin/**`、`lb://macula-cloud-tinyid` 路�
 
 双实例缓存测试验证处理管理请求的实例立即生效，未收到跨实例通知的另一实例可暂时保留旧授权，并在定时刷新或重启加载后收敛；依赖检查证明未为此功能新增 Redis 发布订阅机制。
 
-DAO 与数据库集成测试使用 MySQL 验证应用聚合查询、唯一索引、全库查询和创建业务、稳定顺序生成 remainder、delta 容量校验、remark 全行更新、授权新增、应用全库删除、业务 `max_id=0` 条件删除、业务授权清理和迁移对既有数据的兼容；多数据源测试至少覆盖中间实例移除后顺序不复用、最大顺序号达到 delta 时拒绝、完整/冲突状态、Token 全库同步成功、第二库写入或删除失败且精确补偿成功、补偿失败等路径。
+DAO 与数据库集成测试使用 MySQL 验证管理 `JdbcTemplate` 列表不包含随机路由数据源、应用聚合查询、唯一索引、全库查询和创建业务、列表下标生成 remainder、delta 容量校验、remark 全行更新、授权新增、应用全库删除、业务 `max_id=0` 条件删除、业务授权清理和迁移对既有数据的兼容；多数据源测试至少覆盖配置顺序稳定、末尾追加实例、下标达到 delta 时拒绝、完整/冲突状态、Token 全库同步成功、第二库写入或删除失败且精确补偿成功、补偿失败等路径。
 
 安全测试验证现有发号接口仍可通过 TinyID 直连地址匿名携带 TinyID Token 调用，Gateway 不暴露 `/tinyid/api/v1/id/**`；管理接口匿名返回 401、非 ROOT 返回 403、ROOT 成功，且 TinyID 直连不能绕过 ROOT 校验。日志和审计事件测试使用哨兵 Token，断言应用日志、`OperLogEvent` 和 `tiny_id_audit_log` 均不包含该值；验证 TinyID 不再注册自建审计 Filter，审计查询 API 仅 ROOT 可访问。
 
