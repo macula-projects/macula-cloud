@@ -47,6 +47,6 @@ Tests run: 7, Failures: 0, Errors: 0, Skipped: 0
 
 ## 提交范围
 
-分支：`feat/tinyid-application-management`。仅提交 TinyID 功能及相关 Gateway、System、管理端和 SDLC 材料；排除 `macula-cloud-admin/.env` 与生成产物。提交使用工作树最终内容，包含新增 Mapper、迁移和集成测试，并移除已废弃的 DAO 中间文件。
+分支：`feat/tinyid-application-management`。提交 TinyID 功能及相关 Gateway、System、管理端和 SDLC 材料，并包含 `macula-cloud-admin/.env` 中 OAuth scope 字符串加引号的修正；不包含生成产物。该配置修正已经通过 Vite loadEnv 验证，解析后的 scope 保持不变。提交使用工作树最终内容，包含新增 Mapper、迁移和集成测试，并移除已废弃的 DAO 中间文件。
 
 状态：本地 PR 草稿，尚未创建远端 PR、推送或合并；等待人工审阅。
