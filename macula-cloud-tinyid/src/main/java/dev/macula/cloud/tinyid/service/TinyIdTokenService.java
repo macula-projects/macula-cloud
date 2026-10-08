@@ -17,8 +17,13 @@
 
 package dev.macula.cloud.tinyid.service;
 
+import java.util.Collection;
+
 /**
- * @author du_imba
+ * Validates application access to TinyID businesses and refreshes the authorization snapshot.
+ *
+ * @author Rain
+ * @since 6.1.0
  */
 public interface TinyIdTokenService {
     /**
@@ -29,4 +34,31 @@ public interface TinyIdTokenService {
      * @return boolean 权限
      */
     boolean canVisit(String bizType, String token);
+
+    /**
+     * Immediately rebuilds the immutable authorization cache.
+     */
+    void refreshCache();
+
+    /**
+     * Atomically replaces one application's authorization set in the current instance.
+     *
+     * @param token application token
+     * @param bizTypes complete authorized business set
+     */
+    void replaceAuthorizations(String token, Collection<String> bizTypes);
+
+    /**
+     * Atomically removes an application from the current instance.
+     *
+     * @param token application token
+     */
+    void removeToken(String token);
+
+    /**
+     * Atomically removes one business authorization from every application in the current instance.
+     *
+     * @param bizType deleted business type
+     */
+    void removeBusiness(String bizType);
 }

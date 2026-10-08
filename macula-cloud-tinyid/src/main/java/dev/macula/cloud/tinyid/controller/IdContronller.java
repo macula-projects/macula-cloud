@@ -23,10 +23,10 @@ import dev.macula.boot.starter.tinyid.base.factory.IdGeneratorFactory;
 import dev.macula.boot.starter.tinyid.base.generator.IdGenerator;
 import dev.macula.boot.starter.tinyid.base.service.SegmentIdService;
 import dev.macula.cloud.tinyid.service.TinyIdTokenService;
-import dev.macula.cloud.tinyid.vo.ErrorCode;
+import dev.macula.cloud.tinyid.pojo.vo.ErrorCode;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -34,22 +34,36 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 /**
- * @author du_imba
+ * 提供高可靠直连的 TinyID 发号接口，并校验业务类型与应用 Token 的授权关系。
+ *
+ * @author Rain
+ * @since 6.1.0
  */
 @RestController
 @RequestMapping("/api/v1/id/")
+@RequiredArgsConstructor
 public class IdContronller {
 
+    /** 日志记录器。 */
     private static final Logger logger = LoggerFactory.getLogger(IdContronller.class);
-    @Autowired
-    private IdGeneratorFactory idGeneratorFactory;
-    @Autowired
-    private SegmentIdService segmentIdService;
-    @Autowired
-    private TinyIdTokenService tinyIdTokenService;
+
+    /** ID 生成器工厂。 */
+    private final IdGeneratorFactory idGeneratorFactory;
+    /** 号段申请服务。 */
+    private final SegmentIdService segmentIdService;
+    /** Token 与业务授权校验服务。 */
+    private final TinyIdTokenService tinyIdTokenService;
+
+    /** 单次发号允许返回的最大 ID 数量。 */
     @Value("${macula.tinyid.batch-size-max:100}")
     private Integer batchSizeMax;
 
+    /**
+     * 将请求批量大小规范到 1 至系统上限之间。
+     *
+     * @param batchSize 客户端请求的批量大小
+     * @return 实际使用的批量大小
+     */
     private Integer checkBatchSize(Integer batchSize) {
         if (batchSize == null) {
             batchSize = 1;
@@ -60,9 +74,17 @@ public class IdContronller {
         return batchSize;
     }
 
+    /**
+     * 批量获取 ID，并使用统一结果对象返回。
+     *
+     * @param bizType 业务类型
+     * @param batchSize 请求的 ID 数量
+     * @param token 应用接入 Token
+     * @return ID 列表结果
+     */
     @RequestMapping("nextId")
     public Result<List<Long>> nextId(String bizType, Integer batchSize, String token) {
-        Result<List<Long>> response = new Result<>();
+        Result<List<Long>> response;
         Integer newBatchSize = checkBatchSize(batchSize);
         if (!tinyIdTokenService.canVisit(bizType, token)) {
             return Result.failed(ErrorCode.TOKEN_ERR);
@@ -78,6 +100,14 @@ public class IdContronller {
         return response;
     }
 
+    /**
+     * 批量获取 ID，并以逗号分隔文本返回。
+     *
+     * @param bizType 业务类型
+     * @param batchSize 请求的 ID 数量
+     * @param token 应用接入 Token
+     * @return 逗号分隔的 ID；授权或发号失败时返回空字符串
+     */
     @RequestMapping("nextIdSimple")
     public String nextIdSimple(String bizType, Integer batchSize, String token) {
         Integer newBatchSize = checkBatchSize(batchSize);
@@ -104,6 +134,13 @@ public class IdContronller {
         return response;
     }
 
+    /**
+     * 获取下一个号段，并使用统一结果对象返回。
+     *
+     * @param bizType 业务类型
+     * @param token 应用接入 Token
+     * @return 号段结果
+     */
     @RequestMapping("nextSegmentId")
     public Result<SegmentId> nextSegmentId(String bizType, String token) {
         Result<SegmentId> response = new Result<>();
@@ -120,6 +157,13 @@ public class IdContronller {
         return response;
     }
 
+    /**
+     * 获取下一个号段，并以逗号分隔文本返回。
+     *
+     * @param bizType 业务类型
+     * @param token 应用接入 Token
+     * @return 号段字段文本；授权或发号失败时返回空字符串
+     */
     @RequestMapping("nextSegmentIdSimple")
     public String nextSegmentIdSimple(String bizType, String token) {
         if (!tinyIdTokenService.canVisit(bizType, token)) {
