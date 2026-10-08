@@ -40,6 +40,7 @@ Status: accepted
 - `mvn -pl macula-cloud-tinyid -am test -Plocal` 证明模块编译和单元测试通过；外部 MySQL 集成测试明确报告运行条件和跳过情况。`git diff --check` 证明补丁格式正确。
 
 ## Deviations
+- 2026-10-08：按工程师要求，在 BusinessPanel 增加配置规则、完整/冲突/待补齐说明、状态提示及各库 step/delta/配置存在性展示；BusinessCreateDialog 补充容量约束与扩容示例。文案以 businessStatus 实际判定为准，不修改后端校验；运行现有 TinyID 前端测试与生产构建。
 - 2026-10-08：工程师要求 System 也合并迁移为 V1，并自行清理数据库。将 System V2–V4 的 ID 管理菜单、菜单挂载调整及删除权限 SQL 按原执行顺序并入 V1，删除三个增量文件，更新 System README。验证执行 System 及 API 依赖 clean package，核对最终 JAR 仅含 V1；不执行实际数据库清理。
 - 2026-10-08：按工程师要求，将 Flyway YAML 配置从公共段移入 local profile；docker 继承 local，共享环境继续由配置中心提供配置。
 - 2026-10-08：工程师明确要求 Flyway 使用 DynamicDataSource 并将全部 TinyID SQL 重建为唯一 V1，数据库由工程师重置，替代此前保留历史迁移的约束。修改 DataSourceConfig、application.yml、README、集成测试和 SQL；通过 @FlywayDataSource 选择路由数据源，迁移策略按 sequence 固定路由逐库 migrate，避免随机连接分散到不同库。删除 V2–V7，仅合并仍使用的表与索引；保留 V1 既有示例。关闭自动 baseline，验证双 MySQL 的 V1 迁移及重复启动；运行 clean package 防止旧脚本残留制品。此次变更不重置任何实际数据库。

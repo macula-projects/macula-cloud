@@ -10,9 +10,10 @@
 			</el-form-item>
 			<el-form-item label="delta" prop="delta">
 				<el-input-number v-model="form.delta" :min="1" :max="2147483647" />
-				<span class="hint">预留的数据库实例容量，默认 10</span>
+				<span class="hint">预留数据库实例容量，默认 10，不得小于当前数据源数量</span>
 			</el-form-item>
 		</el-form>
+		<p class="rule-example">例如 3 个数据库、delta=10，系统自动分配 remainder=0、1、2；以后扩容只能追加顺序号，最多支持 10 个数据库。begin_id、max_id 自动初始化为 0。</p>
 		<template #footer>
 			<el-button @click="visible = false">取消</el-button>
 			<el-button type="primary" :loading="saving" @click="submit">在全部数据源创建</el-button>
@@ -60,4 +61,5 @@ defineExpose({open})
 <style scoped>
 .el-alert { margin-bottom: 16px; }
 .hint { margin-left: 10px; color: var(--el-text-color-secondary); }
+.rule-example { color: var(--el-text-color-secondary); line-height: 1.6; }
 </style>
