@@ -1,6 +1,14 @@
 # Spec: TinyID 接入应用管理 (from intent.md 2026-10-03)
 Status: accepted
 
+## 2026-10-08 工程师确认的迁移调整
+本节覆盖下文此前关于保留历史 SQL、部署流程逐库迁移的描述：TinyID Flyway 使用
+`@FlywayDataSource DynamicDataSource`，不另建连接，按 sequence 固定路由逐库执行迁移。
+全部 TinyID 迁移重建为唯一 V1，包含现用业务表、授权表及唯一索引、审计表，保留原 V1 示例；
+删除废弃管理请求表及顺序表的迁移。工程师负责重置数据库及 Flyway 历史，本次不兼容旧迁移历史直接升级。
+关闭自动 baseline；任一物理库迁移失败终止启动。业务数据补齐仍由部署负责，审计仍仅写 sequence=0。
+验证须覆盖动态路由下两库迁移及重复执行，并确认打包制品只包含 V1。
+
 ## Source intent
 [已接受的 TinyID 接入应用管理 intent](./intent.md)：为平台超级管理员提供 TinyID 应用、业务发号配置、授权关系与审计管理能力，同时保持现有发号协议兼容。
 

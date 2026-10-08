@@ -40,6 +40,9 @@ Status: accepted
 - `mvn -pl macula-cloud-tinyid -am test -Plocal` 证明模块编译和单元测试通过；外部 MySQL 集成测试明确报告运行条件和跳过情况。`git diff --check` 证明补丁格式正确。
 
 ## Deviations
+- 2026-10-08：工程师要求 System 也合并迁移为 V1，并自行清理数据库。将 System V2–V4 的 ID 管理菜单、菜单挂载调整及删除权限 SQL 按原执行顺序并入 V1，删除三个增量文件，更新 System README。验证执行 System 及 API 依赖 clean package，核对最终 JAR 仅含 V1；不执行实际数据库清理。
+- 2026-10-08：按工程师要求，将 Flyway YAML 配置从公共段移入 local profile；docker 继承 local，共享环境继续由配置中心提供配置。
+- 2026-10-08：工程师明确要求 Flyway 使用 DynamicDataSource 并将全部 TinyID SQL 重建为唯一 V1，数据库由工程师重置，替代此前保留历史迁移的约束。修改 DataSourceConfig、application.yml、README、集成测试和 SQL；通过 @FlywayDataSource 选择路由数据源，迁移策略按 sequence 固定路由逐库 migrate，避免随机连接分散到不同库。删除 V2–V7，仅合并仍使用的表与索引；保留 V1 既有示例。关闭自动 baseline，验证双 MySQL 的 V1 迁移及重复启动；运行 clean package 防止旧脚本残留制品。此次变更不重置任何实际数据库。
 - 2026-10-07：工程师进一步明确 `master` 只是物理数据源列表中的普通成员，不应在配置阶段单独提取并强制放到首位。实现改为完全保持 Spring `List<DataSource>` 注入顺序；计划中“master 固定首位”的描述由本偏差取代。聚合查询和审计仍使用列表第一个模板，但不绑定数据源名称。验证增加列表顺序保持测试。
 - 2026-10-07：工程师指出 DAO 返回 VO 会让数据访问层依赖接口展示模型。实现新增 `pojo.bo` 查询对象与 `TinyIdManagementConverter`，DAO 仅返回 BO/Entity，Service 使用 MapStruct 将 BO 转换为既有 VO，Controller 与 REST 契约不变；`macula-cloud-tinyid/pom.xml` 因此新增 MapStruct Starter。验证增加 DAO 包不得依赖 `pojo.vo` 的静态扫描，并由 Service 单元测试覆盖真实 Converter。
 - 2026-10-07：工程师要求 DAO 数据访问风格与 `macula-cloud-system` 统一，使用 `macula-boot-starter-mybatis-plus` 替换生产代码中的 `JdbcTemplate` 和 Java SQL 拼接。实现新增 Entity 注解、`BaseMapper`、Mapper XML，并让 `TinyIdInfoDAO`、`TinyIdTokenDAO` 和管理 DAO 统一委托 Mapper；`DynamicDataSource` 在无上下文时继续随机发号，管理 DAO 则按物理列表下标临时固定路由后循环访问。跨库本地事务使用路由数据源事务模板，既有补偿、BO/VO 边界和 REST 契约不变。验证增加生产 DAO 无 `JdbcTemplate`/`java.sql` 引用扫描、显式路由上下文恢复测试及 MyBatis-Plus 编译测试。

@@ -18,6 +18,7 @@ package dev.macula.cloud.tinyid.service.impl;
 
 import com.baomidou.mybatisplus.spring.MybatisSqlSessionFactoryBean;
 import dev.macula.cloud.tinyid.config.DynamicDataSource;
+import dev.macula.cloud.tinyid.config.DataSourceConfig;
 import dev.macula.cloud.tinyid.converter.TinyIdManagementConverter;
 import dev.macula.cloud.tinyid.mapper.TinyIdAuditLogMapper;
 import dev.macula.cloud.tinyid.mapper.TinyIdInfoMapper;
@@ -71,6 +72,29 @@ class TinyIdManagementServiceIntegrationTest {
     /** 第二套隔离 MySQL，模拟物理数据源列表的序号 1。 */
     @Container
     private static final MySQLContainer<?> REPLICA = mysql("tinyid_it_replica");
+
+    /** 验证同一个 Flyway 经动态路由迁移两库，重复执行不重复建表或初始化。 */
+    @Test
+    void migratesBothDatabasesThroughDynamicDatasource() {
+        DataSource first = dataSource(MASTER);
+        DataSource second = dataSource(REPLICA);
+        DynamicDataSource routing = new DynamicDataSource();
+        routing.setDataSourceKeys(List.of("first", "second"));
+        routing.setTargetDataSources(Map.of("first", first, "second", second));
+        routing.afterPropertiesSet();
+        Flyway flyway = Flyway.configure().dataSource(routing).locations("classpath:db/migration").load();
+        var strategy = new DataSourceConfig().tinyIdMigrationStrategy(routing);
+        strategy.migrate(flyway);
+        strategy.migrate(flyway);
+        for (DataSource source : List.of(first, second)) {
+            JdbcTemplate jdbc = new JdbcTemplate(source);
+            assertEquals(1, jdbc.queryForObject(
+                "select count(*) from flyway_schema_history where version='1' and success=1", Integer.class));
+            assertEquals(1, jdbc.queryForObject(
+                "select count(*) from flyway_schema_history where type='SQL'", Integer.class));
+            assertNotNull(jdbc.queryForObject("select count(*) from tiny_id_audit_log", Long.class));
+        }
+    }
 
     /** 验证 MyBatis-Plus Mapper 与 XML 无需连接数据库即可完成装配。 */
     @Test
@@ -354,14 +378,10 @@ class TinyIdManagementServiceIntegrationTest {
     }
 
     private void migrate(DataSource dataSource, boolean master) {
-        String[] locations = master
-            ? new String[] {"classpath:db/migration", "classpath:db/master"}
-            : new String[] {"classpath:db/migration"};
         Flyway.configure()
             .dataSource(dataSource)
-            .locations(locations)
-            .baselineOnMigrate(true)
-            .baselineVersion("1")
+            .locations("classpath:db/migration")
+            .baselineOnMigrate(false)
             .validateOnMigrate(true)
             .cleanDisabled(true)
             .load()

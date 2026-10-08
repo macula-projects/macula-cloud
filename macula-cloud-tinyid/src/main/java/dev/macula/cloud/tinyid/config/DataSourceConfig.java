@@ -20,6 +20,8 @@ package dev.macula.cloud.tinyid.config;
 import com.alibaba.druid.pool.DruidDataSource;
 import com.alibaba.druid.spring.boot4.autoconfigure.DruidDataSourceBuilder;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.flyway.autoconfigure.FlywayDataSource;
+import org.springframework.boot.flyway.autoconfigure.FlywayMigrationStrategy;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
@@ -58,6 +60,7 @@ public class DataSourceConfig {
      */
     @Bean
     @Primary
+    @FlywayDataSource
     public DynamicDataSource getDynamicDataSource(List<DataSource> dataSources) {
         List<DataSource> physicalDataSources = physicalDataSources(dataSources);
         DynamicDataSource routingDataSource = new DynamicDataSource();
@@ -72,6 +75,22 @@ public class DataSourceConfig {
         routingDataSource.setDefaultTargetDataSource(physicalDataSources.get(0));
         routingDataSource.setDataSourceKeys(dataSourceKeys);
         return routingDataSource;
+    }
+
+    /**
+     * 通过动态数据源逐库执行迁移，保证同次迁移的所有连接固定在同一物理库。
+     * 任一库迁移失败时终止启动，避免未初始化的库进入随机发号池。
+     *
+     * @param dataSource 发号与迁移共用的动态数据源
+     * @return 按物理数据源顺序执行的迁移策略
+     */
+    @Bean
+    public FlywayMigrationStrategy tinyIdMigrationStrategy(DynamicDataSource dataSource) {
+        return flyway -> {
+            for (int sequence = 0; sequence < dataSource.size(); sequence++) {
+                dataSource.execute(sequence, () -> { flyway.migrate(); });
+            }
+        };
     }
 
     /**

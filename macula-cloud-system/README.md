@@ -4,6 +4,13 @@
 
 统一的租户、应用、用户、权限等管理
 
+## 数据库初始化
+
+Flyway 迁移统一为 `db/migration/V1__baseline.sql`，包含原有基础数据及“系统管理”下的
+“ID管理”菜单、ROOT 菜单关联和 GET/POST/PUT/DELETE 管理权限。
+本次合并要求由运维先清理数据库及 Flyway 历史，再执行初始化；不支持直接沿用旧版迁移历史升级。
+System 数据库同时供 IAM 使用，清理后相关账号、权限及认证配置需重新初始化。
+
 ## 关于DTO的说明
 
 在使用MVC三层架构时，我们通常将项目分为mapper(dao)、service、controller。
