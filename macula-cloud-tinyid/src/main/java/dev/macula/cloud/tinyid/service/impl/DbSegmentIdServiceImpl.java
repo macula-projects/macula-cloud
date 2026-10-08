@@ -21,8 +21,9 @@ import dev.macula.boot.starter.tinyid.base.entity.SegmentId;
 import dev.macula.boot.starter.tinyid.base.exception.TinyIdSysException;
 import dev.macula.boot.starter.tinyid.base.service.SegmentIdService;
 import dev.macula.cloud.tinyid.common.Constants;
-import dev.macula.cloud.tinyid.dao.TinyIdInfoDAO;
-import dev.macula.cloud.tinyid.dao.entity.TinyIdInfo;
+import dev.macula.cloud.tinyid.mapper.TinyIdInfoMapper;
+import dev.macula.cloud.tinyid.pojo.entity.TinyIdInfo;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -39,18 +40,24 @@ public class DbSegmentIdServiceImpl implements SegmentIdService {
 
     private static final Logger logger = LoggerFactory.getLogger(DbSegmentIdServiceImpl.class);
 
-    private TinyIdInfoDAO tinyIdInfoDAO;
+    /** 发号业务 Mapper。 */
+    private final TinyIdInfoMapper infoMapper;
 
-    public DbSegmentIdServiceImpl(TinyIdInfoDAO tinyIdInfoDAO) {
-        this.tinyIdInfoDAO = tinyIdInfoDAO;
+    /**
+     * 创建数据库号段服务。
+     *
+     * @param infoMapper 发号业务 Mapper
+     */
+    public DbSegmentIdServiceImpl(TinyIdInfoMapper infoMapper) {
+        this.infoMapper = infoMapper;
     }
 
     /**
      * Transactional标记保证query和update使用的是同一连接
      * 事务隔离级别应该为READ_COMMITTED,Spring默认是DEFAULT(取决于底层使用的数据库，mysql的默认隔离级别为REPEATABLE_READ)
      * <p>
-     * 如果是REPEATABLE_READ，那么在本次事务中循环调用tinyIdInfoDAO.queryByBizType(bizType)获取的结果是没有变化的，也就是查询不到别的事务提交的内容
-     * 所以多次调用tinyIdInfoDAO.updateMaxId也就不会成功
+     * 如果是REPEATABLE_READ，那么在本次事务中循环查询 TinyIdInfo 获取的结果不会变化，也就查询不到其他事务提交的内容，
+     * 后续基于旧版本号更新 maxId 将持续失败。
      *
      * @param bizType 业务类型
      * @return SegmentId
@@ -60,13 +67,14 @@ public class DbSegmentIdServiceImpl implements SegmentIdService {
     public SegmentId getNextSegmentId(String bizType) {
         // 获取nextTinyId的时候，有可能存在version冲突，需要重试
         for (int i = 0; i < Constants.RETRY; i++) {
-            TinyIdInfo tinyIdInfo = tinyIdInfoDAO.queryByBizType(bizType);
+            TinyIdInfo tinyIdInfo = infoMapper.selectOne(
+                Wrappers.<TinyIdInfo>lambdaQuery().eq(TinyIdInfo::getBizType, bizType));
             if (tinyIdInfo == null) {
                 throw new TinyIdSysException("can not find biztype:" + bizType);
             }
             Long newMaxId = tinyIdInfo.getMaxId() + tinyIdInfo.getStep();
             Long oldMaxId = tinyIdInfo.getMaxId();
-            int row = tinyIdInfoDAO.updateMaxId(tinyIdInfo.getId(), newMaxId, oldMaxId, tinyIdInfo.getVersion(),
+            int row = infoMapper.updateMaxId(tinyIdInfo.getId(), newMaxId, oldMaxId, tinyIdInfo.getVersion(),
                 tinyIdInfo.getBizType());
             if (row == 1) {
                 tinyIdInfo.setMaxId(newMaxId);
@@ -87,7 +95,7 @@ public class DbSegmentIdServiceImpl implements SegmentIdService {
         segmentId.setRemainder(idInfo.getRemainder() == null ? 0 : idInfo.getRemainder());
         segmentId.setDelta(idInfo.getDelta() == null ? 1 : idInfo.getDelta());
         // 默认20%加载
-        segmentId.setLoadingId(segmentId.getCurrentId().get() + idInfo.getStep() * Constants.LOADING_PERCENT / 100);
+        segmentId.setLoadingId(segmentId.getCurrentId().get() + (long)idInfo.getStep() * Constants.LOADING_PERCENT / 100);
         return segmentId;
     }
 }

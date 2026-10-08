@@ -90,6 +90,7 @@ const DEFAULT_CONFIG = {
     MODEL: {
         system: 'system',
         oss: 'oss',
+        tinyid: 'tinyid',
 
     },
 

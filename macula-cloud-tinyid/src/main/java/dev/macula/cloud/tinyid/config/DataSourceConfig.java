@@ -18,6 +18,7 @@
 package dev.macula.cloud.tinyid.config;
 
 import com.alibaba.druid.pool.DruidDataSource;
+import com.alibaba.druid.spring.boot.autoconfigure.DruidDataSourceBuilder;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -25,46 +26,67 @@ import org.springframework.context.annotation.Primary;
 
 import javax.sql.DataSource;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
- * Configures TinyID's Druid master datasource and dynamic routing datasource.
+ * 配置 TinyID 物理数据源以及发号和管理共用的动态路由数据源。
  *
- * @author du_imba
+ * @author Rain
  * @since 6.1.0
  */
 @Configuration
 public class DataSourceConfig {
 
-    @Bean
+    /**
+     * 创建 TinyID 主数据源。
+     *
+     * @return Druid 主数据源
+     */
+    @Bean("master")
     @ConfigurationProperties(prefix = "spring.datasource.druid.master")
     public DataSource master() {
-        return new DruidDataSource();
+        return DruidDataSourceBuilder.create().build();
     }
 
-    @Bean
+    /**
+     * 创建供发号链路使用的随机路由数据源。
+     *
+     * @param dataSources Spring 容器中的全部数据源
+     * @return 动态路由数据源
+     */
+    @Bean("tinyIdRoutingDataSource")
     @Primary
-    public DataSource getDynamicDataSource(List<DataSource> dataSources) {
+    public DynamicDataSource getDynamicDataSource(List<DataSource> dataSources) {
+        List<DataSource> physicalDataSources = physicalDataSources(dataSources);
         DynamicDataSource routingDataSource = new DynamicDataSource();
-
-        List<String> dataSourceKeys = new ArrayList<>();
-        Map<Object, Object> targetDataSources = new HashMap<>(4);
-
-        // 添加多个数据源
-        for (DataSource dataSource : dataSources) {
-            if (dataSource instanceof DruidDataSource) {
-                String name = ((DruidDataSource)dataSource).getName();
-                targetDataSources.put(name, dataSource);
-                dataSourceKeys.add(name);
-            }
+        List<String> dataSourceKeys = new ArrayList<>(physicalDataSources.size());
+        Map<Object, Object> targetDataSources = new LinkedHashMap<>(physicalDataSources.size());
+        for (int index = 0; index < physicalDataSources.size(); index++) {
+            String key = "tinyid-" + index;
+            dataSourceKeys.add(key);
+            targetDataSources.put(key, physicalDataSources.get(index));
         }
-
         routingDataSource.setTargetDataSources(targetDataSources);
+        routingDataSource.setDefaultTargetDataSource(physicalDataSources.get(0));
         routingDataSource.setDataSourceKeys(dataSourceKeys);
-
         return routingDataSource;
     }
 
+    /**
+     * 按 Spring 注入顺序从数据源集合中提取物理 Druid 数据源。
+     *
+     * @param dataSources Spring 容器中的全部数据源
+     * @return 有序物理数据源列表
+     */
+    static List<DataSource> physicalDataSources(List<DataSource> dataSources) {
+        List<DataSource> physical = dataSources.stream()
+            .filter(dataSource -> dataSource instanceof DruidDataSource)
+            .toList();
+        if (physical.isEmpty()) {
+            throw new IllegalStateException("TinyID requires at least one physical datasource");
+        }
+        return List.copyOf(physical);
+    }
 }

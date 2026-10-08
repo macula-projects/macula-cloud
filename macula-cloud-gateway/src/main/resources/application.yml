@@ -39,6 +39,10 @@ spring:
                 - Path=/system/**
               filters:
                 - StripPrefix=1
+            - id: macula-cloud-tinyid
+              uri: lb://macula-cloud-tinyid
+              predicates:
+                - Path=/tinyid/api/v1/admin/**
 
 macula:
   gateway:
