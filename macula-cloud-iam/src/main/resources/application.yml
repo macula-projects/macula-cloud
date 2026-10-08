@@ -43,7 +43,7 @@ spring:
     activate:
       on-profile: local
     nacos:
-      server-addr: 127.0.0.1:${NACOS_SERVER_PORT:8848}
+      server-addr: 127.0.0.1:${NACOS_SERVER_PORT:18848}
       namespace: ${NACOS_NAMESPACE:MACULA5}
       username: ${NACOS_USERNAME:nacos}
       password: ${NACOS_PASSWORD:nacos}
@@ -51,7 +51,7 @@ spring:
     sentinel:
       enabled: false
   datasource:
-    url: jdbc:mysql://127.0.0.1:${MYSQL_PORT:3306}/macula-system?zeroDateTimeBehavior=convertToNull&useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&autoReconnect=true
+    url: jdbc:mysql://127.0.0.1:${MYSQL_PORT:13306}/macula-system?zeroDateTimeBehavior=convertToNull&useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&autoReconnect=true
     username: ${MYSQL_APP_USER:macula}
     password: ${MYSQL_APP_PASSWORD:macula}
     type: com.alibaba.druid.pool.DruidDataSource
@@ -59,7 +59,7 @@ spring:
   data:
     redis:
       host: 127.0.0.1
-      port: ${REDIS_PORT:6379}
+      port: ${REDIS_PORT:16379}
       database: 0
 
 macula:

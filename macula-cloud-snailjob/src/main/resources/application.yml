@@ -65,13 +65,13 @@ spring:
     activate:
       on-profile: local
     nacos:
-      server-addr: "${NACOS_SERVER_ADDR:127.0.0.1:${NACOS_SERVER_PORT:8848}}"
+      server-addr: 127.0.0.1:${NACOS_SERVER_PORT:18848}
       namespace: ${NACOS_NAMESPACE:MACULA5}
       username: ${NACOS_USERNAME:nacos}
       password: ${NACOS_PASSWORD:nacos}
   datasource:
     ## mysql
-    url: jdbc:mysql://127.0.0.1:${MYSQL_PORT:3306}/macula-snailjob?useSSL=false&allowPublicKeyRetrieval=true&characterEncoding=utf8&useUnicode=true&serverTimezone=Asia/Shanghai
+    url: jdbc:mysql://127.0.0.1:${MYSQL_PORT:13306}/macula-snailjob?useSSL=false&allowPublicKeyRetrieval=true&characterEncoding=utf8&useUnicode=true&serverTimezone=Asia/Shanghai
     username: ${MYSQL_APP_USER:macula}
     password: ${MYSQL_APP_PASSWORD:macula}
     ## postgres

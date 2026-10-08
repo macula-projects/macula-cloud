@@ -16,22 +16,18 @@
  */
 package dev.macula.cloud.tinyid.service.impl;
 
-import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import dev.macula.cloud.tinyid.config.DynamicDataSource;
 import dev.macula.cloud.tinyid.converter.TinyIdManagementConverter;
-import dev.macula.cloud.tinyid.pojo.entity.TinyIdAuditLog;
-import dev.macula.cloud.tinyid.pojo.entity.TinyIdInfo;
-import dev.macula.cloud.tinyid.pojo.entity.TinyIdToken;
 import dev.macula.cloud.tinyid.mapper.TinyIdAuditLogMapper;
 import dev.macula.cloud.tinyid.mapper.TinyIdInfoMapper;
 import dev.macula.cloud.tinyid.mapper.TinyIdTokenMapper;
-import dev.macula.cloud.tinyid.pojo.bo.TinyIdApplicationBO;
-import dev.macula.cloud.tinyid.pojo.bo.TinyIdAuditLogBO;
-import dev.macula.cloud.tinyid.pojo.bo.TinyIdBusinessAggregateBO;
-import dev.macula.cloud.tinyid.pojo.bo.TinyIdBusinessBO;
-import dev.macula.cloud.tinyid.pojo.bo.TinyIdDataSourceBO;
+import dev.macula.cloud.tinyid.pojo.bo.*;
+import dev.macula.cloud.tinyid.pojo.entity.TinyIdAuditLog;
+import dev.macula.cloud.tinyid.pojo.entity.TinyIdInfo;
+import dev.macula.cloud.tinyid.pojo.entity.TinyIdToken;
 import dev.macula.cloud.tinyid.pojo.form.AddApplicationBusinessesForm;
 import dev.macula.cloud.tinyid.pojo.form.CreateApplicationForm;
 import dev.macula.cloud.tinyid.pojo.form.CreateBusinessForm;
@@ -39,31 +35,17 @@ import dev.macula.cloud.tinyid.pojo.form.UpdateApplicationRemarkForm;
 import dev.macula.cloud.tinyid.pojo.query.ApplicationPageQuery;
 import dev.macula.cloud.tinyid.pojo.query.AuditLogPageQuery;
 import dev.macula.cloud.tinyid.pojo.query.BusinessPageQuery;
-import dev.macula.cloud.tinyid.pojo.vo.TinyIdApplicationVO;
-import dev.macula.cloud.tinyid.pojo.vo.TinyIdAuditLogVO;
-import dev.macula.cloud.tinyid.pojo.vo.TinyIdBusinessAggregateVO;
-import dev.macula.cloud.tinyid.pojo.vo.TinyIdBusinessConsistencyVO;
-import dev.macula.cloud.tinyid.pojo.vo.TinyIdDataSourceVO;
+import dev.macula.cloud.tinyid.pojo.vo.*;
 import dev.macula.cloud.tinyid.service.TinyIdManagementService;
 import dev.macula.cloud.tinyid.service.TinyIdTokenService;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.security.SecureRandom;
-import java.util.ArrayList;
-import java.util.Base64;
-import java.util.Collections;
-import java.util.Date;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
-import java.util.TreeSet;
+import java.util.*;
 import java.util.function.BiConsumer;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -102,16 +84,16 @@ public class TinyIdManagementServiceImpl implements TinyIdManagementService {
     /**
      * 创建 TinyID 管理服务。
      *
-     * @param infoMapper 发号业务 Mapper
-     * @param tokenMapper 应用授权 Mapper
-     * @param auditLogMapper 管理审计日志 Mapper
+     * @param infoMapper        发号业务 Mapper
+     * @param tokenMapper       应用授权 Mapper
+     * @param auditLogMapper    管理审计日志 Mapper
      * @param routingDataSource 动态路由数据源
-     * @param tokenService 当前实例的 Token 授权缓存服务
-     * @param converter 管理领域对象转换器
+     * @param tokenService      当前实例的 Token 授权缓存服务
+     * @param converter         管理领域对象转换器
      */
     public TinyIdManagementServiceImpl(TinyIdInfoMapper infoMapper, TinyIdTokenMapper tokenMapper,
-        TinyIdAuditLogMapper auditLogMapper, @Qualifier("tinyIdRoutingDataSource") DynamicDataSource routingDataSource,
-        TinyIdTokenService tokenService, TinyIdManagementConverter converter) {
+        TinyIdAuditLogMapper auditLogMapper, DynamicDataSource routingDataSource, TinyIdTokenService tokenService,
+        TinyIdManagementConverter converter) {
         this.infoMapper = infoMapper;
         this.tokenMapper = tokenMapper;
         this.auditLogMapper = auditLogMapper;
@@ -124,8 +106,7 @@ public class TinyIdManagementServiceImpl implements TinyIdManagementService {
     /** {@inheritDoc} */
     @Override
     public IPage<TinyIdApplicationVO> listApplications(ApplicationPageQuery query) {
-        return converter.toApplicationPage(
-            listApplications(query.getPage(), query.getPageSize(), query.getKeywords()));
+        return converter.toApplicationPage(listApplications(query.getPage(), query.getPageSize(), query.getKeywords()));
     }
 
     /** {@inheritDoc} */
@@ -175,15 +156,15 @@ public class TinyIdManagementServiceImpl implements TinyIdManagementService {
         }
         List<AuthorizationInsert> inserted = List.of();
         try {
-            inserted = addAuthorizationsOnAllDataSources(
-                application.getToken(), application.getRemark(), requestedBizTypes);
+            inserted =
+                addAuthorizationsOnAllDataSources(application.getToken(), application.getRemark(), requestedBizTypes);
             TinyIdApplicationBO updated = getApplicationBO(appId);
             tokenService.replaceAuthorizations(updated.getToken(), updated.getBizTypes());
             return converter.toApplicationVO(updated);
         } catch (RuntimeException ex) {
             List<AuthorizationInsert> actualInserts = inserted;
-            throw compensate(actualInserts.isEmpty()
-                ? null : () -> deleteInsertedAuthorizations(application.getToken(), actualInserts), ex);
+            throw compensate(actualInserts.isEmpty() ? null
+                : () -> deleteInsertedAuthorizations(application.getToken(), actualInserts), ex);
         }
     }
 
@@ -198,8 +179,7 @@ public class TinyIdManagementServiceImpl implements TinyIdManagementService {
     /** {@inheritDoc} */
     @Override
     public IPage<TinyIdBusinessAggregateVO> listBusinesses(BusinessPageQuery query) {
-        return converter.toBusinessPage(
-            listBusinesses(query.getPage(), query.getPageSize(), query.getKeywords()));
+        return converter.toBusinessPage(listBusinesses(query.getPage(), query.getPageSize(), query.getKeywords()));
     }
 
     /** {@inheritDoc} */
@@ -238,9 +218,9 @@ public class TinyIdManagementServiceImpl implements TinyIdManagementService {
         if (business == null) {
             throw new IllegalArgumentException("TinyID business does not exist");
         }
-        boolean deletable = !business.getDataSources().isEmpty() && business.getDataSources().stream()
-            .allMatch(instance -> Boolean.TRUE.equals(instance.getHealthy()) && instance.getId() != null
-                && Objects.equals(instance.getMaxId(), 0L));
+        boolean deletable = !business.getDataSources().isEmpty() && business.getDataSources().stream().allMatch(
+            instance -> Boolean.TRUE.equals(instance.getHealthy()) && instance.getId() != null && Objects.equals(
+                instance.getMaxId(), 0L));
         if (!deletable) {
             throw new IllegalStateException(
                 "TinyID business can only be deleted when max_id is zero on every datasource");
@@ -269,8 +249,7 @@ public class TinyIdManagementServiceImpl implements TinyIdManagementService {
     /** {@inheritDoc} */
     @Override
     public IPage<TinyIdAuditLogVO> listAuditLogs(AuditLogPageQuery query) {
-        return converter.toAuditLogPage(
-            listAuditLogs(query.getPage(), query.getPageSize(), query.getOperator()));
+        return converter.toAuditLogPage(listAuditLogs(query.getPage(), query.getPageSize(), query.getOperator()));
     }
 
     /**
@@ -304,7 +283,7 @@ public class TinyIdManagementServiceImpl implements TinyIdManagementService {
      * 执行跨数据源写入补偿。
      *
      * @param compensation 可为空的补偿动作
-     * @param cause 原始异常
+     * @param cause        原始异常
      * @return 应向上抛出的异常，补偿失败时以补偿异常为主
      */
     private RuntimeException compensate(Runnable compensation, RuntimeException cause) {
@@ -336,8 +315,8 @@ public class TinyIdManagementServiceImpl implements TinyIdManagementService {
 
     /** 分页查询接入应用领域对象。 */
     IPage<TinyIdApplicationBO> listApplications(int page, int pageSize, String keywords) {
-        Page<TinyIdApplicationBO> result = primary(() -> tokenMapper.selectApplicationPage(
-            new Page<>(page, pageSize), keywords));
+        Page<TinyIdApplicationBO> result =
+            primary(() -> tokenMapper.selectApplicationPage(new Page<>(page, pageSize), keywords));
         result.getRecords().forEach(application -> application.setBizTypes(loadBizTypes(application.getToken())));
         return result;
     }
@@ -391,7 +370,8 @@ public class TinyIdManagementServiceImpl implements TinyIdManagementService {
             for (String key : dataSourceKeys()) {
                 List<TinyIdToken> authorizations = findTokensByToken(key, token);
                 if (authorizations.isEmpty()) {
-                    throw new IllegalStateException("Application authorization is inconsistent across TinyID datasources");
+                    throw new IllegalStateException(
+                        "Application authorization is inconsistent across TinyID datasources");
                 }
                 previous.put(key, authorizations.get(0).getRemark());
                 updateRemark(key, token, remark);
@@ -412,8 +392,7 @@ public class TinyIdManagementServiceImpl implements TinyIdManagementService {
     }
 
     /** 在全部数据源追加应用授权。 */
-    List<AuthorizationInsert> addAuthorizationsOnAllDataSources(String token, String remark,
-        List<String> bizTypes) {
+    List<AuthorizationInsert> addAuthorizationsOnAllDataSources(String token, String remark, List<String> bizTypes) {
         for (String key : dataSourceKeys()) {
             if (tokenCount(key, token, null) == 0) {
                 throw new IllegalStateException("Application authorization is inconsistent across TinyID datasources");
@@ -449,11 +428,10 @@ public class TinyIdManagementServiceImpl implements TinyIdManagementService {
     /** 分页查询聚合后的发号业务领域对象。 */
     IPage<TinyIdBusinessAggregateBO> listBusinesses(int page, int pageSize, String keywords) {
         List<String> businessTypes = findBusinessTypes(keywords);
-        int fromIndex = Math.toIntExact(Math.min((long) (page - 1) * pageSize, businessTypes.size()));
+        int fromIndex = Math.toIntExact(Math.min((long)(page - 1) * pageSize, businessTypes.size()));
         int toIndex = Math.min(fromIndex + pageSize, businessTypes.size());
         Page<TinyIdBusinessAggregateBO> result = new Page<>(page, pageSize, businessTypes.size());
-        result.setRecords(businessTypes.subList(fromIndex, toIndex).stream()
-            .map(this::aggregateBusiness).toList());
+        result.setRecords(businessTypes.subList(fromIndex, toIndex).stream().map(this::aggregateBusiness).toList());
         return result;
     }
 
@@ -466,11 +444,9 @@ public class TinyIdManagementServiceImpl implements TinyIdManagementService {
     private List<String> findBusinessTypes(String keywords) {
         TreeSet<String> businessTypes = new TreeSet<>();
         for (String key : dataSourceKeys()) {
-            List<TinyIdInfo> businesses = on(key, () -> infoMapper.selectList(
-                Wrappers.<TinyIdInfo>lambdaQuery()
-                    .like(keywords != null && !keywords.isBlank(), TinyIdInfo::getBizType,
-                        keywords == null ? null : keywords.trim())
-                    .select(TinyIdInfo::getBizType)));
+            List<TinyIdInfo> businesses = on(key, () -> infoMapper.selectList(Wrappers.<TinyIdInfo>lambdaQuery()
+                .like(keywords != null && !keywords.isBlank(), TinyIdInfo::getBizType,
+                    keywords == null ? null : keywords.trim()).select(TinyIdInfo::getBizType)));
             businesses.stream().map(TinyIdInfo::getBizType).forEach(businessTypes::add);
         }
         return List.copyOf(businessTypes);
@@ -532,8 +508,8 @@ public class TinyIdManagementServiceImpl implements TinyIdManagementService {
 
     /** 删除指定数据源中的发号业务。 */
     void deleteBusiness(String dataSourceKey, String bizType) {
-        on(dataSourceKey, () -> infoMapper.delete(
-            Wrappers.<TinyIdInfo>lambdaQuery().eq(TinyIdInfo::getBizType, bizType)));
+        on(dataSourceKey,
+            () -> infoMapper.delete(Wrappers.<TinyIdInfo>lambdaQuery().eq(TinyIdInfo::getBizType, bizType)));
     }
 
     /** 删除全部数据源中的接入应用。 */
@@ -548,8 +524,8 @@ public class TinyIdManagementServiceImpl implements TinyIdManagementService {
         List<String> completed = new ArrayList<>();
         try {
             for (String key : dataSourceKeys()) {
-                inTransaction(key, () -> tokenMapper.delete(
-                    Wrappers.<TinyIdToken>lambdaQuery().eq(TinyIdToken::getToken, token)));
+                inTransaction(key,
+                    () -> tokenMapper.delete(Wrappers.<TinyIdToken>lambdaQuery().eq(TinyIdToken::getToken, token)));
                 completed.add(key);
             }
         } catch (RuntimeException ex) {
@@ -583,8 +559,9 @@ public class TinyIdManagementServiceImpl implements TinyIdManagementService {
         try {
             for (String key : dataSourceKeys()) {
                 inTransaction(key, () -> {
-                    int deleted = infoMapper.delete(Wrappers.<TinyIdInfo>lambdaQuery()
-                        .eq(TinyIdInfo::getBizType, bizType).eq(TinyIdInfo::getMaxId, 0L));
+                    int deleted = infoMapper.delete(
+                        Wrappers.<TinyIdInfo>lambdaQuery().eq(TinyIdInfo::getBizType, bizType)
+                            .eq(TinyIdInfo::getMaxId, 0L));
                     if (deleted != 1) {
                         throw new IllegalStateException(
                             "TinyID business can only be deleted when max_id is zero on every datasource");
@@ -616,8 +593,7 @@ public class TinyIdManagementServiceImpl implements TinyIdManagementService {
         Page<TinyIdAuditLog> result = primary(() -> auditLogMapper.selectPage(new Page<>(page, pageSize),
             Wrappers.<TinyIdAuditLog>lambdaQuery()
                 .like(operator != null && !operator.isBlank(), TinyIdAuditLog::getOperator,
-                    operator == null ? null : operator.trim())
-                .orderByDesc(TinyIdAuditLog::getId)));
+                    operator == null ? null : operator.trim()).orderByDesc(TinyIdAuditLog::getId)));
         return result.convert(this::toAuditLogBO);
     }
 
@@ -642,18 +618,17 @@ public class TinyIdManagementServiceImpl implements TinyIdManagementService {
      * @return 已排序的业务类型列表
      */
     private List<String> loadBizTypes(String token) {
-        return primary(() -> tokenMapper.selectList(Wrappers.<TinyIdToken>lambdaQuery()
-                .eq(TinyIdToken::getToken, token).orderByAsc(TinyIdToken::getBizType)
-                .select(TinyIdToken::getBizType)))
-            .stream().map(TinyIdToken::getBizType).toList();
+        return primary(() -> tokenMapper.selectList(
+            Wrappers.<TinyIdToken>lambdaQuery().eq(TinyIdToken::getToken, token).orderByAsc(TinyIdToken::getBizType)
+                .select(TinyIdToken::getBizType))).stream().map(TinyIdToken::getBizType).toList();
     }
 
     /**
      * 创建应用授权实体。
      *
-     * @param token 应用接入 Token
+     * @param token   应用接入 Token
      * @param bizType 业务类型
-     * @param remark 应用备注
+     * @param remark  应用备注
      * @return 新授权实体
      */
     private TinyIdToken newToken(String token, String bizType, String remark) {
@@ -670,9 +645,9 @@ public class TinyIdManagementServiceImpl implements TinyIdManagementService {
     /**
      * 创建发号业务实体。
      *
-     * @param bizType 业务类型
-     * @param step 号段步长
-     * @param delta 多数据库预留实例数
+     * @param bizType   业务类型
+     * @param step      号段步长
+     * @param delta     多数据库预留实例数
      * @param remainder 当前数据源余数
      * @return 新发号业务实体
      */
@@ -694,70 +669,67 @@ public class TinyIdManagementServiceImpl implements TinyIdManagementService {
     /**
      * 查询指定数据源上的业务记录数。
      *
-     * @param key 数据源展示标识
+     * @param key     数据源展示标识
      * @param bizType 业务类型
      * @return 业务记录数
      */
     private long businessCount(String key, String bizType) {
-        return on(key, () -> infoMapper.selectCount(
-            Wrappers.<TinyIdInfo>lambdaQuery().eq(TinyIdInfo::getBizType, bizType)));
+        return on(key,
+            () -> infoMapper.selectCount(Wrappers.<TinyIdInfo>lambdaQuery().eq(TinyIdInfo::getBizType, bizType)));
     }
 
     /**
      * 查询指定数据源上的授权记录数。
      *
-     * @param key 数据源展示标识
-     * @param token 应用接入 Token
+     * @param key     数据源展示标识
+     * @param token   应用接入 Token
      * @param bizType 可为空的业务类型
      * @return 授权记录数
      */
     private long tokenCount(String key, String token, String bizType) {
-        return on(key, () -> tokenMapper.selectCount(Wrappers.<TinyIdToken>lambdaQuery()
-            .eq(TinyIdToken::getToken, token)
-            .eq(bizType != null, TinyIdToken::getBizType, bizType)));
+        return on(key, () -> tokenMapper.selectCount(
+            Wrappers.<TinyIdToken>lambdaQuery().eq(TinyIdToken::getToken, token)
+                .eq(bizType != null, TinyIdToken::getBizType, bizType)));
     }
 
     /**
      * 更新指定数据源中的应用备注。
      *
-     * @param key 数据源展示标识
-     * @param token 应用接入 Token
+     * @param key    数据源展示标识
+     * @param token  应用接入 Token
      * @param remark 新应用备注
      */
     private void updateRemark(String key, String token, String remark) {
-        on(key, () -> tokenMapper.update(null, Wrappers.<TinyIdToken>lambdaUpdate()
-            .set(TinyIdToken::getRemark, remark)
-            .set(TinyIdToken::getUpdateTime, new Date())
-            .eq(TinyIdToken::getToken, token)));
+        on(key, () -> tokenMapper.update(null, Wrappers.<TinyIdToken>lambdaUpdate().set(TinyIdToken::getRemark, remark)
+            .set(TinyIdToken::getUpdateTime, new Date()).eq(TinyIdToken::getToken, token)));
     }
 
     /**
      * 删除指定数据源中的全部应用授权。
      *
-     * @param key 数据源展示标识
+     * @param key   数据源展示标识
      * @param token 应用接入 Token
      */
     private void deleteToken(String key, String token) {
-        on(key, () -> tokenMapper.delete(
-            Wrappers.<TinyIdToken>lambdaQuery().eq(TinyIdToken::getToken, token)));
+        on(key, () -> tokenMapper.delete(Wrappers.<TinyIdToken>lambdaQuery().eq(TinyIdToken::getToken, token)));
     }
 
     /**
      * 查询一个数据源中的发号业务实体。
      *
-     * @param key 数据源展示标识
+     * @param key     数据源展示标识
      * @param bizType 业务类型
      * @return 发号业务实体，不存在时返回 {@code null}
      */
     private TinyIdInfo findBusinessEntity(String key, String bizType) {
-        return on(key, () -> infoMapper.selectOne(
-            Wrappers.<TinyIdInfo>lambdaQuery().eq(TinyIdInfo::getBizType, bizType)));
+        return on(key,
+            () -> infoMapper.selectOne(Wrappers.<TinyIdInfo>lambdaQuery().eq(TinyIdInfo::getBizType, bizType)));
     }
 
     /**
      * 查询一个数据源中的发号业务配置。
      *
-     * @param key 数据源展示标识
+     * @param key     数据源展示标识
      * @param bizType 业务类型
      * @return 发号业务对象，不存在时返回 {@code null}
      */
@@ -769,25 +741,25 @@ public class TinyIdManagementServiceImpl implements TinyIdManagementService {
     /**
      * 查询指定数据源中的应用授权快照。
      *
-     * @param key 数据源展示标识
+     * @param key   数据源展示标识
      * @param token 应用接入 Token
      * @return 应用授权实体列表
      */
     private List<TinyIdToken> findTokensByToken(String key, String token) {
-        return on(key, () -> tokenMapper.selectList(
-            Wrappers.<TinyIdToken>lambdaQuery().eq(TinyIdToken::getToken, token)));
+        return on(key,
+            () -> tokenMapper.selectList(Wrappers.<TinyIdToken>lambdaQuery().eq(TinyIdToken::getToken, token)));
     }
 
     /**
      * 查询指定数据源中的业务授权快照。
      *
-     * @param key 数据源展示标识
+     * @param key     数据源展示标识
      * @param bizType 业务类型
      * @return 业务授权实体列表
      */
     private List<TinyIdToken> findTokensByBusiness(String key, String bizType) {
-        return on(key, () -> tokenMapper.selectList(
-            Wrappers.<TinyIdToken>lambdaQuery().eq(TinyIdToken::getBizType, bizType)));
+        return on(key,
+            () -> tokenMapper.selectList(Wrappers.<TinyIdToken>lambdaQuery().eq(TinyIdToken::getBizType, bizType)));
     }
 
     /**
@@ -839,21 +811,22 @@ public class TinyIdManagementServiceImpl implements TinyIdManagementService {
         Set<Integer> deltas = configured.stream().map(TinyIdBusinessBO::getDelta).collect(Collectors.toSet());
         Set<Integer> remainders = configured.stream().map(TinyIdBusinessBO::getRemainder).collect(Collectors.toSet());
         int delta = configured.get(0).getDelta();
-        boolean conflict = steps.size() != 1 || deltas.size() != 1 || remainders.size() != configured.size()
-            || remainders.stream().anyMatch(value -> value < 0 || value >= delta)
-            || configured.stream().anyMatch(entry -> !Objects.equals(entry.getRemainder(), entry.getSequence()));
+        boolean conflict =
+            steps.size() != 1 || deltas.size() != 1 || remainders.size() != configured.size() || remainders.stream()
+                .anyMatch(value -> value < 0 || value >= delta) || configured.stream()
+                .anyMatch(entry -> !Objects.equals(entry.getRemainder(), entry.getSequence()));
         if (conflict) {
             return "CONFLICT";
         }
-        boolean allHealthyAndConfigured = entries.size() == dataSourceKeys().size()
-            && entries.stream().allMatch(entry -> Boolean.TRUE.equals(entry.getHealthy()) && entry.getId() != null);
+        boolean allHealthyAndConfigured = entries.size() == dataSourceKeys().size() && entries.stream()
+            .allMatch(entry -> Boolean.TRUE.equals(entry.getHealthy()) && entry.getId() != null);
         return allHealthyAndConfigured ? "COMPLETE" : "PENDING";
     }
 
     /**
      * 构造数据源缺失业务时的占位对象。
      *
-     * @param key 数据源展示标识
+     * @param key     数据源展示标识
      * @param bizType 业务类型
      * @param healthy 数据源是否可访问
      * @return 缺失业务占位对象
@@ -870,7 +843,7 @@ public class TinyIdManagementServiceImpl implements TinyIdManagementService {
     /**
      * 将业务实体转换为带数据源信息的业务对象。
      *
-     * @param key 数据源展示标识
+     * @param key    数据源展示标识
      * @param entity 发号业务实体
      * @return 发号业务对象
      */
@@ -927,7 +900,7 @@ public class TinyIdManagementServiceImpl implements TinyIdManagementService {
      *
      * @param completed 已完成删除的数据源
      * @param snapshots 各数据源删除前快照
-     * @param cause 原始删除异常
+     * @param cause     原始删除异常
      */
     private void restoreApplicationSnapshots(List<String> completed, Map<String, List<TinyIdToken>> snapshots,
         RuntimeException cause) {
@@ -938,10 +911,10 @@ public class TinyIdManagementServiceImpl implements TinyIdManagementService {
     /**
      * 恢复已删除数据源中的业务及授权快照。
      *
-     * @param completed 已完成删除的数据源
-     * @param businesses 各数据源删除前的业务实体
+     * @param completed      已完成删除的数据源
+     * @param businesses     各数据源删除前的业务实体
      * @param authorizations 各数据源删除前的授权实体
-     * @param cause 原始删除异常
+     * @param cause          原始删除异常
      */
     private void restoreBusinessSnapshots(List<String> completed, Map<String, TinyIdInfo> businesses,
         Map<String, List<TinyIdToken>> authorizations, RuntimeException cause) {
@@ -966,9 +939,9 @@ public class TinyIdManagementServiceImpl implements TinyIdManagementService {
      * 逆序恢复已完成删除的数据源，并聚合补偿失败信息。
      *
      * @param completed 已完成删除的数据源
-     * @param cause 原始删除异常
-     * @param message 补偿失败提示
-     * @param restore 单个数据源的恢复动作
+     * @param cause     原始删除异常
+     * @param message   补偿失败提示
+     * @param restore   单个数据源的恢复动作
      */
     private void compensateDeletedData(List<String> completed, RuntimeException cause, String message,
         BiConsumer<String, Void> restore) {
@@ -995,7 +968,7 @@ public class TinyIdManagementServiceImpl implements TinyIdManagementService {
     /**
      * 精确回滚本次请求实际插入的 Token 授权。
      *
-     * @param token 应用接入 Token
+     * @param token    应用接入 Token
      * @param inserted 本次实际插入的授权记录
      * @param original 可为空的原始异常
      */
@@ -1006,8 +979,9 @@ public class TinyIdManagementServiceImpl implements TinyIdManagementService {
         Collections.reverse(changes);
         for (AuthorizationInsert change : changes) {
             try {
-                on(change.dataSourceKey(), () -> tokenMapper.delete(Wrappers.<TinyIdToken>lambdaQuery()
-                    .eq(TinyIdToken::getToken, token).eq(TinyIdToken::getBizType, change.bizType())));
+                on(change.dataSourceKey(), () -> tokenMapper.delete(
+                    Wrappers.<TinyIdToken>lambdaQuery().eq(TinyIdToken::getToken, token)
+                        .eq(TinyIdToken::getBizType, change.bizType())));
             } catch (RuntimeException ex) {
                 if (failure == null) {
                     failure = new IllegalStateException("TinyID authorization compensation failed", ex);
@@ -1028,7 +1002,7 @@ public class TinyIdManagementServiceImpl implements TinyIdManagementService {
      * 在首个物理数据源上执行查询。
      *
      * @param action 数据访问动作
-     * @param <T> 返回类型
+     * @param <T>    返回类型
      * @return 数据访问结果
      */
     private <T> T primary(Supplier<T> action) {
@@ -1038,9 +1012,9 @@ public class TinyIdManagementServiceImpl implements TinyIdManagementService {
     /**
      * 在指定物理数据源上执行查询。
      *
-     * @param key 数据源展示标识
+     * @param key    数据源展示标识
      * @param action 数据访问动作
-     * @param <T> 返回类型
+     * @param <T>    返回类型
      * @return 数据访问结果
      */
     private <T> T on(String key, Supplier<T> action) {
@@ -1050,7 +1024,7 @@ public class TinyIdManagementServiceImpl implements TinyIdManagementService {
     /**
      * 在指定物理数据源上执行命令。
      *
-     * @param key 数据源展示标识
+     * @param key    数据源展示标识
      * @param action 数据访问动作
      */
     private void on(String key, Runnable action) {
@@ -1060,7 +1034,7 @@ public class TinyIdManagementServiceImpl implements TinyIdManagementService {
     /**
      * 在指定物理数据源的本地事务中执行动作。
      *
-     * @param key 数据源展示标识
+     * @param key    数据源展示标识
      * @param action 事务动作
      */
     private void inTransaction(String key, Runnable action) {
@@ -1074,9 +1048,7 @@ public class TinyIdManagementServiceImpl implements TinyIdManagementService {
      * @return 有序数据源展示标识
      */
     private List<String> dataSourceKeys() {
-        return IntStream.range(0, routingDataSource.size())
-            .mapToObj(index -> "datasource-" + index)
-            .toList();
+        return IntStream.range(0, routingDataSource.size()).mapToObj(index -> "datasource-" + index).toList();
     }
 
     /**
@@ -1097,7 +1069,7 @@ public class TinyIdManagementServiceImpl implements TinyIdManagementService {
      * 标识本次管理操作实际新增的一条授权记录。
      *
      * @param dataSourceKey 物理数据源标识
-     * @param bizType 业务类型
+     * @param bizType       业务类型
      */
     record AuthorizationInsert(String dataSourceKey, String bizType) {
     }

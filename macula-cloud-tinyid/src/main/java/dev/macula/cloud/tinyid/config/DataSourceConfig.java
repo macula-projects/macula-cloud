@@ -18,7 +18,7 @@
 package dev.macula.cloud.tinyid.config;
 
 import com.alibaba.druid.pool.DruidDataSource;
-import com.alibaba.druid.spring.boot.autoconfigure.DruidDataSourceBuilder;
+import com.alibaba.druid.spring.boot4.autoconfigure.DruidDataSourceBuilder;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -44,7 +44,7 @@ public class DataSourceConfig {
      *
      * @return Druid 主数据源
      */
-    @Bean("master")
+    @Bean
     @ConfigurationProperties(prefix = "spring.datasource.druid.master")
     public DataSource master() {
         return DruidDataSourceBuilder.create().build();
@@ -56,7 +56,7 @@ public class DataSourceConfig {
      * @param dataSources Spring 容器中的全部数据源
      * @return 动态路由数据源
      */
-    @Bean("tinyIdRoutingDataSource")
+    @Bean
     @Primary
     public DynamicDataSource getDynamicDataSource(List<DataSource> dataSources) {
         List<DataSource> physicalDataSources = physicalDataSources(dataSources);
