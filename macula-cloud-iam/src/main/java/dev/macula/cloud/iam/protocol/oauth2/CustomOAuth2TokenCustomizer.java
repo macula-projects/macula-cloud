@@ -51,23 +51,27 @@ public class CustomOAuth2TokenCustomizer implements OAuth2TokenCustomizer<OAuth2
      */
     @Override
     public void customize(OAuth2TokenClaimsContext context) {
-        OAuth2TokenClaimsSet.Builder claims = context.getClaims();
-        // Customize claims
-        String clientId = context.getAuthorizationGrant().getName();
-        claims.claim(OAuth2ParameterNames.CLIENT_ID, clientId);
-        if (OAuth2TokenType.ACCESS_TOKEN.equals(context.getTokenType()) && context.getPrincipal() != null) {
-            if (context.getPrincipal().getPrincipal() instanceof SysUserDetails) {
-                SysUserDetails userDetails = (SysUserDetails)context.getPrincipal().getPrincipal();
-                claims.claim(SecurityConstants.JWT_NICKNAME_KEY, userDetails.getNickname());
-                claims.claim(SecurityConstants.JWT_DATASCOPE_KEY, userDetails.getDataScope());
-                claims.claim(SecurityConstants.JWT_DEPTID_KEY, userDetails.getDeptId());
-            }
-            if (context.getPrincipal().getAuthorities() != null) {
-                List<String> authorities =
-                    context.getPrincipal().getAuthorities().stream().map(GrantedAuthority::getAuthority)
-                        .collect(Collectors.toList());
-                claims.claim(SecurityConstants.AUTHORITIES_KEY, authorities);
-            }
+        if (OAuth2TokenType.ACCESS_TOKEN.equals(context.getTokenType())) {
+            context.getClaims().claims(claims -> claims.putAll(accessClaims(
+                context.getPrincipal(), context.getRegisteredClient().getClientId())));
         }
+    }
+
+    /** Shared platform access claims for opaque and JWT formats; never add these to ID Tokens. */
+    static java.util.Map<String, Object> accessClaims(org.springframework.security.core.Authentication principal,
+        String clientId) {
+        java.util.Map<String, Object> claims = new java.util.HashMap<>();
+        claims.put(OAuth2ParameterNames.CLIENT_ID, clientId);
+        if (principal == null) return claims;
+        if (principal.getPrincipal() instanceof SysUserDetails user) {
+            if (user.getNickname() != null) claims.put(SecurityConstants.JWT_NICKNAME_KEY, user.getNickname());
+            claims.put(SecurityConstants.JWT_DATASCOPE_KEY, user.getDataScope());
+            if (user.getDeptId() != null) claims.put(SecurityConstants.JWT_DEPTID_KEY, user.getDeptId());
+        }
+        if (principal.getAuthorities() != null) {
+            claims.put(SecurityConstants.AUTHORITIES_KEY, principal.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority).collect(Collectors.toList()));
+        }
+        return claims;
     }
 }

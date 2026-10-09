@@ -43,6 +43,7 @@ import java.util.Set;
  * 自定义用户确认页
  *
  * @author felord.cn
+ * @since 6.1.0
  */
 @Controller
 @AllArgsConstructor
@@ -75,10 +76,14 @@ public class AuthorizationConsentController {
         Set<String> authorizedScopes =
             currentAuthorizationConsent != null ? currentAuthorizationConsent.getScopes() : Collections.emptySet();
 
-        Set<String> scopesToApproves = new HashSet<>();
-        Set<String> previouslyApprovedScopesSet = new HashSet<>();
+        Set<String> scopesToApproves = new java.util.TreeSet<>();
+        Set<String> previouslyApprovedScopesSet = new java.util.TreeSet<>();
 
         String[] scopes = StringUtils.delimitedListToStringArray(scope, " ");
+        model.addAttribute("openidRequested", Arrays.asList(scopes).contains(OidcScopes.OPENID)
+            && registeredClient.getScopes().contains(OidcScopes.OPENID));
+        model.addAttribute("scopeLabels", java.util.Map.of("profile", "基本资料", "email", "电子邮箱",
+            "phone", "手机号码", "address", "联系地址", "offline_access", "离线访问"));
 
         Arrays.stream(scopes).filter(s -> registeredClient.getScopes().contains(s) && !OidcScopes.OPENID.equals(s))
             .forEach(s -> {

@@ -18,7 +18,7 @@
 package dev.macula.cloud.iam.service.userdetails;
 
 import cn.hutool.core.collection.CollectionUtil;
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import tools.jackson.databind.annotation.JsonDeserialize;
 import dev.macula.boot.enums.StatusEnum;
 import dev.macula.cloud.iam.pojo.dto.UserAuthInfo;
 import lombok.Data;
@@ -37,7 +37,9 @@ import java.util.stream.Collectors;
  */
 @Data
 @JsonDeserialize
-public class SysUserDetails implements UserDetails {
+public class SysUserDetails implements UserDetails, org.springframework.security.core.CredentialsContainer {
+    private Long userId;
+    private Long tenantId;
 
     /** 扩展字段：部门ID */
     private Long deptId;
@@ -53,7 +55,12 @@ public class SysUserDetails implements UserDetails {
     private String mobile;
     private String openId;
     private String unionId;
-    private Collection<SimpleGrantedAuthority> authorities;
+    private Collection<SimpleGrantedAuthority> authorities = new java.util.ArrayList<>();
+
+    public void setAuthorities(Collection<SimpleGrantedAuthority> authorities) {
+        // Use a supported concrete collection in the Security serialization allowlist.
+        this.authorities = authorities == null ? new java.util.ArrayList<>() : new java.util.ArrayList<>(authorities);
+    }
 
     private boolean accountNonExpired = true;
     private boolean accountNonLocked = true;
@@ -63,6 +70,7 @@ public class SysUserDetails implements UserDetails {
     }
 
     public SysUserDetails(UserAuthInfo user) {
+        this.setUserId(user.getUserId());
         this.setUsername(user.getUsername());
         this.setNickname(user.getNickname());
         this.setDeptId(user.getDeptId());
@@ -70,7 +78,7 @@ public class SysUserDetails implements UserDetails {
         this.setPassword(user.getPassword());
         this.setEnabled(StatusEnum.ENABLE.getValue().equals(user.getStatus()));
         if (CollectionUtil.isNotEmpty(user.getRoles())) {
-            authorities = user.getRoles().stream().map(SimpleGrantedAuthority::new).collect(Collectors.toSet());
+            setAuthorities(user.getRoles().stream().map(SimpleGrantedAuthority::new).collect(Collectors.toList()));
         }
     }
 
@@ -82,6 +90,11 @@ public class SysUserDetails implements UserDetails {
     @Override
     public String getPassword() {
         return this.password;
+    }
+
+    @Override
+    public void eraseCredentials() {
+        this.password = null;
     }
 
     @Override

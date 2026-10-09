@@ -15,24 +15,21 @@
  * limitations under the License.
  */
 
-package dev.macula.cloud.iam.jackson2;
+package dev.macula.cloud.iam.jackson;
 
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import com.fasterxml.jackson.databind.deser.std.NumberDeserializers;
+import tools.jackson.databind.annotation.JsonDeserialize;
 
 /**
- * {@code LongMixin}  Long类型转换
+ * IAM 认证对象的 Jackson 3 序列化适配。
  *
- * @author rain
- * @since 2023/4/20 18:52
+ * @author felord.cn
+ * @since 1.0.0
  */
 @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, property = "@class")
 @JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY, getterVisibility = JsonAutoDetect.Visibility.NONE,
     isGetterVisibility = JsonAutoDetect.Visibility.NONE)
-@JsonDeserialize(using = NumberDeserializers.LongDeserializer.class)
-@JsonIgnoreProperties(ignoreUnknown = true)
-public class LongMixin {
+@JsonDeserialize(using = CaptchaAuthenticationTokenDeserializer.class)
+public abstract class CaptchaAuthenticationTokenMixin {
 }

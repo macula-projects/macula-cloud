@@ -1,94 +1,43 @@
 <!DOCTYPE html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"
-          integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z" crossorigin="anonymous">
-    <title>@码农小胖哥</title>
-    <style>
-        body {
-            background-color: aliceblue;
-        }
-    </style>
-    <script>
-        function cancelConsent() {
-            document.consent_form.reset();
-            document.consent_form.submit();
-        }
-    </script>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light"><meta name="referrer" content="same-origin">
+  <title>授权确认 · Macula</title>
+  <link rel="stylesheet" th:href="@{/iam/auth.css}" href="/iam/auth.css">
+  <script th:src="@{/iam/auth.js}" src="/iam/auth.js" defer></script>
 </head>
 <body>
-<div class="container">
-    <div class="py-5">
-        <h1 class="text-center text-primary">用户授权确认</h1>
-    </div>
-    <div class="row">
-        <div class="col text-center">
-            <p>
-                应用
-                <a href="https://felord.cn"><span class="font-weight-bold text-primary" th:text="${clientName}"></span></a>
-                想要访问您的账号
-                <span class="font-weight-bold" th:text="${principalName}"></span>
-            </p>
+<main class="shell">
+  <aside class="brand-panel" aria-label="Macula 统一身份平台">
+    <div class="brand"><span class="brand-mark" aria-hidden="true">M</span>Macula</div>
+    <div class="brand-content"><div class="eyebrow">ONE IDENTITY. CONNECTED WORK.</div>
+      <h1>一个身份，<br>连接你的工作。</h1><p>以统一、安全的身份访问企业应用，<br>让每一次连接都简单可信。</p></div>
+    <div class="orbit" aria-hidden="true"></div><div class="brand-meta">MACULA CLOUD · 统一身份平台</div>
+  </aside>
+  <section class="content-panel">
+    <div class="brand mobile-brand"><span class="brand-mark" aria-hidden="true">M</span>Macula</div>
+    <div class="card wide">
+      <span class="step">应用访问授权</span><h1>确认应用访问权限</h1><p class="subtitle">请核对应用信息，仅授权你信任的应用。</p>
+      <div class="identity"><div class="app-icon" aria-hidden="true">↗</div><div><strong th:text="${clientName}">应用名称</strong><small>当前账号 · <span th:text="${principalName}">账号</span></small></div></div>
+      <form data-consent method="post" th:action="@{${authorizationEndpoint}}">
+        <input th:if="${_csrf != null}" type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"><input type="hidden" name="client_id" th:value="${clientId}"><input type="hidden" name="state" th:value="${state}">
+        <input th:if="${openidRequested}" type="hidden" name="scope" value="openid">
+        <p class="section-label" th:if="${!#sets.isEmpty(scopes)}">此应用请求以下权限</p>
+        <div class="scope-list" th:if="${!#sets.isEmpty(scopes)}">
+          <label class="scope-row" th:each="scope : ${scopes}"><input type="checkbox" name="scope" th:value="${scope}"><span th:text="${scopeLabels.get(scope) ?: scope}">权限</span></label>
         </div>
-    </div>
-    <div class="row pb-3">
-        <div class="col text-center"><p>上述应用程序请求以下权限<br/>请审阅以下选项并勾选您同意的权限</p></div>
-    </div>
-    <div class="row">
-        <div class="col text-center">
-            <form name="consent_form" method="post" th:action="${authorizationEndpoint}">
-                <input type="hidden" name="client_id" th:value="${clientId}">
-                <input type="hidden" name="state" th:value="${state}">
-
-                <div th:each="scope: ${scopes}" class="form-group form-check py-1">
-                    <input class="form-check-input"
-                           type="checkbox"
-                           name="scope"
-                           th:value="${scope}"
-                           th:id="${scope}">
-                    <label class="form-check-label font-weight-bold" th:for="${scope}" th:text="${scope}"></label>
-                    <p class="text-primary" th:text="${scope}"></p>
-                </div>
-
-                <p th:if="${not #lists.isEmpty(previouslyApprovedScopes)}">您已对上述应用授予以下权限：</p>
-                <div th:each="scope: ${previouslyApprovedScopes}" class="form-group form-check py-1">
-                    <input class="form-check-input"
-                           type="checkbox"
-                           th:id="${scope}"
-                           disabled
-                           checked>
-                    <label class="form-check-label font-weight-bold" th:for="${scope}" th:text="${scope}"></label>
-                    <p class="text-primary" th:text="${scope}"></p>
-                </div>
-
-                <div class="form-group pt-3">
-                    <button class="btn btn-primary btn-lg" type="submit" id="submit-consent">
-                        同意授权
-                    </button>
-                </div>
-                <div class="form-group">
-                    <button class="btn btn-link regular" type="button" id="cancel-consent" onclick="cancelConsent();">
-                        取消授权
-                    </button>
-                </div>
-            </form>
+        <p class="empty-note" th:if="${#sets.isEmpty(scopes)}">此应用没有请求额外的可选权限。</p>
+        <p class="section-label" th:if="${!#sets.isEmpty(previouslyApprovedScopes)}">此前已授予的权限</p>
+        <div class="scope-list" th:if="${!#sets.isEmpty(previouslyApprovedScopes)}">
+          <div class="scope-row scope-approved" th:each="scope : ${previouslyApprovedScopes}"><span aria-hidden="true">✓</span><span th:text="${scope}">权限</span><small>已授权</small></div>
         </div>
+        <div class="client-note">你可以选择本次同意的权限。拒绝后，将返回应用且不完成本次授权。</div>
+        <div class="actions"><button class="secondary" type="submit" name="decision" value="deny" formnovalidate>拒绝授权</button><button class="primary" type="submit" name="decision" value="allow">同意并继续</button></div>
+      </form>
     </div>
-    <div class="row pt-4">
-        <div class="col text-center">
-            <p>
-                <small>
-                    需要您同意并提供访问权限。
-                    <br/>如果您不同意，请单击<span class="font-weight-bold text-primary">取消授权</span>，将不会为上述应用程序提供任何您的信息。
-                </small>
-            </p>
-            <p class="text-center text-danger font-weight-bold">技术支持</p>
-            <p><a href="https://felord.cn"><img src="https://asset.felord.cn/blog/20201022220055.png" alt=""
-                                                height="130" width="355"></a></p>
-        </div>
-    </div>
-</div>
+    <footer class="footer">Macula Cloud · 统一身份认证</footer>
+  </section>
+</main>
 </body>
 </html>

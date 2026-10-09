@@ -57,7 +57,8 @@ public class LoginController {
         @RequestAttribute(name = "org.springframework.security.web.csrf.CsrfToken",
             required = false) CsrfToken csrfToken) {
 
-        if (!(authentication instanceof AnonymousAuthenticationToken)) {
+        if (authentication != null && authentication.isAuthenticated()
+            && !(authentication instanceof AnonymousAuthenticationToken)) {
             return "redirect:/";
         }
         if (csrfToken != null) {

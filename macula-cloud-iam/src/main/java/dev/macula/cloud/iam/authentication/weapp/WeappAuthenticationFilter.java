@@ -1,6 +1,23 @@
+/*
+ * Copyright (c) 2023 Macula
+ *   macula.dev, China
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package dev.macula.cloud.iam.authentication.weapp;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -18,10 +35,15 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.BufferedReader;
 import java.io.IOException;
 
+/**
+ * 解析小程序登录请求并提交认证。
+ * @author rain
+ * @since 6.1.0
+ */
 public class WeappAuthenticationFilter extends AbstractAuthenticationProcessingFilter {
     private static final PathPatternRequestMatcher DEFAULT_REQUEST_MATCHER =
         PathPatternRequestMatcher.pathPattern(HttpMethod.POST, "/login/weapp");
-    private final ObjectMapper om = new ObjectMapper();
+    private final ObjectMapper om = tools.jackson.databind.json.JsonMapper.builder().build();
     private Converter<HttpServletRequest, WeappAuthenticationToken> weappAuthenticationTokenConverter;
     private boolean postOnly = true;
 
@@ -67,7 +89,7 @@ public class WeappAuthenticationFilter extends AbstractAuthenticationProcessingF
             try (BufferedReader reader = request.getReader()) {
                 WeappRequest weappRequest = this.om.readValue(reader, WeappRequest.class);
                 return new WeappAuthenticationToken(weappRequest);
-            } catch (IOException e) {
+            } catch (IOException | tools.jackson.core.JacksonException e) {
                 return null;
             }
         };

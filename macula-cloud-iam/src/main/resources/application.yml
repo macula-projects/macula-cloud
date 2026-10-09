@@ -28,6 +28,12 @@ spring:
       force: true
 
 macula:
+  cloud:
+    iam:
+      signing-key:
+        location: ${IAM_SIGNING_KEY_LOCATION:}
+        alias: ${IAM_SIGNING_KEY_ALIAS:jose}
+        password: ${IAM_SIGNING_KEY_PASSWORD:}
   security:
     ignore-urls:
       - /swagger-ui/index.html
@@ -65,7 +71,7 @@ spring:
 macula:
   cloud:
     iam:
-      issuer-uri: http://127.0.0.1:${IAM_HOST_PORT:9010}
+      issuer-uri: ${IAM_ISSUER_URI:http://127.0.0.1:${IAM_HOST_PORT:9010}}
 
 mybatis-plus:
   configuration:
@@ -124,7 +130,7 @@ spring:
 macula:
   cloud:
     iam:
-      issuer-uri: http://macula-cloud-iam:9010
+      issuer-uri: ${IAM_ISSUER_URI:http://macula-cloud-iam:9010}
 
 ---
 # 共享环境只保留配置中心连接信息，其余配置由 Nacos Data ID 提供

@@ -18,9 +18,17 @@
 package dev.macula.cloud.iam.config;
 
 import cn.hutool.core.lang.Assert;
+import dev.macula.cloud.iam.protocol.oauth2.CustomOidcTokenCustomizer;
+import dev.macula.cloud.iam.protocol.oauth2.LocalAccessTokenIntrospector;
+import com.nimbusds.jose.jwk.source.JWKSource;
+import com.nimbusds.jose.proc.SecurityContext;
+import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
+import org.springframework.security.oauth2.server.resource.authentication.OpaqueTokenAuthenticationProvider;
 import dev.macula.cloud.iam.handler.OAuth2AuthenticationExceptionEntryPoint;
 import dev.macula.cloud.iam.protocol.oauth2.CustomOAuth2TokenCustomizer;
 import dev.macula.cloud.iam.protocol.oauth2.grant.CustomeOAuth2AccessTokenGenerator;
+import dev.macula.cloud.iam.protocol.oauth2.grant.CompatibilityRefreshTokenAuthenticationProvider;
+import org.springframework.security.oauth2.server.authorization.authentication.OAuth2RefreshTokenAuthenticationProvider;
 import dev.macula.cloud.iam.protocol.oauth2.grant.password.OAuth2ResourceOwnerPasswordAuthenticationConverter;
 import dev.macula.cloud.iam.protocol.oauth2.grant.password.OAuth2ResourceOwnerPasswordAuthenticationProvider;
 import dev.macula.cloud.iam.protocol.oauth2.grant.sms.OAuth2ResourceOwnerSmsAuthenticationConverter;
@@ -37,6 +45,13 @@ import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.core.OAuth2Error;
+import org.springframework.security.oauth2.core.OAuth2ErrorCodes;
+import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationConsentAuthenticationProvider;
+import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationConsentAuthenticationToken;
+import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationCodeRequestAuthenticationToken;
+import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationCodeRequestAuthenticationException;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.oauth2.core.OAuth2Token;
@@ -65,7 +80,13 @@ public class ProtocolOAuth2Configuration {
 
     @Bean("authorizationServerSecurityFilterChain")
     @Order(Ordered.HIGHEST_PRECEDENCE)
-    SecurityFilterChain authorizationServerSecurityFilterChain(HttpSecurity http) throws Exception {
+    SecurityFilterChain authorizationServerSecurityFilterChain(HttpSecurity http,
+        OAuth2AuthorizationService authorizationService, OAuth2TokenGenerator<OAuth2Token> tokenGenerator,
+        dev.macula.cloud.iam.authentication.captcha.CaptchaUserDetailsService captchaUsers,
+        dev.macula.cloud.iam.authentication.captcha.CaptchaService captchaService) throws Exception {
+        // The token endpoint has its own manager; the form-login chain's SMS provider is not shared.
+        http.authenticationProvider(new dev.macula.cloud.iam.authentication.captcha.CaptchaAuthenticationProvider(
+            captchaUsers, captchaService));
         // @formatter:off
         OAuth2AuthorizationServerConfigurer authorizationServerConfigurer = new OAuth2AuthorizationServerConfigurer();
         //  把自定义的授权确认URI加入配置
@@ -73,11 +94,42 @@ public class ProtocolOAuth2Configuration {
             .authorizationEndpoint(authorizationEndpoint ->
                 authorizationEndpoint
                     .consentPage(CUSTOM_CONSENT_PAGE_URI)
+                    .authenticationProviders(providers -> providers.forEach(provider -> {
+                        if (provider instanceof OAuth2AuthorizationConsentAuthenticationProvider consentProvider) {
+                            consentProvider.setAuthorizationConsentCustomizer(context -> {
+                                OAuth2AuthorizationConsentAuthenticationToken consent = context.getAuthentication();
+                                if (!"deny".equals(consent.getAdditionalParameters().get("decision"))) return;
+                                // The framework has already validated state, principal and registered redirect.
+                                // Deny this request even when previous consent exists; preserve that earlier consent.
+                                var request = context.getAuthorizationRequest();
+                                String redirect = request.getRedirectUri() != null ? request.getRedirectUri()
+                                    : context.getRegisteredClient().getRedirectUris().iterator().next();
+                                authorizationService.remove(context.getAuthorization());
+                                throw new OAuth2AuthorizationCodeRequestAuthenticationException(
+                                    new OAuth2Error(OAuth2ErrorCodes.ACCESS_DENIED),
+                                    new OAuth2AuthorizationCodeRequestAuthenticationToken(consent.getAuthorizationUri(),
+                                        consent.getClientId(), (Authentication) consent.getPrincipal(), redirect,
+                                        request.getState(), request.getScopes(), null));
+                            });
+                        }
+                    }))
             )
             .tokenEndpoint(tokenEndpoint ->
                 tokenEndpoint
                     .accessTokenRequestConverter(new OAuth2ResourceOwnerPasswordAuthenticationConverter())
                     .accessTokenRequestConverter(new OAuth2ResourceOwnerSmsAuthenticationConverter())
+                    .authenticationProviders(providers -> {
+                        providers.replaceAll(provider -> provider instanceof OAuth2RefreshTokenAuthenticationProvider
+                            ? new CompatibilityRefreshTokenAuthenticationProvider(provider, authorizationService, tokenGenerator)
+                            : provider);
+                        // The shared manager exists at request time, after HttpSecurity has been built.
+                        AuthenticationManager userAuthentication = authentication ->
+                            http.getSharedObject(AuthenticationManager.class).authenticate(authentication);
+                        providers.add(new OAuth2ResourceOwnerPasswordAuthenticationProvider(
+                            userAuthentication, authorizationService, tokenGenerator));
+                        providers.add(new OAuth2ResourceOwnerSmsAuthenticationProvider(
+                            userAuthentication, authorizationService, tokenGenerator));
+                    })
             )
             .oidc(Customizer.withDefaults());
         RequestMatcher endpointsMatcher = authorizationServerConfigurer.getEndpointsMatcher();
@@ -94,13 +146,16 @@ public class ProtocolOAuth2Configuration {
             // 应用 授权服务器的配置
             .with(authorizationServerConfigurer, Customizer.withDefaults());
 
-        SecurityFilterChain securityFilterChain = http.build();
+        // Security 7 installs a JWT resource-server configurer for UserInfo. Supply its
+        // authentication manager explicitly so both persisted JWT and opaque tokens work.
+        OpaqueTokenAuthenticationProvider bearerProvider = new OpaqueTokenAuthenticationProvider(
+            new LocalAccessTokenIntrospector(authorizationService));
+        http.oauth2ResourceServer(resource -> resource.jwt(jwt ->
+            jwt.authenticationManager(bearerProvider::authenticate)));
 
-        // 注入自定义授权模式实现(未来应该删除，兼容用)
-        addCustomOAuth2GrantAuthenticationProvider(http);
 
         // @formatter:on
-        return securityFilterChain;
+        return http.build();
     }
 
     @Bean
@@ -130,36 +185,13 @@ public class ProtocolOAuth2Configuration {
         return new CustomOAuth2TokenCustomizer();
     }
 
-    /**
-     * 注入授权模式实现提供方 1. 密码模式 </br> 2. 短信登录 </br>
-     */
-    private void addCustomOAuth2GrantAuthenticationProvider(HttpSecurity http) {
-        AuthenticationManager authenticationManager = http.getSharedObject(AuthenticationManager.class);
-        OAuth2AuthorizationService authorizationService = http.getSharedObject(OAuth2AuthorizationService.class);
-
-        // 注入Token 增加关联用户信息
+    @Bean
+    OAuth2TokenGenerator<OAuth2Token> tokenGenerator(JWKSource<SecurityContext> jwkSource,
+        OAuth2TokenCustomizer<OAuth2TokenClaimsContext> accessTokenCustomizer) {
         CustomeOAuth2AccessTokenGenerator accessTokenGenerator = new CustomeOAuth2AccessTokenGenerator();
-        OAuth2TokenCustomizer<OAuth2TokenClaimsContext> accessTokenCustomizer =
-            OAuth2ConfigurerUtils.getAccessTokenCustomizer(http);
-        if (accessTokenCustomizer != null) {
-            accessTokenGenerator.setAccessTokenCustomizer(accessTokenCustomizer);
-        }
-        OAuth2TokenGenerator<OAuth2Token> oAuth2TokenGenerator =
-            new DelegatingOAuth2TokenGenerator(accessTokenGenerator, new OAuth2RefreshTokenGenerator());
-
-        // grant_type=password
-        OAuth2ResourceOwnerPasswordAuthenticationProvider resourceOwnerPasswordAuthenticationProvider =
-            new OAuth2ResourceOwnerPasswordAuthenticationProvider(authenticationManager, authorizationService,
-                oAuth2TokenGenerator);
-
-        // grant_type=sms
-        OAuth2ResourceOwnerSmsAuthenticationProvider resourceOwnerSmsAuthenticationProvider =
-            new OAuth2ResourceOwnerSmsAuthenticationProvider(authenticationManager, authorizationService,
-                oAuth2TokenGenerator);
-
-        // 处理 OAuth2ResourceOwnerPasswordAuthenticationToken
-        http.authenticationProvider(resourceOwnerPasswordAuthenticationProvider);
-        // 处理 OAuth2ResourceOwnerSmsAuthenticationToken
-        http.authenticationProvider(resourceOwnerSmsAuthenticationProvider);
+        accessTokenGenerator.setAccessTokenCustomizer(accessTokenCustomizer);
+        JwtGenerator jwtGenerator = new JwtGenerator(new NimbusJwtEncoder(jwkSource));
+        jwtGenerator.setJwtCustomizer(new CustomOidcTokenCustomizer());
+        return new DelegatingOAuth2TokenGenerator(jwtGenerator, accessTokenGenerator, new OAuth2RefreshTokenGenerator());
     }
 }
