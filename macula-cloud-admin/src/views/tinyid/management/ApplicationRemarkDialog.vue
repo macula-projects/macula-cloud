@@ -14,6 +14,7 @@
 
 <script setup>
 import {reactive, ref} from 'vue'
+import {ElMessage} from 'element-plus'
 import api from '@/api/model/tinyid/management'
 
 const emit = defineEmits(['success'])
@@ -34,7 +35,12 @@ async function submit() {
 	await formRef.value.validate()
 	saving.value = true
 	try {
-		await api.applications.updateRemark(appId.value, form)
+		const response = await api.applications.updateRemark(appId.value, form).catch(() => null)
+		if (!response) return
+		if (!response.success) {
+			ElMessage.error(response.cause || response.msg || '操作失败')
+			return
+		}
 		visible.value = false
 		emit('success')
 	} finally {

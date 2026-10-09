@@ -91,9 +91,14 @@ async function load(targetPage = page.value) {
 	loading.value = true
 	page.value = targetPage
 	try {
-		const response = await api.businesses.list({page: targetPage, pageSize, keywords: keywords.value})
-		records.value = response.records
-		total.value = response.total
+		const response = await api.businesses.list({page: targetPage, pageSize, keywords: keywords.value}).catch(() => null)
+		if (!response) return
+		if (!response.success) {
+			ElMessage.error(response.cause || response.msg || '操作失败')
+			return
+		}
+		records.value = response.data.records
+		total.value = response.data.total
 	} finally {
 		loading.value = false
 	}
@@ -131,7 +136,12 @@ async function removeBusiness(business) {
 	} catch {
 		return
 	}
-	await api.businesses.delete(business.bizType)
+	const response = await api.businesses.delete(business.bizType).catch(() => null)
+	if (!response) return
+	if (!response.success) {
+		ElMessage.error(response.cause || response.msg || '操作失败')
+		return
+	}
 	ElMessage.success('发号业务已删除')
 	await load(records.value.length === 1 && page.value > 1 ? page.value - 1 : page.value)
 }

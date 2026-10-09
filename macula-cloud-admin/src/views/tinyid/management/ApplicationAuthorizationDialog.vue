@@ -17,6 +17,7 @@
 
 <script setup>
 import {computed, reactive, ref} from 'vue'
+import {ElMessage} from 'element-plus'
 import api from '@/api/model/tinyid/management'
 
 const emit = defineEmits(['success'])
@@ -36,9 +37,14 @@ async function open(row) {
 	let all = []
 	let total = 0
 	do {
-		const response = await api.businesses.list({page, pageSize: 100})
-		all = all.concat(response.records)
-		total = response.total
+		const response = await api.businesses.list({page, pageSize: 100}).catch(() => null)
+		if (!response) return
+		if (!response.success) {
+			ElMessage.error(response.cause || response.msg || '操作失败')
+			return
+		}
+		all = all.concat(response.data.records)
+		total = response.data.total
 		page++
 	} while (all.length < total)
 	businesses.value = all.filter(item => item.consistencyStatus === 'COMPLETE')
@@ -49,7 +55,12 @@ async function submit() {
 	await formRef.value.validate()
 	saving.value = true
 	try {
-		await api.applications.addBusinesses(application.value.appId, {bizTypes: form.bizTypes})
+		const response = await api.applications.addBusinesses(application.value.appId, {bizTypes: form.bizTypes}).catch(() => null)
+		if (!response) return
+		if (!response.success) {
+			ElMessage.error(response.cause || response.msg || '操作失败')
+			return
+		}
 		visible.value = false
 		emit('success')
 	} finally {
