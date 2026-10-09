@@ -107,6 +107,32 @@ Admin 的 `development` mode 对应本地 `local` 环境：`/api`、`/iam` 由 V
 
 ## 常用命令
 
+### 启用本机 IAM 接入演示
+
+应用及 Compose 未设置变量时默认关闭演示；当前 `.env.example` 按 Rain 确认开启本机演示，内含公开演示密钥，禁止用于业务客户端、共享环境或生产环境。所有开关由主 Compose 文件传入 IAM，无需额外覆盖文件。
+在被 Git 忽略的 `deploy/.env` 中设置以下变量，以及随机 `IAM_PLAYGROUND_CLIENT_SECRET`（不要提交或复用业务密钥）：
+
+```dotenv
+IAM_HOST_PORT=9010
+IAM_ISSUER_URI=http://127.0.0.1:9010
+IAM_PLAYGROUND_ENABLED=true
+IAM_PLAYGROUND_ALLOWED_PROFILES=docker
+IAM_PLAYGROUND_ALLOW_LOOPBACK_HTTP=true
+```
+
+```bash
+docker compose --env-file deploy/.env -f deploy/docker-compose.yml --profile apps config --quiet
+docker compose --env-file deploy/.env -f deploy/docker-compose.yml --profile apps up -d --no-deps --force-recreate --wait macula-cloud-iam
+```
+
+访问 `http://127.0.0.1:9010/playground`，不要通过 Admin 的 `/iam` 前缀访问。
+上述配置将 issuer 设为同一地址，浏览器及 IAM 容器的自调用均使用 9010；修改 issuer 后应重新登录，旧令牌不保证继续有效。
+仅允许本机回环 HTTP，不能用于远程演示环境。`prd`/`production` 的强制关闭规则仍有效。
+
+后续使用原部署命令即可继续读取 `.env` 中的设置。关闭时将 `IAM_PLAYGROUND_ENABLED=false`，然后按上述命令仅重建 IAM，不删除任何数据卷或用户账号。
+
+2026-10-09 本机启用验收：页面、资源及配置 API 均 200；真实客户端凭据、introspection、撤销后 inactive、Device 发码通过；390px 浏览器五场景就绪且无横向溢出。未执行真实用户登录/授权或 Device 用户批准；此前隔离协议测试不能替代本环境身份源验收。测试 access token 已撤销，演示会话已重置；停止 Device 轮询不会撤销设备码，未批准的测试设备码按五分钟期限自然失效。
+
 ```bash
 # 启动指定中间件
 ./deploy/scripts/compose.sh up mysql mysql-init redis
