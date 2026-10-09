@@ -88,6 +88,8 @@ Docker 镜像构建时仍使用 Vite 配置生成静态资源；容器启动时�
 
 ## TinyID 管理接口
 
+仅保留发号业务（含数据源配置状态）及审计日志；接入应用、Token 和业务授权管理已移除，访问权限由统一网关管理。
+
 TinyID 管理接口与 system 使用相同的 Result 结构：先检查 `success`，再读取 `data`；业务失败展示 `cause/msg`。
 保存或删除失败时不关闭表单、不显示成功。该响应升级需要同步部署 TinyID Server 与管理前端。
 相关回归用例位于 `tests/unit/tinyid-management.test.js` 和 `cypress/e2e/tinyid-management.cy.js`；后者使用模拟接口，不代表真实后端联调。

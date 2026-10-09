@@ -25,7 +25,6 @@ import dev.macula.cloud.tinyid.pojo.vo.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
@@ -49,8 +48,8 @@ class TinyIdIssuingServiceImplTest {
 
     @Test
     void rejectsBlankBusinessBeforeIssuing() {
-        assertThatThrownBy(() -> service.nextIds(" ", 1)).isInstanceOf(ResponseStatusException.class);
-        assertThatThrownBy(() -> service.nextSegment(null)).isInstanceOf(ResponseStatusException.class);
+        assertThatThrownBy(() -> service.nextIds(" ", 1)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> service.nextSegment(null)).isInstanceOf(IllegalArgumentException.class);
         verifyNoInteractions(factory, segments);
     }
 
@@ -71,7 +70,7 @@ class TinyIdIssuingServiceImplTest {
         var failure = new TinyIdSysException(ErrorCode.BIZ_TYPE_NOT_FOUND, "发号业务不存在");
         when(segments.getNextSegmentId("missing")).thenThrow(failure);
         assertThatThrownBy(() -> service.nextSegment("missing")).isSameAs(failure);
-        assertThatThrownBy(() -> service.nextSegment(" ")).isInstanceOf(ResponseStatusException.class);
+        assertThatThrownBy(() -> service.nextSegment(" ")).isInstanceOf(IllegalArgumentException.class);
         when(factory.getIdGenerator("missing")).thenThrow(failure);
         assertThatThrownBy(() -> service.nextIds("missing", 1)).isSameAs(failure);
     }

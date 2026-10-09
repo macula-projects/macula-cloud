@@ -4,16 +4,13 @@
 			<div class="page-title">
 				<div>
 					<h2>TinyID 管理</h2>
-					<p>先配置发号业务，再创建接入应用并授权业务。仅超级管理员可访问。</p>
+					<p>配置发号业务并查看审计日志。仅超级管理员可访问。</p>
 				</div>
 			</div>
 		</template>
 		<el-tabs v-model="activeTab">
 			<el-tab-pane label="发号业务" name="businesses">
 				<BusinessPanel v-if="activeTab === 'businesses'" />
-			</el-tab-pane>
-			<el-tab-pane label="接入应用" name="applications">
-				<ApplicationPanel v-if="activeTab === 'applications'" />
 			</el-tab-pane>
 			<el-tab-pane label="审计日志" name="audit">
 				<AuditLogPanel v-if="activeTab === 'audit'" />
@@ -30,7 +27,6 @@ export default {
 
 <script setup>
 import {ref} from 'vue'
-import ApplicationPanel from './ApplicationPanel.vue'
 import BusinessPanel from './BusinessPanel.vue'
 import AuditLogPanel from './AuditLogPanel.vue'
 

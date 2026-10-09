@@ -22,30 +22,20 @@ import dev.macula.cloud.tinyid.config.DynamicDataSource;
 import dev.macula.cloud.tinyid.converter.TinyIdManagementConverter;
 import dev.macula.cloud.tinyid.mapper.TinyIdAuditLogMapper;
 import dev.macula.cloud.tinyid.mapper.TinyIdInfoMapper;
-import dev.macula.cloud.tinyid.mapper.TinyIdTokenMapper;
-import dev.macula.cloud.tinyid.pojo.bo.TinyIdApplicationBO;
 import dev.macula.cloud.tinyid.pojo.bo.TinyIdBusinessAggregateBO;
 import dev.macula.cloud.tinyid.pojo.bo.TinyIdBusinessBO;
-import dev.macula.cloud.tinyid.pojo.form.AddApplicationBusinessesForm;
-import dev.macula.cloud.tinyid.pojo.form.CreateApplicationForm;
 import dev.macula.cloud.tinyid.pojo.form.CreateBusinessForm;
-import dev.macula.cloud.tinyid.pojo.query.ApplicationPageQuery;
-import dev.macula.cloud.tinyid.pojo.vo.TinyIdApplicationVO;
-import dev.macula.cloud.tinyid.service.TinyIdTokenService;
+import dev.macula.cloud.tinyid.pojo.query.BusinessPageQuery;
+import dev.macula.cloud.tinyid.pojo.vo.TinyIdBusinessAggregateVO;
 import org.junit.jupiter.api.Test;
 import org.mapstruct.factory.Mappers;
 
-import java.util.Base64;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
@@ -61,29 +51,27 @@ class TinyIdManagementServiceImplTest {
 
     @Test
     void convertsMybatisPageWithoutCustomPageWrapper() {
-        TinyIdManagementServiceImpl service = service(mock(TinyIdTokenService.class));
-        TinyIdApplicationBO application = new TinyIdApplicationBO();
-        application.setAppId(8L);
-        application.setToken("test-application-token");
-        Page<TinyIdApplicationBO> source = new Page<>(2, 20, 21);
-        source.setRecords(List.of(application));
-        doReturn(source).when(service).listApplications(2, 20, "test");
-        ApplicationPageQuery query = new ApplicationPageQuery();
+        TinyIdManagementServiceImpl service = service();
+        TinyIdBusinessAggregateBO business = new TinyIdBusinessAggregateBO("order", 100, 10, "COMPLETE", List.of());
+        Page<TinyIdBusinessAggregateBO> source = new Page<>(2, 20, 21);
+        source.setRecords(List.of(business));
+        doReturn(source).when(service).listBusinesses(2, 20, "test");
+        BusinessPageQuery query = new BusinessPageQuery();
         query.setPage(2);
         query.setPageSize(20);
         query.setKeywords("test");
 
-        IPage<TinyIdApplicationVO> result = service.listApplications(query);
+        IPage<TinyIdBusinessAggregateVO> result = service.listBusinesses(query);
 
         assertEquals(2, result.getCurrent());
         assertEquals(20, result.getSize());
         assertEquals(21, result.getTotal());
-        assertEquals("test-application-token", result.getRecords().get(0).getToken());
+        assertEquals("order", result.getRecords().get(0).getBizType());
     }
 
     @Test
     void createsBusinessWithDefaultDeltaAcrossAllDataSources() {
-        TinyIdManagementServiceImpl service = service(mock(TinyIdTokenService.class));
+        TinyIdManagementServiceImpl service = service();
         TinyIdBusinessAggregateBO created = aggregate("COMPLETE", business("datasource-0", 10, 0));
         doReturn(null, created).when(service).getBusinessBO("order");
         doNothing().when(service).createBusinessOnAllDataSources("order", 100, 10);
@@ -95,7 +83,7 @@ class TinyIdManagementServiceImplTest {
 
     @Test
     void honorsCustomDeltaAtCreation() {
-        TinyIdManagementServiceImpl service = service(mock(TinyIdTokenService.class));
+        TinyIdManagementServiceImpl service = service();
         doReturn(null, aggregate("COMPLETE", business("datasource-0", 32, 0)))
             .when(service).getBusinessBO("order");
         doNothing().when(service).createBusinessOnAllDataSources("order", 100, 32);
@@ -107,7 +95,7 @@ class TinyIdManagementServiceImplTest {
 
     @Test
     void compensatesCompletedBusinessWriteWhenReloadFails() {
-        TinyIdManagementServiceImpl service = service(mock(TinyIdTokenService.class));
+        TinyIdManagementServiceImpl service = service();
         doReturn(null).doThrow(new IllegalStateException("Injected reload failure"))
             .when(service).getBusinessBO("order");
         doNothing().when(service).createBusinessOnAllDataSources("order", 100, 10);
@@ -120,8 +108,7 @@ class TinyIdManagementServiceImplTest {
 
     @Test
     void deletesBusinessOnlyWhenEveryDatasourceHasZeroMaxId() {
-        TinyIdTokenService tokenService = mock(TinyIdTokenService.class);
-        TinyIdManagementServiceImpl service = service(tokenService);
+        TinyIdManagementServiceImpl service = service();
         doReturn(aggregate("COMPLETE", business("datasource-0", 10, 0, 0),
             business("datasource-1", 10, 1, 0))).when(service).getBusinessBO("order");
         doNothing().when(service).deleteBusinessOnAllDataSources("order");
@@ -129,82 +116,26 @@ class TinyIdManagementServiceImplTest {
         service.deleteBusiness("order");
 
         verify(service).deleteBusinessOnAllDataSources("order");
-        verify(tokenService).removeBusiness("order");
     }
 
     @Test
     void rejectsBusinessDeletionWhenAnyDatasourceHasIssuedIds() {
-        TinyIdTokenService tokenService = mock(TinyIdTokenService.class);
-        TinyIdManagementServiceImpl service = service(tokenService);
+        TinyIdManagementServiceImpl service = service();
         doReturn(aggregate("COMPLETE", business("datasource-0", 10, 0, 0),
             business("datasource-1", 10, 1, 100))).when(service).getBusinessBO("order");
 
         assertThrows(IllegalStateException.class, () -> service.deleteBusiness("order"));
 
         verify(service, never()).deleteBusinessOnAllDataSources("order");
-        verify(tokenService, never()).removeBusiness("order");
-    }
-
-    @Test
-    void createsA256BitServerTokenAndRefreshesAuthorizationImmediately() {
-        TinyIdTokenService tokenService = mock(TinyIdTokenService.class);
-        TinyIdManagementServiceImpl service = service(tokenService);
-        doReturn(false).when(service).tokenExists(anyString());
-        doReturn(aggregate("COMPLETE", business("datasource-0", 10, 0)))
-            .when(service).getBusinessBO("order");
-        TinyIdApplicationBO saved = new TinyIdApplicationBO();
-        saved.setAppId(8L);
-        saved.setBizTypes(List.of("order"));
-        doAnswer(invocation -> {
-            saved.setToken(invocation.getArgument(0));
-            return saved;
-        }).when(service).getApplicationByToken(anyString());
-        doNothing().when(service).createApplicationOnAllDataSources(anyString(), eq("order application"),
-            eq(List.of("order")));
-        CreateApplicationForm form = new CreateApplicationForm();
-        form.setRemark("order application");
-        form.setBizTypes(List.of("order"));
-
-        TinyIdApplicationVO application = service.createApplication(form);
-
-        assertEquals(32, Base64.getUrlDecoder().decode(application.getToken()).length);
-        verify(tokenService).replaceAuthorizations(application.getToken(), List.of("order"));
-    }
-
-    @Test
-    void compensatesOnlyAuthorizationRowsInsertedByCurrentRequest() {
-        TinyIdTokenService tokenService = mock(TinyIdTokenService.class);
-        TinyIdManagementServiceImpl service = service(tokenService);
-        TinyIdApplicationBO existing = new TinyIdApplicationBO();
-        existing.setAppId(8L);
-        existing.setToken("test-application-token");
-        existing.setRemark("test application");
-        existing.setBizTypes(List.of("existing"));
-        List<TinyIdManagementServiceImpl.AuthorizationInsert> inserted = List.of(
-            new TinyIdManagementServiceImpl.AuthorizationInsert("datasource-1", "order"));
-        doReturn(existing).doThrow(new IllegalStateException("Injected reload failure"))
-            .when(service).getApplicationBO(8L);
-        doReturn(aggregate("COMPLETE", business("datasource-0", 10, 0)))
-            .when(service).getBusinessBO("order");
-        doReturn(inserted).when(service).addAuthorizationsOnAllDataSources(
-            existing.getToken(), existing.getRemark(), List.of("order"));
-        doNothing().when(service).deleteInsertedAuthorizations(existing.getToken(), inserted);
-        AddApplicationBusinessesForm form = new AddApplicationBusinessesForm();
-        form.setBizTypes(List.of("order"));
-
-        assertThrows(IllegalStateException.class, () -> service.addBusinesses(8L, form));
-
-        verify(service).deleteInsertedAuthorizations(existing.getToken(), inserted);
-        verify(tokenService, never()).replaceAuthorizations(anyString(), eq(List.of("existing", "order")));
     }
 
     /** 创建带真实转换器和被监控持久化方法的管理服务。 */
-    private TinyIdManagementServiceImpl service(TinyIdTokenService tokenService) {
+    private TinyIdManagementServiceImpl service() {
         DynamicDataSource routingDataSource = new DynamicDataSource();
         routingDataSource.setDataSourceKeys(List.of("datasource-0"));
         TinyIdManagementConverter converter = Mappers.getMapper(TinyIdManagementConverter.class);
-        return spy(new TinyIdManagementServiceImpl(mock(TinyIdInfoMapper.class), mock(TinyIdTokenMapper.class),
-            mock(TinyIdAuditLogMapper.class), routingDataSource, tokenService, converter));
+        return spy(new TinyIdManagementServiceImpl(mock(TinyIdInfoMapper.class),
+            mock(TinyIdAuditLogMapper.class), routingDataSource, converter));
     }
 
     /** 创建发号业务表单。 */

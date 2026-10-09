@@ -18,7 +18,6 @@ package dev.macula.cloud.tinyid.service;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import dev.macula.cloud.tinyid.pojo.form.*;
-import dev.macula.cloud.tinyid.pojo.query.ApplicationPageQuery;
 import dev.macula.cloud.tinyid.pojo.query.AuditLogPageQuery;
 import dev.macula.cloud.tinyid.pojo.query.BusinessPageQuery;
 import dev.macula.cloud.tinyid.pojo.vo.*;
@@ -26,60 +25,12 @@ import dev.macula.cloud.tinyid.pojo.vo.*;
 import java.util.List;
 
 /**
- * ROOT-only TinyID application and business management service.
+ * ROOT-only TinyID business and audit management service.
  *
  * @author Rain
  * @since 6.1.0
  */
 public interface TinyIdManagementService {
-    /**
-     * 分页查询接入应用。
-     *
-     * @param query 分页及关键字查询条件
-     * @return 接入应用分页结果
-     */
-    IPage<TinyIdApplicationVO> listApplications(ApplicationPageQuery query);
-
-    /**
-     * 查询指定接入应用。
-     *
-     * @param appId 应用主键
-     * @return 接入应用详情
-     */
-    TinyIdApplicationVO getApplication(long appId);
-
-    /**
-     * 创建接入应用并为其授权业务类型。
-     *
-     * @param form 应用创建参数
-     * @return 创建后的接入应用
-     */
-    TinyIdApplicationVO createApplication(CreateApplicationForm form);
-
-    /**
-     * 修改接入应用备注。
-     *
-     * @param appId 应用主键
-     * @param form  备注修改参数
-     * @return 修改后的接入应用
-     */
-    TinyIdApplicationVO updateRemark(long appId, UpdateApplicationRemarkForm form);
-
-    /**
-     * 为接入应用追加业务授权。
-     *
-     * @param appId 应用主键
-     * @param form  待追加的业务类型
-     * @return 追加授权后的接入应用
-     */
-    TinyIdApplicationVO addBusinesses(long appId, AddApplicationBusinessesForm form);
-
-    /**
-     * 删除接入应用及其全部业务授权。
-     *
-     * @param appId 应用主键
-     */
-    void deleteApplication(long appId);
 
     /**
      * 分页查询跨数据源聚合后的发号业务。

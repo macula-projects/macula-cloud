@@ -24,7 +24,7 @@ import lombok.NoArgsConstructor;
 import java.io.Serializable;
 
 /**
- * TinyID 直连发号接口返回的业务错误码。
+ * TinyID 发号接口返回的业务错误码。
  *
  * @author Rain
  * @since 6.1.0
@@ -33,10 +33,6 @@ import java.io.Serializable;
 @AllArgsConstructor
 @NoArgsConstructor
 public enum ErrorCode implements ResultCode, Serializable {
-    /**
-     * token is wrong
-     */
-    TOKEN_ERR("ID500", "token is error"),
     /**
      * server internal error
      */

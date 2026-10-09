@@ -23,10 +23,8 @@ import dev.macula.boot.starter.tinyid.base.service.SegmentIdService;
 import dev.macula.cloud.tinyid.service.TinyIdIssuingService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
@@ -60,7 +58,7 @@ public class TinyIdIssuingServiceImpl implements TinyIdIssuingService {
 
     private void requireBizType(String bizType) {
         if (!StringUtils.hasText(bizType)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "bizType must not be blank");
+            throw new IllegalArgumentException("bizType must not be blank");
         }
     }
 }

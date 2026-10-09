@@ -42,7 +42,7 @@ spring:
             - id: macula-cloud-tinyid
               uri: lb://macula-cloud-tinyid
               predicates:
-                - Path=/tinyid/api/v1/admin/**,/tinyid/api/v1/id/nextId,/tinyid/api/v1/id/nextIdSimple,/tinyid/api/v1/id/nextSegmentId,/tinyid/api/v1/id/nextSegmentIdSimple
+                - Path=/tinyid/**
               filters:
                 - StripPrefix=1
 

@@ -131,17 +131,16 @@ class TinyIdAdminControllerTest {
     }
 
     @Test
-    void rootCanDeleteApplicationsAndBusinesses() throws Exception {
+    void rootCanDeleteBusinessesButApplicationEndpointsAreRemoved() throws Exception {
         mockMvc.perform(delete("/api/v1/admin/apps/8")
                 .with(user("root").roles("ROOT"))
                 .with(csrf()))
-            .andExpect(status().isOk());
+            .andExpect(status().isNotFound());
         mockMvc.perform(delete("/api/v1/admin/businesses/order")
                 .with(user("root").roles("ROOT"))
                 .with(csrf()))
             .andExpect(status().isOk());
 
-        verify(managementService).deleteApplication(8L);
         verify(managementService).deleteBusiness("order");
     }
 
