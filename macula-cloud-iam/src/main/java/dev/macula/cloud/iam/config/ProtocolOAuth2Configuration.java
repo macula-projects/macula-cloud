@@ -18,6 +18,11 @@
 package dev.macula.cloud.iam.config;
 
 import cn.hutool.core.lang.Assert;
+import dev.macula.cloud.iam.playground.*;
+import org.springframework.context.annotation.Import;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.server.authorization.authentication.OAuth2TokenIntrospectionAuthenticationProvider;
 import dev.macula.cloud.iam.protocol.oauth2.CustomOidcTokenCustomizer;
 import dev.macula.cloud.iam.protocol.oauth2.LocalAccessTokenIntrospector;
 import com.nimbusds.jose.jwk.source.JWKSource;
@@ -71,6 +76,7 @@ import org.springframework.security.web.util.matcher.RequestMatcher;
  * @since 2023/3/11 22:25
  */
 @Configuration(proxyBeanMethods = false)
+@Import(PlaygroundConfiguration.class)
 @ConfigurationProperties(prefix = "macula.cloud.iam")
 public class ProtocolOAuth2Configuration {
     private static final String CUSTOM_CONSENT_PAGE_URI = "/oauth2/consent";
@@ -82,6 +88,7 @@ public class ProtocolOAuth2Configuration {
     @Order(Ordered.HIGHEST_PRECEDENCE)
     SecurityFilterChain authorizationServerSecurityFilterChain(HttpSecurity http,
         OAuth2AuthorizationService authorizationService, OAuth2TokenGenerator<OAuth2Token> tokenGenerator,
+        RegisteredClientRepository clients, OAuth2AuthorizationConsentService consents, PlaygroundAccessPolicy playgroundPolicy,
         dev.macula.cloud.iam.authentication.captcha.CaptchaUserDetailsService captchaUsers,
         dev.macula.cloud.iam.authentication.captcha.CaptchaService captchaService) throws Exception {
         // The token endpoint has its own manager; the form-login chain's SMS provider is not shared.
@@ -91,6 +98,9 @@ public class ProtocolOAuth2Configuration {
         OAuth2AuthorizationServerConfigurer authorizationServerConfigurer = new OAuth2AuthorizationServerConfigurer();
         //  把自定义的授权确认URI加入配置
         authorizationServerConfigurer
+            .clientAuthentication(client -> client
+                .authenticationConverters(converters -> converters.add(0, new DevicePublicClientAuthenticationConverter(playgroundPolicy)))
+                .authenticationProviders(providers -> providers.add(0, new DevicePublicClientAuthenticationProvider(clients, playgroundPolicy))))
             .authorizationEndpoint(authorizationEndpoint ->
                 authorizationEndpoint
                     .consentPage(CUSTOM_CONSENT_PAGE_URI)
@@ -131,7 +141,13 @@ public class ProtocolOAuth2Configuration {
                             userAuthentication, authorizationService, tokenGenerator));
                     })
             )
+            .tokenIntrospectionEndpoint(endpoint -> endpoint.authenticationProviders(providers ->
+                providers.replaceAll(provider -> provider instanceof OAuth2TokenIntrospectionAuthenticationProvider
+                    ? new PlaygroundTokenIntrospectionAuthenticationProvider(provider, authorizationService) : provider)))
             .oidc(Customizer.withDefaults());
+        if (playgroundPolicy.isEnabled()) {
+            authorizationServerConfigurer.deviceAuthorizationEndpoint(Customizer.withDefaults());
+        }
         RequestMatcher endpointsMatcher = authorizationServerConfigurer.getEndpointsMatcher();
 
         // 拦截 授权服务器相关的请求端点
@@ -152,6 +168,10 @@ public class ProtocolOAuth2Configuration {
             new LocalAccessTokenIntrospector(authorizationService));
         http.oauth2ResourceServer(resource -> resource.jwt(jwt ->
             jwt.authenticationManager(bearerProvider::authenticate)));
+
+        http.addFilterBefore(new PlaygroundConfiguration.DeviceVerificationFilter(playgroundPolicy, issuerUri,
+            clients, authorizationService, consents),
+            org.springframework.security.web.access.intercept.AuthorizationFilter.class);
 
 
         // @formatter:on
@@ -175,9 +195,16 @@ public class ProtocolOAuth2Configuration {
         return new MaculaOAuth2AuthorizationService(redisTemplate, registeredClientRepository);
     }
 
-    @Bean
-    RegisteredClientRepository registeredClientRepository(SysOAuth2ClientService sysOAuth2ClientService) {
+    @Bean(defaultCandidate = false)
+    MaculaRegisteredClientRepository businessRegisteredClientRepository(SysOAuth2ClientService sysOAuth2ClientService) {
         return new MaculaRegisteredClientRepository(sysOAuth2ClientService);
+    }
+
+    @Bean
+    RegisteredClientRepository registeredClientRepository(
+        @Qualifier("businessRegisteredClientRepository") MaculaRegisteredClientRepository delegate,
+        PlaygroundAccessPolicy policy, PlaygroundProperties properties, PasswordEncoder encoder) {
+        return new PlaygroundRegisteredClientRepository(delegate, policy, properties, issuerUri, encoder);
     }
 
     @Bean

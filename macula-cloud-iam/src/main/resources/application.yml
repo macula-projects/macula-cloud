@@ -30,6 +30,11 @@ spring:
 macula:
   cloud:
     iam:
+      playground:
+        enabled: ${IAM_PLAYGROUND_ENABLED:false}
+        allowed-profiles: ${IAM_PLAYGROUND_ALLOWED_PROFILES:}
+        allow-loopback-http: ${IAM_PLAYGROUND_ALLOW_LOOPBACK_HTTP:false}
+        client-secret: ${IAM_PLAYGROUND_CLIENT_SECRET:}
       signing-key:
         location: ${IAM_SIGNING_KEY_LOCATION:}
         alias: ${IAM_SIGNING_KEY_ALIAS:jose}

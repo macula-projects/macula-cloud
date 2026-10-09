@@ -62,6 +62,8 @@ public class CustomOAuth2TokenCustomizer implements OAuth2TokenCustomizer<OAuth2
         String clientId) {
         java.util.Map<String, Object> claims = new java.util.HashMap<>();
         claims.put(OAuth2ParameterNames.CLIENT_ID, clientId);
+        // Even a privileged login must not turn a demo token into a business credential.
+        if (dev.macula.cloud.iam.playground.PlaygroundRegisteredClientRepository.isPlayground(clientId)) return claims;
         if (principal == null) return claims;
         if (principal.getPrincipal() instanceof SysUserDetails user) {
             if (user.getNickname() != null) claims.put(SecurityConstants.JWT_NICKNAME_KEY, user.getNickname());

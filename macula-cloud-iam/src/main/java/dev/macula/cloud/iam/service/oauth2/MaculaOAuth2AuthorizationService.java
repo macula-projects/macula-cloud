@@ -156,12 +156,16 @@ public class MaculaOAuth2AuthorizationService implements OAuth2AuthorizationServ
     public OAuth2Authorization findById(String id) {
         Assert.hasText(id, "id cannot be empty");
         Authorization record = readRecord(id);
-        return record == null || record.isDeleted() ? null : toObject(record);
+        return unavailable(record) ? null : toObject(record);
     }
 
     @Override
     public void save(OAuth2Authorization authorization) {
         Assert.notNull(authorization, "authorization cannot be null");
+        if (dev.macula.cloud.iam.playground.PlaygroundRegisteredClientRepository.isPlayground(authorization.getRegisteredClientId())
+            && registeredClientRepository.findById(authorization.getRegisteredClientId()) == null) {
+            throw new OAuth2AuthenticationException(OAuth2ErrorCodes.INVALID_GRANT);
+        }
         Authorization previous = readRecord(authorization.getId());
         Number expected = authorization.getAttribute(VERSION);
         long version = expected == null ? 0 : expected.longValue();
@@ -261,7 +265,7 @@ public class MaculaOAuth2AuthorizationService implements OAuth2AuthorizationServ
                 }
             }
         }
-        if (record == null || record.isDeleted()) return null;
+        if (unavailable(record)) return null;
         OAuth2Authorization result = toObject(record);
         if ("state".equals(type)) return value.equals(record.getState()) && record.getStateExpiresAt() != null
             && record.getStateExpiresAt().isAfter(Instant.now()) ? result : null;
@@ -276,6 +280,12 @@ public class MaculaOAuth2AuthorizationService implements OAuth2AuthorizationServ
         if (data == null) return null;
         try { return recordMapper.readValue(data, Authorization.class); }
         catch (Exception ex) { throw new IllegalStateException("Cannot read authorization record", ex); }
+    }
+
+    private boolean unavailable(@Nullable Authorization record) {
+        return record == null || record.isDeleted()
+            || (dev.macula.cloud.iam.playground.PlaygroundRegisteredClientRepository.isPlayground(record.getRegisteredClientId())
+                && registeredClientRepository.findById(record.getRegisteredClientId()) == null);
     }
 
     private String writeRecord(Authorization record) {
