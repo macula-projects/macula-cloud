@@ -37,6 +37,9 @@ Rain 在完整计划展示后回复 YES，批准按此顺序实施；不代表�
 
 ## Risks
 ### 已记录的实施调整
+- 2026-10-09：提交前告知 `.env.example` 含当前本机演示密钥且开启演示，Rain 明确回复“没事，直接推送”，批准按当前示例发布。该值从此按公开演示值处理，禁止业务/共享/生产复用；应用及 Compose 无变量默认关闭、生产 profile 否决仍保留。本条更新此前“示例默认关闭”的部署选择，授权沿用已请求的提交、推送、合并、清理流程。
+- 2026-10-09：Rain 明确要求取消独立 playground Compose 文件，配置集中到 `.env.example`。改为主 `deploy/docker-compose.yml` 映射 IAM 演示环境变量，示例默认关闭；本机忽略的 `.env` 保留开启和原随机密钥，删除先前未提交的覆盖文件，使用原部署命令验收。此项替代下条覆盖文件方案。
+- 2026-10-09：合并并本机部署后，Rain 明确要求“启用演示”。新增可选 `deploy/docker-compose.playground.yml` 和部署说明，仅覆盖本机 IAM 的开关、profile、回环 issuer 和外部密钥；不改变 application.yml 默认关闭、不改生产配置。密钥只写入已忽略的 deploy/.env；只重建 IAM，验证实际页面/API/协议。此为已接受配置部署步骤的本机落实，不授权提交、推送或合并。
 - 2026-10-09：已核对本地 Security 7.0.7 源码，Device Provider 明确不产生 slow_down。真实 IAM 测试覆盖 pending/批准/拒绝/重放；slow_down 使用独立 HTTP 测试端点验证客户端退避，不谎称该响应来自 IAM，也不擅自新增全平台限流机制。正式验证报告须单列此证据差异。
 - 2026-10-09：Device 使用只匹配演示授权的独立框架 DeviceVerification filter 和 ProviderManager，业务 Device 不改用演示确认页。独立 CSRF filter 补足 AS 默认忽略 CSRF 的行为，每次设备连接强制确认。页面采用 strict-origin Referrer-Policy，避免真实浏览器原生 POST 在 no-referrer 下产生 Origin: null，同时不发送代码/状态所在的完整 URL。
 - 2026-10-09：真实 HTTP 集成测试放在 `src/test/java/dev/macula/cloud/iam/config/PlaygroundHttpIntegrationTest.java`，复用同包既有 IAM 测试身份/隔离 Redis 配置，使用已存在的嵌入式 Tomcat 启动真实过滤链；避免复制测试身份实现或公开测试内部类。不新增依赖。
