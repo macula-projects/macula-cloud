@@ -124,6 +124,41 @@ class MaculaOAuth2AuthorizationServiceTest {
             .isInstanceOf(org.springframework.data.redis.RedisConnectionFailureException.class);
     }
 
+    @Test void disabledPlaygroundRejectsEveryPersistedTokenTypeWithoutBreakingBusiness() {
+        var demo = RegisteredClient.from(client).id("iam-playground-public").clientId("iam-playground-public").build();
+        var repository = org.mockito.Mockito.mock(RegisteredClientRepository.class);
+        org.mockito.Mockito.when(repository.findById(demo.getId())).thenReturn(demo);
+        var scoped = new MaculaOAuth2AuthorizationService(legacy, repository);
+        var original = authorization();
+        var authorization = OAuth2Authorization.withRegisteredClient(demo).id(original.getId())
+            .principalName(original.getPrincipalName()).authorizationGrantType(original.getAuthorizationGrantType())
+            .authorizedScopes(original.getAuthorizedScopes()).attributes(values -> values.putAll(original.getAttributes()))
+            .token(original.getToken(OAuth2AuthorizationCode.class).getToken())
+            .accessToken(original.getAccessToken().getToken()).refreshToken(original.getRefreshToken().getToken())
+            .token(original.getToken(OidcIdToken.class).getToken())
+            .token(original.getToken(OAuth2DeviceCode.class).getToken())
+            .token(original.getToken(OAuth2UserCode.class).getToken()).build();
+        scoped.save(authorization);
+        assertThat(scoped.findById(authorization.getId())).isNotNull();
+        org.mockito.Mockito.when(repository.findById(demo.getId())).thenReturn(null);
+        assertThat(scoped.findById(authorization.getId())).isNull();
+        Map<String, String> tokens = Map.of("code", authorization.getToken(OAuth2AuthorizationCode.class).getToken().getTokenValue(),
+            "access_token", authorization.getAccessToken().getToken().getTokenValue(),
+            "refresh_token", authorization.getRefreshToken().getToken().getTokenValue(),
+            "id_token", authorization.getToken(OidcIdToken.class).getToken().getTokenValue(),
+            "device_code", authorization.getToken(OAuth2DeviceCode.class).getToken().getTokenValue(),
+            "user_code", authorization.getToken(OAuth2UserCode.class).getToken().getTokenValue(),
+            "state", authorization.getAttribute("state"));
+        tokens.forEach((type, value) -> {
+            assertThat(scoped.findByToken(value, new OAuth2TokenType(type))).as(type).isNull();
+            assertThat(scoped.findByToken(value, null)).as("unspecified " + type).isNull();
+        });
+        assertThatThrownBy(() -> scoped.save(authorization)).isInstanceOf(OAuth2AuthenticationException.class);
+        var business = authorization();
+        service.save(business);
+        assertThat(service.findById(business.getId())).isNotNull();
+    }
+
     @Test void readsHistoricalJdkSerializedDtoAndMigratesIt() throws Exception {
         byte[] fixture;
         try (var input = getClass().getResourceAsStream("/fixtures/legacy-authorization.base64")) {

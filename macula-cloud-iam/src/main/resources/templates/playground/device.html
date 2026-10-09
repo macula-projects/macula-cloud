@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="referrer" content="strict-origin"><title>设备授权 · Macula IAM</title>
+  <link rel="stylesheet" th:href="@{/playground/assets/playground.css}"></head>
+<body class="device-page"><main class="device-card">
+  <a class="brand" th:href="@{/playground}">MACULA <span>IAM / CONNECT</span></a>
+  <p class="eyebrow">DEVICE AUTHORIZATION</p><h1>确认连接设备</h1>
+  <p class="muted">仅确认你本人正在操作的设备。请核对另一块屏幕上的代码，不要批准他人通过消息发来的授权请求。</p>
+  <section th:if="${result != ''}" role="status">
+    <h2 th:text="${result == 'approved' ? '已批准设备连接' : (result == 'denied' ? '已拒绝授权' : '设备代码无效或已过期')}"></h2>
+    <p>请返回设备屏幕查看轮询结果。此页面不是设备令牌，关闭页面不会撤销已经签发的令牌。</p>
+  </section>
+  <form th:if="${result == '' and state == null}" method="get" th:action="${verificationEndpoint}">
+    <label for="user-code">设备显示的代码</label>
+    <input id="user-code" name="user_code" th:value="${userCode}" maxlength="32" autocomplete="off" autocapitalize="characters" required>
+    <button class="primary" type="submit">核对并继续</button>
+  </form>
+  <form th:if="${state != null}" method="post" th:action="${verificationEndpoint}">
+    <div class="user-code" th:text="${userCode}"></div>
+    <input type="hidden" name="client_id" th:value="${clientId}">
+    <input type="hidden" name="user_code" th:value="${userCode}">
+    <input type="hidden" name="state" th:value="${state}">
+    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+    <input type="hidden" name="scope" value="playground.read">
+    <p>本次仅允许读取演示资源（playground.read），不授予业务系统权限。</p>
+    <div class="actions"><button type="submit" name="decision" value="deny">拒绝</button>
+      <button class="primary" type="submit" name="decision" value="allow">允许连接</button></div>
+  </form>
+  <footer>Macula IAM 接入演示 · Rain</footer>
+</main></body></html>

@@ -106,6 +106,12 @@ PLAYWRIGHT_MODULE=/path/to/node_modules/playwright node macula-cloud-iam/src/tes
 
 浏览器回归涵盖 320/390/844/1440px、无横向溢出、触控尺寸、密码显隐、错误后恢复、拒绝授权；截图位于 target/iam-preview，不纳入提交。生产数据库身份、外部代理 issuer、真实网关部署及设备 Safari/软键盘仍需环境联调。
 
+## 接入演示
+
+入口 `/playground`，按 H5、移动端、Device、应用后端和兼容接入展示参与者、准备条件、真实请求、脱敏结果与占位符示例。页面支持桌面/移动端，实际调用 IAM 的授权码 PKCE/OIDC、UserInfo/退出、机密刷新、客户端凭据、introspection/撤销和 Device；password/sms 沿用原业务。当前处于实现验收阶段，尚未部署。
+
+默认 `IAM_PLAYGROUND_ENABLED=false`。启用还必须通过 `IAM_PLAYGROUND_ALLOWED_PROFILES` 显式许可当前非生产 profile；`prd` 或 `production` 任一激活均否决。演示客户端使用 `iam-playground-` 保留前缀，不写数据库；关闭时该前缀的授权记录不再参与协议认证。详细配置和当前完成范围见 [接入演示说明](docs/playground.md)。
+
 ## 扩展
 
 身份源实现 UserAuthInfoService；协议和 grant 使用 Spring Security 的扩展点。复用框架能力应回到 Macula Boot，IAM 仅保留本服务的协议与身份编排。CAS/SAML 尚未实现。

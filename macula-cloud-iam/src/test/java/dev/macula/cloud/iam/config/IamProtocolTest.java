@@ -178,6 +178,15 @@ class IamProtocolTest {
         }).build();
     }
 
+    @Test void disabledPlaygroundRoutesAndAssetsReturn404ThroughRealSecurityChain() throws Exception {
+        for (String path : new String[]{"/playground", "/playground/callback", "/playground/device",
+            "/playground/assets/playground.js", "/api/v1/iam-playground/flows"}) {
+            mvc.perform(get(path)).andExpect(status().isNotFound()).andExpect(header().string("Cache-Control", "no-store"));
+            mvc.perform(post(path)).andExpect(status().isNotFound());
+            mvc.perform(options(path)).andExpect(status().isNotFound());
+        }
+    }
+
     @Test void loginPagesAndSessionWorkWithCsrf() throws Exception {
         mvc.perform(get("/login")).andExpect(status().isOk()).andExpect(content().string(
             org.hamcrest.Matchers.containsString("autocomplete=\"current-password\"")))

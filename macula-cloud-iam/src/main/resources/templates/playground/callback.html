@@ -1,0 +1,8 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="referrer" content="no-referrer">
+  <title>完成授权 · Macula IAM</title><link rel="stylesheet" th:href="@{/playground/assets/playground.css}">
+  <script defer th:src="@{/playground/assets/playground.js}"></script></head>
+<body class="device-page" data-page="callback"><main class="device-card"><a class="brand" th:href="@{/playground}">MACULA <span>IAM / CONNECT</span></a>
+  <p class="eyebrow">CALLBACK &amp; VERIFICATION</p><h1>正在验证这次连接</h1><p id="status" role="status">检查 state / PKCE，兑换授权码并验证 ID Token…</p>
+  <p id="error" class="error" role="alert" tabindex="-1" hidden></p><a th:href="@{/playground}">返回接入实验室 →</a></main></body></html>

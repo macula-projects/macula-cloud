@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="referrer" content="no-referrer"><title>接入实验室 · Macula IAM</title>
+  <link rel="stylesheet" th:href="@{/playground/assets/playground.css}">
+  <script defer th:src="@{/playground/assets/playground.js}"></script></head>
+<body data-page="index">
+<header class="topbar"><a class="brand" th:href="@{/playground}">MACULA <span>IAM / CONNECT</span></a>
+  <span class="environment"><i></i> 非生产 · 真实协议调用</span></header>
+<div class="shell">
+  <aside class="sidebar"><p class="nav-caption">INTEGRATION LAB</p><h2>选择接入场景</h2>
+    <nav aria-label="接入场景">
+      <button type="button" data-scene="h5" aria-pressed="true"><span>01</span> H5 / 浏览器</button>
+      <button type="button" data-scene="mobile" aria-pressed="false"><span>02</span> 移动应用</button>
+      <button type="button" data-scene="device" aria-pressed="false"><span>03</span> Device 设备</button>
+      <button type="button" data-scene="server" aria-pressed="false"><span>04</span> 应用后端</button>
+      <button type="button" data-scene="legacy" aria-pressed="false"><span>05</span> 兼容接入</button>
+    </nav>
+    <div class="sidebar-note"><span class="tag">SAFE BY DESIGN</span><p>专用客户端 · 会话隔离<br>生产关闭 · 无业务权限</p>
+      <small>本页面帮助你理解协议，不替代原生 SDK、真实短信身份源或生产验收。</small></div>
+  </aside>
+  <main class="workspace">
+    <section class="intro"><p class="eyebrow">BUILD YOUR CONNECTION</p><h1 id="scene-title">H5 与 IAM 的第一次握手</h1>
+      <p id="scene-description" class="lead">用真实请求，走一遍安全登录、授权和用户信息获取。</p>
+      <div class="chips"><span id="grant-label">Authorization Code + S256 PKCE</span><span>Opaque Access Token</span><span id="oidc-label">OIDC</span></div>
+    </section>
+    <section class="journey" aria-label="协议参与者"><div><span>01 / CLIENT</span><strong id="actor-client">浏览器</strong><p id="actor-client-note">生成 state、nonce 和 PKCE</p></div>
+      <div><span>02 / IDENTITY</span><strong>Macula IAM</strong><p>身份认证、用户确认、签发令牌</p></div>
+      <div><span>03 / RESOURCE</span><strong id="actor-resource">UserInfo</strong><p id="actor-resource-note">用 Access Token 获取已授权信息</p></div></section>
+    <div class="content-grid"><div>
+      <section class="panel"><div class="panel-heading"><h2>开始一次真实接入</h2><span class="step">LIVE REQUEST</span></div>
+        <p id="preparation" class="muted"></p>
+        <details class="configuration"><summary>接入前提与环境配置</summary><dl><dt>Issuer</dt><dd id="issuer">正在加载…</dd>
+          <dt>精确回调</dt><dd id="callback"></dd><dt>机密客户端</dt><dd id="confidential-status"></dd></dl>
+          <p>运维需启用非生产演示、准备无业务权限测试身份，并保证浏览器与服务端都能访问 issuer。页面不接收任意目标 URL 或 client secret。</p></details>
+        <form id="start-form" method="post" th:action="@{/api/v1/iam-playground/flows}"><div id="variant-field" class="field" hidden><label for="variant">接入方式</label><select id="variant"></select></div>
+          <div id="password-fields" hidden><div class="field"><label for="username">测试账号</label><input id="username" name="username" autocomplete="username" maxlength="128"></div>
+            <div class="field"><label for="password">测试密码</label><input id="password" name="password" type="password" autocomplete="current-password" maxlength="256"></div></div>
+          <div id="sms-fields" hidden><div class="field"><label for="phone">测试手机号</label><input id="phone" name="phone" type="tel" autocomplete="tel" maxlength="32"></div>
+            <div class="field"><label for="captcha">已有验证码</label><input id="captcha" name="captcha" autocomplete="one-time-code" maxlength="32"></div></div>
+          <div class="actions"><button id="start" class="primary" type="submit" disabled>生成 PKCE 并前往 IAM →</button><button id="reset" type="button">重置本会话</button></div>
+        </form>
+        <p id="status" role="status" aria-live="polite">正在读取演示配置…</p><p id="error" class="error" role="alert" tabindex="-1" hidden></p>
+        <div id="device-result" class="device-result" hidden><span class="eyebrow">在另一浏览器或设备上确认</span><div id="user-code" class="user-code"></div>
+          <a id="verify-device" target="_blank" rel="noopener noreferrer">打开设备确认页面 ↗</a><p>请核对代码。取消只停止轮询，不会撤销设备码。</p></div>
+        <div id="token-actions" class="actions" hidden>
+          <button type="button" data-action="userinfo">读取 UserInfo</button><button type="button" data-action="refresh">刷新令牌</button>
+          <button type="button" data-action="introspect">查询状态</button><button type="button" data-action="revoke-access">撤销 Access Token</button>
+          <button type="button" data-action="revoke-refresh">撤销 Refresh Token</button><button type="button" data-action="reveal">查看本次令牌</button>
+          <button type="button" data-action="logout">OIDC 退出</button></div>
+        <button id="stop" type="button" hidden>停止设备轮询</button>
+        <div id="revealed" hidden><div class="panel-heading"><h3>仅本会话可见</h3><button id="hide-tokens" type="button">隐藏令牌</button></div><pre id="tokens"></pre><p class="muted">不要粘贴到日志、工单或聊天中。页面不会把令牌写入浏览器存储。</p></div>
+      </section>
+      <section class="panel"><div class="panel-heading"><h2>接入步骤</h2><span class="step">IMPLEMENTATION</span></div><ol id="steps" class="steps"></ol>
+        <details open><summary>可复制的请求骨架</summary><p class="muted">示例中的凭据均为占位符，实际值请在你的客户端安全生成或注入。</p>
+          <pre id="example"></pre><button id="copy-example" type="button">复制示例</button></details></section>
+    </div><aside class="evidence">
+      <section class="panel dark-panel"><div class="panel-heading"><h2>请求与结果</h2><span id="http-status" class="step">WAITING</span></div>
+        <p class="muted">辅助接口由演示后端真实调用 IAM；这里只显示脱敏轨迹，不是模拟成功。</p><pre id="transcript" aria-label="脱敏协议轨迹">尚未发起请求</pre></section>
+      <section class="panel"><h2>如何理解结果</h2><p id="explanation"></p><div class="definition"><strong>Access Token ≠ ID Token</strong><p>本演示访问令牌为 opaque，不能当 JWT 解码。ID Token 是 JWT，必须验签并校验绑定后才代表登录结果。</p></div>
+        <div class="definition"><strong id="verification-state">ID Token：尚未验证</strong><p>“仅解码”不等于验证通过。本页只有服务端完成验签与 claims 校验后才显示已验证。</p></div>
+        <details><summary>失败时检查什么？</summary><p>invalid_client：注册/secret/认证方式；invalid_grant：过期、重放或 PKCE；invalid_scope：超出许可；access_denied：用户拒绝或授权失效。网络失败先检查 issuer 的双向可达性。</p></details>
+      </section>
+    </aside></div>
+    <footer>Macula IAM 接入实验室 · 作者 Rain <span>OAuth 协议实践，不是业务访问凭据发放入口</span></footer>
+  </main>
+</div></body></html>
