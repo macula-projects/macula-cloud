@@ -7,7 +7,7 @@
 路由包含 `/tinyid/api/v1/admin/**` 和 `/tinyid/api/v1/id/` 下四个精确发号路径：
 `nextId`、`nextIdSimple`、`nextSegmentId`、`nextSegmentIdSimple`，
 通过 `StripPrefix=1` 移除 `/tinyid` 前缀后转发至 `macula-cloud-tinyid`，Server 不设置上下文前缀。
-管理接口外部地址不变。其他旧发号接口不增加网关路由。
+管理接口外部地址不变。除上述路径外，不开放其他 TinyID 路由。
 新号段请求为 POST，业务参数只有 bizType；Starter 使用统一应用 AK/SK 进行 HMAC 签名，
 网关沿用应用 URL 访问策略校验后向下游传递 JWT。不得将此路径加入匿名白名单。
 沿用共享网关认证授权策略，TinyID 不额外区分 HMAC 应用与个人 Token；身份边界由后续统一策略处理。
