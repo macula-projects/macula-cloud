@@ -40,7 +40,11 @@ public enum ErrorCode implements ResultCode, Serializable {
     /**
      * server internal error
      */
-    SYS_ERR("ID502", "sys error");
+    SYS_ERR("ID502", "sys error"),
+    /** 发号业务尚未配置。 */
+    BIZ_TYPE_NOT_FOUND("ID503", "发号业务不存在"),
+    /** 乐观锁重试耗尽。 */
+    SEGMENT_CONFLICT("ID504", "号段更新冲突，请稍后重试");
 
     /** 错误码。 */
     private String code;

@@ -57,7 +57,9 @@ TinyID 管理端 API 仅通过网关 `/tinyid/api/v1/admin/**` 访问，管理�
   `tiny_id_audit_log`；不保存请求/响应正文、原始异常、SQL 或原始 Token。审计是异步尽力写入，
   鉴权或方法调用前被拒绝的请求可能不会产生 Controller 审计事件，审计失败也不会回滚已完成的管理操作。
 
-发号时仍按 `(token, biz_type)` 组合校验接入权限。管理端不提供单条授权撤销、应用或业务停用和
+四个发号接口均使用统一网关认证，不再校验 TinyID Token 或应用—bizType 绑定。
+上述管理功能及历史授权记录暂时保留，但不约束发号访问权限。
+管理端不提供单条授权撤销、应用或业务停用和
 Token 轮换功能；`step`、`delta`、`remainder` 创建后不提供修改入口。应用和未使用业务的删除均跨
 全部数据源执行并记录审计，只有全部当前数据源配置完整且参数一致的业务才可以授权给应用。
 
@@ -79,7 +81,7 @@ Nacos 等外部配置也应移除旧的 Flyway 连接配置及 `db/master` 位�
 迁移已合并为唯一的 `db/migration/V1__baseline.sql`，包含业务表、授权唯一索引和审计表，
 不再创建已废弃的管理请求表与数据源顺序表。此次基线重建要求先由运维重置数据库及 Flyway 历史，
 不能直接覆盖升级旧库；`baseline-on-migrate=false` 防止将未迁移的非空库静默标记为 V1。
-新增库仍需在加入发号池前复制既有业务配置和 Token 授权，并设置正确的 remainder；迁移不会自动补齐业务数据。
+新增库仍需在加入发号池前复制既有业务配置，并设置正确的 remainder；迁移不会自动补齐业务数据。
 数据库连接信息只用于服务端建池，不会通过管理 API 返回。
 
 V1 中的 `test`、`test_odd` 和固定 Token 是历史示例。服务不再在启动迁移阶段自动删除或补齐数据，已有
@@ -148,7 +150,36 @@ delta)
 
 ## 部署说明
 
-TinyID 是独立应用；Gateway 只代理 `/tinyid/api/v1/admin/**` 管理接口。接入应用的发号请求不经过
-Gateway，而是使用 TinyID Starter 配置的服务地址，通过集群内服务发现或专用负载均衡地址直连 TinyID，
-减少发号链路依赖。TinyID 服务自身继续对白名单 `/api/v1/id/**` 开放匿名访问，并使用 `(token, biz_type)`
-校验发号权限。
+TinyID 是独立应用；Gateway 代理管理接口及 `/tinyid/api/v1/id/` 下的
+`nextId`、`nextIdSimple`、`nextSegmentId`、`nextSegmentIdSimple` 四个发号接口。
+发号只需 `bizType`，批量取号可传 `batchSize`；Starter 使用 `POST nextSegmentIdSimple`。
+Server 不设置 `/tinyid` 上下文，
+Gateway 对 TinyID 路由使用 `StripPrefix=1`，先移除前缀再验签及转发，与 system 一致。
+管理接口的网关地址保持不变；直接访问 Server 时，管理和旧发号接口地址均去掉 `/tinyid`。
+Starter 使用 `macula.cloud.endpoint/app-key/secret-key` 签名访问网关，不传 TinyID 专用 token，
+不单独设置超时；缓存与预加载、本地发号保持不变。
+
+Gateway 验证 HMAC 后转发 JWT，Server 对全部发号接口执行 JWT 认证。
+网关沿用共享认证授权逻辑，本模块不额外区分 HMAC 应用与个人 Token，后续由统一策略处理。
+Server 仍信任有效 JWT，不独立校验 JWT 的 HMAC 来源，不能将其直连端口作为不受控的公开入口。
+发号接口不再加入匿名白名单。必须同步删除 Nacos 或环境中的 `/api/v1/id/**`
+及其单接口白名单，不能由外部配置重新放开匿名访问。
+网关与 Server 应使用匹配的 JWT 签发/验证配置；具备接口访问权的应用可申请任意已存在的 bizType。
+
+升级时删除客户端旧 `macula.cloud.tinyid.server/token/connect-timeout/read-timeout` 配置，
+并协调更新客户端、Server、网关路由与认证配置。旧 token-only 调用不再支持，全部发号调用需迁移到统一网关认证；
+配置中心或环境变量若覆盖 `server.servlet.context-path`，也必须移除旧值；
+网关应用 URL 授权按改写后的路径配置，例如 `POST:/api/v1/id/nextSegmentIdSimple`。
+回滚需同步恢复这些版本与配置，无数据库迁移，不重置号段进度。
+Server 自定义 `SegmentIdService` 会使 Starter 远程客户端退让，无需配置客户端网关凭据。
+
+### 号段错误响应
+
+与 system 一样引入 `macula-boot-starter-web`，`TinyIdSysException` 由统一 BizException 处理器处理。
+新号段接口成功仍返回五字段 `text/plain`；失败改为 HTTP 500 + Result JSON，不再返回 HTTP 200 空串。
+`ID503` 表示业务不存在，`ID504` 表示号段更新冲突，`ID502` 表示内部申请失败；底层异常保留在 cause 链中供日志诊断。
+调用方需接受文本和 JSON 两种媒体类型，新版 Starter 会保留远程错误码。
+其他发号接口的业务失败同样返回 HTTP 500 + Result JSON，不再返回空串或 HTTP 200 错误响应。
+Controller 直接返回业务数据，由 Advice 包装普通 JSON 请求；Feign 标记请求按统一约定返回原始数据，Simple 接口成功仍为文本。
+管理接口同样使用统一 Result，前端与 system 一致先检查 `success` 再读取 `data`；请协调升级前后端。
+`macula.jackson.long-to-string=false` 保留原 JSON 数值类型；MVC 参数错误等保留 HTTP 状态并返回统一 Result。

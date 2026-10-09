@@ -23,6 +23,7 @@ import dev.macula.boot.starter.tinyid.base.service.SegmentIdService;
 import dev.macula.cloud.tinyid.common.Constants;
 import dev.macula.cloud.tinyid.mapper.TinyIdInfoMapper;
 import dev.macula.cloud.tinyid.pojo.entity.TinyIdInfo;
+import dev.macula.cloud.tinyid.pojo.vo.ErrorCode;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,7 +34,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
+ * 在事务内通过乐观锁申请号段，并以统一业务异常报告失败。
+ *
  * @author du_imba
+ * @since 6.1.0
  */
 @Component
 public class DbSegmentIdServiceImpl implements SegmentIdService {
@@ -65,12 +69,22 @@ public class DbSegmentIdServiceImpl implements SegmentIdService {
     @Override
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public SegmentId getNextSegmentId(String bizType) {
+        try {
+            return allocateSegment(bizType);
+        } catch (TinyIdSysException e) {
+            throw e;
+        } catch (RuntimeException e) {
+            throw new TinyIdSysException(ErrorCode.SYS_ERR, "号段申请失败", e);
+        }
+    }
+
+    private SegmentId allocateSegment(String bizType) {
         // 获取nextTinyId的时候，有可能存在version冲突，需要重试
         for (int i = 0; i < Constants.RETRY; i++) {
             TinyIdInfo tinyIdInfo = infoMapper.selectOne(
                 Wrappers.<TinyIdInfo>lambdaQuery().eq(TinyIdInfo::getBizType, bizType));
             if (tinyIdInfo == null) {
-                throw new TinyIdSysException("can not find biztype:" + bizType);
+                throw new TinyIdSysException(ErrorCode.BIZ_TYPE_NOT_FOUND, "发号业务不存在");
             }
             Long newMaxId = tinyIdInfo.getMaxId() + tinyIdInfo.getStep();
             Long oldMaxId = tinyIdInfo.getMaxId();
@@ -85,7 +99,7 @@ public class DbSegmentIdServiceImpl implements SegmentIdService {
                 logger.info("getNextSegmentId conflict tinyIdInfo:{}", tinyIdInfo);
             }
         }
-        throw new TinyIdSysException("get next segmentId conflict");
+        throw new TinyIdSysException(ErrorCode.SEGMENT_CONFLICT, "号段更新冲突，请稍后重试");
     }
 
     public SegmentId convert(TinyIdInfo idInfo) {

@@ -1,7 +1,5 @@
 server:
   port: ${SERVER_PORT:9082}
-  servlet:
-    context-path: /tinyid
 
 spring:
   profiles:
@@ -27,9 +25,10 @@ spring:
       force: true
 
 macula:
+  jackson:
+    long-to-string: false # 保留既有发号与管理 JSON 的数值类型
   security:
-    ignore-urls:
-      - /api/v1/id/**
+    ignore-urls: []
 
 ---
 # local Profile 包含 IDE 本地开发所需的全部默认配置

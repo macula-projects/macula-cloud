@@ -86,6 +86,12 @@ Docker 镜像构建时仍使用 Vite 配置生成静态资源；容器启动时�
 
 > `client_secret`、示例用户名和密码最终都会发送到浏览器，Base64 只用于安全生成 JavaScript，并不提供加密或保密能力。这里仅允许使用 public/demo client 和本地示例账号；不得把生产 confidential client secret 或真实账号密码放入前端环境变量、构建产物或 `config.js`。
 
+## TinyID 管理接口
+
+TinyID 管理接口与 system 使用相同的 Result 结构：先检查 `success`，再读取 `data`；业务失败展示 `cause/msg`。
+保存或删除失败时不关闭表单、不显示成功。该响应升级需要同步部署 TinyID Server 与管理前端。
+相关回归用例位于 `tests/unit/tinyid-management.test.js` 和 `cypress/e2e/tinyid-management.cy.js`；后者使用模拟接口，不代表真实后端联调。
+
 ## License
 
 MMacula Cloud Admin is Open Source software released under the Apache 2.0 license.

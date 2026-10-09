@@ -23,6 +23,7 @@
 
 <script setup>
 import {onMounted, ref} from 'vue'
+import {ElMessage} from 'element-plus'
 import api from '@/api/model/tinyid/management'
 
 const records = ref([])
@@ -36,9 +37,14 @@ async function load(targetPage = page.value) {
 	loading.value = true
 	page.value = targetPage
 	try {
-		const response = await api.auditLogs({page: targetPage, pageSize, operator: operator.value})
-		records.value = response.records
-		total.value = response.total
+		const response = await api.auditLogs({page: targetPage, pageSize, operator: operator.value}).catch(() => null)
+		if (!response) return
+		if (!response.success) {
+			ElMessage.error(response.cause || response.msg || '操作失败')
+			return
+		}
+		records.value = response.data.records
+		total.value = response.data.total
 	} finally {
 		loading.value = false
 	}

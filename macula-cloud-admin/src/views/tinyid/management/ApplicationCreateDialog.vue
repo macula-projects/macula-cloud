@@ -48,9 +48,14 @@ async function open() {
 	let all = []
 	let total = 0
 	do {
-		const response = await api.businesses.list({page, pageSize: 100})
-		all = all.concat(response.records)
-		total = response.total
+		const response = await api.businesses.list({page, pageSize: 100}).catch(() => null)
+		if (!response) return
+		if (!response.success) {
+			ElMessage.error(response.cause || response.msg || '操作失败')
+			return
+		}
+		all = all.concat(response.data.records)
+		total = response.data.total
 		page++
 	} while (all.length < total)
 	businesses.value = all.filter(item => item.consistencyStatus === 'COMPLETE')
@@ -65,8 +70,13 @@ async function submit() {
 	await formRef.value.validate()
 	saving.value = true
 	try {
-		const response = await api.applications.create({...form})
-		createdToken.value = response.token
+		const response = await api.applications.create({...form}).catch(() => null)
+		if (!response) return
+		if (!response.success) {
+			ElMessage.error(response.cause || response.msg || '操作失败')
+			return
+		}
+		createdToken.value = response.data.token
 		visible.value = false
 		tokenVisible.value = true
 		emit('success')
