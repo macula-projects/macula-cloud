@@ -17,17 +17,20 @@
 
 package dev.macula.cloud.iam.service.oauth2;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.Module;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
+import dev.macula.cloud.iam.authentication.captcha.CaptchaAuthenticationToken;
+import dev.macula.cloud.iam.authentication.weapp.WeappAuthenticationToken;
+import dev.macula.cloud.iam.service.userdetails.SysUserDetails;
 import dev.macula.boot.constants.CacheConstants;
-import dev.macula.cloud.iam.jackson2.MaculaIamJackson2Module;
+import dev.macula.cloud.iam.jackson.MaculaIamJacksonModule;
 import dev.macula.cloud.iam.pojo.dto.Authorization;
 import org.springframework.dao.DataRetrievalFailureException;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.lang.Nullable;
-import org.springframework.security.jackson2.SecurityJackson2Modules;
+import org.jspecify.annotations.Nullable;
+import org.springframework.security.jackson.SecurityJacksonModules;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.security.oauth2.core.OAuth2RefreshToken;
@@ -40,13 +43,20 @@ import org.springframework.security.oauth2.server.authorization.OAuth2Authorizat
 import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
-import org.springframework.security.oauth2.server.authorization.jackson2.OAuth2AuthorizationServerJackson2Module;
 import org.springframework.util.Assert;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
+import java.time.Duration;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.util.HexFormat;
+import java.util.LinkedHashMap;
+import java.util.HashMap;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.security.oauth2.core.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -62,24 +72,58 @@ import java.util.function.Consumer;
  */
 public class MaculaOAuth2AuthorizationService implements OAuth2AuthorizationService {
 
-    private final static Long TIMEOUT = 10L;
+    private static final String VERSION = "macula.authorization.version";
+    private static final String STATE_EXPIRY = "macula.authorization.stateExpiresAt";
+    private static final Map<String, Class<? extends OAuth2Token>> TOKEN_TYPES = new LinkedHashMap<>();
+    static {
+        TOKEN_TYPES.put("access_token", OAuth2AccessToken.class);
+        TOKEN_TYPES.put("refresh_token", OAuth2RefreshToken.class);
+        TOKEN_TYPES.put("code", OAuth2AuthorizationCode.class);
+        TOKEN_TYPES.put("id_token", OidcIdToken.class);
+        TOKEN_TYPES.put("device_code", OAuth2DeviceCode.class);
+        TOKEN_TYPES.put("user_code", OAuth2UserCode.class);
+        TOKEN_TYPES.put("state", null);
+    }
+    // All v2 keys share a slot. CAS and index replacement are a single Redis operation.
+    private static final DefaultRedisScript<Long> SAVE_SCRIPT = new DefaultRedisScript<>("""
+        local current = redis.call('GET', KEYS[1])
+        local version = 0
+        if current then version = cjson.decode(current).version end
+        if version ~= tonumber(ARGV[1]) then return 0 end
+        local oldCount = tonumber(ARGV[4])
+        for i = 2, oldCount + 1 do redis.call('DEL', KEYS[i]) end
+        redis.call('SET', KEYS[1], ARGV[2], 'PX', ARGV[3])
+        for i = oldCount + 2, #KEYS do
+            redis.call('SET', KEYS[i], ARGV[5], 'PX', ARGV[i - oldCount + 4])
+        end
+        return 1
+        """, Long.class);
+    private final StringRedisTemplate strings;
+    private final ObjectMapper recordMapper = JsonMapper.builder().build();
     private static final String AUTHORIZATION = CacheConstants.OAUTH2_TOKEN_KEY;
 
     private final RedisTemplate<String, Object> redisTemplate;
 
     private final RegisteredClientRepository registeredClientRepository;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper;
 
     public MaculaOAuth2AuthorizationService(RedisTemplate<String, Object> redisTemplate,
         RegisteredClientRepository registeredClientRepository) {
 
         this.registeredClientRepository = registeredClientRepository;
         this.redisTemplate = redisTemplate;
+        this.strings = new StringRedisTemplate(Objects.requireNonNull(redisTemplate.getConnectionFactory()));
         ClassLoader classLoader = MaculaOAuth2AuthorizationService.class.getClassLoader();
-        List<Module> securityModules = SecurityJackson2Modules.getModules(classLoader);
-        this.objectMapper.registerModules(securityModules);
-        this.objectMapper.registerModule(new JavaTimeModule());
-        this.objectMapper.registerModules(new OAuth2AuthorizationServerJackson2Module(), new MaculaIamJackson2Module());
+        var allowedTypes = BasicPolymorphicTypeValidator.builder()
+            .allowIfSubType(SysUserDetails.class)
+            .allowIfSubType(CaptchaAuthenticationToken.class)
+            .allowIfSubType(WeappAuthenticationToken.class)
+            .allowIfSubType(Long.class);
+        // Includes OAuth2AuthorizationServerJacksonModule and its constrained type validator.
+        this.objectMapper = JsonMapper.builder()
+            .addModules(SecurityJacksonModules.getModules(classLoader, allowedTypes))
+            .addModule(new MaculaIamJacksonModule())
+            .build();
     }
 
     private static AuthorizationGrantType resolveAuthorizationGrantType(String authorizationGrantType) {
@@ -97,111 +141,163 @@ public class MaculaOAuth2AuthorizationService implements OAuth2AuthorizationServ
     @Override
     public void remove(OAuth2Authorization authorization) {
         Assert.notNull(authorization, "authorization cannot be null");
-
-        List<String> keys = new ArrayList<>();
-        if (isState(authorization)) {
-            String token = authorization.getAttribute(OAuth2ParameterNames.STATE);
-            keys.add(buildKey(OAuth2ParameterNames.STATE, token));
-        }
-
-        if (isCode(authorization)) {
-            OAuth2Authorization.Token<OAuth2AuthorizationCode> authorizationCode =
-                authorization.getToken(OAuth2AuthorizationCode.class);
-            OAuth2AuthorizationCode authorizationCodeToken = authorizationCode.getToken();
-            keys.add(buildKey(OAuth2ParameterNames.CODE, authorizationCodeToken.getTokenValue()));
-        }
-
-        if (isRefreshToken(authorization)) {
-            OAuth2RefreshToken refreshToken = authorization.getRefreshToken().getToken();
-            keys.add(buildKey(OAuth2ParameterNames.REFRESH_TOKEN, refreshToken.getTokenValue()));
-        }
-
-        if (isAccessToken(authorization)) {
-            OAuth2AccessToken accessToken = authorization.getAccessToken().getToken();
-            keys.add(buildKey(OAuth2ParameterNames.ACCESS_TOKEN, accessToken.getTokenValue()));
-        }
-        redisTemplate.delete(keys);
+        Authorization current = readRecord(authorization.getId());
+        if (current != null && current.isDeleted()) return;
+        Authorization previous = current != null ? current : toEntity(authorization);
+        Authorization deleted = toEntity(authorization);
+        deleted.setDeleted(true);
+        deleted.setVersion(previous.getVersion() + 1);
+        deleted.setRetentionExpiresAt(retention(previous));
+        persist(previous, deleted, Map.of(), previous.getVersion());
     }
 
     @Override
     @Nullable
     public OAuth2Authorization findById(String id) {
-        throw new UnsupportedOperationException();
+        Assert.hasText(id, "id cannot be empty");
+        Authorization record = readRecord(id);
+        return record == null || record.isDeleted() ? null : toObject(record);
     }
 
     @Override
     public void save(OAuth2Authorization authorization) {
         Assert.notNull(authorization, "authorization cannot be null");
-
-        if (isState(authorization)) {
-            String token = authorization.getAttribute(OAuth2ParameterNames.STATE);
-            redisTemplate.opsForValue()
-                .set(buildKey(OAuth2ParameterNames.STATE, token), toEntity(authorization), TIMEOUT, TimeUnit.MINUTES);
+        Authorization previous = readRecord(authorization.getId());
+        Number expected = authorization.getAttribute(VERSION);
+        long version = expected == null ? 0 : expected.longValue();
+        Authorization record = toEntity(authorization);
+        record.setVersion(version + 1);
+        if (record.getState() != null) {
+            Long expiry = authorization.getAttribute(STATE_EXPIRY);
+            record.setStateExpiresAt(previous != null && previous.getStateExpiresAt() != null
+                ? previous.getStateExpiresAt()
+                : expiry == null ? Instant.now().plusSeconds(600) : Instant.ofEpochMilli(expiry));
         }
+        Instant expires = retention(record);
+        if (previous != null && retention(previous).isAfter(expires)) expires = retention(previous);
+        record.setRetentionExpiresAt(expires);
+        persist(previous, record, indexes(record), version);
+    }
 
-        if (isCode(authorization)) {
-            OAuth2Authorization.Token<OAuth2AuthorizationCode> authorizationCode =
-                authorization.getToken(OAuth2AuthorizationCode.class);
-            OAuth2AuthorizationCode authorizationCodeToken = authorizationCode.getToken();
-            long between =
-                ChronoUnit.MINUTES.between(authorizationCodeToken.getIssuedAt(), authorizationCodeToken.getExpiresAt());
-            redisTemplate.opsForValue().set(buildKey(OAuth2ParameterNames.CODE, authorizationCodeToken.getTokenValue()),
-                toEntity(authorization), between, TimeUnit.MINUTES);
+    private void persist(Authorization previous, Authorization record, Map<String, Instant> next, long version) {
+        List<String> keys = new ArrayList<>();
+        keys.add(recordKey(record.getId()));
+        // Keep expired old keys in the delete set as well.
+        if (previous != null) keys.addAll(indexes(previous).keySet());
+        int oldCount = keys.size() - 1;
+        List<String> args = new ArrayList<>(List.of(Long.toString(version), writeRecord(record),
+            Long.toString(Math.max(1, Duration.between(Instant.now(), retention(record)).toMillis())),
+            Integer.toString(oldCount), record.getId()));
+        Instant now = Instant.now();
+        next.forEach((key, expiry) -> {
+            long ttl = Duration.between(now, expiry).toMillis();
+            if (ttl > 0) { keys.add(key); args.add(Long.toString(ttl)); }
+        });
+        Long saved = strings.execute(SAVE_SCRIPT, keys, args.toArray());
+        if (!Long.valueOf(1).equals(saved)) {
+            throw new OAuth2AuthenticationException(new OAuth2Error(OAuth2ErrorCodes.INVALID_GRANT,
+                "Authorization was concurrently modified; restart the authorization flow.", null));
         }
+    }
 
-        if (isRefreshToken(authorization)) {
-            OAuth2RefreshToken refreshToken = authorization.getRefreshToken().getToken();
-            long between = ChronoUnit.SECONDS.between(refreshToken.getIssuedAt(), refreshToken.getExpiresAt());
-            redisTemplate.opsForValue().set(buildKey(OAuth2ParameterNames.REFRESH_TOKEN, refreshToken.getTokenValue()),
-                toEntity(authorization), between, TimeUnit.SECONDS);
+    private Map<String, Instant> indexes(Authorization record) {
+        Map<String, Instant> result = new LinkedHashMap<>();
+        addIndex(result, "access_token", record.getAccessTokenValue(), record.getAccessTokenExpiresAt());
+        addIndex(result, "refresh_token", record.getRefreshTokenValue(), record.getRefreshTokenExpiresAt());
+        addIndex(result, "code", record.getAuthorizationCodeValue(), record.getAuthorizationCodeExpiresAt());
+        // RP-Initiated Logout accepts an expired ID Token while the authorization/session is retained.
+        addIndex(result, "id_token", record.getOidcIdTokenValue(), retention(record));
+        addIndex(result, "device_code", record.getDeviceCodeValue(), record.getDeviceCodeExpiresAt());
+        addIndex(result, "user_code", record.getUserCodeValue(), record.getUserCodeExpiresAt());
+        addIndex(result, "state", record.getState(), record.getStateExpiresAt());
+        return result;
+    }
+
+    private void addIndex(Map<String, Instant> indexes, String type, String value, Instant expiry) {
+        if (value != null && expiry != null) indexes.put(indexKey(type, value), expiry);
+    }
+
+    private Instant retention(Authorization record) {
+        Instant latest = record.getRetentionExpiresAt() == null ? Instant.now() : record.getRetentionExpiresAt();
+        for (Instant expiry : new Instant[] {record.getStateExpiresAt(), record.getAuthorizationCodeExpiresAt(),
+            record.getAccessTokenExpiresAt(), record.getRefreshTokenExpiresAt(), record.getOidcIdTokenExpiresAt(),
+            record.getDeviceCodeExpiresAt(), record.getUserCodeExpiresAt()}) {
+            if (expiry != null && expiry.isAfter(latest)) latest = expiry;
         }
-
-        if (isAccessToken(authorization)) {
-            OAuth2AccessToken accessToken = authorization.getAccessToken().getToken();
-            long between = ChronoUnit.SECONDS.between(accessToken.getIssuedAt(), accessToken.getExpiresAt());
-            redisTemplate.opsForValue()
-                .set(buildKey(OAuth2ParameterNames.ACCESS_TOKEN, accessToken.getTokenValue()), toEntity(authorization),
-                    between, TimeUnit.SECONDS);
-        }
-    }
-
-    private String buildKey(String type, String id) {
-        return String.format("%s:%s:%s", AUTHORIZATION, type, id);
-    }
-
-    private static boolean isState(OAuth2Authorization authorization) {
-        return Objects.nonNull(authorization.getAttribute(OAuth2ParameterNames.STATE));
-    }
-
-    private static boolean isCode(OAuth2Authorization authorization) {
-        OAuth2Authorization.Token<OAuth2AuthorizationCode> authorizationCode =
-            authorization.getToken(OAuth2AuthorizationCode.class);
-        return Objects.nonNull(authorizationCode);
-    }
-
-    private static boolean isRefreshToken(OAuth2Authorization authorization) {
-        return Objects.nonNull(authorization.getRefreshToken());
-    }
-
-    private static boolean isAccessToken(OAuth2Authorization authorization) {
-        return Objects.nonNull(authorization.getAccessToken());
+        return latest;
     }
 
     @Override
     @Nullable
     public OAuth2Authorization findByToken(String token, @Nullable OAuth2TokenType tokenType) {
         Assert.hasText(token, "token cannot be empty");
-        if (tokenType == null) {
-            tokenType = OAuth2TokenType.ACCESS_TOKEN;
+        if (tokenType != null) return TOKEN_TYPES.containsKey(tokenType.getValue())
+            ? findByType(token, tokenType.getValue()) : null;
+        for (String type : TOKEN_TYPES.keySet()) {
+            OAuth2Authorization result = findByType(token, type);
+            if (result != null) return result;
         }
-        return toObject((Authorization)redisTemplate.opsForValue().get(buildKey(tokenType.getValue(), token)));
+        return null;
+    }
+
+    private OAuth2Authorization findByType(String value, String type) {
+        String id = strings.opsForValue().get(indexKey(type, value));
+        Authorization record;
+        if (id != null) {
+            record = readRecord(id);
+        } else {
+            Object legacy = redisTemplate.opsForValue().get(String.format("%s:%s:%s", AUTHORIZATION, type, value));
+            if (legacy == null) return null;
+            if (!(legacy instanceof Authorization)) throw new IllegalStateException("Unsupported authorization cache format");
+            Authorization old = (Authorization) legacy;
+            record = readRecord(old.getId());
+            if (record == null) {
+                record = old;
+                if ("state".equals(type)) {
+                    Long ttl = redisTemplate.getExpire(String.format("%s:%s:%s", AUTHORIZATION, type, value),
+                        TimeUnit.MILLISECONDS);
+                    if (ttl == null || ttl <= 0) return null;
+                    record.setStateExpiresAt(Instant.now().plusMillis(Math.min(ttl, 600_000)));
+                }
+            }
+        }
+        if (record == null || record.isDeleted()) return null;
+        OAuth2Authorization result = toObject(record);
+        if ("state".equals(type)) return value.equals(record.getState()) && record.getStateExpiresAt() != null
+            && record.getStateExpiresAt().isAfter(Instant.now()) ? result : null;
+        OAuth2Authorization.Token<?> found = result.getToken(TOKEN_TYPES.get(type));
+        // Preserve invalidation metadata for the protocol provider; don't resurrect replaced tokens.
+        return found != null && value.equals(found.getToken().getTokenValue())
+            && ("id_token".equals(type) || !found.isExpired()) ? result : null;
+    }
+
+    private Authorization readRecord(String id) {
+        String data = strings.opsForValue().get(recordKey(id));
+        if (data == null) return null;
+        try { return recordMapper.readValue(data, Authorization.class); }
+        catch (Exception ex) { throw new IllegalStateException("Cannot read authorization record", ex); }
+    }
+
+    private String writeRecord(Authorization record) {
+        try { return recordMapper.writeValueAsString(record); }
+        catch (Exception ex) { throw new IllegalStateException("Cannot write authorization record", ex); }
+    }
+
+    private String recordKey(String id) { return AUTHORIZATION + ":{iam-oauth2}:v2:authorization:" + digest(id); }
+    private String indexKey(String type, String value) {
+        return AUTHORIZATION + ":{iam-oauth2}:v2:" + type + ":" + digest(value);
+    }
+    private String digest(String value) {
+        try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+            .digest(value.getBytes(StandardCharsets.UTF_8))); }
+        catch (java.security.NoSuchAlgorithmException ex) { throw new IllegalStateException(ex); }
     }
 
     private OAuth2Authorization toObject(Authorization entity) {
         Assert.notNull(entity, "authorization cannot be null");
 
         RegisteredClient registeredClient =
-            this.registeredClientRepository.findByClientId(entity.getRegisteredClientId());
+            this.registeredClientRepository.findById(entity.getRegisteredClientId());
         if (registeredClient == null) {
             throw new DataRetrievalFailureException(
                 "The RegisteredClient with id '" + entity.getRegisteredClientId() + "' was not found in the RegisteredClientRepository.");
@@ -211,7 +307,12 @@ public class MaculaOAuth2AuthorizationService implements OAuth2AuthorizationServ
             OAuth2Authorization.withRegisteredClient(registeredClient).id(entity.getId())
                 .principalName(entity.getPrincipalName())
                 .authorizationGrantType(resolveAuthorizationGrantType(entity.getAuthorizationGrantType()))
-                .attributes(attributes -> attributes.putAll(parseMap(entity.getAttributes())));
+                .attributes(attributes -> {
+                    attributes.putAll(parseMap(entity.getAttributes()));
+                    attributes.put(VERSION, entity.getVersion());
+                    if (entity.getStateExpiresAt() != null)
+                        attributes.put(STATE_EXPIRY, entity.getStateExpiresAt().toEpochMilli());
+                });
         if (entity.getState() != null) {
             builder.attribute(OAuth2ParameterNames.STATE, entity.getState());
         }
@@ -249,6 +350,14 @@ public class MaculaOAuth2AuthorizationService implements OAuth2AuthorizationServ
             builder.token(idToken, metadata -> metadata.putAll(parseMap(entity.getOidcIdTokenMetadata())));
         }
 
+        if (entity.getDeviceCodeValue() != null) {
+            builder.token(new OAuth2DeviceCode(entity.getDeviceCodeValue(), entity.getDeviceCodeIssuedAt(),
+                entity.getDeviceCodeExpiresAt()), metadata -> metadata.putAll(parseMap(entity.getDeviceCodeMetadata())));
+        }
+        if (entity.getUserCodeValue() != null) {
+            builder.token(new OAuth2UserCode(entity.getUserCodeValue(), entity.getUserCodeIssuedAt(),
+                entity.getUserCodeExpiresAt()), metadata -> metadata.putAll(parseMap(entity.getUserCodeMetadata())));
+        }
         return builder.build();
     }
 
@@ -262,7 +371,10 @@ public class MaculaOAuth2AuthorizationService implements OAuth2AuthorizationServ
             entity.setAuthorizedScopes(
                 StringUtils.collectionToDelimitedString(authorization.getAuthorizedScopes(), ","));
         }
-        entity.setAttributes(writeMap(authorization.getAttributes()));
+        Map<String, Object> attributes = new HashMap<>(authorization.getAttributes());
+        attributes.remove(VERSION);
+        attributes.remove(STATE_EXPIRY);
+        entity.setAttributes(writeMap(attributes));
         entity.setState(authorization.getAttribute(OAuth2ParameterNames.STATE));
 
         OAuth2Authorization.Token<OAuth2AuthorizationCode> authorizationCode =
@@ -286,9 +398,13 @@ public class MaculaOAuth2AuthorizationService implements OAuth2AuthorizationServ
         setTokenValues(oidcIdToken, entity::setOidcIdTokenValue, entity::setOidcIdTokenIssuedAt,
             entity::setOidcIdTokenExpiresAt, entity::setOidcIdTokenMetadata);
         if (oidcIdToken != null) {
-            entity.setOidcIdTokenClaims(writeMap(oidcIdToken.getClaims()));
+            entity.setOidcIdTokenClaims(writeMap(oidcIdToken.getToken().getClaims()));
         }
 
+        setTokenValues(authorization.getToken(OAuth2DeviceCode.class), entity::setDeviceCodeValue,
+            entity::setDeviceCodeIssuedAt, entity::setDeviceCodeExpiresAt, entity::setDeviceCodeMetadata);
+        setTokenValues(authorization.getToken(OAuth2UserCode.class), entity::setUserCodeValue,
+            entity::setUserCodeIssuedAt, entity::setUserCodeExpiresAt, entity::setUserCodeMetadata);
         return entity;
     }
 

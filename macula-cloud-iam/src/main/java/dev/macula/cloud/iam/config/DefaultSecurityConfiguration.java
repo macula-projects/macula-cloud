@@ -73,9 +73,10 @@ public class DefaultSecurityConfiguration {
                 .requestMatchers("/admin/js/**").permitAll()
                 .requestMatchers("/admin/images/**").permitAll()
                 .requestMatchers("/favicon.ico").permitAll()
+                .requestMatchers("/iam/**").permitAll()
                 .anyRequest().authenticated())
             .userDetailsService(userDetailsService)
-            .csrf(AbstractHttpConfigurer::disable);
+            .csrf(org.springframework.security.config.Customizer.withDefaults());
 
         // FORM登录
         http.formLogin(form -> form

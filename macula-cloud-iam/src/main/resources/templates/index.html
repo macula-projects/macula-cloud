@@ -1,29 +1,29 @@
 <!DOCTYPE html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
 <head>
-    <meta charset="utf-8">
-    <title></title>
-    <link rel="stylesheet" th:href="@{/component/pear/css/pear.css}"/>
-    <style>
-        h1 {
-            margin-top: 200px;
-            color: #5FB878;
-        }
-
-        .layui-card-body {
-            text-align: center;
-            height: 500px;
-        }
-    </style>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light"><meta name="referrer" content="same-origin">
+  <title>已登录 · Macula</title>
+  <link rel="stylesheet" th:href="@{/iam/auth.css}" href="/iam/auth.css">
+  <script th:src="@{/iam/auth.js}" src="/iam/auth.js" defer></script>
 </head>
-<body class="pear-container">
-<div class="layui-card">
-    <div class="layui-card-header"></div>
-    <div class="layui-card-body">
-        <h1><b th:text="'你好！'+${principal}+'，此页面为中间页'"></b></h1>
+<body>
+<main class="shell">
+  <aside class="brand-panel" aria-label="Macula 统一身份平台">
+    <div class="brand"><span class="brand-mark" aria-hidden="true">M</span>Macula</div>
+    <div class="brand-content"><div class="eyebrow">ONE IDENTITY. CONNECTED WORK.</div>
+      <h1>一个身份，<br>连接你的工作。</h1><p>以统一、安全的身份访问企业应用，<br>让每一次连接都简单可信。</p></div>
+    <div class="orbit" aria-hidden="true"></div><div class="brand-meta">MACULA CLOUD · 统一身份平台</div>
+  </aside>
+  <section class="content-panel">
+    <div class="brand mobile-brand"><span class="brand-mark" aria-hidden="true">M</span>Macula</div>
+    <div class="card">
+      <div class="success-mark" aria-hidden="true">✓</div><h1>你已成功登录</h1>
+      <p class="subtitle">当前账号：<strong class="account-name" th:text="${principal}">账号</strong><br>请从需要访问的应用继续操作。</p>
+      <form method="post" th:action="@{/logout}"><input th:if="${_csrf != null}" type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"><button class="secondary" type="submit">退出当前账号</button></form>
     </div>
-</div>
+    <footer class="footer">Macula Cloud · 统一身份认证</footer>
+  </section>
+</main>
 </body>
-<script th:src="@{/component/layui/layui.js}"></script>
-<script th:src="@{/component/pear/pear.js}"></script>
 </html>

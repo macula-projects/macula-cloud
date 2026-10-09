@@ -46,6 +46,7 @@ import static dev.macula.boot.starter.web.utils.RequestUtil.getCurrentRequest;
  * 系统用户体系业务类
  *
  * @author <a href="mailto:xianrui0365@163.com">haoxr</a>
+ * @since 6.1.0
  */
 @Slf4j
 @RequiredArgsConstructor
@@ -82,7 +83,9 @@ public class SysUserDetailsServiceImpl implements UserDetailsService, UserDetail
         if (!StatusEnum.ENABLE.getValue().equals(userAuthInfo.getStatus())) {
             throw new DisabledException("该账户已被禁用!");
         }
-        return new SysUserDetails(userAuthInfo);
+        SysUserDetails details = new SysUserDetails(userAuthInfo);
+        details.setTenantId(tenantId);
+        return details;
     }
 
     @Override

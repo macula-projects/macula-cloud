@@ -204,6 +204,10 @@ public abstract class AbstractLoginFilterConfigurer<H extends HttpSecurityBuilde
             ((SavedRequestAwareAuthenticationSuccessHandler)this.successHandler).setRequestCache(requestCache);
         }
         this.authFilter.setAuthenticationManager(http.getSharedObject(AuthenticationManager.class));
+        org.springframework.security.web.context.SecurityContextRepository repository =
+            http.getSharedObject(org.springframework.security.web.context.SecurityContextRepository.class);
+        this.authFilter.setSecurityContextRepository(repository != null ? repository :
+            new org.springframework.security.web.context.HttpSessionSecurityContextRepository());
         this.authFilter.setAuthenticationSuccessHandler(this.successHandler);
         this.authFilter.setAuthenticationFailureHandler(this.failureHandler);
         if (this.authenticationDetailsSource != null) {
@@ -219,7 +223,7 @@ public abstract class AbstractLoginFilterConfigurer<H extends HttpSecurityBuilde
             this.authFilter.setRememberMeServices(rememberMeServices);
         }
         F filter = postProcess(this.authFilter);
-        http.addFilterBefore(filter, LogoutFilter.class);
+        http.addFilterAfter(filter, org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class);
     }
 
     public final <T> T getBeanOrNull(ApplicationContext applicationContext, Class<T> beanType) {

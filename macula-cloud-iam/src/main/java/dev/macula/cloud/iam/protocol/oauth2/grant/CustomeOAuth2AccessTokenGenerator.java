@@ -145,7 +145,7 @@ public class CustomeOAuth2AccessTokenGenerator implements OAuth2TokenGenerator<O
      * @return Base64后的token串
      */
     protected String generateTokenKey(OAuth2TokenContext context) {
-        String clientId = context.getAuthorizationGrant().getName();
+        String clientId = context.getRegisteredClient().getClientId();
         String username = context.getPrincipal().getName();
         String openId = null;
         if (context.getPrincipal() != null && context.getPrincipal().getPrincipal() instanceof SysUserDetails) {

@@ -1,7 +1,24 @@
+/*
+ * Copyright (c) 2023 Macula
+ *   macula.dev, China
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package dev.macula.cloud.iam.handler;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import dev.macula.boot.result.Result;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,12 +39,14 @@ import java.io.PrintWriter;
 import java.util.Collections;
 
 /**
+ * 登录成功后返回原始请求跳转地址，使用 Jackson 3 输出 JSON。
+ *
  * @author felord.cn
  * @since 1.0.0
  */
 public class RedirectLoginAuthenticationSuccessHandler implements AuthenticationSuccessHandler {
     protected final Logger logger = LoggerFactory.getLogger(this.getClass());
-    private final ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
+    private final ObjectMapper objectMapper = JsonMapper.builder().build();
     private RequestCache requestCache;
     private static final String defaultTargetUrl = "/";
     private final String redirect;

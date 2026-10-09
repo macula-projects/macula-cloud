@@ -54,7 +54,6 @@ public class CaptchaLoginFilterConfigurer<H extends HttpSecurityBuilder<H>>
 
     @Override
     public void configure(H http) {
-        http.addFilterAfter(this.getAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class);
         super.configure(http);
     }
 }

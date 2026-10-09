@@ -65,7 +65,7 @@ public class MaculaRegisteredClientRepository implements RegisteredClientReposit
     /**
      * 请求的CODE的默认有效期，5分钟
      */
-    private final static Duration authorizationCodeValiditySeconds = Duration.ofMillis(5);
+    private final static Duration authorizationCodeValiditySeconds = Duration.ofMinutes(5);
 
     private final SysOAuth2ClientService oauth2ClientService;
 
@@ -107,10 +107,10 @@ public class MaculaRegisteredClientRepository implements RegisteredClientReposit
     @Cacheable(value = CacheConstants.OAUTH2_CLIENT_CACHE_KEY, key = "#clientId", unless = "#result == null")
     public RegisteredClient findByClientId(String clientId) {
         // @formatter:off
-        SysOAuth2Client oauth2Client =
-            Optional.ofNullable(oauth2ClientService.getClientByClientId(clientId))
-                    .orElseThrow(() -> new OAuth2AuthorizationCodeRequestAuthenticationException(
-                                            new OAuth2Error("客户端查询异常，请检查数据库链接"), null));
+        SysOAuth2Client oauth2Client = oauth2ClientService.getClientByClientId(clientId);
+        if (oauth2Client == null) {
+            return null;
+        }
 
         RegisteredClient.Builder builder = RegisteredClient
             .withId(oauth2Client.getClientId())
@@ -149,7 +149,8 @@ public class MaculaRegisteredClientRepository implements RegisteredClientReposit
 
         // Client Settings
         ClientSettings.Builder clientSettingsBuilder = ClientSettings.builder()
-            .requireProofKey(oauth2Client.isRequireProofKey())
+            .requireProofKey(oauth2Client.isRequireProofKey() ||
+                StringUtils.commaDelimitedListToSet(oauth2Client.getClientAuthenticationMethods()).contains("none"))
             .requireAuthorizationConsent(oauth2Client.isRequireAuthorizationConsent());
         SignatureAlgorithm signatureAlgorithm = SignatureAlgorithm.from(oauth2Client.getSigningAlgorithm());
         JwsAlgorithm jwsAlgorithm = signatureAlgorithm == null ? MacAlgorithm.from(oauth2Client.getSigningAlgorithm()) : signatureAlgorithm;
