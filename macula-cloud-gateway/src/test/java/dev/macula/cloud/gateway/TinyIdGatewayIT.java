@@ -59,12 +59,11 @@ class TinyIdGatewayIT {
     private static final String SECRET = "test-only-app-secret";
 
     @Test
-    void configuredRouteStripsPrefixAndIncludesExactlyFourIssuingApis() throws Exception {
+    void configuredRouteCoversTinyIdPathsAndStripsPrefix() throws Exception {
         var source = new YamlPropertySourceLoader().load("gateway", new ClassPathResource("application.yml")).get(0);
         String predicate = (String) source.getProperty(
             "spring.cloud.gateway.server.webflux.routes[1].predicates[0]");
-        assertThat(predicate).isEqualTo("Path=/tinyid/api/v1/admin/**,/tinyid/api/v1/id/nextId,"
-            + "/tinyid/api/v1/id/nextIdSimple,/tinyid/api/v1/id/nextSegmentId," + PATH);
+        assertThat(predicate).isEqualTo("Path=/tinyid/**");
         assertThat(source.getProperty("spring.cloud.gateway.server.webflux.routes[1].filters[0]"))
             .isEqualTo("StripPrefix=1");
         var config = new PathRoutePredicateFactory.Config().setPatterns(
@@ -83,6 +82,10 @@ class TinyIdGatewayIT {
                 .getRequest().getURI().getPath()).isEqualTo("/api/v1/id/" + endpoint);
         }
         assertThat(matches.test(MockServerWebExchange.from(MockServerHttpRequest.post("/tinyid/api/v1/id/unknown"))))
+            .isTrue();
+        assertThat(matches.test(MockServerWebExchange.from(MockServerHttpRequest.get("/tinyid/actuator/health"))))
+            .isTrue();
+        assertThat(matches.test(MockServerWebExchange.from(MockServerHttpRequest.get("/tinyid-other/api/v1/id"))))
             .isFalse();
     }
 

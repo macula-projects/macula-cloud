@@ -17,12 +17,10 @@
 package dev.macula.cloud.tinyid.converter;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
-import dev.macula.cloud.tinyid.pojo.bo.TinyIdApplicationBO;
 import dev.macula.cloud.tinyid.pojo.bo.TinyIdAuditLogBO;
 import dev.macula.cloud.tinyid.pojo.bo.TinyIdBusinessAggregateBO;
 import dev.macula.cloud.tinyid.pojo.bo.TinyIdBusinessBO;
 import dev.macula.cloud.tinyid.pojo.bo.TinyIdDataSourceBO;
-import dev.macula.cloud.tinyid.pojo.vo.TinyIdApplicationVO;
 import dev.macula.cloud.tinyid.pojo.vo.TinyIdAuditLogVO;
 import dev.macula.cloud.tinyid.pojo.vo.TinyIdBusinessAggregateVO;
 import dev.macula.cloud.tinyid.pojo.vo.TinyIdBusinessVO;
@@ -39,14 +37,6 @@ import java.util.List;
  */
 @Mapper(componentModel = "spring")
 public interface TinyIdManagementConverter {
-
-    /**
-     * 转换接入应用。
-     *
-     * @param source 接入应用业务对象
-     * @return 接入应用视图对象
-     */
-    TinyIdApplicationVO toApplicationVO(TinyIdApplicationBO source);
 
     /**
      * 转换单库发号业务。
@@ -87,16 +77,6 @@ public interface TinyIdManagementConverter {
      * @return 管理审计日志视图对象
      */
     TinyIdAuditLogVO toAuditLogVO(TinyIdAuditLogBO source);
-
-    /**
-     * 转换接入应用分页结果。
-     *
-     * @param source 接入应用分页业务对象
-     * @return 接入应用分页视图对象
-     */
-    default IPage<TinyIdApplicationVO> toApplicationPage(IPage<TinyIdApplicationBO> source) {
-        return source.convert(this::toApplicationVO);
-    }
 
     /**
      * 转换发号业务分页结果。

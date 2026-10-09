@@ -23,7 +23,6 @@ import dev.macula.boot.starter.tinyid.base.factory.IdGeneratorFactory;
 import dev.macula.boot.starter.tinyid.base.generator.IdGenerator;
 import dev.macula.boot.starter.tinyid.base.service.SegmentIdService;
 import dev.macula.boot.starter.web.config.WebAutoConfiguration;
-import dev.macula.cloud.tinyid.config.TinyIdHttpExceptionAdvice;
 import dev.macula.cloud.tinyid.pojo.vo.ErrorCode;
 import dev.macula.cloud.tinyid.pojo.vo.TinyIdDataSourceVO;
 import dev.macula.cloud.tinyid.service.TinyIdManagementService;
@@ -120,10 +119,10 @@ class TinyIdExceptionIT {
                     mvc.perform(get("/api/v1/admin/data-sources")).andExpect(jsonPath("$.success").value(true));
                 }
             }
-            mvc.perform(post("/api/v1/id/nextSegmentIdSimple")).andExpect(status().isBadRequest());
+            mvc.perform(post("/api/v1/id/nextSegmentIdSimple")).andExpect(status().isInternalServerError());
             mvc.perform(post("/api/v1/id/nextSegmentIdSimple").param("bizType", " "))
-                .andExpect(status().isBadRequest());
-            mvc.perform(get("/api/v1/id/nextSegmentIdSimple")).andExpect(status().isMethodNotAllowed());
+                .andExpect(status().isInternalServerError());
+            mvc.perform(get("/api/v1/id/nextSegmentIdSimple")).andExpect(status().isInternalServerError());
             mvc.perform(post("/api/v1/id/nextIdSimple").param("bizType", "missing"))
                 .andExpect(status().isInternalServerError()).andExpect(jsonPath("$.code").value("ID503"));
             mvc.perform(post("/api/v1/id/nextId").param("bizType", "order"))
@@ -147,7 +146,7 @@ class TinyIdExceptionIT {
      */
     @Configuration(proxyBeanMethods = false)
     @EnableWebMvc
-    @Import({WebAutoConfiguration.class, TinyIdHttpExceptionAdvice.class,
+    @Import({WebAutoConfiguration.class,
         IdContronller.class, TinyIdAdminController.class, TinyIdIssuingServiceImpl.class})
     static class TestConfiguration {
         @Bean

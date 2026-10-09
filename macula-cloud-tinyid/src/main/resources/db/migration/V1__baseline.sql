@@ -54,38 +54,6 @@ VALUES (1, 'test', 1, 3301, 100, 1, 0, '2018-07-21 23:52:58', '2023-07-18 10:34:
 UNLOCK
 TABLES;
 
---
--- Table structure for table `tiny_id_token`
---
-
-DROP TABLE IF EXISTS `tiny_id_token`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `tiny_id_token`
-(
-    `id`          int unsigned NOT NULL AUTO_INCREMENT COMMENT '自增id',
-    `token`       varchar(255) NOT NULL DEFAULT '' COMMENT 'token',
-    `biz_type`    varchar(63)  NOT NULL DEFAULT '' COMMENT '此token可访问的业务类型标识',
-    `remark`      varchar(255) NOT NULL DEFAULT '' COMMENT '备注',
-    `create_time` timestamp    NOT NULL DEFAULT '2009-12-31 16:00:00' COMMENT '创建时间',
-    `update_time` timestamp    NOT NULL DEFAULT '2009-12-31 16:00:00' COMMENT '更新时间',
-    PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb3 COMMENT='token信息表';
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `tiny_id_token`
---
-
-LOCK
-TABLES `tiny_id_token` WRITE;
-/*!40000 ALTER TABLE `tiny_id_token` DISABLE KEYS */;
-INSERT INTO `tiny_id_token` (`id`, `token`, `biz_type`, `remark`, `create_time`, `update_time`)
-VALUES (1, '0f673adf80504e2eaa552f5d791b644c', 'test', '1', '2017-12-14 08:36:46', '2017-12-14 08:36:48'),
-       (2, '0f673adf80504e2eaa552f5d791b644c', 'test_odd', '1', '2017-12-14 08:36:46', '2017-12-14 08:36:48');
-/*!40000 ALTER TABLE `tiny_id_token` ENABLE KEYS */;
-UNLOCK
-TABLES;
 /*
  * Copyright (c) 2023 Macula
  *   macula.dev, China
@@ -113,9 +81,7 @@ TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- 接入授权唯一约束及管理审计表；仅用于重置后的全新数据库。
-CREATE UNIQUE INDEX uk_tiny_id_token_token_biz_type
-    ON tiny_id_token (token, biz_type);
+-- 管理审计表；仅用于全新数据库。
 
 CREATE TABLE tiny_id_audit_log
 (

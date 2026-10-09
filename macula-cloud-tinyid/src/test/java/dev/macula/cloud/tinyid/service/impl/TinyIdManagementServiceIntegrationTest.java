@@ -22,9 +22,6 @@ import dev.macula.cloud.tinyid.config.DataSourceConfig;
 import dev.macula.cloud.tinyid.converter.TinyIdManagementConverter;
 import dev.macula.cloud.tinyid.mapper.TinyIdAuditLogMapper;
 import dev.macula.cloud.tinyid.mapper.TinyIdInfoMapper;
-import dev.macula.cloud.tinyid.mapper.TinyIdTokenMapper;
-import dev.macula.cloud.tinyid.service.TinyIdTokenService;
-import dev.macula.cloud.tinyid.pojo.bo.TinyIdApplicationBO;
 import org.flywaydb.core.Flyway;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.junit.jupiter.api.Test;
@@ -54,10 +51,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.mock;
 
 /**
- * Exercises aggregate business writes and global application synchronization on two MySQL databases.
+ * Exercises aggregate business writes and compensation on two MySQL databases.
  *
  * @author Rain
  * @since 6.1.0
@@ -93,6 +89,9 @@ class TinyIdManagementServiceIntegrationTest {
             assertEquals(1, jdbc.queryForObject(
                 "select count(*) from flyway_schema_history where type='SQL'", Integer.class));
             assertNotNull(jdbc.queryForObject("select count(*) from tiny_id_audit_log", Long.class));
+            assertEquals(0, jdbc.queryForObject(
+                "select count(*) from information_schema.tables where table_schema=database() and table_name='tiny_id_token'",
+                Integer.class));
         }
     }
 
@@ -115,7 +114,7 @@ class TinyIdManagementServiceIntegrationTest {
     }
 
     @Test
-    void createsBusinessAcrossAllSourcesAndSynchronizesApplicationCredentials() {
+    void createsAndDeletesBusinessAcrossAllSources() {
         DataSource master = dataSource(MASTER);
         DataSource replica = dataSource(REPLICA);
         migrate(master, true);
@@ -123,42 +122,28 @@ class TinyIdManagementServiceIntegrationTest {
         TinyIdManagementServiceImpl dao = managementService(master, replica);
         String suffix = UUID.randomUUID().toString().replace("-", "");
         String bizType = "it_" + suffix.substring(0, 20);
-        String token = "test-token-" + suffix;
 
         try {
             assertThrows(IllegalArgumentException.class,
                 () -> dao.createBusinessOnAllDataSources("too_small_" + bizType, 100, 1));
             dao.createBusinessOnAllDataSources(bizType, 100, 10);
-            dao.createApplicationOnAllDataSources(token, "integration test application", List.of(bizType));
 
-            TinyIdApplicationBO application = dao.getApplicationByToken(token);
-            assertEquals(List.of(bizType), application.getBizTypes());
             assertEquals(List.of(0, 1), dao.getBusiness(bizType).getDataSources().stream()
                 .map(item -> item.getRemainder()).toList());
             assertEquals("COMPLETE", dao.getBusiness(bizType).getConsistencyStatus());
 
-            dao.deleteApplicationOnAllDataSources(token);
-            assertEquals(0L, authorizationCount(master, token, bizType));
-            assertEquals(0L, authorizationCount(replica, token, bizType));
-
-            dao.createApplicationOnAllDataSources(token, "integration test application", List.of(bizType));
             new JdbcTemplate(replica).update("update tiny_id_info set max_id=100 where biz_type=?", bizType);
             assertThrows(IllegalStateException.class, () -> dao.deleteBusinessOnAllDataSources(bizType));
             assertEquals(1L, count(master, bizType));
             assertEquals(1L, count(replica, bizType));
-            assertEquals(1L, authorizationCount(master, token, bizType));
-            assertEquals(1L, authorizationCount(replica, token, bizType));
 
             new JdbcTemplate(replica).update("update tiny_id_info set max_id=0 where biz_type=?", bizType);
             dao.deleteBusinessOnAllDataSources(bizType);
             assertEquals(0L, count(master, bizType));
             assertEquals(0L, count(replica, bizType));
-            assertEquals(0L, authorizationCount(master, token, bizType));
-            assertEquals(0L, authorizationCount(replica, token, bizType));
         } finally {
             for (DataSource dataSource : List.of(master, replica)) {
                 JdbcTemplate jdbc = new JdbcTemplate(dataSource);
-                jdbc.update("delete from tiny_id_token where token=?", token);
                 jdbc.update("delete from tiny_id_info where biz_type=?", bizType);
             }
         }
@@ -228,37 +213,7 @@ class TinyIdManagementServiceIntegrationTest {
     }
 
     @Test
-    void restoresDeletedApplicationWhenLaterDatasourceDeleteFails() {
-        DataSource master = dataSource(MASTER);
-        DataSource replica = dataSource(REPLICA);
-        migrate(master, true);
-        migrate(replica, false);
-        TinyIdManagementServiceImpl setupDao = managementService(master, replica);
-        String suffix = UUID.randomUUID().toString().replace("-", "");
-        String bizType = "delete_restore_" + suffix.substring(0, 16);
-        String token = "test-token-" + suffix;
-
-        try {
-            setupDao.createBusinessOnAllDataSources(bizType, 100, 10);
-            setupDao.createApplicationOnAllDataSources(token, "delete restore test", List.of(bizType));
-            DataSource failingReplica = failingDataSource(replica,
-                sql -> normalized(sql).startsWith("delete from tiny_id_token"));
-            TinyIdManagementServiceImpl failingDao = managementService(master, failingReplica);
-
-            assertThrows(RuntimeException.class, () -> failingDao.deleteApplicationOnAllDataSources(token));
-            assertEquals(1L, authorizationCount(master, token, bizType));
-            assertEquals(1L, authorizationCount(replica, token, bizType));
-        } finally {
-            for (DataSource dataSource : List.of(master, replica)) {
-                JdbcTemplate jdbc = new JdbcTemplate(dataSource);
-                jdbc.update("delete from tiny_id_token where token=?", token);
-                jdbc.update("delete from tiny_id_info where biz_type=?", bizType);
-            }
-        }
-    }
-
-    @Test
-    void restoresUnusedBusinessAndAuthorizationsWhenLaterDatasourceDeleteFails() {
+    void restoresUnusedBusinessWhenLaterDatasourceDeleteFails() {
         DataSource master = dataSource(MASTER);
         DataSource replica = dataSource(REPLICA);
         migrate(master, true);
@@ -266,11 +221,9 @@ class TinyIdManagementServiceIntegrationTest {
         TinyIdManagementServiceImpl setupDao = managementService(master, replica);
         String suffix = UUID.randomUUID().toString().replace("-", "");
         String bizType = "biz_restore_" + suffix.substring(0, 16);
-        String token = "test-token-" + suffix;
 
         try {
             setupDao.createBusinessOnAllDataSources(bizType, 100, 10);
-            setupDao.createApplicationOnAllDataSources(token, "business restore test", List.of(bizType));
             DataSource failingReplica = failingDataSource(replica,
                 sql -> normalized(sql).startsWith("delete from tiny_id_info"));
             TinyIdManagementServiceImpl failingDao = managementService(master, failingReplica);
@@ -278,50 +231,10 @@ class TinyIdManagementServiceIntegrationTest {
             assertThrows(RuntimeException.class, () -> failingDao.deleteBusinessOnAllDataSources(bizType));
             assertEquals(1L, count(master, bizType));
             assertEquals(1L, count(replica, bizType));
-            assertEquals(1L, authorizationCount(master, token, bizType));
-            assertEquals(1L, authorizationCount(replica, token, bizType));
         } finally {
             for (DataSource dataSource : List.of(master, replica)) {
                 JdbcTemplate jdbc = new JdbcTemplate(dataSource);
-                jdbc.update("delete from tiny_id_token where token=?", token);
                 jdbc.update("delete from tiny_id_info where biz_type=?", bizType);
-            }
-        }
-    }
-
-    @Test
-    void compensatesOnlyNewAuthorizationWithoutDeletingPreexistingReplicaRow() {
-        DataSource master = dataSource(MASTER);
-        DataSource replica = dataSource(REPLICA);
-        migrate(master, true);
-        migrate(replica, false);
-        TinyIdManagementServiceImpl dao = managementService(master, replica);
-        String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 16);
-        String baseBiz = "base_" + suffix;
-        String addedBiz = "added_" + suffix;
-        String token = "compensation-token-" + suffix;
-
-        try {
-            dao.createBusinessOnAllDataSources(baseBiz, 100, 10);
-            dao.createBusinessOnAllDataSources(addedBiz, 100, 10);
-            dao.createApplicationOnAllDataSources(token, "compensation test", List.of(baseBiz));
-            new JdbcTemplate(replica).update(
-                "insert into tiny_id_token(token,biz_type,remark,create_time,update_time) values(?,?,?,now(),now())",
-                token, addedBiz, "compensation test");
-
-            List<TinyIdManagementServiceImpl.AuthorizationInsert> inserted =
-                dao.addAuthorizationsOnAllDataSources(token, "compensation test", List.of(addedBiz));
-            assertEquals(List.of(new TinyIdManagementServiceImpl.AuthorizationInsert("datasource-0", addedBiz)), inserted);
-
-            dao.deleteInsertedAuthorizations(token, inserted);
-
-            assertEquals(0L, authorizationCount(master, token, addedBiz));
-            assertEquals(1L, authorizationCount(replica, token, addedBiz));
-        } finally {
-            for (DataSource dataSource : List.of(master, replica)) {
-                JdbcTemplate jdbc = new JdbcTemplate(dataSource);
-                jdbc.update("delete from tiny_id_token where token=?", token);
-                jdbc.update("delete from tiny_id_info where biz_type in (?,?)", baseBiz, addedBiz);
             }
         }
     }
@@ -353,12 +266,11 @@ class TinyIdManagementServiceIntegrationTest {
             factoryBean.afterPropertiesSet();
             SqlSessionFactory factory = factoryBean.getObject();
             registerMapper(factory, TinyIdInfoMapper.class);
-            registerMapper(factory, TinyIdTokenMapper.class);
             registerMapper(factory, TinyIdAuditLogMapper.class);
             SqlSessionTemplate template = new SqlSessionTemplate(factory);
             return new TinyIdManagementServiceImpl(template.getMapper(TinyIdInfoMapper.class),
-                template.getMapper(TinyIdTokenMapper.class), template.getMapper(TinyIdAuditLogMapper.class),
-                routingDataSource, mock(TinyIdTokenService.class),
+                template.getMapper(TinyIdAuditLogMapper.class),
+                routingDataSource,
                 Mappers.getMapper(TinyIdManagementConverter.class));
         } catch (Exception ex) {
             throw new IllegalStateException("Unable to create TinyID MyBatis integration test fixture", ex);
@@ -391,12 +303,6 @@ class TinyIdManagementServiceIntegrationTest {
     private long count(DataSource dataSource, String bizType) {
         Long value = new JdbcTemplate(dataSource).queryForObject(
             "select count(*) from tiny_id_info where biz_type=?", Long.class, bizType);
-        return value == null ? 0 : value;
-    }
-
-    private long authorizationCount(DataSource dataSource, String token, String bizType) {
-        Long value = new JdbcTemplate(dataSource).queryForObject(
-            "select count(*) from tiny_id_token where token=? and biz_type=?", Long.class, token, bizType);
         return value == null ? 0 : value;
     }
 

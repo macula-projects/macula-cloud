@@ -43,13 +43,9 @@ JDK 17、Maven、MySQL。
 TinyID 管理端 API 仅通过网关 `/tinyid/api/v1/admin/**` 访问，管理页为 `/tinyid/management`，动态菜单显示为“ID管理”并挂载在“系统管理”下，仅授权给 `ROOT`
 超级管理员。管理功能包括：
 
-- 接入应用：生成 256 bit 随机 Token，在备注中描述 Token 对应的应用，并为应用追加 `biz_type`
-  授权。接入应用可以整体删除，删除后该 Token 在所有数据源中的授权和处理请求实例的本地缓存立即失效；
-  不使用 Redis 发布订阅等跨实例通知，其他 TinyID 实例在下一次定时刷新成功或进程重启后收敛。Token 不轮换、不停用，
-  且对超级管理员始终完整展示。
-- 发号业务：`biz_type` 表示独立业务，与应用无关；应先创建业务，再创建应用并授权业务。
+- 发号业务：`biz_type` 表示独立业务，发号访问由网关统一认证。
   `begin_id` 和 `max_id` 固定从 `0` 初始化，`step` 是每次获取 ID 的步长。只有该业务在全部数据源
-  都存在且每个数据源的 `max_id` 都为 `0` 时才允许删除；删除业务会同时清理对应应用授权。
+  都存在且每个数据源的 `max_id` 都为 `0` 时才允许删除。
 - 多数据库：创建业务时系统一次写入当前全部物理数据源，不需要切换数据源。`delta` 是该业务预留的
   数据库实例容量，默认 `10`、创建时可以修改；`remainder` 按物理数据源列表下标从 `0` 开始自动
   分配，页面只读展示。
@@ -58,10 +54,8 @@ TinyID 管理端 API 仅通过网关 `/tinyid/api/v1/admin/**` 访问，管理�
   鉴权或方法调用前被拒绝的请求可能不会产生 Controller 审计事件，审计失败也不会回滚已完成的管理操作。
 
 四个发号接口均使用统一网关认证，不再校验 TinyID Token 或应用—bizType 绑定。
-上述管理功能及历史授权记录暂时保留，但不约束发号访问权限。
-管理端不提供单条授权撤销、应用或业务停用和
-Token 轮换功能；`step`、`delta`、`remainder` 创建后不提供修改入口。应用和未使用业务的删除均跨
-全部数据源执行并记录审计，只有全部当前数据源配置完整且参数一致的业务才可以授权给应用。
+不再提供接入应用或业务授权管理。`step`、`delta`、`remainder` 创建后不提供修改入口。
+未使用业务的删除跨全部数据源执行并记录审计；历史审计记录仍可查询。
 
 ### 数据源与迁移
 
@@ -78,15 +72,17 @@ Flyway 通过 `@FlywayDataSource` 使用同一个 `DynamicDataSource`，不单�
 Flyway 配置位于 `local` profile，`docker` 通过 profile 分组继承；共享环境由配置中心提供配置。
 迁移策略按列表序号固定路由后逐库执行，确保迁移 SQL 与历史表处于同一个库；任一库失败会终止启动。
 Nacos 等外部配置也应移除旧的 Flyway 连接配置及 `db/master` 位置。
-迁移已合并为唯一的 `db/migration/V1__baseline.sql`，包含业务表、授权唯一索引和审计表，
-不再创建已废弃的管理请求表与数据源顺序表。此次基线重建要求先由运维重置数据库及 Flyway 历史，
-不能直接覆盖升级旧库；`baseline-on-migrate=false` 防止将未迁移的非空库静默标记为 V1。
+迁移已合并为唯一的 `db/migration/V1__baseline.sql`，仅包含业务表和审计表，
+不再创建 Token 表、管理请求表与数据源顺序表。
+直接清理 V1 会改变已执行版本的校验和，不能直接覆盖升级旧库。已有环境需由运维在备份后安排基线处理；
+本次不自动执行 repair、重置数据库或删除旧表，也不新增 V2。必须保留历史发号进度。
+`baseline-on-migrate=false` 防止将未迁移的非空库静默标记为 V1。
 新增库仍需在加入发号池前复制既有业务配置，并设置正确的 remainder；迁移不会自动补齐业务数据。
 数据库连接信息只用于服务端建池，不会通过管理 API 返回。
 
-V1 中的 `test`、`test_odd` 和固定 Token 是历史示例。服务不再在启动迁移阶段自动删除或补齐数据，已有
+V1 中的 `test`、`test_odd` 是历史示例。服务不再在启动迁移阶段自动删除或补齐数据，已有
 数据库及历史发号进度保持不变；全新环境是否保留示例由部署初始化流程决定。
-管理页面在请求提交期间禁用按钮，服务端依靠业务唯一约束避免重复业务或授权；不保存通用管理请求状态。
+管理页面在请求提交期间禁用按钮，服务端依靠业务唯一约束避免重复业务；不保存通用管理请求状态。
 TinyID 内部 REST 模型统一位于 `pojo.form`、`pojo.query`、`pojo.vo`，不会发布到 `macula-cloud-api`。
 
 跨数据库写入不使用分布式事务：系统会先全量预检，再按管理列表顺序写入；失败时反向补偿。若补偿仍
@@ -150,7 +146,7 @@ delta)
 
 ## 部署说明
 
-TinyID 是独立应用；Gateway 代理管理接口及 `/tinyid/api/v1/id/` 下的
+TinyID 是独立应用；Gateway 通过 `/tinyid/**` 统一代理，包括管理接口及下列发号接口：
 `nextId`、`nextIdSimple`、`nextSegmentId`、`nextSegmentIdSimple` 四个发号接口。
 发号只需 `bizType`，批量取号可传 `batchSize`；Starter 使用 `POST nextSegmentIdSimple`。
 Server 不设置 `/tinyid` 上下文，
@@ -170,7 +166,7 @@ Server 仍信任有效 JWT，不独立校验 JWT 的 HMAC 来源，不能将其�
 并协调更新客户端、Server、网关路由与认证配置。旧 token-only 调用不再支持，全部发号调用需迁移到统一网关认证；
 配置中心或环境变量若覆盖 `server.servlet.context-path`，也必须移除旧值；
 网关应用 URL 授权按改写后的路径配置，例如 `POST:/api/v1/id/nextSegmentIdSimple`。
-回滚需同步恢复这些版本与配置，无数据库迁移，不重置号段进度。
+回滚需同步恢复这些版本与配置，V1 基线差异需人工处理，不重置号段进度。
 Server 自定义 `SegmentIdService` 会使 Starter 远程客户端退让，无需配置客户端网关凭据。
 
 ### 号段错误响应
@@ -182,4 +178,4 @@ Server 自定义 `SegmentIdService` 会使 Starter 远程客户端退让，无�
 其他发号接口的业务失败同样返回 HTTP 500 + Result JSON，不再返回空串或 HTTP 200 错误响应。
 Controller 直接返回业务数据，由 Advice 包装普通 JSON 请求；Feign 标记请求按统一约定返回原始数据，Simple 接口成功仍为文本。
 管理接口同样使用统一 Result，前端与 system 一致先检查 `success` 再读取 `data`；请协调升级前后端。
-`macula.jackson.long-to-string=false` 保留原 JSON 数值类型；MVC 参数错误等保留 HTTP 状态并返回统一 Result。
+`macula.jackson.long-to-string=false` 保留原 JSON 数值类型；不再提供专属异常 Advice，参数及 MVC 异常遵循共享 ControllerExceptionAdvice 的状态与 Result 约定，不单独保留 400/405 状态。

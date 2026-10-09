@@ -8,7 +8,7 @@
 			</div>
 		</div>
 		<el-alert type="info" :closable="false" show-icon
-				title="第一步：创建发号业务，系统会同时配置全部数据源并自动分配 remainder；完成后再创建接入应用并授权业务。" />
+				title="创建发号业务，系统会同时配置全部数据源并自动分配 remainder；发号访问由网关统一认证。" />
 		<el-collapse class="config-help">
 			<el-collapse-item title="配置规则与状态说明（点击展开）" name="rules">
 				<ul>
@@ -17,8 +17,8 @@
 					<li>delta 是 ID 增量，也是预留的数据库实例容量，默认 10，创建时可调整；数据源数量不能超过 delta。</li>
 					<li>remainder 按数据源顺序从 0 自动分配，必须等于该库的顺序号，互不重复，且满足 0 ≤ remainder &lt; delta。</li>
 					<li>例如 3 个数据库、delta=10，各库 remainder 为 0、1、2；扩容时只能追加 3、4…9，已有数据源不可重排、删除或中间插入。</li>
-					<li>step、delta、remainder 创建后不可通过管理页面修改；新增库的既有业务和授权需由运维补齐。</li>
-					<li>配置完整：所有数据源可用、均存在该业务，且参数满足一致性检查。只有配置完整的业务才可新增应用授权。</li>
+					<li>step、delta、remainder 创建后不可通过管理页面修改；新增库的既有业务需由运维补齐。</li>
+					<li>配置完整：所有数据源可用、均存在该业务，且参数满足一致性检查。</li>
 					<li>配置冲突：已读取到的配置中，step 或 delta 不一致，或 remainder 重复、越界、与数据源顺序不符。请展开业务行对照各库参数，由运维核对原配置和部署顺序；不要直接修改已发号业务的参数。</li>
 					<li>待补齐：未发现上述参数冲突，但存在不可用的数据源或缺少业务配置的库；请先恢复连接并核对业务数据。冲突与缺失同时存在时优先显示配置冲突。</li>
 					<li>各库 max_id、version 和更新时间可以不同，不属于配置冲突；仅所有库均可用、业务存在且 max_id 都为 0 时允许删除。</li>
@@ -114,7 +114,7 @@ function statusType(status) {
 
 function statusDescription(status) {
 	return {
-		COMPLETE: '全部数据源可用且业务配置一致，可以新增应用授权。',
+		COMPLETE: '全部数据源可用且业务配置一致。',
 		PENDING: '存在不可用的数据源或缺少业务配置的库，请展开业务行查看。',
 		CONFLICT: 'step、delta 不一致，或 remainder 重复、越界、与数据源顺序不符。请展开业务行对照参数，详见上方配置规则。'
 	}[status] || '暂时无法确定配置状态，请刷新后重试。'
@@ -129,7 +129,7 @@ function canDelete(business) {
 async function removeBusiness(business) {
 	try {
 		await ElMessageBox.confirm(
-			`确定删除发号业务“${business.bizType}”吗？对应的应用授权也会被删除。`,
+			`确定删除发号业务“${business.bizType}”吗？删除后无法恢复，请确认该业务尚未使用。`,
 			'删除发号业务',
 			{type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消'}
 		)

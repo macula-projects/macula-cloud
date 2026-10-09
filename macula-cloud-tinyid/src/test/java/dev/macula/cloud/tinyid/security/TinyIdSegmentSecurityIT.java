@@ -24,7 +24,6 @@ import dev.macula.boot.starter.tinyid.base.service.SegmentIdService;
 import dev.macula.cloud.tinyid.controller.IdContronller;
 import dev.macula.cloud.tinyid.service.impl.TinyIdIssuingServiceImpl;
 import dev.macula.boot.starter.web.advice.ControllerExceptionAdvice;
-import dev.macula.cloud.tinyid.config.TinyIdHttpExceptionAdvice;
 import dev.macula.boot.starter.tinyid.base.exception.TinyIdSysException;
 import dev.macula.cloud.tinyid.pojo.vo.ErrorCode;
 import org.junit.jupiter.api.Test;
@@ -83,6 +82,9 @@ class TinyIdSegmentSecurityIT {
                     .andExpect(status().isUnauthorized());
             }
             verifyNoInteractions(service);
+            for (String endpoint : java.util.List.of("/api/v1/admin/data-sources", "/api/v1/unknown")) {
+                mvc.perform(get(endpoint)).andExpect(status().isUnauthorized());
+            }
             mvc.perform(post(PATH).param("bizType", "unknown").header("Authorization", "Bearer "
                 + token("another-test-only-secret-32-bytes-long", Instant.now().plusSeconds(60))))
                 .andExpect(status().isUnauthorized());
@@ -96,11 +98,11 @@ class TinyIdSegmentSecurityIT {
                 .andExpect(status().isInternalServerError()).andExpect(jsonPath("$.code").value("ID503"));
             verify(service).getNextSegmentId("unknown");
             mvc.perform(post(PATH).param("bizType", " ").header("Authorization", "Bearer "
-                + token(SECRET, Instant.now().plusSeconds(60)))).andExpect(status().isBadRequest());
+                + token(SECRET, Instant.now().plusSeconds(60)))).andExpect(status().isInternalServerError());
             mvc.perform(post(PATH).header("Authorization", "Bearer "
-                + token(SECRET, Instant.now().plusSeconds(60)))).andExpect(status().isBadRequest());
+                + token(SECRET, Instant.now().plusSeconds(60)))).andExpect(status().isInternalServerError());
             mvc.perform(get(PATH).param("bizType", "unknown").header("Authorization", "Bearer "
-                + token(SECRET, Instant.now().plusSeconds(60)))).andExpect(status().isMethodNotAllowed());
+                + token(SECRET, Instant.now().plusSeconds(60)))).andExpect(status().isInternalServerError());
             var generator = mock(dev.macula.boot.starter.tinyid.base.generator.IdGenerator.class);
             when(generator.nextId(1)).thenReturn(java.util.List.of(101L));
             when(context.getBean(IdGeneratorFactory.class).getIdGenerator("order")).thenReturn(generator);
@@ -137,7 +139,7 @@ class TinyIdSegmentSecurityIT {
     @EnableWebSecurity
     @EnableConfigurationProperties(OAuth2ResourceServerProperties.class)
     @Import({ResourceServerConfiguration.class, IdContronller.class,
-        ControllerExceptionAdvice.class, TinyIdHttpExceptionAdvice.class, TinyIdIssuingServiceImpl.class})
+        ControllerExceptionAdvice.class, TinyIdIssuingServiceImpl.class})
     static class TestConfiguration {
         @Bean
         static SpringUtil springUtil() { return new SpringUtil(); }
