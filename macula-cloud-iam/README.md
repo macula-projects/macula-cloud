@@ -28,7 +28,7 @@
 
 ## 授权码与 OIDC 接入
 
-兼容扩展说明：`grant_type=password` / `sms` 保留原参数、认证业务逻辑及异常映射；SMS 仍通过 `phone` / `captcha` 调用原验证码与身份服务。公共 Provider 原有授权记录标记（包括 SMS 记录为 password）保持不变。兼容 grant 携带 openid 时，可正常刷新 access/refresh token，保留原 scope，不新增 ID Token；标准授权码 OIDC 刷新仍由框架处理。适配保留客户端绑定、有效期与撤销校验、scope 不扩权、刷新令牌复用/轮换和 Redis CAS。此路径只适配已有机密客户端 Bearer 令牌，不将绑定密钥的令牌降级；勿将兼容 grant 视为完整 OIDC 登录流程。
+兼容扩展说明：`grant_type=password` / `sms` 保留原参数、认证业务逻辑及异常映射；SMS 仍通过 `phone` / `code` 调用原验证码与身份服务。公共 Provider 原有授权记录标记（包括 SMS 记录为 password）保持不变。兼容 grant 携带 openid 时，可正常刷新 access/refresh token，保留原 scope，不新增 ID Token；标准授权码 OIDC 刷新仍由框架处理。适配保留客户端绑定、有效期与撤销校验、scope 不扩权、刷新令牌复用/轮换和 Redis CAS。此路径只适配已有机密客户端 Bearer 令牌，不将绑定密钥的令牌降级；勿将兼容 grant 视为完整 OIDC 登录流程。
 
 客户端每次发起授权前生成随机 `code_verifier`（43–128 个 RFC 7636 允许的字符），以 SHA-256 后 Base64URL 无填充编码生成 `code_challenge`。由客户端维护 state、nonce 并在回调验证，不能复用固定示例值。
 
@@ -57,7 +57,7 @@ code_challenge_method=S256
 
 采用本地 Thymeleaf + CSS/JavaScript，无外部 CDN。桌面为品牌区与表单，680px 以下为移动单列；包含安全区、触控按钮、16px 输入字号、密码显隐、密码管理器、错误反馈、请求超时和防重复提交。授权页可按 scope 勾选，同意与拒绝由服务端处理，拒绝当前请求不会取消此前授权。
 
-短信入口保留原有默认开启行为，`spring.security.oauth2.server.login.captcha.enabled` 控制展示，默认 true；内置 CaptchaServiceImpl 保留原有占位行为，默认返回 true，不代表已完成真实验证码校验。生产使用需接入真实验证码校验与手机号身份查询。页面不模拟发送验证码。本次不改变该占位行为、不接入短信供应商、不增加注册/找回密码功能。password 与 sms grant 均保留原有兼容接入，不要求旧客户端改用 PKCE/OIDC。
+短信入口保留原有默认开启行为，`spring.security.oauth2.server.login.sms.enabled` 控制展示，默认 true；内置 SmsServiceImpl 保留原有占位行为，默认返回 true，不代表已完成真实验证码校验。生产使用需接入真实验证码校验与手机号身份查询。页面不模拟发送验证码。本次不改变该占位行为、不接入短信供应商、不增加注册/找回密码功能。password 与 sms grant 均保留原有兼容接入，不要求旧客户端改用 PKCE/OIDC。
 
 表单登录和本地退出开启 CSRF，页面自动携带 token；自定义表单客户端需先获取登录页。OAuth 协议端点仍使用标准协议校验。password token endpoint 的兼容参数不变。
 

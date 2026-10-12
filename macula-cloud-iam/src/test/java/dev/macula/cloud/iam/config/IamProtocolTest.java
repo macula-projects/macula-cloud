@@ -181,7 +181,7 @@ class IamProtocolTest {
     @Test void loginPagesAndSessionWorkWithCsrf() throws Exception {
         mvc.perform(get("/login")).andExpect(status().isOk()).andExpect(content().string(
             org.hamcrest.Matchers.containsString("autocomplete=\"current-password\"")))
-            .andExpect(content().string(org.hamcrest.Matchers.containsString("captcha-login")));
+            .andExpect(content().string(org.hamcrest.Matchers.containsString("sms-login")));
         mvc.perform(get("/iam/auth.css")).andExpect(status().isOk());
         mvc.perform(post("/login").param("username", "fixture-user").param("password", "fixture-password"))
             .andExpect(status().isForbidden());
@@ -325,7 +325,7 @@ class IamProtocolTest {
 
     @Test void smsCompatibilityUsesOriginalParametersAndDefaultVerifierWithoutPkce() throws Exception {
         MvcResult result = mvc.perform(post("/oauth2/token").with(httpBasic("compat", "fixture-secret"))
-            .param("grant_type", "sms").param("phone", "13800000000").param("captcha", "fixture-code")
+            .param("grant_type", "sms").param("phone", "13800000000").param("code", "fixture-code")
             .param("scope", "profile")).andExpect(status().isOk())
             .andExpect(jsonPath("$.access_token").exists()).andExpect(jsonPath("$.refresh_token").exists())
             .andExpect(jsonPath("$.id_token").doesNotExist()).andReturn();
@@ -345,7 +345,7 @@ class IamProtocolTest {
             .param("grant_type", "sms").param("phone", "13800000000").param("scope", "profile"))
             .andExpect(status().isBadRequest()).andExpect(jsonPath("$.error").value("invalid_request"));
         mvc.perform(post("/oauth2/token").with(httpBasic("compat", "fixture-secret"))
-            .param("grant_type", "sms").param("captcha", "fixture-code").param("scope", "profile"))
+            .param("grant_type", "sms").param("code", "fixture-code").param("scope", "profile"))
             .andExpect(status().isBadRequest()).andExpect(jsonPath("$.error").value("invalid_request"));
         mvc.perform(post("/oauth2/token").with(httpBasic("compat", "fixture-secret"))
             .param("grant_type", "password").param("username", "fixture-user").param("password", "wrong")
@@ -364,7 +364,7 @@ class IamProtocolTest {
             for (String grant : new String[] {"password", "sms"}) {
                 MvcResult issued = mvc.perform(post("/oauth2/token").with(httpBasic(client, "fixture-secret"))
                     .param("grant_type", grant).param("username", "fixture-user").param("password", "fixture-password")
-                    .param("phone", "13800000000").param("captcha", "fixture-code").param("scope", "openid profile"))
+                    .param("phone", "13800000000").param("code", "fixture-code").param("scope", "openid profile"))
                     .andExpect(status().isOk()).andExpect(jsonPath("$.id_token").doesNotExist()).andReturn();
                 String refresh = json.readTree(issued.getResponse().getContentAsString()).get("refresh_token").asText();
                 mvc.perform(post("/oauth2/token").with(httpBasic(client.equals("compat") ? "jwt" : "compat", "fixture-secret"))

@@ -247,7 +247,7 @@ class MaculaOAuth2AuthorizationServiceTest {
         oldMapper.registerModules(org.springframework.security.jackson2.SecurityJackson2Modules
             .getModules(getClass().getClassLoader()));
         oldMapper.registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
-        oldMapper.addMixIn(dev.macula.cloud.iam.authentication.captcha.CaptchaAuthenticationToken.class,
+        oldMapper.addMixIn(dev.macula.cloud.iam.authentication.sms.SmsAuthenticationToken.class,
             LegacyAuthenticationMixin.class);
         oldMapper.addMixIn(dev.macula.cloud.iam.authentication.weapp.WeappAuthenticationToken.class,
             LegacyAuthenticationMixin.class);
@@ -257,8 +257,8 @@ class MaculaOAuth2AuthorizationServiceTest {
         user.setUsername("fixture-user"); user.setEnabled(true); user.setUserId(42L); user.setTenantId(1L);
         user.setAuthorities(List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("USER")));
         var tokens = List.of(
-            new dev.macula.cloud.iam.authentication.captcha.CaptchaAuthenticationToken(user, null, user.getAuthorities()),
-            new dev.macula.cloud.iam.authentication.captcha.CaptchaAuthenticationToken("fixture-user", null),
+            new dev.macula.cloud.iam.authentication.sms.SmsAuthenticationToken(user, null, user.getAuthorities()),
+            new dev.macula.cloud.iam.authentication.sms.SmsAuthenticationToken("fixture-user", null),
             new dev.macula.cloud.iam.authentication.weapp.WeappAuthenticationToken(user, user.getAuthorities()),
             new dev.macula.cloud.iam.authentication.weapp.WeappAuthenticationToken("fixture-user"));
         for (var token : tokens) {

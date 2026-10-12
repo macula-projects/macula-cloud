@@ -18,17 +18,17 @@
 package dev.macula.cloud.iam.config;
 
 import cn.hutool.core.lang.Assert;
-import dev.macula.cloud.iam.protocol.oauth2.CustomOidcTokenCustomizer;
-import dev.macula.cloud.iam.protocol.oauth2.LocalAccessTokenIntrospector;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
-import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
-import org.springframework.security.oauth2.server.resource.authentication.OpaqueTokenAuthenticationProvider;
+import dev.macula.cloud.iam.authentication.sms.SmsAuthenticationProvider;
+import dev.macula.cloud.iam.authentication.sms.SmsService;
+import dev.macula.cloud.iam.authentication.sms.SmsUserDetailsService;
 import dev.macula.cloud.iam.handler.OAuth2AuthenticationExceptionEntryPoint;
 import dev.macula.cloud.iam.protocol.oauth2.CustomOAuth2TokenCustomizer;
-import dev.macula.cloud.iam.protocol.oauth2.grant.CustomeOAuth2AccessTokenGenerator;
+import dev.macula.cloud.iam.protocol.oauth2.CustomOidcTokenCustomizer;
+import dev.macula.cloud.iam.protocol.oauth2.LocalAccessTokenIntrospector;
 import dev.macula.cloud.iam.protocol.oauth2.grant.CompatibilityRefreshTokenAuthenticationProvider;
-import org.springframework.security.oauth2.server.authorization.authentication.OAuth2RefreshTokenAuthenticationProvider;
+import dev.macula.cloud.iam.protocol.oauth2.grant.CustomeOAuth2AccessTokenGenerator;
 import dev.macula.cloud.iam.protocol.oauth2.grant.password.OAuth2ResourceOwnerPasswordAuthenticationConverter;
 import dev.macula.cloud.iam.protocol.oauth2.grant.password.OAuth2ResourceOwnerPasswordAuthenticationProvider;
 import dev.macula.cloud.iam.protocol.oauth2.grant.sms.OAuth2ResourceOwnerSmsAuthenticationConverter;
@@ -45,22 +45,21 @@ import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configurers.oauth2.server.authorization.OAuth2AuthorizationServerConfigurer;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.OAuth2ErrorCodes;
-import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationConsentAuthenticationProvider;
-import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationConsentAuthenticationToken;
-import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationCodeRequestAuthenticationToken;
-import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationCodeRequestAuthenticationException;
-import org.springframework.security.config.Customizer;
-import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.oauth2.core.OAuth2Token;
+import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsentService;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
+import org.springframework.security.oauth2.server.authorization.authentication.*;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
-import org.springframework.security.config.annotation.web.configurers.oauth2.server.authorization.OAuth2AuthorizationServerConfigurer;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
 import org.springframework.security.oauth2.server.authorization.token.*;
+import org.springframework.security.oauth2.server.resource.authentication.OpaqueTokenAuthenticationProvider;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 
@@ -82,13 +81,12 @@ public class ProtocolOAuth2Configuration {
     @Order(Ordered.HIGHEST_PRECEDENCE)
     SecurityFilterChain authorizationServerSecurityFilterChain(HttpSecurity http,
         OAuth2AuthorizationService authorizationService, OAuth2TokenGenerator<OAuth2Token> tokenGenerator,
-        dev.macula.cloud.iam.authentication.captcha.CaptchaUserDetailsService captchaUsers,
-        dev.macula.cloud.iam.authentication.captcha.CaptchaService captchaService) throws Exception {
-        // The token endpoint has its own manager; the form-login chain's SMS provider is not shared.
-        http.authenticationProvider(new dev.macula.cloud.iam.authentication.captcha.CaptchaAuthenticationProvider(
-            captchaUsers, captchaService));
+        SmsUserDetailsService smsUsers, SmsService smsService) throws Exception {
+
         // @formatter:off
+
         OAuth2AuthorizationServerConfigurer authorizationServerConfigurer = new OAuth2AuthorizationServerConfigurer();
+
         //  把自定义的授权确认URI加入配置
         authorizationServerConfigurer
             .authorizationEndpoint(authorizationEndpoint ->
@@ -132,6 +130,7 @@ public class ProtocolOAuth2Configuration {
                     })
             )
             .oidc(Customizer.withDefaults());
+
         RequestMatcher endpointsMatcher = authorizationServerConfigurer.getEndpointsMatcher();
 
         // 拦截 授权服务器相关的请求端点
@@ -144,15 +143,16 @@ public class ProtocolOAuth2Configuration {
             .exceptionHandling(exceptions -> exceptions
                 .authenticationEntryPoint(new OAuth2AuthenticationExceptionEntryPoint("/login")))
             // 应用 授权服务器的配置
-            .with(authorizationServerConfigurer, Customizer.withDefaults());
+            .with(authorizationServerConfigurer, Customizer.withDefaults())
+            .authenticationProvider(new SmsAuthenticationProvider(smsUsers, smsService));
 
         // Security 7 installs a JWT resource-server configurer for UserInfo. Supply its
         // authentication manager explicitly so both persisted JWT and opaque tokens work.
         OpaqueTokenAuthenticationProvider bearerProvider = new OpaqueTokenAuthenticationProvider(
             new LocalAccessTokenIntrospector(authorizationService));
-        http.oauth2ResourceServer(resource -> resource.jwt(jwt ->
-            jwt.authenticationManager(bearerProvider::authenticate)));
 
+        http.oauth2ResourceServer(resource -> resource
+            .jwt(jwt -> jwt.authenticationManager(bearerProvider::authenticate)));
 
         // @formatter:on
         return http.build();
@@ -192,6 +192,7 @@ public class ProtocolOAuth2Configuration {
         accessTokenGenerator.setAccessTokenCustomizer(accessTokenCustomizer);
         JwtGenerator jwtGenerator = new JwtGenerator(new NimbusJwtEncoder(jwkSource));
         jwtGenerator.setJwtCustomizer(new CustomOidcTokenCustomizer());
-        return new DelegatingOAuth2TokenGenerator(jwtGenerator, accessTokenGenerator, new OAuth2RefreshTokenGenerator());
+        return new DelegatingOAuth2TokenGenerator(jwtGenerator, accessTokenGenerator,
+            new OAuth2RefreshTokenGenerator());
     }
 }

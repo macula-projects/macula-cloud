@@ -17,9 +17,9 @@
 
 package dev.macula.cloud.iam.config;
 
-import dev.macula.cloud.iam.authentication.captcha.CaptchaLoginFilterConfigurer;
-import dev.macula.cloud.iam.authentication.captcha.CaptchaService;
-import dev.macula.cloud.iam.authentication.captcha.CaptchaUserDetailsService;
+import dev.macula.cloud.iam.authentication.sms.SmsLoginFilterConfigurer;
+import dev.macula.cloud.iam.authentication.sms.SmsService;
+import dev.macula.cloud.iam.authentication.sms.SmsUserDetailsService;
 import dev.macula.cloud.iam.authentication.weapp.WeappClientService;
 import dev.macula.cloud.iam.authentication.weapp.WeappLoginFilterConfigurer;
 import dev.macula.cloud.iam.authentication.weapp.WeappSessionKeyCache;
@@ -37,6 +37,7 @@ import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.lang.Nullable;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -76,7 +77,7 @@ public class DefaultSecurityConfiguration {
                 .requestMatchers("/iam/**").permitAll()
                 .anyRequest().authenticated())
             .userDetailsService(userDetailsService)
-            .csrf(org.springframework.security.config.Customizer.withDefaults());
+            .csrf(Customizer.withDefaults());
 
         // FORM登录
         http.formLogin(form -> form
@@ -86,7 +87,7 @@ public class DefaultSecurityConfiguration {
             .permitAll());
 
         // 短信验证码登录
-        http.with(new CaptchaLoginFilterConfigurer<>(), captcha -> captcha
+        http.with(new SmsLoginFilterConfigurer<>(), code -> code
             .successHandler(loginAuthenticationSuccessHandler)
             .failureHandler(authenticationFailureHandler)
             .permitAll());
@@ -108,14 +109,14 @@ public class DefaultSecurityConfiguration {
     }
 
     @Bean
-    public CaptchaService captchaService() {
-        return new CaptchaServiceImpl();
+    public SmsService smsService() {
+        return new SmsServiceImpl();
     }
 
     @Bean
-    public CaptchaUserDetailsService captchaUserDetailsService(
+    public SmsUserDetailsService smsUserDetailsService(
         @Qualifier("sysUserDetailsService") UserDetailsService userDetailsService) {
-        return new CaptchaUserDetailsServiceImpl(userDetailsService);
+        return new SmsUserDetailsServiceImpl(userDetailsService);
     }
 
     @Bean

@@ -1,4 +1,4 @@
-package dev.macula.cloud.iam.authentication.captcha;
+package dev.macula.cloud.iam.authentication.sms;
 
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.context.MessageSource;
@@ -18,52 +18,53 @@ import org.springframework.util.Assert;
 import java.util.Collection;
 
 /**
- * 验证码认证器
+ * 校验短信验证码并建立用户认证状态。
  *
  * @author n1
+ * @since 6.1.0
  */
-public class CaptchaAuthenticationProvider implements AuthenticationProvider, InitializingBean, MessageSourceAware {
+public class SmsAuthenticationProvider implements AuthenticationProvider, InitializingBean, MessageSourceAware {
 
     private final GrantedAuthoritiesMapper authoritiesMapper = new NullAuthoritiesMapper();
-    private final CaptchaUserDetailsService captchaUserDetailsService;
-    private final CaptchaService captchaService;
+    private final SmsUserDetailsService smsUserDetailsService;
+    private final SmsService smsService;
     private MessageSourceAccessor messages = SpringSecurityMessageSource.getAccessor();
 
-    public CaptchaAuthenticationProvider(CaptchaUserDetailsService captchaUserDetailsService,
-        CaptchaService captchaService) {
-        this.captchaUserDetailsService = captchaUserDetailsService;
-        this.captchaService = captchaService;
+    public SmsAuthenticationProvider(SmsUserDetailsService smsUserDetailsService,
+        SmsService smsService) {
+        this.smsUserDetailsService = smsUserDetailsService;
+        this.smsService = smsService;
     }
 
     @Override
     public Authentication authenticate(Authentication authentication) throws AuthenticationException {
-        Assert.isInstanceOf(CaptchaAuthenticationToken.class, authentication,
-            () -> messages.getMessage("CaptchaAuthenticationProvider.onlySupports",
-                "Only CaptchaAuthenticationToken is supported"));
+        Assert.isInstanceOf(SmsAuthenticationToken.class, authentication,
+            () -> messages.getMessage("SmsAuthenticationProvider.onlySupports",
+                "Only SmsAuthenticationToken is supported"));
 
-        CaptchaAuthenticationToken unAuthenticationToken = (CaptchaAuthenticationToken)authentication;
+        SmsAuthenticationToken unAuthenticationToken = (SmsAuthenticationToken)authentication;
 
         String phone = unAuthenticationToken.getName();
         String rawCode = (String)unAuthenticationToken.getCredentials();
         // 验证码校验
-        if (captchaService.verifyCaptcha(phone, rawCode)) {
-            UserDetails userDetails = captchaUserDetailsService.loadUserByPhone(phone);
+        if (smsService.verifyCode(phone, rawCode)) {
+            UserDetails userDetails = smsUserDetailsService.loadUserByPhone(phone);
             //TODO 此处省略对UserDetails 的可用性 是否过期  是否锁定 是否失效的检验  建议根据实际情况添加  或者在 UserDetailsService 的实现中处理
             return createSuccessAuthentication(authentication, userDetails);
         } else {
-            throw new BadCredentialsException("captcha is not matched");
+            throw new BadCredentialsException("code is not matched");
         }
     }
 
     @Override
     public boolean supports(Class<?> authentication) {
-        return CaptchaAuthenticationToken.class.isAssignableFrom(authentication);
+        return SmsAuthenticationToken.class.isAssignableFrom(authentication);
     }
 
     @Override
     public void afterPropertiesSet() throws Exception {
-        Assert.notNull(captchaUserDetailsService, "captchaUserDetailsService must not be null");
-        Assert.notNull(captchaService, "captchaService must not be null");
+        Assert.notNull(smsUserDetailsService, "smsUserDetailsService must not be null");
+        Assert.notNull(smsService, "smsService must not be null");
     }
 
     @Override
@@ -81,7 +82,7 @@ public class CaptchaAuthenticationProvider implements AuthenticationProvider, In
     protected Authentication createSuccessAuthentication(Authentication authentication, UserDetails user) {
 
         Collection<? extends GrantedAuthority> authorities = authoritiesMapper.mapAuthorities(user.getAuthorities());
-        CaptchaAuthenticationToken authenticationToken = new CaptchaAuthenticationToken(user, null, authorities);
+        SmsAuthenticationToken authenticationToken = new SmsAuthenticationToken(user, null, authorities);
         authenticationToken.setDetails(authentication.getDetails());
 
         return authenticationToken;

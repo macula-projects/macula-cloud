@@ -17,18 +17,18 @@
 
 package dev.macula.cloud.iam.service.userdetails;
 
-import dev.macula.cloud.iam.authentication.captcha.CaptchaService;
+import dev.macula.cloud.iam.authentication.sms.SmsService;
 import org.springframework.stereotype.Component;
 
 /**
- * {@code CaptchaServiceImpl} 手机号验证服务
+ * {@code SmsServiceImpl} 手机号验证服务
  *
  * @author rain
  * @since 2023/4/12 19:34
  */
-public class CaptchaServiceImpl implements CaptchaService {
+public class SmsServiceImpl implements SmsService {
     @Override
-    public boolean verifyCaptcha(String phone, String rawCode) {
+    public boolean verifyCode(String phone, String rawCode) {
         // TODO 手机号验证
         return true;
     }

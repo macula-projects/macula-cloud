@@ -1,17 +1,22 @@
 package dev.macula.cloud.iam.authentication.weapp;
 
-import org.springframework.security.config.annotation.web.configurers.AbstractLoginFilterConfigurer;
 import org.springframework.context.ApplicationContext;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.config.annotation.web.HttpSecurityBuilder;
+import org.springframework.security.config.annotation.web.builders.FilterOrderRegUtils;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractAuthenticationFilterConfigurer;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.authentication.logout.LogoutFilter;
-import org.springframework.http.HttpMethod;
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.util.Assert;
 
+import static org.springframework.security.config.annotation.web.builders.FilterOrderRegUtils.registryFilterOrder;
+
 public class WeappLoginFilterConfigurer<H extends HttpSecurityBuilder<H>>
-    extends AbstractLoginFilterConfigurer<H, WeappLoginFilterConfigurer<H>, WeappAuthenticationFilter> {
+    extends AbstractAuthenticationFilterConfigurer<H, WeappLoginFilterConfigurer<H>, WeappAuthenticationFilter> {
     private WeappUserDetailsService weappUserDetailsService;
 
     private WeappClientService weappClientService;
@@ -39,11 +44,14 @@ public class WeappLoginFilterConfigurer<H extends HttpSecurityBuilder<H>>
 
     @Override
     public void init(H http) {
-        super.init(http);
+        http.authenticationProvider(postProcess(authenticationProvider(http)));
+        registryFilterOrder((HttpSecurity)http, this.getAuthenticationFilter(),
+            UsernamePasswordAuthenticationFilter.class, FilterOrderRegUtils.Position.AFTER);
         initPreAuthenticationFilter(http);
+
+        super.init(http);
     }
 
-    @Override
     protected AuthenticationProvider authenticationProvider(H http) {
         ApplicationContext applicationContext = http.getSharedObject(ApplicationContext.class);
         WeappUserDetailsService weappUserDetailsService =
@@ -72,5 +80,9 @@ public class WeappLoginFilterConfigurer<H extends HttpSecurityBuilder<H>>
     @Override
     protected RequestMatcher createLoginProcessingUrlMatcher(String loginProcessingUrl) {
         return PathPatternRequestMatcher.pathPattern(HttpMethod.POST, loginProcessingUrl);
+    }
+
+    private <T> T getBeanOrNull(ApplicationContext applicationContext, Class<T> beanType) {
+        return applicationContext == null ? null : applicationContext.getBeanProvider(beanType).getIfUnique();
     }
 }

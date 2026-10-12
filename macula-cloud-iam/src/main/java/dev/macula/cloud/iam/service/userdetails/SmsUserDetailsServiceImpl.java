@@ -17,20 +17,20 @@
 
 package dev.macula.cloud.iam.service.userdetails;
 
-import dev.macula.cloud.iam.authentication.captcha.CaptchaUserDetailsService;
+import dev.macula.cloud.iam.authentication.sms.SmsUserDetailsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 
 /**
- * {@code CaptchaUserDetailsServiceImpl} 通过手机号获取用户
+ * {@code SmsUserDetailsServiceImpl} 通过手机号获取用户
  *
  * @author rain
  * @since 2023/4/12 19:28
  */
 @RequiredArgsConstructor
-public class CaptchaUserDetailsServiceImpl implements CaptchaUserDetailsService {
+public class SmsUserDetailsServiceImpl implements SmsUserDetailsService {
 
     private final UserDetailsService userDetailsService;
 

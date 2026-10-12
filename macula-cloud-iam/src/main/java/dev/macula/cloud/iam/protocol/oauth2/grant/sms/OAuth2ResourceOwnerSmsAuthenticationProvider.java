@@ -18,8 +18,8 @@
 package dev.macula.cloud.iam.protocol.oauth2.grant.sms;
 
 import dev.macula.boot.constants.SecurityConstants;
-import dev.macula.cloud.iam.authentication.captcha.CaptchaAuthenticationFilter;
-import dev.macula.cloud.iam.authentication.captcha.CaptchaAuthenticationToken;
+import dev.macula.cloud.iam.authentication.sms.SmsAuthenticationFilter;
+import dev.macula.cloud.iam.authentication.sms.SmsAuthenticationToken;
 import dev.macula.cloud.iam.protocol.oauth2.grant.base.OAuth2ResourceOwnerBaseAuthenticationProvider;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -77,9 +77,9 @@ public class OAuth2ResourceOwnerSmsAuthenticationProvider
 
     @Override
     public AbstractAuthenticationToken buildToken(Map<String, Object> reqParameters) {
-        String phone = (String)reqParameters.get(CaptchaAuthenticationFilter.SPRING_SECURITY_FORM_USERNAME_KEY);
-        String captcha = (String)reqParameters.get(CaptchaAuthenticationFilter.SPRING_SECURITY_FORM_CAPTCHA_KEY);
-        return new CaptchaAuthenticationToken(phone, captcha);
+        String phone = (String)reqParameters.get(SmsAuthenticationFilter.SPRING_SECURITY_FORM_PHONE_KEY);
+        String code = (String)reqParameters.get(SmsAuthenticationFilter.SPRING_SECURITY_FORM_CODE_KEY);
+        return new SmsAuthenticationToken(phone, code);
     }
 
 }

@@ -21,7 +21,7 @@ import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
-import dev.macula.cloud.iam.authentication.captcha.CaptchaAuthenticationToken;
+import dev.macula.cloud.iam.authentication.sms.SmsAuthenticationToken;
 import dev.macula.cloud.iam.authentication.weapp.WeappAuthenticationToken;
 import dev.macula.cloud.iam.service.userdetails.SysUserDetails;
 import dev.macula.boot.constants.CacheConstants;
@@ -116,7 +116,7 @@ public class MaculaOAuth2AuthorizationService implements OAuth2AuthorizationServ
         ClassLoader classLoader = MaculaOAuth2AuthorizationService.class.getClassLoader();
         var allowedTypes = BasicPolymorphicTypeValidator.builder()
             .allowIfSubType(SysUserDetails.class)
-            .allowIfSubType(CaptchaAuthenticationToken.class)
+            .allowIfSubType(SmsAuthenticationToken.class)
             .allowIfSubType(WeappAuthenticationToken.class)
             .allowIfSubType(Long.class);
         // Includes OAuth2AuthorizationServerJacksonModule and its constrained type validator.

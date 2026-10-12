@@ -23,7 +23,7 @@ import tools.jackson.databind.DeserializationContext;
 import tools.jackson.databind.ValueDeserializer;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.MissingNode;
-import dev.macula.cloud.iam.authentication.captcha.CaptchaAuthenticationToken;
+import dev.macula.cloud.iam.authentication.sms.SmsAuthenticationToken;
 import org.springframework.security.core.GrantedAuthority;
 
 import java.util.List;
@@ -34,25 +34,25 @@ import java.util.List;
  * @author felord.cn
  * @since 1.0.0
  */
-class CaptchaAuthenticationTokenDeserializer extends ValueDeserializer<CaptchaAuthenticationToken> {
+class SmsAuthenticationTokenDeserializer extends ValueDeserializer<SmsAuthenticationToken> {
 
     private static final TypeReference<List<GrantedAuthority>> GRANTED_AUTHORITY_LIST =
         new TypeReference<List<GrantedAuthority>>() {
         };
 
     @Override
-    public CaptchaAuthenticationToken deserialize(JsonParser jp, DeserializationContext ctxt) {
+    public SmsAuthenticationToken deserialize(JsonParser jp, DeserializationContext ctxt) {
         JsonNode jsonNode = ctxt.readTree(jp);
         boolean authenticated = readJsonNode(jsonNode, "authenticated").asBoolean();
         JsonNode principalNode = readJsonNode(jsonNode, "principal");
         Object principal = getPrincipal(ctxt, principalNode);
-        JsonNode credentialsNode = readJsonNode(jsonNode, "captcha");
-        String credentials = getCaptcha(credentialsNode);
+        JsonNode credentialsNode = readJsonNode(jsonNode, "code");
+        String credentials = getCode(credentialsNode);
         List<GrantedAuthority> authorities =
             ctxt.readTreeAsValue(readJsonNode(jsonNode, "authorities"),
                 ctxt.getTypeFactory().constructType(GRANTED_AUTHORITY_LIST));
-        CaptchaAuthenticationToken token = (!authenticated) ? new CaptchaAuthenticationToken(principal, credentials)
-            : new CaptchaAuthenticationToken(principal, credentials, authorities);
+        SmsAuthenticationToken token = (!authenticated) ? new SmsAuthenticationToken(principal, credentials)
+            : new SmsAuthenticationToken(principal, credentials, authorities);
         JsonNode detailsNode = readJsonNode(jsonNode, "details");
         if (detailsNode.isNull() || detailsNode.isMissingNode()) {
             token.setDetails(null);
@@ -63,7 +63,7 @@ class CaptchaAuthenticationTokenDeserializer extends ValueDeserializer<CaptchaAu
         return token;
     }
 
-    private String getCaptcha(JsonNode credentialsNode) {
+    private String getCode(JsonNode credentialsNode) {
         if (credentialsNode.isNull() || credentialsNode.isMissingNode()) {
             return null;
         }

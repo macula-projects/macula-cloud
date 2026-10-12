@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package dev.macula.cloud.iam.authentication.captcha;
+package dev.macula.cloud.iam.authentication.sms;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -30,33 +30,33 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * {@link CaptchaAuthenticationFilter} 的 Spring Security 7 兼容回归测试。
+ * {@link SmsAuthenticationFilter} 的 Spring Security 7 兼容回归测试。
  *
  * @author rain
  * @since 6.1.0
  */
-class CaptchaAuthenticationFilterTest {
+class SmsAuthenticationFilterTest {
 
     @Test
     void shouldMatchOnlyConfiguredPostEndpoint() {
-        TestCaptchaAuthenticationFilter filter = new TestCaptchaAuthenticationFilter(authentication -> authentication);
+        TestSmsAuthenticationFilter filter = new TestSmsAuthenticationFilter(authentication -> authentication);
 
-        assertThat(filter.requiresAuthentication(request("POST", "/login/captcha"))).isTrue();
-        assertThat(filter.requiresAuthentication(request("GET", "/login/captcha"))).isFalse();
+        assertThat(filter.requiresAuthentication(request("POST", "/login/sms"))).isTrue();
+        assertThat(filter.requiresAuthentication(request("GET", "/login/sms"))).isFalse();
         assertThat(filter.requiresAuthentication(request("POST", "/login/other"))).isFalse();
     }
 
     @Test
-    void shouldTrimAndSubmitCaptchaCredentials() {
+    void shouldTrimAndSubmitSmsCode() {
         AtomicReference<Authentication> submitted = new AtomicReference<>();
         AuthenticationManager authenticationManager = authentication -> {
             submitted.set(authentication);
             return authentication;
         };
-        CaptchaAuthenticationFilter filter = new CaptchaAuthenticationFilter(authenticationManager);
-        MockHttpServletRequest request = request("POST", "/login/captcha");
+        SmsAuthenticationFilter filter = new SmsAuthenticationFilter(authenticationManager);
+        MockHttpServletRequest request = request("POST", "/login/sms");
         request.addParameter("phone", " 13800138000 ");
-        request.addParameter("captcha", " 123456 ");
+        request.addParameter("code", " 123456 ");
 
         Authentication result = filter.attemptAuthentication(request, new MockHttpServletResponse());
 
@@ -67,9 +67,9 @@ class CaptchaAuthenticationFilterTest {
 
     @Test
     void shouldRejectNonPostAuthenticationAttempt() {
-        CaptchaAuthenticationFilter filter = new CaptchaAuthenticationFilter(authentication -> authentication);
+        SmsAuthenticationFilter filter = new SmsAuthenticationFilter(authentication -> authentication);
 
-        assertThatThrownBy(() -> filter.attemptAuthentication(request("GET", "/login/captcha"),
+        assertThatThrownBy(() -> filter.attemptAuthentication(request("GET", "/login/sms"),
             new MockHttpServletResponse())).isInstanceOf(AuthenticationServiceException.class)
                 .hasMessageContaining("GET");
     }
@@ -80,9 +80,9 @@ class CaptchaAuthenticationFilterTest {
         return request;
     }
 
-    private static final class TestCaptchaAuthenticationFilter extends CaptchaAuthenticationFilter {
+    private static final class TestSmsAuthenticationFilter extends SmsAuthenticationFilter {
 
-        private TestCaptchaAuthenticationFilter(AuthenticationManager authenticationManager) {
+        private TestSmsAuthenticationFilter(AuthenticationManager authenticationManager) {
             super(authenticationManager);
         }
 

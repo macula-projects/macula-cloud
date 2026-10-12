@@ -44,7 +44,7 @@ public class LoginController {
      *
      * @param model              the model
      * @param authentication     the authentication
-     * @param enableCaptchaLogin the enable captcha login
+     * @param enableSmsLogin the enable code login
      * @param clientId           the client id
      * @param csrfToken          the csrf token
      * @return the string
@@ -52,7 +52,7 @@ public class LoginController {
     @GetMapping("/login")
     public String loginPage(Model model,
         @CurrentSecurityContext(expression = "authentication") Authentication authentication,
-        @Value("${spring.security.oauth2.server.login.captcha.enabled:true}") boolean enableCaptchaLogin,
+        @Value("${spring.security.oauth2.server.login.sms.enabled:true}") boolean enableSmsLogin,
         @RequestParam(name = OAuth2ParameterNames.CLIENT_ID, required = false) String clientId,
         @RequestAttribute(name = "org.springframework.security.web.csrf.CsrfToken",
             required = false) CsrfToken csrfToken) {
@@ -67,7 +67,7 @@ public class LoginController {
         if (StrUtil.isNotBlank(clientId)) {
             model.addAttribute(OAuth2ParameterNames.CLIENT_ID, clientId);
         }
-        model.addAttribute("enableCaptchaLogin", enableCaptchaLogin);
+        model.addAttribute("enableSmsLogin", enableSmsLogin);
         return "login";
     }
 

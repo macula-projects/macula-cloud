@@ -18,7 +18,7 @@
 package dev.macula.cloud.iam.protocol.oauth2.grant.sms;
 
 import dev.macula.boot.constants.SecurityConstants;
-import dev.macula.cloud.iam.authentication.captcha.CaptchaAuthenticationFilter;
+import dev.macula.cloud.iam.authentication.sms.SmsAuthenticationFilter;
 import dev.macula.cloud.iam.protocol.oauth2.grant.base.OAuth2ResourceOwnerBaseAuthenticationConverter;
 import dev.macula.cloud.iam.utils.OAuth2EndpointUtils;
 import org.springframework.security.core.Authentication;
@@ -68,20 +68,20 @@ public class OAuth2ResourceOwnerSmsAuthenticationConverter
     public void checkParams(HttpServletRequest request) {
         MultiValueMap<String, String> parameters = OAuth2EndpointUtils.getParameters(request);
         // PHONE (REQUIRED)
-        String phone = parameters.getFirst(CaptchaAuthenticationFilter.SPRING_SECURITY_FORM_USERNAME_KEY);
-        if (!StringUtils.hasText(phone) || parameters.get(CaptchaAuthenticationFilter.SPRING_SECURITY_FORM_USERNAME_KEY)
+        String phone = parameters.getFirst(SmsAuthenticationFilter.SPRING_SECURITY_FORM_PHONE_KEY);
+        if (!StringUtils.hasText(phone) || parameters.get(SmsAuthenticationFilter.SPRING_SECURITY_FORM_PHONE_KEY)
             .size() != 1) {
             OAuth2EndpointUtils.throwError(OAuth2ErrorCodes.INVALID_REQUEST,
-                CaptchaAuthenticationFilter.SPRING_SECURITY_FORM_USERNAME_KEY,
+                SmsAuthenticationFilter.SPRING_SECURITY_FORM_PHONE_KEY,
                 OAuth2EndpointUtils.ACCESS_TOKEN_REQUEST_ERROR_URI);
         }
 
-        // CAPTCHA (REQUIRED)
-        String captcha = parameters.getFirst(CaptchaAuthenticationFilter.SPRING_SECURITY_FORM_CAPTCHA_KEY);
-        if (!StringUtils.hasText(captcha) || parameters.get(
-            CaptchaAuthenticationFilter.SPRING_SECURITY_FORM_CAPTCHA_KEY).size() != 1) {
+        // SMS code (REQUIRED)
+        String code = parameters.getFirst(SmsAuthenticationFilter.SPRING_SECURITY_FORM_CODE_KEY);
+        if (!StringUtils.hasText(code) || parameters.get(
+            SmsAuthenticationFilter.SPRING_SECURITY_FORM_CODE_KEY).size() != 1) {
             OAuth2EndpointUtils.throwError(OAuth2ErrorCodes.INVALID_REQUEST,
-                CaptchaAuthenticationFilter.SPRING_SECURITY_FORM_CAPTCHA_KEY,
+                SmsAuthenticationFilter.SPRING_SECURITY_FORM_CODE_KEY,
                 OAuth2EndpointUtils.ACCESS_TOKEN_REQUEST_ERROR_URI);
         }
     }
