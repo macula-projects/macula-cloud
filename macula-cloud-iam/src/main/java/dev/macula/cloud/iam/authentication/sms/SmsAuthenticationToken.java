@@ -2,7 +2,6 @@ package dev.macula.cloud.iam.authentication.sms;
 
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.SpringSecurityCoreVersion;
 
 import java.io.Serial;
 import java.util.Collection;
@@ -25,7 +24,7 @@ public class SmsAuthenticationToken extends AbstractAuthenticationToken {
      * 此构造函数用来初始化未授信凭据.
      *
      * @param principal the principal
-     * @param code   the code
+     * @param code      the code
      */
     public SmsAuthenticationToken(Object principal, String code) {
         super((Collection<? extends GrantedAuthority>)null);
@@ -38,11 +37,10 @@ public class SmsAuthenticationToken extends AbstractAuthenticationToken {
      * 此构造函数用来初始化授信凭据.
      *
      * @param principal   the principal
-     * @param code     the code
+     * @param code        the code
      * @param authorities the authorities
      */
-    public SmsAuthenticationToken(Object principal, String code,
-        Collection<? extends GrantedAuthority> authorities) {
+    public SmsAuthenticationToken(Object principal, String code, Collection<? extends GrantedAuthority> authorities) {
         super(authorities);
         this.principal = principal;
         this.code = code;

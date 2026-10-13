@@ -16,4 +16,10 @@ public interface SmsService {
      * @return isVerified
      */
     boolean verifyCode(String phone, String rawCode);
+
+    /**
+     * 发送验证码
+     * @param phone 手机号
+     */
+    void sendCode(String phone);
 }

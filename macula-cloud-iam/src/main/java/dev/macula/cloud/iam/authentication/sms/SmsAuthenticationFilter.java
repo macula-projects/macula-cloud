@@ -1,5 +1,6 @@
 package dev.macula.cloud.iam.authentication.sms;
 
+import org.jspecify.annotations.NonNull;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -8,7 +9,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.authentication.AbstractAuthenticationProcessingFilter;
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
-import org.springframework.util.Assert;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -27,13 +27,11 @@ public class SmsAuthenticationFilter extends AbstractAuthenticationProcessingFil
     private static final PathPatternRequestMatcher DEFAULT_REQUEST_MATCHER =
         PathPatternRequestMatcher.pathPattern(HttpMethod.POST, "/login/sms");
 
-    private String phoneParameter = SPRING_SECURITY_FORM_PHONE_KEY;
+    private final String phoneParameter = SPRING_SECURITY_FORM_PHONE_KEY;
 
-    private String codeParameter = SPRING_SECURITY_FORM_CODE_KEY;
+    private final String codeParameter = SPRING_SECURITY_FORM_CODE_KEY;
 
-    private Converter<HttpServletRequest, SmsAuthenticationToken> smsAuthenticationTokenConverter;
-
-    private boolean postOnly = true;
+    private final Converter<HttpServletRequest, SmsAuthenticationToken> smsAuthenticationTokenConverter;
 
     public SmsAuthenticationFilter() {
         super(DEFAULT_REQUEST_MATCHER);
@@ -46,9 +44,9 @@ public class SmsAuthenticationFilter extends AbstractAuthenticationProcessingFil
     }
 
     @Override
-    public Authentication attemptAuthentication(HttpServletRequest request, HttpServletResponse response)
+    public Authentication attemptAuthentication(HttpServletRequest request, @NonNull HttpServletResponse response)
         throws AuthenticationException {
-        if (this.postOnly && !HttpMethod.POST.matches(request.getMethod())) {
+        if (!HttpMethod.POST.matches(request.getMethod())) {
             throw new AuthenticationServiceException("Authentication method not supported: " + request.getMethod());
         }
 
@@ -70,32 +68,5 @@ public class SmsAuthenticationFilter extends AbstractAuthenticationProcessingFil
 
     protected void setDetails(HttpServletRequest request, SmsAuthenticationToken authRequest) {
         authRequest.setDetails(this.authenticationDetailsSource.buildDetails(request));
-    }
-
-    public void setPhoneParameter(String phoneParameter) {
-        Assert.hasText(phoneParameter, "Phone parameter must not be empty or null");
-        this.phoneParameter = phoneParameter;
-    }
-
-    public void setCodeParameter(String codeParameter) {
-        Assert.hasText(codeParameter, "Code parameter must not be empty or null");
-        this.codeParameter = codeParameter;
-    }
-
-    public void setConverter(Converter<HttpServletRequest, SmsAuthenticationToken> converter) {
-        Assert.notNull(converter, "Converter must not be null");
-        this.smsAuthenticationTokenConverter = converter;
-    }
-
-    public void setPostOnly(boolean postOnly) {
-        this.postOnly = postOnly;
-    }
-
-    public final String getPhoneParameter() {
-        return this.phoneParameter;
-    }
-
-    public final String getCodeParameter() {
-        return this.codeParameter;
     }
 }

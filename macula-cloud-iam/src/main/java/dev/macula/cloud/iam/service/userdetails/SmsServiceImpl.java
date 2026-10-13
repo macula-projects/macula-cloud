@@ -32,4 +32,10 @@ public class SmsServiceImpl implements SmsService {
         // TODO 手机号验证
         return true;
     }
+
+    @Override
+    public void sendCode(String phone) {
+        // 发送手机验证码
+
+    }
 }

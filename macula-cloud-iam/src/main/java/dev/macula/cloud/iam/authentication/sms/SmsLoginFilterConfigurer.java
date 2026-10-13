@@ -49,8 +49,7 @@ public class SmsLoginFilterConfigurer<H extends HttpSecurityBuilder<H>>
         super(new SmsAuthenticationFilter(), "/login/sms");
     }
 
-    public SmsLoginFilterConfigurer<H> smsUserDetailsService(
-        SmsUserDetailsService smsUserDetailsService) {
+    public SmsLoginFilterConfigurer<H> smsUserDetailsService(SmsUserDetailsService smsUserDetailsService) {
         this.smsUserDetailsService = smsUserDetailsService;
         return this;
     }
@@ -75,13 +74,14 @@ public class SmsLoginFilterConfigurer<H extends HttpSecurityBuilder<H>>
 
     protected AuthenticationProvider authenticationProvider(H http) {
         ApplicationContext applicationContext = http.getSharedObject(ApplicationContext.class);
-        SmsUserDetailsService smsUserDetailsService =
-            this.smsUserDetailsService != null ? this.smsUserDetailsService
-                : getBeanOrNull(applicationContext, SmsUserDetailsService.class);
+        SmsUserDetailsService smsUserDetailsService = this.smsUserDetailsService != null ? this.smsUserDetailsService
+            : getBeanOrNull(applicationContext, SmsUserDetailsService.class);
+
         Assert.notNull(smsUserDetailsService, "smsUserDetailsService is required");
 
-        SmsService smsService =
-            this.smsService != null ? this.smsService : getBeanOrNull(applicationContext, SmsService.class);
+        SmsService smsService = this.smsService != null ? this.smsService
+            : getBeanOrNull(applicationContext, SmsService.class);
+
         Assert.notNull(smsService, "smsService is required");
 
         return new SmsAuthenticationProvider(smsUserDetailsService, smsService);

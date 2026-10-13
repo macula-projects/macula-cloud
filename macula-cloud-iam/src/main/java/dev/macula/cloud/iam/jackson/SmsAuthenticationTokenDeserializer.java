@@ -17,14 +17,14 @@
 
 package dev.macula.cloud.iam.jackson;
 
+import dev.macula.cloud.iam.authentication.sms.SmsAuthenticationToken;
+import org.springframework.security.core.GrantedAuthority;
 import tools.jackson.core.JsonParser;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.DeserializationContext;
-import tools.jackson.databind.ValueDeserializer;
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ValueDeserializer;
 import tools.jackson.databind.node.MissingNode;
-import dev.macula.cloud.iam.authentication.sms.SmsAuthenticationToken;
-import org.springframework.security.core.GrantedAuthority;
 
 import java.util.List;
 
@@ -48,9 +48,8 @@ class SmsAuthenticationTokenDeserializer extends ValueDeserializer<SmsAuthentica
         Object principal = getPrincipal(ctxt, principalNode);
         JsonNode credentialsNode = readJsonNode(jsonNode, "code");
         String credentials = getCode(credentialsNode);
-        List<GrantedAuthority> authorities =
-            ctxt.readTreeAsValue(readJsonNode(jsonNode, "authorities"),
-                ctxt.getTypeFactory().constructType(GRANTED_AUTHORITY_LIST));
+        List<GrantedAuthority> authorities = ctxt.readTreeAsValue(readJsonNode(jsonNode, "authorities"),
+            ctxt.getTypeFactory().constructType(GRANTED_AUTHORITY_LIST));
         SmsAuthenticationToken token = (!authenticated) ? new SmsAuthenticationToken(principal, credentials)
             : new SmsAuthenticationToken(principal, credentials, authorities);
         JsonNode detailsNode = readJsonNode(jsonNode, "details");
@@ -67,14 +66,14 @@ class SmsAuthenticationTokenDeserializer extends ValueDeserializer<SmsAuthentica
         if (credentialsNode.isNull() || credentialsNode.isMissingNode()) {
             return null;
         }
-        return credentialsNode.asText();
+        return credentialsNode.asString();
     }
 
     private Object getPrincipal(DeserializationContext ctxt, JsonNode principalNode) {
         if (principalNode.isObject()) {
             return ctxt.readTreeAsValue(principalNode, Object.class);
         }
-        return principalNode.asText();
+        return principalNode.asString();
     }
 
     private JsonNode readJsonNode(JsonNode jsonNode, String field) {

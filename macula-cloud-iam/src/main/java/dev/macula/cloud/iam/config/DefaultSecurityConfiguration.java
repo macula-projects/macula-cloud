@@ -30,13 +30,13 @@ import dev.macula.cloud.iam.service.support.SysOAuth2ClientService;
 import dev.macula.cloud.iam.service.support.SysUserService;
 import dev.macula.cloud.iam.service.support.UserAuthInfoService;
 import dev.macula.cloud.iam.service.userdetails.*;
+import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.lang.Nullable;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -88,6 +88,7 @@ public class DefaultSecurityConfiguration {
 
         // 短信验证码登录
         http.with(new SmsLoginFilterConfigurer<>(), code -> code
+            .smsUserDetailsService((SmsUserDetailsService)userDetailsService)
             .successHandler(loginAuthenticationSuccessHandler)
             .failureHandler(authenticationFailureHandler)
             .permitAll());
@@ -111,12 +112,6 @@ public class DefaultSecurityConfiguration {
     @Bean
     public SmsService smsService() {
         return new SmsServiceImpl();
-    }
-
-    @Bean
-    public SmsUserDetailsService smsUserDetailsService(
-        @Qualifier("sysUserDetailsService") UserDetailsService userDetailsService) {
-        return new SmsUserDetailsServiceImpl(userDetailsService);
     }
 
     @Bean

@@ -1,5 +1,6 @@
 package dev.macula.cloud.iam.authentication.sms;
 
+import org.jspecify.annotations.NonNull;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.context.MessageSource;
 import org.springframework.context.MessageSourceAware;
@@ -37,7 +38,7 @@ public class SmsAuthenticationProvider implements AuthenticationProvider, Initia
     }
 
     @Override
-    public Authentication authenticate(Authentication authentication) throws AuthenticationException {
+    public Authentication authenticate(@NonNull Authentication authentication) throws AuthenticationException {
         Assert.isInstanceOf(SmsAuthenticationToken.class, authentication,
             () -> messages.getMessage("SmsAuthenticationProvider.onlySupports",
                 "Only SmsAuthenticationToken is supported"));
@@ -49,7 +50,6 @@ public class SmsAuthenticationProvider implements AuthenticationProvider, Initia
         // 验证码校验
         if (smsService.verifyCode(phone, rawCode)) {
             UserDetails userDetails = smsUserDetailsService.loadUserByPhone(phone);
-            //TODO 此处省略对UserDetails 的可用性 是否过期  是否锁定 是否失效的检验  建议根据实际情况添加  或者在 UserDetailsService 的实现中处理
             return createSuccessAuthentication(authentication, userDetails);
         } else {
             throw new BadCredentialsException("code is not matched");
@@ -57,7 +57,7 @@ public class SmsAuthenticationProvider implements AuthenticationProvider, Initia
     }
 
     @Override
-    public boolean supports(Class<?> authentication) {
+    public boolean supports(@NonNull Class<?> authentication) {
         return SmsAuthenticationToken.class.isAssignableFrom(authentication);
     }
 
@@ -68,7 +68,7 @@ public class SmsAuthenticationProvider implements AuthenticationProvider, Initia
     }
 
     @Override
-    public void setMessageSource(MessageSource messageSource) {
+    public void setMessageSource(@NonNull MessageSource messageSource) {
         this.messages = new MessageSourceAccessor(messageSource);
     }
 
