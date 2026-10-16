@@ -21,6 +21,8 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import dev.macula.boot.enums.MenuTypeEnum;
 import lombok.Data;
 
+import java.io.Serial;
+import java.io.Serializable;
 import java.util.List;
 
 /**
@@ -31,7 +33,10 @@ import java.util.List;
  */
 @Data
 @JsonInclude(JsonInclude.Include.NON_EMPTY)
-public class RouteVO {
+public class RouteVO implements Serializable {
+
+    @Serial
+    private static final long serialVersionUID = 1L;
 
     private long id;
 
@@ -51,7 +56,10 @@ public class RouteVO {
     private List<RouteVO> children;
 
     @Data
-    public static class Meta {
+    public static class Meta implements Serializable {
+
+        @Serial
+        private static final long serialVersionUID = 1L;
 
         private Boolean visible;
 

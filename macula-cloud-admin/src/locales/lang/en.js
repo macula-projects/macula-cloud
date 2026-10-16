@@ -17,6 +17,21 @@
 
 export default {
 	adminSettings: {
+		identity: 'Identity Providers',
+		identitySocial: 'Social Providers',
+		identityEnterprise: 'Enterprise Providers',
+		identityPending:
+			'Configurations are stored only; third-party IAM login is not connected yet.',
+		message: 'Message Settings',
+		messageDescription:
+			'Manage mail and SMS providers and templates. Test sends use a temporary recipient; confirm final delivery at the recipient.',
+		mailTemplate: 'Mail Templates',
+		mailService: 'Mail Services',
+		smsTemplate: 'SMS Templates',
+		smsService: 'SMS Services',
+		oauth: 'IAM OAuth Clients',
+		oauthWarning:
+			'Changing a client configuration does not revoke previously issued grants or tokens.',
 		securityPolicy: 'Security Policy',
 		securityPolicyPending:
 			'These settings are stored but not yet enforced by IAM or Gateway.'
