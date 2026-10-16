@@ -21,3 +21,13 @@ Clear. All three mutations use the platform audit mechanism with request and res
 - Non-blocking coverage gap: the staged tests do not run the complete anonymous/unauthorized/authorized/ROOT security matrix or a service-level two-tenant context integration test. Existing coverage verifies unknown tenant fields are rejected, database uniqueness permits the same key across tenants, and the migration preserves cross-tenant boundaries.
 
 No Important findings remain.
+
+## Accepted UI refinement review
+
+Review scope: committed diff `3435cea..a9a5a68`, after human acceptance and clean-worktree verification.
+
+- Bugs: clear.
+- Security: clear.
+- Compliance: one Nit. In `macula-cloud-admin/src/views/system/securityPolicy/index.vue` (first occurrence around lines 37–50, repeated for the other controls), units and help text are visually adjacent but are not programmatically associated with their controls through `aria-describedby`. A screen reader may therefore omit constraints such as the unit or “0 disables this check” while the control is focused. Suggested follow-up: give each unit/help element a stable ID and bind the relevant IDs to each input-number, switch, textarea, and radio-group.
+
+No Important findings were found. The accessibility Nit is non-blocking and remains within the five-Nit cap from `REVIEW.md`.
