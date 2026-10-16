@@ -11,8 +11,8 @@ Flyway 迁移统一为 `db/migration/V1__baseline.sql`，包含原有基础数�
 本次合并要求由运维先清理数据库及 Flyway 历史，再执行初始化；不支持直接沿用旧版迁移历史升级。
 System 数据库同时供 IAM 使用，清理后相关账号、权限及认证配置需重新初始化。
 
-后续 `V2__admin_identity_security_settings.sql` 为增量迁移：新增平台身份提供商、通用安全、
-密码策略、消息服务和模板覆盖配置，并将 `sys_oauth2_client.client_secret` 调整为可空以支持
+后续 `V2__admin_identity_security_settings.sql` 为增量迁移：新增平台身份提供商、消息服务和模板覆盖配置
+（其中历史全局安全/密码表和菜单已由 V4 的租户安全策略替代），并将 `sys_oauth2_client.client_secret` 调整为可空以支持
 公共 PKCE 客户端。V2 不清理旧客户端，也不修改已经执行的 V1；已按 V1 初始化的数据库可直接
 升级。升级前请备份数据库；回滚需要恢复升级前备份，不能直接删除 V2 新表（可能包含新配置）。
 
@@ -24,15 +24,14 @@ System 数据库同时供 IAM 使用，清理后相关账号、权限及认证�
 需先由数据负责人核对并修复，不能自动清洗。回滚须先停写 System/IAM，再恢复数据库备份及匹配的
 应用版本；不要手工删除 V3 的 Flyway 记录或直接缩回 `app_secret` 列，以免截断已保存的密文。
 
-## 身份、安全和消息管理
+## 身份提供商、消息与 OAuth 客户端管理
 
-- 新增 `/api/v1/identity-providers`、`/api/v1/security-settings`、`/api/v1/password-policy`、
-  `/api/v1/message-settings`、`/api/v1/oauth2-clients` 管理 API。Controller 不再硬编码 `ROOT`
+- 新增 `/api/v1/identity-providers`、`/api/v1/message-settings`、`/api/v1/oauth2-clients` 管理 API。
+  Controller 不再硬编码 `ROOT`
   角色检查；访问授权由现有网关 URL 权限配置控制。V2 只为 `ROOT` 角色建立默认关联，后续可在
   系统权限管理中调整。直接访问 System 服务虽仍需资源服务器认证，但不会经过网关的 URL 权限检查；
   应以容器网络、防火墙或入口代理限制 System 直连，不能将其端口暴露给不可信客户端。
-- 身份提供商只管理 GitHub、支付宝、微信、企业微信、飞书、钉钉配置；通用安全及密码策略仅保存，
-  本轮不改变 IAM/Gateway 的登录、密码校验或响应头行为。管理页明确提示“暂未生效”。
+- 身份提供商只管理 GitHub、支付宝、微信、企业微信、飞书、钉钉配置；本轮不改变 IAM 的第三方登录行为。
 - 身份源列表可用 `category=social|enterprise` 筛选。创建/更新请求中的 `config` 必须是 JSON 对象：
   GitHub 使用 `clientId/clientSecret`，支付宝使用 `appId/appPrivateKey/alipayPublicKey`，微信使用
   `appId/appSecret`，企业微信使用 `corpId/agentId/appSecret`，飞书使用 `appId/appSecret`，钉钉使用
@@ -71,16 +70,32 @@ System 数据库同时供 IAM 使用，清理后相关账号、权限及认证�
   `client_secret_jwt` 不开放新配置，因为现有单向哈希密钥不能用于 HMAC 验签。上线前应针对已有客户端做兼容回归。
 
 隔离数据库集成测试 `SettingsPersistenceIT` 默认不运行；显式设置 `SYSTEM_SETTINGS_IT=true` 后，
-须将 `SPRING_DATASOURCE_URL` 指向名称以 `macula_settings_it_` 开头、已升级至 V3 的隔离测试库，
+须将 `SPRING_DATASOURCE_URL` 指向名称以 `macula_settings_it_` 开头、已升级至 V4 的隔离测试库，
 并提供测试用 `MACULA_CRYPTO_PASSWORD`、MySQL 凭据与独立 Redis database。此测试禁用自动
 Flyway，不会自行执行迁移。测试会核对库名，
 只清理自己创建的行与缓存项，不可指向业务数据库。
 
 Flyway 增量验证 `IdentityProviderMigrationIT` 默认禁用；仅将 `SYSTEM_MIGRATION_IT=true`、
 `SPRING_DATASOURCE_URL/USERNAME/PASSWORD` 指向**全新空的** `macula_settings_it_*` 隔离库后运行。
-测试先应用 V1、V2，插入虚构旧行，再应用 V3，核对 `flyway_schema_history`、列类型和旧行；
+测试先应用 V1、V2，插入虚构旧行，再应用 V3/V4，核对 `flyway_schema_history`、列类型和旧行；
 测试不会删除该库，执行者须核实库名后单独清理。若切换分支后 `target/classes` 有旧迁移残留，
 先对目标模块执行 Maven `clean`，不要修改已执行的 Flyway 源文件。
+## 租户安全策略
+
+`V4__tenant_security_policy_dict.sql` 将 `sys_dict_item_tenant.value` 扩为 `TEXT`，并在全表
+重复项预检通过后建立 `(tenant_id, type_code, name)` 唯一索引。发现重复项时迁移会停止，升级前
+必须备份并执行 `GROUP BY tenant_id, type_code, name HAVING COUNT(*) > 1` 预检，不能自动合并数据。
+迁移只替换平台租户（`tenant_id=1`）的旧安全菜单和权限，不触碰其他租户的菜单关系。
+
+安全策略固定使用 `type_code=system_security_policy`，20 个字段名分别作为 `name`，字段的字符串化
+单值作为 `value`；整数使用十进制字符串，布尔值使用 `true`/`false`。统一读取接口为
+`GET /api/v1/security-policy`，分区保存接口为 `PUT /api/v1/security-policy/basic`、
+`PUT /api/v1/security-policy/defense`、`PUT /api/v1/security-policy/password`。请求不接受
+`tenantId`，只访问认证上下文中的当前租户。旧 `/api/v1/security-settings` 和
+`/api/v1/password-policy` 接口已删除。写操作审计只记录固定键组和结果，不记录 CSP、弱密码清单
+或其他配置值。这些配置当前仅保存，尚未接入 IAM/Gateway 运行时。
+
+详细字段、默认值、单位和升级说明见 `../docs/security-policy.md`。
 
 ## 关于DTO的说明
 

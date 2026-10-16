@@ -22,12 +22,6 @@ export default {
 		identityEnterprise: 'Enterprise Providers',
 		identityPending:
 			'Configurations are stored only; third-party IAM login is not connected yet.',
-		security: 'General Security',
-		securityPending:
-			'These settings are stored but not yet enforced by IAM or Gateway.',
-		password: 'Password Policy',
-		passwordPending:
-			'This policy is stored but not yet enforced during IAM login or password changes.',
 		message: 'Message Settings',
 		messageDescription:
 			'Manage mail and SMS providers and templates. Test sends use a temporary recipient; confirm final delivery at the recipient.',
@@ -37,7 +31,110 @@ export default {
 		smsService: 'SMS Services',
 		oauth: 'IAM OAuth Clients',
 		oauthWarning:
-			'Changing a client configuration does not revoke previously issued grants or tokens.'
+			'Changing a client configuration does not revoke previously issued grants or tokens.',
+		securityPolicy: 'Security Policy',
+		securityPolicyPending:
+			'These settings are stored but not yet enforced by IAM or Gateway.'
+	},
+	securityPolicyPage: {
+		basic: 'Basic Security',
+		defense: 'Defense Policy',
+		password: 'Password Policy',
+		pageDescription:
+			'Manage session, defense, and password rules for the current tenant. Each tab is saved independently.',
+		basicDescription:
+			'Configure user sessions, verification codes, and remember-me validity for the current tenant.',
+		defenseDescription:
+			'Configure login-failure lockout, automatic unlock, and browser content security policy.',
+		passwordDescription:
+			'Configure password length, complexity, expiry, history, and weak-password rules.',
+		seconds: 'seconds',
+		minutes: 'minutes',
+		days: 'days',
+		times: 'times',
+		sessions: 'sessions',
+		characters: 'characters',
+		sessionValidTime: 'Session validity',
+		sessionValidTimeHelp:
+			'How long a signed-in user session remains valid before sign-in is required again.',
+		verifyCodeValidTime: 'Verification code validity',
+		verifyCodeValidTimeHelp:
+			'How long a verification code remains valid for sign-in and recovery flows.',
+		rememberMeValidTime: 'Remember-me validity',
+		rememberMeValidTimeHelp:
+			'How long remember-me sign-in remains valid; set to 0 to disable extended retention.',
+		sessionMaximum: 'Concurrent sessions per user',
+		sessionMaximumHelp:
+			'Maximum concurrent sessions for one user; older sessions expire according to IAM rules.',
+		loginFailureDuration: 'Login failure window',
+		loginFailureDurationHelp:
+			'Time window used to count consecutive login failures before the count resets.',
+		loginFailureCount: 'Consecutive login failures',
+		loginFailureCountHelp:
+			'The account is locked when failures reach this number within the configured window.',
+		autoUnlockTime: 'Automatic unlock time',
+		autoUnlockTimeHelp:
+			'How long a login-failure lock remains in place before the account is unlocked automatically.',
+		contentSecurityPolicy: 'Content Security Policy',
+		contentSecurityPolicyHelp:
+			'A browser CSP restricts script, style, image, and other resource origins to reduce XSS and injection risks.',
+		passwordBiggestLength: 'Maximum password length',
+		passwordBiggestLengthHelp:
+			'Maximum permitted password length; it must be at least the minimum length.',
+		passwordLeastLength: 'Minimum password length',
+		passwordLeastLengthHelp:
+			'Minimum required password length, from 6 through 128 characters.',
+		passwordComplexity: 'Password complexity',
+		passwordComplexityHelp:
+			'Select the combination of character classes required in a new password.',
+		customWeakPassword: 'Custom weak passwords',
+		customWeakPasswordHelp:
+			'Extend the built-in weak-password dictionary with one password per line.',
+		weakPasswordCheck: 'Weak password check',
+		weakPasswordCheckHelp:
+			'Reject passwords found in the built-in or custom weak-password dictionary.',
+		includeAccountCheck: 'Account information check',
+		includeAccountCheckHelp:
+			'Reject passwords containing the username, phone, email prefix, or name spelling.',
+		notSameChars: 'Maximum repeated characters',
+		notSameCharsHelp:
+			'Maximum number of identical consecutive characters; set to 0 to disable this check.',
+		historyPasswordCheck: 'Password history check',
+		historyPasswordCheckHelp:
+			'Prevent a new password from matching a password in the configured history range.',
+		historyPasswordCheckCount: 'Password history count',
+		historyPasswordCheckCountHelp:
+			'Number of recent passwords to compare when password history checking is enabled.',
+		illegalSequenceCheck: 'Illegal sequence check',
+		illegalSequenceCheckHelp:
+			'Reject easy-to-guess keyboard, alphabetic, or numeric sequences.',
+		passwordValidDays: 'Password validity',
+		passwordValidDaysHelp:
+			'Days from the password-set date until expiry; set to 0 for no expiry.',
+		passwordValidWarnBeforeDays: 'Expiry warning',
+		passwordValidWarnBeforeDaysHelp:
+			'Days before expiry to warn the user; must be less than password validity.',
+		saveBasic: 'Save Basic Security',
+		saveDefense: 'Save Defense Policy',
+		savePassword: 'Save Password Policy',
+		retry: 'Reload',
+		cspPlaceholder: "For example: default-src 'self'",
+		weakPasswordPlaceholder: 'One weak password per line',
+		requiredNumber: 'Enter a valid number',
+		operationFailed: 'Operation failed',
+		loadFailed: 'Failed to load the security policy',
+		saveSuccess: 'Saved; runtime enforcement is not connected yet',
+		invalidLength: 'Minimum password length cannot exceed the maximum',
+		invalidWarnDays:
+			'Expiry warning days must be less than password validity days',
+		complexity0: 'Any password',
+		complexity1: 'Must contain numbers and letters',
+		complexity2: 'Must contain numbers and uppercase letters',
+		complexity3:
+			'Must contain numbers, upper/lowercase letters and special characters',
+		complexity4: 'At least two of numbers, letters and special characters',
+		complexity5:
+			'At least three of numbers, upper/lowercase letters and special characters'
 	},
 	login: {
 		slogan: 'High performance / delicate / grace',
@@ -78,6 +175,6 @@ export default {
 			'Suitable for low light environment,The current night mode is beta',
 		language: 'language',
 		language_msg:
-			'Translation in progress,Temporarily translated the text of this view'
+			'Translation in progress,Temporarily translated the text of this view',
 	}
 }

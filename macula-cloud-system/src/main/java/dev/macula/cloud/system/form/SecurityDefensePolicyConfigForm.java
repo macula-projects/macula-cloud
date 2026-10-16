@@ -16,38 +16,34 @@
  */
 package dev.macula.cloud.system.form;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonAnySetter;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
-import lombok.AllArgsConstructor;
 import lombok.Data;
-import lombok.NoArgsConstructor;
 
 /**
- * 尚未接入 IAM 运行时的全局通用安全设置。
+ * 当前租户防御策略写入参数。
  *
  * @author Rain
- * @since 2026-10-13
+ * @since 2026-10-16
  */
 @Data
-@NoArgsConstructor
-@AllArgsConstructor
-public class SecuritySettingsForm {
-    @NotNull @Min(1) @Max(1000)
-    private Integer maxConcurrentSessions;
-    @NotNull @Min(1) @Max(43200)
-    private Integer sessionTimeoutMinutes;
-    @NotNull @Min(0) @Max(365)
-    private Integer rememberMeDays;
-    @NotNull @Min(30) @Max(3600)
-    private Integer captchaValiditySeconds;
+@JsonIgnoreProperties(ignoreUnknown = false)
+public class SecurityDefensePolicyConfigForm {
     @NotNull @Min(1) @Max(1440)
-    private Integer failureWindowMinutes;
+    private Integer loginFailureDuration;
     @NotNull @Min(1) @Max(100)
-    private Integer maxFailures;
+    private Integer loginFailureCount;
     @NotNull @Min(1) @Max(10080)
-    private Integer unlockMinutes;
-    @Size(max = 4000)
+    private Integer autoUnlockTime;
+    @Size(max = 16000)
     private String contentSecurityPolicy;
+
+    @JsonAnySetter
+    public void rejectUnknownField(String name, Object value) {
+        throw new IllegalArgumentException("未知配置字段：" + name);
+    }
 }

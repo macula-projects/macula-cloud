@@ -1,4 +1,4 @@
-describe("平台身份与安全设置管理", () => {
+describe("平台身份、消息与接入应用管理", () => {
   const ok = (data) => ({
     statusCode: 200,
     body: { success: true, code: "00000", data },
@@ -60,8 +60,7 @@ describe("平台身份与安全设置管理", () => {
       "system/identityProvider/index",
       "身份提供商",
     ],
-    ["/system/security-settings", "system/securitySettings/index", "通用安全"],
-    ["/system/password-policy", "system/passwordPolicy/index", "密码策略"],
+    ["/system/security-policy", "system/securityPolicy/index", "安全策略"],
     ["/system/message-settings", "system/messageSettings/index", "消息设置"],
     ["/system/oauth2-client", "system/oauth2Client/index", "IAM接入应用"],
   ].map(([path, component, title]) => ({ path, component, meta: { title } }));
@@ -353,27 +352,6 @@ describe("平台身份与安全设置管理", () => {
     cy.contains("认证源列表失败").should("be.visible");
   });
 
-  it("marks policy settings as pending runtime integration", () => {
-    cy.intercept(
-      "GET",
-      "**/system/api/v1/security-settings*",
-      ok({
-        maxConcurrentSessions: 1,
-        sessionTimeoutMinutes: 30,
-        rememberMeDays: 0,
-        captchaValiditySeconds: 300,
-        failureWindowMinutes: 15,
-        maxFailures: 5,
-        unlockMinutes: 30,
-        contentSecurityPolicy: "",
-        effective: false,
-      })
-    ).as("settings");
-    open("/system/security-settings");
-    cy.wait("@settings");
-    cy.contains("暂未生效").should("be.visible");
-  });
-
   it("requires a selected tenant for OAuth client creation", () => {
     cy.intercept(
       "GET",
@@ -456,34 +434,6 @@ describe("平台身份与安全设置管理", () => {
       expect(request.body.target).to.equal("temporary@example.test");
       expect(request.body.variables.platform).to.equal("Macula Cloud");
     });
-  });
-
-  it("loads and saves password policy without claiming runtime effect", () => {
-    const policy = {
-      minLength: 8,
-      maxLength: 128,
-      complexityLevel: 2,
-      expiryDays: 0,
-      reminderDays: 0,
-      maxConsecutiveCharacters: 3,
-      checkUserInformation: true,
-      historyCount: 0,
-      illegalSequences: [],
-      weakPasswordCheck: true,
-      customWeakPasswords: [],
-      effective: false,
-    };
-    cy.intercept("GET", "**/system/api/v1/password-policy*", ok(policy)).as(
-      "policy"
-    );
-    cy.intercept("PUT", "**/system/api/v1/password-policy*", ok(policy)).as(
-      "savePolicy"
-    );
-    open("/system/password-policy");
-    cy.wait("@policy");
-    cy.contains("暂未生效").should("be.visible");
-    cy.contains("保存策略").click();
-    cy.wait("@savePolicy").its("request.body.minLength").should("equal", 8);
   });
 
   it("does not save OAuth client before the tenant is selected", () => {

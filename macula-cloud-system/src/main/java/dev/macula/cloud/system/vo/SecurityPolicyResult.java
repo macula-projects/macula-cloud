@@ -14,18 +14,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package dev.macula.cloud.system.mapper;
+package dev.macula.cloud.system.vo;
 
-import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import dev.macula.cloud.system.pojo.entity.SysSecuritySettings;
-import org.apache.ibatis.annotations.Mapper;
+import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 /**
- * 通用安全设置数据访问。
+ * 当前租户三类安全策略的聚合读取结果。
  *
  * @author Rain
- * @since 2026-10-13
+ * @since 2026-10-16
  */
-@Mapper
-public interface SysSecuritySettingsMapper extends BaseMapper<SysSecuritySettings> {
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Schema(description = "安全策略")
+public class SecurityPolicyResult {
+    private SecurityBasicConfigResult basic;
+    private SecurityDefensePolicyConfigResult defense;
+    private PasswordPolicyConfigResult password;
 }

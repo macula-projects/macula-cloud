@@ -10,24 +10,18 @@ vi.mock("@/utils/request", () => ({
 }));
 
 import identity from "@/api/model/system/identityProvider";
-import security from "@/api/model/system/securitySettings";
-import password from "@/api/model/system/passwordPolicy";
 import message from "@/api/model/system/messageSettings";
 import oauth from "@/api/model/system/oauth2Client";
 import identityPage from "@/views/system/identityProvider/index.vue?raw";
 import {Wecom} from "@/assets/icons";
-import securityPage from "@/views/system/securitySettings/index.vue?raw";
-import passwordPage from "@/views/system/passwordPolicy/index.vue?raw";
 import messagePage from "@/views/system/messageSettings/index.vue?raw";
 import oauthPage from "@/views/system/oauth2Client/index.vue?raw";
 
-describe("平台身份与安全设置管理", () => {
-  it("routes all five management APIs through System", async () => {
+describe("平台身份、消息与接入应用管理", () => {
+  it("routes management APIs through System", async () => {
     for (const result of [
       await identity.catalog(),
       await identity.list({ pageNum: 1 }),
-      await security.get(),
-      await password.get(),
       await message.providers("MAIL"),
       await oauth.list({ pageNum: 1 }),
     ])
@@ -60,8 +54,6 @@ describe("平台身份与安全设置管理", () => {
     expect(identityPage).toContain("回调地址");
     expect(identityPage).toContain("只读地址");
     expect(identityPage).not.toMatch(/callbackUrl:\s*form\./);
-    expect(securityPage).toContain("暂未生效");
-    expect(passwordPage).toContain("暂未生效");
     expect(messagePage).toContain("临时收件邮箱");
     expect(messagePage).toContain('v-model="providerDrawer"');
     expect(messagePage).toContain('v-model="templateDrawer"');

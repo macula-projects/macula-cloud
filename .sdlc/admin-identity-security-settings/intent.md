@@ -1,24 +1,29 @@
-# Intent: 身份与安全设置管理
+# Intent: 租户安全策略统一管理
 Author: Rain. Status: accepted.
 
 ## Problem
-管理员目前无法在 Macula Cloud 管理端集中管理身份提供商、通用安全、密码策略、消息设置和 IAM 接入应用的 OAuth2 客户端配置。相关信息分散在现有服务实现、数据库或部署配置中；截图所示的管理入口与操作尚未形成完整的管理能力。这阻碍后续 IAM 能力继续开发。
+系统管理中的通用安全、防御策略和密码策略目前分散在不同页面与保存模型中，管理员无法在一个入口内连续查看和维护完整的租户安全策略。现有独立 JSON 配置记录也不符合按配置项逐个维护和审计的要求。
 
 ## Proposed outcome
-管理员能通过 Macula Cloud Admin 查阅并维护身份提供商、通用安全、密码策略、消息设置和 IAM 接入应用的配置，界面与所提供截图的主要分组、字段和操作相对应；保存后能够再次读取到正确结果。身份提供商、通用安全、密码策略和消息设置为平台全局配置；身份提供商界面区分社交认证源和企业认证源，按所选提供商展示并校验不同的必需字段；管理 API 的 `config` 为 JSON 对象，数据库字段保存 JSON 文本。社交认证源包含 GitHub、支付宝、微信；企业认证源包含企业微信、飞书、钉钉；不包含 Gitee、QQ。IAM 接入应用仅管理现有 `sys_oauth2_client` 表表达的客户端配置，录入时选择所属租户并保存 `tenant_id`，用户类型沿用 IAM 的 `UserTypeEnum`。本次不要求这些配置驱动 IAM 登录、授权、密码校验等新的运行时行为；邮件和短信服务例外，管理员需要能够向临时输入的邮箱或手机号发送真实测试消息并确认收件端收到。邮件服务支持自定义、Exchange、阿里、腾讯、网易；短信服务支持阿里、腾讯、自定义。邮件和短信模板由枚举提供默认值，启用或修改后保存到数据库；测试发送使用当前模板及变量渲染内容。
+管理员通过一个管理页面的“通用安全”“防御策略”“密码策略”三个页签查看和维护当前租户的安全配置。每个配置项独立保存，保存后重新进入页面能够读取相同值；不同租户之间的配置互不泄漏。页面清楚提示尚未接入 IAM 或 Gateway 运行时的策略仅完成配置管理，不误导管理员认为已即时生效。
 
 ## Affected users and systems
-- 使用管理端的系统管理员、身份与安全配置管理员；细粒度权限配置留待后续工作。
-- `macula-cloud-admin`、`macula-cloud-system`；`macula-cloud-iam` 继续读取客户端所属租户，本次不修改其运行时逻辑。
-- 邮件及短信供应商、接收测试消息的邮箱与手机号码。
+- 使用 Macula Cloud Admin 管理租户安全配置的 ROOT、租户管理员及后续被授权的安全管理员。
+- `macula-cloud-admin` 的系统管理菜单、路由、API 封装与统一安全策略页面。
+- `macula-cloud-system` 的安全策略管理 API、服务端校验、租户边界和字典数据访问。
+- 现有字典类型、字典项管理及 `sys_dict_item_tenant` 数据。
 
 ## Constraints
-- 以提供的截图作为交互和字段参考，以当前仓库中已实现的能力及 `SysOAuth2Client` 为现状依据；身份提供商字段差异参考现有接口契约，并参考 TopIAM 的 `IdentityProviderEntity`、创建参数及对应提供商配置模型理解分类与 JSON 配置。模板类型可参考 eIAM 的 `MailType` 和相邻 `SmsType` 所表达的业务场景；eIAM 源码采用 AGPL-3.0，不复制其实现或模块。
-- 只做管理配置，IAM 身份源登录、密码策略执行和其他认证流程暂不开发；身份源不包含 Gitee、QQ。
-- 邮件和短信凭据使用 Macula Boot 提供的加密字段能力保存；支持真实发送测试，不能把凭据返回给浏览器或写入日志。
-- 身份提供商、通用安全、密码策略和消息设置按平台全局管理；IAM 接入应用保留并录入所属租户，保持 OAuth2 客户端协议兼容；本次不开发细粒度权限配置。
-- 保留用户在原工作树中的 IAM 未提交改动，不覆盖或清理。
-- 无特定交付期限。
+- 三类策略必须整合为一个页面，并以三个 Tab 呈现。
+- 配置必须保存到 `sys_dict_item_tenant`；每个配置项一条记录，一个稳定 key 对应一个 value，不以单条 JSON 保存整组设置。
+- “通用安全”包含 `sessionValidTime`、`verifyCodeValidTime`、`rememberMeValidTime`、`sessionMaximum`，三个有效期字段使用秒。
+- “防御策略”包含 `loginFailureDuration`、`loginFailureCount`、`autoUnlockTime`、`contentSecurityPolicy`；自动解锁时间使用分钟。
+- “密码策略”包含 `passwordBiggestLength`、`passwordLeastLength`、`passwordComplexity`、`customWeakPassword`、`weakPasswordCheck`、`includeAccountCheck`、`notSameChars`、`historyPasswordCheck`、`historyPasswordCheckCount`、`illegalSequenceCheck`、`passwordValidDays`、`passwordValidWarnBeforeDays`。
+- 配置按租户隔离，服务端不得信任前端传入的租户身份或跨租户读写。
+- 保持 Java 17、Vue 3、Element Plus、现有 System 分层和动态菜单机制兼容；不引入新的前端或持久化框架。
+- 本次聚焦配置管理；除非已有运行时明确消费这些配置，否则不扩展 IAM、Gateway 的认证执行逻辑。
+- 保留与本需求无关的身份提供商、消息设置和 OAuth 客户端管理能力，不把它们并入本页面。
 
 ## Open questions
-- 已有 `config_json` 数据向新的配置结构兼容或迁移的方式，需在设计阶段核对实际数据后确定。
+- 现有 `/api/v1/security-settings`、`/api/v1/password-policy` 及两个旧菜单入口是否需要保留兼容/跳转，还是直接由统一接口和单一菜单替换。
+- 独立安全/密码配置表是否已在任何环境写入数据；如果存在，需要明确迁移到字典项的升级策略。

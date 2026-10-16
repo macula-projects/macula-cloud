@@ -40,14 +40,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 class AdminSettingsAuthorizationTest {
     private final IdentityProviderService identity = mock(IdentityProviderService.class);
-    private final SecuritySettingsService security = mock(SecuritySettingsService.class);
-    private final PasswordPolicyService password = mock(PasswordPolicyService.class);
     private final MessageSettingsService message = mock(MessageSettingsService.class);
     private final OAuth2ClientConfigService oauth = mock(OAuth2ClientConfigService.class);
     private final MockMvc mvc = MockMvcBuilders.standaloneSetup(
         new IdentityProviderController(identity),
-        new SecuritySettingsController(security),
-        new PasswordPolicyController(password),
         new MessageSettingsController(message),
         new OAuth2ClientConfigController(oauth)).build();
 
@@ -65,14 +61,10 @@ class AdminSettingsAuthorizationTest {
         when(message.providers("MAIL")).thenReturn(List.of());
         mvc.perform(get("/api/v1/identity-providers")).andExpect(status().isOk());
         mvc.perform(get("/api/v1/identity-providers/catalog")).andExpect(status().isOk());
-        mvc.perform(get("/api/v1/security-settings")).andExpect(status().isOk());
-        mvc.perform(get("/api/v1/password-policy")).andExpect(status().isOk());
         mvc.perform(get("/api/v1/message-settings/providers").param("channel", "MAIL"))
             .andExpect(status().isOk());
         mvc.perform(get("/api/v1/oauth2-clients")).andExpect(status().isOk());
         verify(identity).catalog();
-        verify(security).get();
-        verify(password).get();
         verify(message).providers("MAIL");
     }
 

@@ -19,8 +19,6 @@ package dev.macula.cloud.system.vo;
 import dev.macula.cloud.system.controller.OAuth2ClientConfigController.SecretResetForm;
 import dev.macula.cloud.system.form.MessageTemplateForm;
 import dev.macula.cloud.system.form.MessageTestForm;
-import dev.macula.cloud.system.form.PasswordPolicyForm;
-import dev.macula.cloud.system.form.SecuritySettingsForm;
 import dev.macula.cloud.system.message.CustomSmsTestSender.Options;
 import dev.macula.cloud.system.message.MailTestSender.MailOptions;
 import dev.macula.cloud.system.message.TencentSmsTestSender.TencentOptions;
@@ -39,20 +37,6 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class SettingsModelJsonTest {
     private final JsonMapper json = JsonMapper.builder().build();
-
-    @Test
-    void policyFormsAndViewsKeepTheirJsonFields() {
-        PasswordPolicyForm password = json.readValue("{\"minLength\":8,\"checkUserInformation\":true}",
-            PasswordPolicyForm.class);
-        assertEquals(8, password.getMinLength());
-        assertTrue(password.getCheckUserInformation());
-        assertTrue(json.writeValueAsString(PasswordPolicyVO.from(password)).contains("\"effective\":false"));
-
-        SecuritySettingsForm security = json.readValue("{\"sessionTimeoutMinutes\":30,\"contentSecurityPolicy\":\"default-src 'self'\"}",
-            SecuritySettingsForm.class);
-        assertEquals(30, security.getSessionTimeoutMinutes());
-        assertTrue(json.writeValueAsString(SecuritySettingsVO.from(security)).contains("\"sessionTimeoutMinutes\":30"));
-    }
 
     @Test
     void messageAndSecretFormsKeepTheirJsonFields() {

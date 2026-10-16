@@ -68,7 +68,7 @@ class IdentityProviderMigrationIT {
         }
 
         Flyway toV3 = Flyway.configure().dataSource(url, username, password)
-            .locations("classpath:db/migration").load();
+            .locations("classpath:db/migration").target(MigrationVersion.fromVersion("3")).load();
         toV3.migrate();
         try (Connection connection = DriverManager.getConnection(url, username, password)) {
             assertEquals(3L, count(connection,
@@ -82,6 +82,16 @@ class IdentityProviderMigrationIT {
             assertEquals("varchar", string(connection,
                 "SELECT DATA_TYPE FROM information_schema.columns WHERE table_schema = ? " +
                     "AND table_name = 'sys_identity_provider' AND column_name = 'remark'", database));
+        }
+        Flyway toV4 = Flyway.configure().dataSource(url, username, password)
+            .locations("classpath:db/migration").load();
+        toV4.migrate();
+        try (Connection connection = DriverManager.getConnection(url, username, password)) {
+            assertEquals(4L, count(connection,
+                "SELECT COUNT(*) FROM flyway_schema_history WHERE success = 1"));
+            assertEquals(1L, count(connection,
+                "SELECT COUNT(*) FROM sys_identity_provider WHERE name = 'migration-legacy-fixture' " +
+                    "AND app_id = 'legacy-client' AND config_json = '{}'"));
         }
     }
 
