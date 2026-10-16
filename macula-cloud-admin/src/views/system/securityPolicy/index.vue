@@ -1,14 +1,6 @@
 <template>
-  <div class="security-policy-page" v-loading="loading">
-    <div class="page-heading">
-      <h2>{{ $t("adminSettings.securityPolicy") }}</h2>
-      <p>{{ $t("securityPolicyPage.pageDescription") }}</p>
-    </div>
-    <el-alert
-      :title="$t('adminSettings.securityPolicyPending')"
-      type="warning"
-      :closable="false"
-    />
+  <el-main>
+
     <div v-if="loadError" class="load-error">
       <el-alert :title="loadError" type="error" :closable="false" show-icon />
       <el-button type="primary" plain @click="load">{{
@@ -19,10 +11,6 @@
     <el-card class="policy-card" shadow="never">
       <el-tabs v-model="activeTab">
         <el-tab-pane :label="$t('securityPolicyPage.basic')" name="basic">
-          <div class="section-heading">
-            <h3>{{ $t("securityPolicyPage.basic") }}</h3>
-            <p>{{ $t("securityPolicyPage.basicDescription") }}</p>
-          </div>
           <el-form
             ref="basicFormRef"
             class="policy-form"
@@ -123,10 +111,6 @@
         </el-tab-pane>
 
         <el-tab-pane :label="$t('securityPolicyPage.defense')" name="defense">
-          <div class="section-heading">
-            <h3>{{ $t("securityPolicyPage.defense") }}</h3>
-            <p>{{ $t("securityPolicyPage.defenseDescription") }}</p>
-          </div>
           <el-form
             ref="defenseFormRef"
             class="policy-form"
@@ -224,10 +208,6 @@
         </el-tab-pane>
 
         <el-tab-pane :label="$t('securityPolicyPage.password')" name="password">
-          <div class="section-heading">
-            <h3>{{ $t("securityPolicyPage.password") }}</h3>
-            <p>{{ $t("securityPolicyPage.passwordDescription") }}</p>
-          </div>
           <el-form
             ref="passwordFormRef"
             class="policy-form"
@@ -434,7 +414,7 @@
         </el-tab-pane>
       </el-tabs>
     </el-card>
-  </div>
+  </el-main>
 </template>
 
 <script>
@@ -614,7 +594,7 @@ onMounted(load);
   line-height: 1.7;
 }
 .policy-card {
-  margin-top: 20px;
+  margin-top: 0;
   width: 100%;
   box-sizing: border-box;
 }
@@ -696,7 +676,7 @@ onMounted(load);
     padding: 12px;
   }
   .policy-card {
-    margin-top: 12px;
+    margin-top: 0;
   }
   .policy-card :deep(.el-card__body) {
     padding: 14px;

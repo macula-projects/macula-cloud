@@ -38,13 +38,6 @@ export default {
 		basic: '通用安全',
 		defense: '防御策略',
 		password: '密码策略',
-		pageDescription:
-			'统一管理当前租户的登录会话、防御和密码规则，各页签独立保存。',
-		basicDescription:
-			'设置当前租户的用户会话、验证码和“记住我”登录状态有效期。',
-		defenseDescription: '设置登录失败锁定、自动解锁和浏览器内容安全策略。',
-		passwordDescription:
-			'设置密码长度、复杂度、有效期及弱密码等规则，保证用户修改密码时使用符合要求的密码。',
 		seconds: '秒',
 		minutes: '分钟',
 		days: '天',

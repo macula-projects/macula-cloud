@@ -40,14 +40,6 @@ export default {
 		basic: 'Basic Security',
 		defense: 'Defense Policy',
 		password: 'Password Policy',
-		pageDescription:
-			'Manage session, defense, and password rules for the current tenant. Each tab is saved independently.',
-		basicDescription:
-			'Configure user sessions, verification codes, and remember-me validity for the current tenant.',
-		defenseDescription:
-			'Configure login-failure lockout, automatic unlock, and browser content security policy.',
-		passwordDescription:
-			'Configure password length, complexity, expiry, history, and weak-password rules.',
 		seconds: 'seconds',
 		minutes: 'minutes',
 		days: 'days',
