@@ -50,5 +50,13 @@ describe("租户安全策略", () => {
     expect(page).toContain(':disabled="!loaded"');
     expect(page).toContain('v-if="loadError"');
     expect(page).toContain('@click="load"');
+    expect(page).toContain('class="field-help"');
+    expect(page).toContain("securityPolicyPage.contentSecurityPolicyHelp");
+    expect(page).toContain("securityPolicyPage.customWeakPasswordHelp");
+    expect(page).toContain("securityPolicyPage.passwordValidWarnBeforeDaysHelp");
+    expect(page).toContain("<el-radio-group");
+    expect(page).toContain("width: 100%;");
+    expect(page).toContain("@media (max-width: 768px)");
+    expect(page).not.toContain("max-width: 980px");
   });
 });

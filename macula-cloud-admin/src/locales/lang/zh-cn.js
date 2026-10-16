@@ -25,26 +25,73 @@ export default {
 		basic: '通用安全',
 		defense: '防御策略',
 		password: '密码策略',
-		sessionValidTime: '会话有效时间（秒）',
-		verifyCodeValidTime: '验证码有效时间（秒）',
-		rememberMeValidTime: '记住我有效时间（秒）',
+		pageDescription:
+			'统一管理当前租户的登录会话、防御和密码规则，各页签独立保存。',
+		basicDescription:
+			'设置当前租户的用户会话、验证码和“记住我”登录状态有效期。',
+		defenseDescription: '设置登录失败锁定、自动解锁和浏览器内容安全策略。',
+		passwordDescription:
+			'设置密码长度、复杂度、有效期及弱密码等规则，保证用户修改密码时使用符合要求的密码。',
+		seconds: '秒',
+		minutes: '分钟',
+		days: '天',
+		times: '次',
+		sessions: '个会话',
+		characters: '个字符',
+		sessionValidTime: '会话有效时间',
+		sessionValidTimeHelp: '用户登录会话的有效时长，超时后需要重新登录。',
+		verifyCodeValidTime: '验证码有效时间',
+		verifyCodeValidTimeHelp: '验证码在登录、找回密码等验证场景中的有效时长。',
+		rememberMeValidTime: '记住我有效时间',
+		rememberMeValidTimeHelp:
+			'用户选择“记住我”后登录状态的有效时长；设置为 0 表示不启用长期记忆。',
 		sessionMaximum: '用户并发数',
-		loginFailureDuration: '连续登录失败持续时间（分钟）',
+		sessionMaximumHelp:
+			'同一用户允许同时在线的会话数量；达到上限后，旧会话将按认证服务规则失效。',
+		loginFailureDuration: '连续登录失败持续时间',
+		loginFailureDurationHelp:
+			'统计连续登录失败次数的时间窗口，超过该时长后重新计算。',
 		loginFailureCount: '连续登录失败次数',
-		autoUnlockTime: '自动解锁时间（分钟）',
+		loginFailureCountHelp:
+			'在统计时间窗口内达到此次数时，当前账户将被自动锁定。',
+		autoUnlockTime: '自动解锁时间',
+		autoUnlockTimeHelp: '账户因连续登录失败被锁定后，经过此时长自动解除锁定。',
 		contentSecurityPolicy: '内容安全策略',
+		contentSecurityPolicyHelp:
+			'浏览器内容安全策略（CSP）可限制脚本、样式、图片等资源来源，用于降低跨站脚本和数据注入风险。',
 		passwordBiggestLength: '密码最大长度',
+		passwordBiggestLengthHelp:
+			'新密码允许的最大字符数，必须大于或等于密码最小长度。',
 		passwordLeastLength: '密码最小长度',
+		passwordLeastLengthHelp:
+			'新密码必须达到的最小字符数，取值范围为 6 到 128。',
 		passwordComplexity: '密码复杂度',
+		passwordComplexityHelp: '选择新密码必须包含的字符类型组合。',
 		customWeakPassword: '自定义弱密码',
+		customWeakPasswordHelp: '补充系统内置弱密码库，每行填写一个弱密码。',
 		weakPasswordCheck: '弱密码检查',
+		weakPasswordCheckHelp:
+			'开启后，新密码不能命中系统内置弱密码库或下方自定义弱密码。',
 		includeAccountCheck: '账户信息检查',
+		includeAccountCheckHelp:
+			'开启后，新密码不能包含用户名、手机号、邮箱前缀或姓名拼音等账户信息。',
 		notSameChars: '连续相同字符上限',
+		notSameCharsHelp:
+			'限制密码中连续出现相同字符的最大数量；设置为 0 表示不检查。',
 		historyPasswordCheck: '历史密码检查',
+		historyPasswordCheckHelp: '开启后，新密码不能与指定范围内的历史密码相同。',
 		historyPasswordCheckCount: '历史密码检查次数',
+		historyPasswordCheckCountHelp:
+			'指定需要比对的最近历史密码数量，仅在历史密码检查开启时生效。',
 		illegalSequenceCheck: '非法序列检查',
+		illegalSequenceCheckHelp:
+			'开启后，禁止使用键盘、字母或数字等容易猜测的连续序列。',
 		passwordValidDays: '密码有效天数',
+		passwordValidDaysHelp:
+			'密码自设置之日起的有效天数；设置为 0 表示永不过期。',
 		passwordValidWarnBeforeDays: '过期前提醒天数',
+		passwordValidWarnBeforeDaysHelp:
+			'在密码过期前多少天提醒用户，必须小于密码有效天数。',
 		saveBasic: '保存通用安全',
 		saveDefense: '保存防御策略',
 		savePassword: '保存密码策略',
