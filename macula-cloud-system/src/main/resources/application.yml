@@ -33,6 +33,13 @@ mybatis-plus:
   type-handlers-package: dev.macula.boot.starter.mp.handler
 
 macula:
+  crypto:
+    enable: true
+    algorithm: AES
+    encode: BASE64
+    password: ${MACULA_CRYPTO_PASSWORD}
+  message:
+    custom-sms-allowed-hosts: ${MACULA_MESSAGE_CUSTOM_SMS_ALLOWED_HOSTS:}
   security:
     ignore-urls:
       - /api/token

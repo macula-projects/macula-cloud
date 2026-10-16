@@ -11,6 +11,77 @@ Flyway 迁移统一为 `db/migration/V1__baseline.sql`，包含原有基础数�
 本次合并要求由运维先清理数据库及 Flyway 历史，再执行初始化；不支持直接沿用旧版迁移历史升级。
 System 数据库同时供 IAM 使用，清理后相关账号、权限及认证配置需重新初始化。
 
+后续 `V2__admin_identity_security_settings.sql` 为增量迁移：新增平台身份提供商、通用安全、
+密码策略、消息服务和模板覆盖配置，并将 `sys_oauth2_client.client_secret` 调整为可空以支持
+公共 PKCE 客户端。V2 不清理旧客户端，也不修改已经执行的 V1；已按 V1 初始化的数据库可直接
+升级。升级前请备份数据库；回滚需要恢复升级前备份，不能直接删除 V2 新表（可能包含新配置）。
+
+`V3__identity_provider_json_config.sql` 只为身份源增加 `remark`，并把 `app_secret` 扩为 `TEXT`
+以容纳支付宝私钥的加密结果；不会重写或删除已有行。升级前请完整备份 `macula-system`
+数据库及 Flyway 历史，并预检 `sys_identity_provider` 的 `provider_type`、`config_json`
+（例如用 `JSON_VALID(config_json)` 找出非空且非法的 JSON）和 `app_id` 是否与 JSON 标识一致。
+新接口只接受下列六种类型及各自字段；旧行若含未知字段、无效 JSON 或标识冲突，读取会返回冲突错误，
+需先由数据负责人核对并修复，不能自动清洗。回滚须先停写 System/IAM，再恢复数据库备份及匹配的
+应用版本；不要手工删除 V3 的 Flyway 记录或直接缩回 `app_secret` 列，以免截断已保存的密文。
+
+## 身份、安全和消息管理
+
+- 新增 `/api/v1/identity-providers`、`/api/v1/security-settings`、`/api/v1/password-policy`、
+  `/api/v1/message-settings`、`/api/v1/oauth2-clients` 管理 API。Controller 不再硬编码 `ROOT`
+  角色检查；访问授权由现有网关 URL 权限配置控制。V2 只为 `ROOT` 角色建立默认关联，后续可在
+  系统权限管理中调整。直接访问 System 服务虽仍需资源服务器认证，但不会经过网关的 URL 权限检查；
+  应以容器网络、防火墙或入口代理限制 System 直连，不能将其端口暴露给不可信客户端。
+- 身份提供商只管理 GitHub、支付宝、微信、企业微信、飞书、钉钉配置；通用安全及密码策略仅保存，
+  本轮不改变 IAM/Gateway 的登录、密码校验或响应头行为。管理页明确提示“暂未生效”。
+- 身份源列表可用 `category=social|enterprise` 筛选。创建/更新请求中的 `config` 必须是 JSON 对象：
+  GitHub 使用 `clientId/clientSecret`，支付宝使用 `appId/appPrivateKey/alipayPublicKey`，微信使用
+  `appId/appSecret`，企业微信使用 `corpId/agentId/appSecret`，飞书使用 `appId/appSecret`，钉钉使用
+  `appKey/appSecret`（可选 `corpId`）。请求另带 `providerType`、相符的 `category`、名称、备注、
+  启用/显示开关。服务端拒绝未知或跨类型字段；响应 `config` 只含非敏感字段，
+  `configuredSecrets` 只标明凭据是否已配置。更新时省略或留空凭据表示保留原值，不能通过本接口清空凭据。
+  `config_json` 存规范非敏感 JSON，`app_secret` 由 `@CryptoField` 保存密文；旧 `app_id` 继续同步以兼容已有行。
+  `GET /api/v1/identity-providers/catalog` 返回分类和六种类型的稳定 code、显示名称、
+  字段标签、必填/敏感/多行标记、创建应用入口及每个字段的获取位置；这些元数据与服务端字段校验
+  共用枚举定义，不含配置值或凭据。链接指向第三方官方开放平台，平台菜单调整时需核对提示。
+  支付宝应用私钥由管理员本地生成，只上传对应应用公钥；钉钉的 Client ID/Client Secret
+  对应本接口沿用的 `appKey`/`appSecret` 字段。
+  已保存的 `provider_type` 大写 code 和列表 `category` 小写 code 保持不变。
+  身份源不提供可配置的回调地址；目录及列表/详情 VO 的只读 `callbackUrl` 为
+  `/login/{providerType 小写}`（Admin 展示为 `IAM_URL` + 该路径），与现有 `/login/sms`
+  命名约定一致，由未来 IAM `authentication` 包中各提供商的 LoginFilter
+  按相同路径处理。当前 Filter 尚未接入，此地址不能用于实际登录。Admin 使用其 `IAM_URL`
+  配置的对外基址显示完整 URL，部署时须核对该基址。历史 `callback_url` 列和值保留，但
+  `SysIdentityProvider` 不再映射该列，管理 API 不读取或写入旧值。接入应用的 OAuth
+  `redirectUris` 是另一项配置，不受此变更影响。
+- 消息模板初始值定义在 `MessageTemplateType` 枚举；启用或编辑后保存数据库覆盖值。邮件使用
+  SMTP，Exchange 邮箱需在目标邮箱开放 SMTP AUTH，服务器、端口、账号、STARTTLS/SSL 可配置。
+  短信使用阿里、腾讯 SDK 或自定义 HTTPS POST；自定义接口的目标主机必须由环境/配置中心设置
+  `macula.message.custom-sms-allowed-hosts` 允许列表（逗号分隔，默认不允许任何主机），并禁止
+  跳转及内网目标。自定义接口需配置鉴权请求头与凭据。测试发送需要管理员临时输入目标和模板变量，返回供应商提交状态；最终收件应
+  在收件端核实。供应商账户、审核模板和网络由部署环境提供。
+- 身份源和消息供应商凭据使用 Macula Boot 现有 `@CryptoField` 存储；读取接口只暴露“已配置”
+  状态，更新时留空保留旧值。业务代码不记录明文凭据。当前 Boot 加密拦截器在加密失败时可能
+  捕获异常后继续写库，本轮按已确认范围不修改 Boot，也不承诺失败必定阻止写库。部署时应确保
+  `MACULA_CRYPTO_PASSWORD` 由安全环境注入（AES 密钥必须为 16/24/32 个字符），否则 System
+  无法启动；还应监控加密错误。后续要消除此风险需在 Boot 独立修复。
+- OAuth 客户端管理的是 IAM 共用的 `sys_oauth2_client` 表，创建时必须选择有效租户及用户类型。
+  机密客户端密钥由 System `PasswordEncoder` 单向哈希保存；公共客户端使用 `none` 且无密钥，
+  强制启用 PKCE。表单支持 OIDC `openid` 和 ID Token 签名设置。客户端变更在事务提交后清理
+  IAM 共享缓存，但不会撤销已签发的授权或令牌。仅 `client_credentials` 的应用无需回调 URI；
+  `client_secret_jwt` 不开放新配置，因为现有单向哈希密钥不能用于 HMAC 验签。上线前应针对已有客户端做兼容回归。
+
+隔离数据库集成测试 `SettingsPersistenceIT` 默认不运行；显式设置 `SYSTEM_SETTINGS_IT=true` 后，
+须将 `SPRING_DATASOURCE_URL` 指向名称以 `macula_settings_it_` 开头、已升级至 V3 的隔离测试库，
+并提供测试用 `MACULA_CRYPTO_PASSWORD`、MySQL 凭据与独立 Redis database。此测试禁用自动
+Flyway，不会自行执行迁移。测试会核对库名，
+只清理自己创建的行与缓存项，不可指向业务数据库。
+
+Flyway 增量验证 `IdentityProviderMigrationIT` 默认禁用；仅将 `SYSTEM_MIGRATION_IT=true`、
+`SPRING_DATASOURCE_URL/USERNAME/PASSWORD` 指向**全新空的** `macula_settings_it_*` 隔离库后运行。
+测试先应用 V1、V2，插入虚构旧行，再应用 V3，核对 `flyway_schema_history`、列类型和旧行；
+测试不会删除该库，执行者须核实库名后单独清理。若切换分支后 `target/classes` 有旧迁移残留，
+先对目标模块执行 Maven `clean`，不要修改已执行的 Flyway 源文件。
+
 ## 关于DTO的说明
 
 在使用MVC三层架构时，我们通常将项目分为mapper(dao)、service、controller。

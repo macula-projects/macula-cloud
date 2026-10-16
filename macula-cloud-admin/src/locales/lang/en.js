@@ -16,9 +16,33 @@
  */
 
 export default {
+	adminSettings: {
+		identity: 'Identity Providers',
+		identitySocial: 'Social Providers',
+		identityEnterprise: 'Enterprise Providers',
+		identityPending:
+			'Configurations are stored only; third-party IAM login is not connected yet.',
+		security: 'General Security',
+		securityPending:
+			'These settings are stored but not yet enforced by IAM or Gateway.',
+		password: 'Password Policy',
+		passwordPending:
+			'This policy is stored but not yet enforced during IAM login or password changes.',
+		message: 'Message Settings',
+		messageDescription:
+			'Manage mail and SMS providers and templates. Test sends use a temporary recipient; confirm final delivery at the recipient.',
+		mailTemplate: 'Mail Templates',
+		mailService: 'Mail Services',
+		smsTemplate: 'SMS Templates',
+		smsService: 'SMS Services',
+		oauth: 'IAM OAuth Clients',
+		oauthWarning:
+			'Changing a client configuration does not revoke previously issued grants or tokens.'
+	},
 	login: {
 		slogan: 'High performance / delicate / grace',
-		describe: 'Vue3 + element plus based front-end solutions in the background.',
+		describe:
+			'Vue3 + element plus based front-end solutions in the background.',
 		signInTitle: 'Sign in',
 		accountLogin: 'Account sign in',
 		mobileLogin: 'Mobile sign in',
@@ -41,7 +65,8 @@ export default {
 		noAccount: 'No account?',
 		createAccount: 'Create a new account',
 		wechatLoginTitle: 'QR code sign in',
-		wechatLoginMsg: 'Please use wechat to scan and log in | Auto scan after 3 seconds of simulation',
+		wechatLoginMsg:
+			'Please use wechat to scan and log in | Auto scan after 3 seconds of simulation',
 		wechatLoginResult: 'Scanned | Please click authorize login in the device'
 	},
 	user: {
@@ -49,8 +74,10 @@ export default {
 		info: 'User Info',
 		settings: 'Settings',
 		nightmode: 'night mode',
-		nightmode_msg: 'Suitable for low light environment,The current night mode is beta',
+		nightmode_msg:
+			'Suitable for low light environment,The current night mode is beta',
 		language: 'language',
-		language_msg: 'Translation in progress,Temporarily translated the text of this view',
+		language_msg:
+			'Translation in progress,Temporarily translated the text of this view'
 	}
 }

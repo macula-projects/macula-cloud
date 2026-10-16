@@ -16,6 +16,27 @@
  */
 
 export default {
+	adminSettings: {
+		identity: '身份提供商',
+		identitySocial: '社交身份提供商',
+		identityEnterprise: '企业身份提供商',
+		identityPending: '配置仅保存，尚未接入 IAM 第三方登录。',
+		security: '通用安全',
+		securityPending:
+			'这些配置目前仅保存，尚未接入 IAM 或网关运行时，暂未生效。',
+		password: '密码策略',
+		passwordPending:
+			'策略目前仅保存，尚未接入 IAM 密码设置和登录流程，暂未生效。',
+		message: '消息设置',
+		messageDescription:
+			'管理邮件、短信服务及模板。测试发送只向本次输入的地址或手机号投递，服务端返回提交状态，最终收件请在收件端确认。',
+		mailTemplate: '邮件模板',
+		mailService: '邮件服务',
+		smsTemplate: '短信模板',
+		smsService: '短信服务',
+		oauth: 'IAM 接入应用',
+		oauthWarning: '客户端配置变更不会撤销已经签发的授权和令牌。'
+	},
 	login: {
 		slogan: '高性能 / 精致 / 优雅',
 		describe: '基于Vue3 + Element-Plus 的中后台前端解决方案。',
@@ -51,6 +72,6 @@ export default {
 		nightmode: '黑夜模式',
 		nightmode_msg: '适合光线较弱的环境，当前黑暗模式为beta版本',
 		language: '语言',
-		language_msg: '翻译进行中，暂翻译了本视图的文本',
+		language_msg: '翻译进行中，暂翻译了本视图的文本'
 	}
 }
