@@ -1,43 +1,35 @@
-# Plan: 身份与安全设置管理 (from spec.md 2026-10-13)
-Status: accepted
+# Plan: 租户安全策略统一配置 (from spec.md 2026-10-16)
 
 ## Files that change
-- 数据和依赖：现有工作区已有 `macula-cloud-system/src/main/resources/db/migration/V2__admin_identity_security_settings.sql`、相关 POM 与配置改动。本轮新增 `macula-cloud-system/src/main/resources/db/migration/V3__identity_provider_json_config.sql`，仅扩容身份源凭据列并增加备注列；不编辑 V1/V2。其他依赖或部署文件只在验证确有必要且记录偏差后修改。
-- System 持久化：现有工作区已包含 `pojo/entity/SysIdentityProvider.java`、其余五类设置/OAuth Entity 及对应 Mapper。本轮只调整 `SysIdentityProvider.java` 的备注映射和加密凭据列语义；必要时调整 `mapper/SysIdentityProviderMapper.java` 的查询，不修改 IAM Entity 或其他持久化模型。
-- System API 模型：现有工作区已包含 `form/IdentityProviderForm.java`、`vo/IdentityProviderVO.java`、`enums/IdentityProviderType.java` 及其余设置和 OAuth 管理模型。本轮调整这三个身份源类型以支持分类、备注、对象型 `config` 与 `configuredSecrets`；视实现需要在 `service/impl/` 或 `enums/` 新增本仓库自有的六类字段模式/校验类型。新增 Java 顶层类型按版权头、类级 Javadoc、`@author Rain`、`@since` 编写，不依赖或复制 eIAM 类。
-- System 业务与协议：现有工作区已包含五类 Service/Controller、`RootAdminGuard` 和消息适配。本轮修改 `service/IdentityProviderService.java`、`service/impl/IdentityProviderServiceImpl.java`、`controller/IdentityProviderController.java`、`pojo/entity/SysIdentityProvider.java`、`mapper/SysIdentityProviderMapper.java`（仅实际需要时），完成分类过滤、差异字段校验、敏感字段拆分与旧记录读取兼容；其他服务维持现有范围。
-- Admin：现有工作区已包含五个页面和 API 封装。本轮修改 `macula-cloud-admin/src/views/system/identityProvider/index.vue`、`src/api/model/system/identityProvider.js`（仅参数适配时）、`src/locales/lang/zh-cn.js` 与 `en.js`；使用现有 Element Plus 组件展示社交/企业页签、六种专属字段及列表图标，不引入新前端依赖或复制参考项目素材。菜单仍沿 V2 动态路由。
-- 测试与文档：修改 `macula-cloud-system/src/test/java/dev/macula/cloud/system/service/impl/IdentityProviderServiceImplTest.java`、`macula-cloud-admin/tests/unit/admin-identity-security-settings.test.js`、`macula-cloud-admin/cypress/e2e/admin-identity-security-settings.cy.js`，并在隔离数据库测试 `macula-cloud-system/src/test/java/dev/macula/cloud/system/integration/SettingsPersistenceIT.java` 覆盖 V3 与加密列；修改 `macula-cloud-system/README.md`、`macula-cloud-admin/README.md`。其余现有测试保留，IAM 运行时不改。
+- 数据库迁移：新增 `macula-cloud-system/src/main/resources/db/migration/V4__tenant_security_policy_dict.sql`。将 `sys_dict_item_tenant.value` 扩为 `TEXT NOT NULL`，在预检无重复数据后增加 `(tenant_id, type_code, name)` 唯一索引；删除旧通用安全、密码策略菜单及其角色/权限关联，创建统一 `/system/security-policy` 菜单和三个保存权限。已存在的 V1/V2/V3 不回写；旧专用配置表不迁移、不删除，仅停止使用。
+- 后端删除：删除 `controller/SecuritySettingsController.java`、`controller/PasswordPolicyController.java`，`form/SecuritySettingsForm.java`、`form/PasswordPolicyForm.java`，`mapper/SysSecuritySettingsMapper.java`、`mapper/SysPasswordPolicyMapper.java`，`pojo/entity/SysSecuritySettings.java`、`pojo/entity/SysPasswordPolicy.java`，`service/SecuritySettingsService.java`、`service/PasswordPolicyService.java`，`service/impl/SecuritySettingsServiceImpl.java`、`service/impl/PasswordPolicyServiceImpl.java`，`vo/SecuritySettingsVO.java`、`vo/PasswordPolicyVO.java`，以及对应旧单元测试。旧 `/api/v1/security-settings`、`/api/v1/password-policy` 不保留兼容入口。
+- 后端新增：新增 `controller/SecurityPolicyController.java`、`service/SecurityPolicyService.java`、`service/impl/SecurityPolicyServiceImpl.java`；新增 `form/SecurityBasicConfigForm.java`、`SecurityDefensePolicyConfigForm.java`、`PasswordPolicyConfigForm.java`；新增 `vo/SecurityBasicConfigResult.java`、`SecurityDefensePolicyConfigResult.java`、`PasswordPolicyConfigResult.java`、聚合返回 `SecurityPolicyResult.java`；新增稳定值为 0–5 的 `enums/PasswordComplexityRule.java`。复用现有 `SysDictItem`/`SysDictItemMapper`，不新增依赖和专用配置表。新增顶层 Java 类型均带 Apache 2.0 头、职责 Javadoc、非空 `@author` 与 `@since`。
+- 后端测试：新增 `service/impl/SecurityPolicyServiceImplTest.java`，更新 `controller/AdminSettingsAuthorizationTest.java`；新增或改造 `integration/SecurityPolicyPersistenceIT.java`，覆盖迁移、唯一约束、长值和租户隔离。测试只操作显式隔离的测试库。
+- Admin 删除：删除 `src/api/model/system/securitySettings.js`、`src/api/model/system/passwordPolicy.js`、`src/views/system/securitySettings/index.vue`、`src/views/system/passwordPolicy/index.vue`。
+- Admin 新增及修改：新增 `src/api/model/system/securityPolicy.js` 与 `src/views/system/securityPolicy/index.vue`，同页提供“通用安全 / 防御策略 / 密码策略”三个页签；修改 `src/locales/lang/zh-cn.js`、`src/locales/lang/en.js`、`tests/unit/admin-identity-security-settings.test.js`、`cypress/e2e/admin-identity-security-settings.cy.js`。动态路由由 V4 菜单提供，不新增静态路由或前端依赖。
+- 文档：修改 `macula-cloud-system/README.md` 和 `macula-cloud-admin/README.md`，记录新 API、20 个字典键、单位、复杂度代码、权限、迁移预检及回滚边界。当前工作树中身份源、消息配置、OAuth 等无关实现保持不动，除共享测试或菜单断言的必要适配外不扩大范围；用户已有 `AGENTS.md` 与 `.agent_context/` 不修改。
 
 ## Order of work
-1. 冻结现有工作树：检查 `git status --short`、现有 V2、身份源 Form/VO/Entity/Service/Controller、页面/API/测试及 README；只改本轮列出的身份源文件，保留其余功能和用户改动。先核实隔离数据库与本地 Compose 的身份源记录数量，不把本地空表推断为其他环境为空。
-2. 先添加失败用例：后端覆盖六种字段模式、分类不匹配、对象型 `config`、未知或跨类型字段、Secret/私钥不回显、凭据保留、旧记录无损读取及无效记录拒绝；前端覆盖页签切换、分类查询、差异表单和请求体。测试数据只用虚构值。
-3. V3 迁移与后端模型：使用现有 Flyway、MyBatis-Plus、Macula Boot `@CryptoField` 及项目已引入的 Jackson 工具，不增加依赖；在独立 V3 中增加备注并扩容加密凭据列，不触碰 V1/V2。将 `IdentityProviderForm`/VO 改为 `config` 对象，Entity 保留 `config_json` 文本与加密凭据列。为旧 `app_id`/`callback_url` 定义读取合成和同步策略，迁移不覆盖已有记录。
-4. 后端业务和 API：按提供商白名单校验类别与字段，拒绝未知字段；非敏感字段写入规范 JSON，敏感字段拆出加密，更新空值保留、显式值替换；类型不可变；列表按分类过滤。读取旧记录只公开白名单字段，遇无效/可疑 JSON 明确失败并提示处理，不静默丢弃。
-5. 前端页面：社交/企业页签分别查询、展示和添加，类型切换清理旧字段，按类型呈现标签与必需项；编辑只填回非敏感 `config`，凭据不回显；使用自有/现有图标和中英文文案。保留加载、空态、失败、重复提交和 ROOT 权限边界。
-6. 文档与验证：补充 V3 备份/预检/回滚和新 API 契约；运行相关后端单测、System/API Maven 测试、隔离库迁移/加密往返、Admin Vitest/Cypress/构建及 `git diff --check`。按 `REVIEW.md` 做 Bugs、Security、Compliance 检查。正式测试签收属于 Stage 4；外部供应商实网投递仍需独立凭据和收件确认。
+1. 冻结并核对当前脏工作树，确认只处理安全策略相关文件；先添加失败测试，固定 20 个键、默认值、校验、三组 API、租户隔离、权限和三页签交互。
+2. 增加 V4 迁移：先用 SQL 检查 `(tenant_id, type_code, name)` 重复项并在存在重复时中止，再扩容 `value`、建立唯一索引；按依赖顺序清理旧菜单的角色菜单、角色权限、租户权限关联和菜单记录，再插入统一菜单与权限。迁移不读取或搬运旧专用表数据，因为这些表尚未作为已发布数据源使用。
+3. 实现后端模型与服务：固定 `type_code=system_security_policy`，以 `name` 保存配置键、`value` 保存单个标量字符串；从认证/租户上下文解析当前租户，API 请求体不接受 `tenantId`。查询时一次取出当前租户全部键并按默认值组装三个结果；三个页签分别在事务内校验并 upsert 自己的键，不修改其他页签。
+4. 实现 `GET /api/v1/security-policy`、`PUT /api/v1/security-policy/basic`、`PUT /api/v1/security-policy/defense`、`PUT /api/v1/security-policy/password`，接入现有 URL 权限体系。通用安全按秒处理；`loginFailureDuration`、`autoUnlockTime` 按分钟处理；密码复杂度只接受 0–5 的稳定代码。布尔值规范化为 `true`/`false`，整数规范化为十进制字符串，字符串原样保存但执行长度和内容校验。
+5. 删除旧后端 API、服务、Mapper、Entity 和旧测试，确保源码及调用方不再引用专用安全/密码策略表；保留历史数据库表以避免破坏性迁移。日志和异常不得输出自定义弱密码内容或完整内容安全策略。
+6. 实现 Admin 统一页面和 API 封装：三个页签独立加载状态、表单校验和保存按钮，保存成功只刷新当前页签；覆盖空态、失败重试和重复提交保护。删除旧两个页面与 API，并同步中英文文案、菜单和权限断言。
+7. 更新 README 与测试。Stage 3 先执行相关编译、单测、Admin 单测/构建和 `git diff --check` 作为实现反馈；完成后交给 Stage 4 按隔离 MySQL、完整 Maven、Vitest/Cypress 与 `REVIEW.md` 正式验证，不将环境依赖失败误报为代码失败。
 
 ## Risks
-- Boot 当前 `@CryptoField` 拦截器加密异常后可能继续写库。按已接受规格本轮不改 Boot、不承诺失败即中止；验证正常加解密路径，并在交付时明确残余风险，不把明文凭据放入应用日志。
-- `sys_oauth2_client` 可空 secret 的迁移与 IAM 构造 `RegisteredClient` 的行为可能不兼容；需在开发早期用旧/新客户端样本验证。若必须改 IAM 运行时或扩大跨模块契约，先记录计划偏差并请工程师确认。
-- System 与 IAM 的 Redis 缓存必须共享相同 cache name/key/序列化配置；缓存只能在事务成功提交后失效，避免旧密钥、租户或 scope 持续生效。
-- SMTP AUTH 在目标 Exchange 邮箱已开放，但 TLS、证书和供应商账号/模板审核仍依赖外部环境；本地 SMTP/HTTP 模拟不能代表实网投递成功。自定义 HTTP POST 必须限制目标地址以防 SSRF，并禁止脚本/表达式。
-- 新管理 API 的 ROOT 校验必须覆盖读取和测试发送，不能只靠菜单或网关；全局配置不能受当前用户租户上下文误过滤。测试发送需限制滥用与敏感回显。
-- 菜单 ID、权限码、Flyway 版本与已部署数据可能冲突；只增量迁移，提供数据库备份/回滚说明，不自动删除既有客户端、菜单或配置。
-- V2 已在本地 Compose 执行，不能改历史迁移；外部环境可能已有身份源记录。V3 仅扩列，读取旧 JSON 时必须验证格式和字段；无法无损兼容的记录需由环境负责人处理后再升级，绝不自动删除或清洗。
-- TopIAM 把私钥/Secret 放在单一 JSON 中，本仓库按已验收规格分离密文列。支付宝 PEM 私钥加密后可能超过旧列长度，V3 必须扩容并以长私钥样本做数据库往返；不得把原文持久化到 `config_json`、日志或 API 响应。
+- 唯一索引会在历史重复键存在时失败，这是预期的安全停止行为；升级前必须备份并运行重复项预检，由环境负责人决定保留哪一条，代码不自动删除或合并数据。
+- 旧 API 和旧菜单直接移除是已确认的破坏性变更；尚未同步的外部调用方会失败。README 明确新路径和权限，不额外提供双写或兼容代理。
+- `value` 扩为 `TEXT` 后，MySQL 索引不包含该列，不影响唯一键；长 CSP 和弱密码清单需用数据库往返证明不截断，同时禁止在日志、审计描述和响应错误中泄露具体内容。
+- 租户隔离依赖现有租户插件与认证上下文。服务不得接受、切换或信任客户端 tenantId；ROOT 与租户管理员都必须按当前上下文读写，授权仍由菜单 URL 权限控制。
+- 同一页签多键写入必须处于同一事务；唯一约束冲突、校验失败或数据库异常时整组回滚，避免半保存。并发 upsert 要用唯一键兜底并验证异常映射。
+- 旧专用表本轮不删且不迁移，回滚代码仍可读取旧表，但新字典值不会自动反写旧表。该边界是基于旧功能尚未发布数据的确认；若部署前发现生产数据，必须停止并另做迁移设计。
+- 当前工作树含同一较大需求的其他未提交实现；删除和改名时必须只匹配安全策略文件，不能覆盖身份源、消息、OAuth、部署配置或用户文件。
 
 ## Proof
-- System 单测：ROOT/非 ROOT/匿名访问；六种身份源的分类/字段/JSON/凭据更新与拒绝、旧记录兼容与异常拒绝；安全/密码边界、模板默认与覆盖、OAuth 租户和 PKCE/OIDC 等现有测试不退化。
-- 数据库/跨服务集成：从 V1→V2→V3 和 V2→V3 升级、旧身份源行保留、长私钥密文往返且 `config_json` 无密钥；旧机密客户端与新公共客户端、IAM 缓存失效和 PKCE/OIDC 兼容维持原证明范围。区分真实隔离库验证与 mock。
-- 网络适配测试：模拟 SMTP AUTH 和阿里/腾讯/自定义 HTTP 端点，覆盖成功、拒绝、超时、错误映射、临时目标与 POST 参数映射；仅凭真实测试账号和收件端确认实网投递。
-- Admin Vitest/Cypress：社交/企业页签、六种字段、跨类型切换清理、对象型 `config`、凭据不回显，并保留五个入口的加载、空态、失败、保存与重复提交、租户选择、PKCE/OIDC、模板预览和临时测试目标；构建与 `git diff --check`。不把 IAM 第三方登录、运行时密码策略或细粒度权限配置误报为已实现。
-
-## Deviations recorded during implementation
-- `CLAUDE.md` 在该工作树不存在；按根 `AGENTS.md` 和 `.agents/rules/` 执行，未绕过仓库规则。
-- 安全/密码配置使用单条 JSON 持久化，并分别新增 Form 与 VO；身份源和 OAuth 分页直接接收有界参数，未增加原计划的两个 Query 类型。字段仍经服务端验证，不改变 REST 路径。
-- 消息设置 UI 的四个功能页签保留在一个 `messageSettings/index.vue`，未拆成四个只服务该页的子组件；发送适配器以 `*TestSender` 类实现，避免额外的空接口层。功能路径与原计划一致。
-- Macula Boot 的加密自动配置只有 `macula.crypto.enable=true` 才生效；System `application.yml` 增加 AES/BASE64 和必需的 `MACULA_CRYPTO_PASSWORD` 环境占位。未修改 Boot，仍保留其加密异常处理风险。需要在环境提供 16/24/32 字符密钥后才能启动 System。
-- 阿里/腾讯短信 SDK 版本未由 Boot BOM 管理，System POM 在目标模块单独固定本地可解析的 Apache-2.0 版本；未改根 POM或 API 模块。
-- 自定义短信要求鉴权请求头与 `@CryptoField` 凭据，避免 Boot 拦截器对空凭据执行 `String.valueOf(null)` 加密后误认其已配置；OAuth 管理 API 不接受新 `client_secret_jwt` 配置，因本方案的单向哈希密钥无法供 HMAC 验签；`private_key_jwt` 仍保留。
-- Stage 4 隔离数据库启动发现 System 原先没有 `CacheManager` Bean；已在 System POM 增加与 IAM 相同的 Macula Boot cache starter。为满足新的必需加密环境变量，增补 `deploy/docker-compose.yml` 的 System 环境映射及 `deploy/.env.example` 说明，未部署现有容器。
+- 后端单测：20 个键逐一覆盖；缺失键返回默认值；三页签只修改各自键；整数边界、布尔值、CSP/弱密码字符串、0–5 复杂度及非法输入；同页签原子回滚；旧 API/类型无引用。
+- 授权测试：匿名、无权限、具备对应权限的请求结果；请求体 tenantId 或其他未知字段不能越权；三个 PUT 权限相互独立，GET 遵循统一页面读取权限。
+- 数据库集成：在隔离 MySQL 从 V1 迁移至 V4，验证 `value` 长文本往返、唯一索引、重复预检失败、两个租户同名键可并存且互不可见、同租户同键不可重复；验证旧菜单和关系清除、统一菜单及权限存在，旧专用表未被破坏。
+- Admin Vitest/Cypress：统一入口、三个页签、字段和单位、复杂度 0–5 显示与请求、分别保存、加载/失败/重复提交保护、菜单和权限；确认旧路径不再作为入口。执行 `npm run test:unit`、目标 Cypress 和 `npm run build`。
+- 工程检查：执行 `mvn -pl macula-cloud-api,macula-cloud-api/macula-cloud-system-api,macula-cloud-system -am test -Plocal`（外部依赖按测试规则区分）、`git diff --check`，并按 `REVIEW.md` 完成 Bugs、Security、Compliance 检查；Stage 4 留存真实命令、退出码和环境限制。
