@@ -11,6 +11,23 @@ Flyway 迁移统一为 `db/migration/V1__baseline.sql`，包含原有基础数�
 本次合并要求由运维先清理数据库及 Flyway 历史，再执行初始化；不支持直接沿用旧版迁移历史升级。
 System 数据库同时供 IAM 使用，清理后相关账号、权限及认证配置需重新初始化。
 
+## 租户安全策略
+
+`V4__tenant_security_policy_dict.sql` 将 `sys_dict_item_tenant.value` 扩为 `TEXT`，并在全表
+重复项预检通过后建立 `(tenant_id, type_code, name)` 唯一索引。发现重复项时迁移会停止，升级前
+必须备份并执行 `GROUP BY tenant_id, type_code, name HAVING COUNT(*) > 1` 预检，不能自动合并数据。
+迁移只替换平台租户（`tenant_id=1`）的旧安全菜单和权限，不触碰其他租户的菜单关系。
+
+安全策略固定使用 `type_code=system_security_policy`，20 个字段名分别作为 `name`，字段的字符串化
+单值作为 `value`；整数使用十进制字符串，布尔值使用 `true`/`false`。统一读取接口为
+`GET /api/v1/security-policy`，分区保存接口为 `PUT /api/v1/security-policy/basic`、
+`PUT /api/v1/security-policy/defense`、`PUT /api/v1/security-policy/password`。请求不接受
+`tenantId`，只访问认证上下文中的当前租户。旧 `/api/v1/security-settings` 和
+`/api/v1/password-policy` 接口已删除。写操作审计只记录固定键组和结果，不记录 CSP、弱密码清单
+或其他配置值。这些配置当前仅保存，尚未接入 IAM/Gateway 运行时。
+
+详细字段、默认值、单位和升级说明见 `../docs/security-policy.md`。
+
 ## 关于DTO的说明
 
 在使用MVC三层架构时，我们通常将项目分为mapper(dao)、service、controller。
