@@ -59,6 +59,7 @@ npm run lint
 
 只读取与当前任务相关的规则：
 
+- 做新任务时先识别是新功能还是BUG，新功能分支前缀是feat/，BUG分支前缀是fix/，后面跟着当前HiFox的任务ID,如果没有则使用当前任务的名称
 - 理解服务职责、依赖方向或跨模块修改：`.agents/rules/architecture.md`
 - 修改 Java 后端、REST API、数据模型或数据库访问：`.agents/rules/backend-development.md`
 - 修改 `macula-cloud-admin`：`.agents/rules/frontend-development.md`
