@@ -433,6 +433,43 @@ describe("平台身份、消息与接入应用管理", () => {
     });
   });
 
+  it("loads SMS templates on first enable and follows the template language", () => {
+    cy.intercept("GET", "**/message-settings/templates/MAIL*", ok([])).as(
+      "emptyMailTemplates"
+    );
+    cy.intercept("GET", "**/message-settings/providers/SMS*", ok({
+      channel: "SMS", providerType: null, enabled: false,
+      credentialConfigured: false,
+    })).as("emptySmsProvider");
+    cy.intercept("GET", "**/message-settings/templates/SMS*", (request) => {
+      const languageCode = new URL(request.url).searchParams.get("languageCode");
+      request.reply(ok([
+        { templateKey: "SMS_LOGIN", channel: "SMS", providerType: "ALIYUN",
+          languageCode, providerTemplateCode: "", enabled: false,
+          overridden: false, variables: ["code"] },
+      ]));
+    }).as("smsTemplatesByLanguage");
+
+    open("/system/message-settings");
+    cy.wait("@emptyMailTemplates");
+    cy.contains(".el-tabs__item", "短信服务").click();
+    cy.wait("@emptySmsProvider");
+    cy.contains(".el-form-item", "启用服务").find(".el-switch").click();
+    cy.contains(".el-form-item", "服务商").find(".el-select").click();
+    cy.contains(".el-select-dropdown__item", "阿里云").click();
+    cy.wait("@smsTemplatesByLanguage").then(({ request }) => {
+      expect(new URL(request.url).searchParams.get("languageCode")).to.equal("zh-CN");
+    });
+    cy.contains("登录验证").should("be.visible");
+
+    cy.contains(".el-radio-button", "English").click();
+    cy.wait("@smsTemplatesByLanguage").then(({ request }) => {
+      expect(new URL(request.url).searchParams.get("languageCode")).to.equal("en-US");
+    });
+    cy.contains("Sign-in verification").should("be.visible");
+    cy.contains("登录验证").should("not.exist");
+  });
+
   it("does not save OAuth client before the tenant is selected", () => {
     cy.intercept(
       "GET",

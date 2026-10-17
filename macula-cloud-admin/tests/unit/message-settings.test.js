@@ -17,9 +17,13 @@ describe("message settings", () => {
     expect(page).not.toContain("QINIU");
     expect(page).toContain('sandbox=""');
     expect(page).toContain('i18n.global.t');
+    expect(page).toContain('@change="providerEnabledChanged"');
+    expect(page).toMatch(/providerChanged\(\).*loadTemplates/);
+    expect(page).toContain('templateMessages[language.value]');
     expect(page).not.toContain('useI18n');
     expect(page).toContain("messageSettingsPage.keepSecret");
     expect(zhCn.messageSettingsPage.keepSecret).toBe("留空保持原值");
     expect(en.messageSettingsPage.scenes.SMS_LOGIN).toBe("Sign-in verification");
+    expect(zhCn.messageSettingsPage.scenes.SMS_LOGIN).toBe("登录验证");
   });
 });

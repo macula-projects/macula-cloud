@@ -19,7 +19,7 @@
     <template v-else>
       <el-card shadow="never">
         <el-form label-width="150px">
-          <el-form-item :label="$t('messageSettingsPage.enableService')"><el-switch v-model="provider.enabled" /></el-form-item>
+          <el-form-item :label="$t('messageSettingsPage.enableService')"><el-switch v-model="provider.enabled" @change="providerEnabledChanged" /></el-form-item>
           <template v-if="provider.enabled">
           <el-form-item :label="$t('messageSettingsPage.provider')"><el-select v-model="provider.providerType" @change="providerChanged"><el-option v-for="item in providerOptions" :key="item.value" :label="item.label" :value="item.value" /></el-select></el-form-item>
           <template v-if="channel === 'MAIL'">
@@ -60,6 +60,8 @@
 import { computed, onMounted, reactive, ref } from "vue";
 import { ElMessage } from "element-plus";
 import i18n from "@/locales";
+import zhCn from "@/locales/lang/zh-cn";
+import en from "@/locales/lang/en";
 import api from "@/api/model/system/messageSettings";
 const t = (...args) => i18n.global.t(...args);
 const active = ref("MAIL_TEMPLATE"), loading = ref(false), saving = ref(false), error = ref("");
@@ -68,9 +70,13 @@ const loadedProviderType = ref("");
 const previewDialog = ref(false), previewHtml = ref(""), testDialog = ref(false), testTarget = ref(""), testScene = ref(null);
 const channel = computed(() => active.value.startsWith("MAIL") ? "MAIL" : "SMS");
 const providerOptions = computed(() => channel.value === "MAIL" ? [{ value:"CUSTOM",label:t("messageSettingsPage.customSmtp")},{value:"ALIYUN",label:t("messageSettingsPage.aliyunMail")},{value:"TENCENT",label:t("messageSettingsPage.tencentMail")},{value:"NETEASE",label:t("messageSettingsPage.neteaseMail")}] : [{value:"ALIYUN",label:t("messageSettingsPage.aliyunSms")},{value:"TENCENT",label:t("messageSettingsPage.tencentSms")}]);
-const sceneLabel = (key) => t(`messageSettingsPage.scenes.${key}`);
+const templateMessages = { "zh-CN": zhCn, "en-US": en };
+const sceneLabel = (key) => channel.value === "SMS"
+  ? templateMessages[language.value]?.messageSettingsPage.scenes[key] || key
+  : t(`messageSettingsPage.scenes.${key}`);
 function unwrap(response){if(response?.success===false)throw new Error(response.cause||response.msg||t("messageSettingsPage.operationFailed"));return response&&Object.prototype.hasOwnProperty.call(response,"data")?response.data:response;}
-function providerChanged(){provider.credential="";if(channel.value==="MAIL"&&provider.providerType==="CUSTOM"){provider.port ||= 25;provider.securityMode ||= "NONE";}if(channel.value==="SMS"&&provider.providerType==="ALIYUN"){provider.regionCode="";provider.smsSdkAppId="";}}
+async function providerChanged(){provider.credential="";if(channel.value==="MAIL"&&provider.providerType==="CUSTOM"){provider.port ||= 25;provider.securityMode ||= "NONE";}if(channel.value==="SMS"&&provider.providerType==="ALIYUN"){provider.regionCode="";provider.smsSdkAppId="";}if(channel.value==="SMS"&&provider.enabled)await loadTemplates();}
+async function providerEnabledChanged(enabled){if(channel.value!=="SMS")return;if(enabled)await loadTemplates();else templates.value=[];}
 function invalid(message){ElMessage.error(message||t("messageSettingsPage.invalidForm"));return false;}
 function validProvider(){if(!provider.enabled&&loadedProviderType.value)return true;if(!provider.providerType||!provider.account||!provider.sender)return invalid();if((!provider.credentialConfigured||loadedProviderType.value!==provider.providerType)&&!provider.credential)return invalid(t("messageSettingsPage.credentialRequired"));if(channel.value==="MAIL"&&provider.providerType==="CUSTOM"&&(!provider.endpoint||!provider.port||!provider.securityMode))return invalid();if(channel.value==="SMS"&&provider.providerType==="TENCENT"&&(!provider.regionCode||!provider.smsSdkAppId))return invalid();return true;}
 async function load(){ loading.value=true;error.value="";try{ if(active.value==="MAIL_TEMPLATE") templates.value=unwrap(await api.templates("MAIL","","zh-CN")); else {Object.assign(provider,unwrap(await api.provider(channel.value)),{credential:""});loadedProviderType.value=provider.providerType||""; if(channel.value==="SMS") await loadTemplates();}}catch(e){error.value=e?.message||t("messageSettingsPage.loadFailed");}finally{loading.value=false;} }
