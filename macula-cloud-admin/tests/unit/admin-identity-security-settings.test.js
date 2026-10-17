@@ -22,7 +22,7 @@ describe("平台身份、消息与接入应用管理", () => {
     for (const result of [
       await identity.catalog(),
       await identity.list({ pageNum: 1 }),
-      await message.providers("MAIL"),
+      await message.provider("MAIL"),
       await oauth.list({ pageNum: 1 }),
     ])
       expect(result.url).toContain("/system/api/v1/");
@@ -54,11 +54,12 @@ describe("平台身份、消息与接入应用管理", () => {
     expect(identityPage).toContain("回调地址");
     expect(identityPage).toContain("只读地址");
     expect(identityPage).not.toMatch(/callbackUrl:\s*form\./);
-    expect(messagePage).toContain("临时收件邮箱");
-    expect(messagePage).toContain('v-model="providerDrawer"');
+    expect((messagePage.match(/<el-tab-pane/g) || []).length).toBe(3);
     expect(messagePage).toContain('v-model="templateDrawer"');
     expect(messagePage).toContain('v-model="testDialog"');
-    expect(messagePage).toMatch(/credential:\s*["']{2}/);
+    expect(messagePage).toContain('sandbox=""');
+    expect(messagePage).not.toContain("EXCHANGE");
+    expect(messagePage).not.toContain('value:"CUSTOM",label:"自定义短信"');
     expect(oauthPage).toContain("<el-drawer");
     expect(oauthPage).not.toContain("<el-dialog");
     expect(oauthPage).toMatch(/clientSecret:\s*["']{2}/);

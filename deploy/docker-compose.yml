@@ -187,7 +187,7 @@ services:
       <<: *app-environment
       SERVER_PORT: "9081"
       MACULA_CRYPTO_PASSWORD: ${MACULA_CRYPTO_PASSWORD:?Set a 16/24/32-character System crypto key}
-      MACULA_MESSAGE_CUSTOM_SMS_ALLOWED_HOSTS: ${MACULA_MESSAGE_CUSTOM_SMS_ALLOWED_HOSTS:-}
+      MACULA_MESSAGE_AUDIT_HMAC_KEY: ${MACULA_MESSAGE_AUDIT_HMAC_KEY:?Set a separate 32+ character message audit HMAC key}
     ports:
       - "${BIND_ADDRESS:-127.0.0.1}:${SYSTEM_HOST_PORT:-9081}:9081"
     depends_on:
@@ -255,6 +255,8 @@ services:
     environment:
       <<: *app-environment
       SERVER_PORT: "9010"
+      MACULA_CRYPTO_PASSWORD: ${MACULA_CRYPTO_PASSWORD:?Set the same 16/24/32-character crypto key as System}
+      MACULA_MESSAGE_AUDIT_HMAC_KEY: ${MACULA_MESSAGE_AUDIT_HMAC_KEY:?Set a separate 32+ character message audit HMAC key}
     ports:
       - "${BIND_ADDRESS:-127.0.0.1}:${IAM_HOST_PORT:-9010}:9010"
     depends_on:

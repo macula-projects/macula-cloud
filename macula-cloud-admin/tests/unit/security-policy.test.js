@@ -47,6 +47,7 @@ describe("租户安全策略", () => {
       expect(page).toContain(key);
     }
     expect(page).toContain("securityPolicyPage.saveSuccess");
+    expect(page).toContain("adminSettings.securityPolicyPending");
     expect(page).toContain(':disabled="!loaded"');
     expect(page).toContain('v-if="loadError"');
     expect(page).toContain('@click="load"');

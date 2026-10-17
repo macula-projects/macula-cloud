@@ -49,6 +49,27 @@
       }
     });
   });
+  document.querySelectorAll("[data-send-code]").forEach(button => {
+    button.addEventListener("click", async () => {
+      const form = button.closest("form");
+      const phone = form.querySelector("[name=phone]");
+      const csrf = form.querySelector("input[type=hidden]");
+      const error = form.querySelector("[role=alert]");
+      if (!phone.reportValidity() || button.disabled) return;
+      const body = new URLSearchParams({ phone: phone.value });
+      if (csrf) body.set(csrf.name, csrf.value);
+      button.disabled = true; error.textContent = "";
+      try {
+        const response = await fetch(button.dataset.sendCodeUrl, { method: "POST", body, credentials: "same-origin" });
+        if (!response.ok) throw new Error("验证码暂时无法发送，请稍后重试。");
+        let remaining = 60; button.textContent = `${remaining} 秒后重试`;
+        const timer = window.setInterval(() => {
+          remaining -= 1; button.textContent = remaining ? `${remaining} 秒后重试` : "获取验证码";
+          if (!remaining) { clearInterval(timer); button.disabled = false; }
+        }, 1000);
+      } catch (failure) { error.textContent = failure.message; button.disabled = false; }
+    });
+  });
   const consent = document.querySelector("[data-consent]");
   if (consent) {
     consent.addEventListener("submit", event => {

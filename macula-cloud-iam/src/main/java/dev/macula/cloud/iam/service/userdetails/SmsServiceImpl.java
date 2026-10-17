@@ -18,7 +18,9 @@
 package dev.macula.cloud.iam.service.userdetails;
 
 import dev.macula.cloud.iam.authentication.sms.SmsService;
-import org.springframework.stereotype.Component;
+import dev.macula.cloud.iam.message.LoginSmsDispatcher;
+import dev.macula.cloud.iam.message.SmsVerificationCodeStore;
+import lombok.RequiredArgsConstructor;
 
 /**
  * {@code SmsServiceImpl} 手机号验证服务
@@ -26,16 +28,37 @@ import org.springframework.stereotype.Component;
  * @author rain
  * @since 2023/4/12 19:34
  */
+@RequiredArgsConstructor
 public class SmsServiceImpl implements SmsService {
+    private final SmsVerificationCodeStore store;
+    private final LoginSmsDispatcher dispatcher;
+
     @Override
     public boolean verifyCode(String phone, String rawCode) {
-        // TODO 手机号验证
-        return true;
+        return phone != null && rawCode != null && store.consume(normalize(phone), rawCode);
     }
 
     @Override
     public void sendCode(String phone) {
-        // 发送手机验证码
+        sendCode(phone, "unknown");
+    }
 
+    @Override
+    public void sendCode(String phone, String remoteAddress) {
+        String normalized = normalize(phone);
+        String source = remoteAddress == null ? "unknown" : remoteAddress;
+        String code = store.issue(normalized, source);
+        try {
+            dispatcher.send(normalized, code);
+        } catch (RuntimeException ex) {
+            throw ex;
+        }
+        store.activate(normalized, code);
+    }
+
+    private String normalize(String phone) {
+        String value = phone == null ? "" : phone.replace(" ", "").replace("-", "");
+        if (!value.matches("^\\+?[0-9]{6,20}$")) throw new IllegalArgumentException("手机号格式无效");
+        return value;
     }
 }

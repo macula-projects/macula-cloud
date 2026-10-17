@@ -16,7 +16,9 @@
  */
 package dev.macula.cloud.system.form;
 
-import jakarta.validation.constraints.NotBlank;
+import com.fasterxml.jackson.annotation.JsonAnySetter;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -30,14 +32,24 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@JsonIgnoreProperties(ignoreUnknown = false)
 public class MessageTemplateForm {
-    @NotBlank
-    private String templateKey;
+    @Size(max = 32)
     private String providerType;
+    @Size(max = 16)
     private String languageCode;
+    @Size(max = 255)
+    private String senderName;
+    @Size(max = 255)
     private String title;
-    @NotBlank
+    @Size(max = 10000)
     private String content;
+    @Size(max = 128)
     private String providerTemplateCode;
     private boolean enabled;
+
+    @JsonAnySetter
+    public void rejectUnknownField(String name, Object value) {
+        throw new IllegalArgumentException("未知模板配置字段：" + name);
+    }
 }

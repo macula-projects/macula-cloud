@@ -36,6 +36,7 @@ public class MessageTemplateVO {
     private String channel;
     private String providerType;
     private String languageCode;
+    private String senderName;
     private String title;
     private String content;
     private String providerTemplateCode;

@@ -70,6 +70,13 @@ cp deploy/.env.example deploy/.env
 
 Compose 固定激活 `docker` profile，并显式传入每个应用的 `SERVER_PORT`。数据库地址和库名由模块配置维护；System、IAM、TinyID、Seata、SnailJob 的 MySQL 账号密码使用 `MYSQL_APP_USER`、`MYSQL_APP_PASSWORD`，Compose 从 `deploy/.env` 注入，并与 MySQL 初始化账号保持一致。
 
+完整容器模式还要求配置以下两个相互独立的密钥：
+
+- `MACULA_CRYPTO_PASSWORD`：System 与 IAM 共享的 16/24/32 字符字段加密密钥。
+- `MACULA_MESSAGE_AUDIT_HMAC_KEY`：System 与 IAM 共享的至少 32 字符消息审计 HMAC 密钥，不得复用字段加密密钥。轮换后，同一目标的新旧审计摘要将无法直接关联。
+
+`.env.example` 中的审计密钥只用于本地开发，复制到共享或生产环境前必须替换为密钥管理系统注入的随机值。修改后可运行 `./deploy/scripts/compose.sh config-apps` 验证必填配置。
+
 Nacos 配置使用以下 Data ID：
 
 ```text

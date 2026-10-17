@@ -17,6 +17,7 @@
 package dev.macula.cloud.system.controller;
 
 import dev.macula.cloud.system.form.MessageProviderForm;
+import dev.macula.cloud.system.form.MessagePreviewForm;
 import dev.macula.cloud.system.form.MessageTemplateForm;
 import dev.macula.cloud.system.form.MessageTestForm;
 import dev.macula.cloud.system.service.MessageSettingsService;
@@ -41,47 +42,34 @@ import java.util.Map;
 public class MessageSettingsController {
     private final MessageSettingsService service;
 
-    @GetMapping("/providers")
-    public List<MessageProviderVO> providers(@RequestParam String channel) {
-        return service.providers(channel);
+    @GetMapping("/providers/{channel}")
+    public MessageProviderVO provider(@PathVariable String channel) {
+        return service.provider(channel);
     }
 
-    @GetMapping("/providers/{id}")
-    public MessageProviderVO provider(@PathVariable Long id) {
-        return service.provider(id);
+    @PutMapping("/providers/{channel}")
+    public MessageProviderVO saveProvider(@PathVariable String channel,
+        @Valid @RequestBody MessageProviderForm form) {
+        return service.saveProvider(channel, form);
     }
 
-    @PostMapping("/providers")
-    public MessageProviderVO createProvider(@Valid @RequestBody MessageProviderForm form) {
-        return service.saveProvider(null, form);
+    @GetMapping("/templates/{channel}")
+    public List<MessageTemplateVO> templates(@PathVariable String channel,
+        @RequestParam(required = false) String providerType,
+        @RequestParam(required = false, defaultValue = "zh-CN") String languageCode) {
+        return service.templates(channel, providerType, languageCode);
     }
 
-    @PutMapping("/providers/{id}")
-    public MessageProviderVO updateProvider(@PathVariable Long id, @Valid @RequestBody MessageProviderForm form) {
-        return service.saveProvider(id, form);
-    }
-
-    @DeleteMapping("/providers/{id}")
-    public void deleteProvider(@PathVariable Long id) {
-        service.deleteProvider(id);
-    }
-
-    @GetMapping("/templates")
-    public List<MessageTemplateVO> templates(@RequestParam String channel,
-        @RequestParam(required = false) String providerType) {
-        return service.templates(channel, providerType);
-    }
-
-    @PutMapping("/templates/{channel}")
-    public MessageTemplateVO saveTemplate(@PathVariable String channel,
+    @PutMapping("/templates/{channel}/{scene}")
+    public MessageTemplateVO saveTemplate(@PathVariable String channel, @PathVariable String scene,
         @Valid @RequestBody MessageTemplateForm form) {
-        return service.saveTemplate(channel, form);
+        return service.saveTemplate(channel, scene, form);
     }
 
-    @PostMapping("/templates/{channel}/{key}/preview")
-    public Map<String, String> preview(@PathVariable String channel, @PathVariable String key,
-        @RequestParam(required = false) String providerType, @RequestBody Map<String, String> variables) {
-        return Map.of("content", service.preview(channel, key, providerType, variables));
+    @PostMapping("/templates/MAIL/{scene}/preview")
+    public Map<String, String> preview(@PathVariable String scene,
+        @RequestBody(required = false) MessagePreviewForm form) {
+        return Map.of("content", service.preview(scene, form == null ? null : form.getVariables()));
     }
 
     @PostMapping("/test")

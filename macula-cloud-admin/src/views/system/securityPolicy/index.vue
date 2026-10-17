@@ -1,5 +1,12 @@
 <template>
   <el-main>
+    <el-alert
+      class="pending-alert"
+      :title="$t('adminSettings.securityPolicyPending')"
+      type="warning"
+      :closable="false"
+      show-icon
+    />
 
     <div v-if="loadError" class="load-error">
       <el-alert :title="loadError" type="error" :closable="false" show-icon />
@@ -597,6 +604,9 @@ onMounted(load);
   margin-top: 0;
   width: 100%;
   box-sizing: border-box;
+}
+.pending-alert {
+  margin-bottom: 16px;
 }
 .section-heading {
   padding: 8px 4px 24px;
