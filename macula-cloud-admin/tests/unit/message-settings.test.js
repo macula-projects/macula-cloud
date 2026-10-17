@@ -18,6 +18,10 @@ describe("message settings", () => {
     expect(page).toContain('sandbox=""');
     expect(page).toContain(':title="previewTitle"');
     expect(page).toContain('class="mail-preview-card"');
+    expect(page).toContain('class="mail-template-list"');
+    expect(page).toContain('class="mail-template-item"');
+    expect(page).toContain('sceneDescription(row.templateKey)');
+    expect(page).toContain('messageSettingsPage.confirm');
     expect(page).toContain("escapeHtml(row.senderName");
     expect(page).toContain('i18n.global.t');
     expect(page).toContain('@change="providerEnabledChanged"');
@@ -28,5 +32,7 @@ describe("message settings", () => {
     expect(zhCn.messageSettingsPage.keepSecret).toBe("留空保持原值");
     expect(en.messageSettingsPage.scenes.SMS_LOGIN).toBe("Sign-in verification");
     expect(zhCn.messageSettingsPage.scenes.SMS_LOGIN).toBe("登录验证");
+    expect(zhCn.messageSettingsPage.sceneDescriptions.MAIL_BIND).toContain("绑定邮箱");
+    expect(en.messageSettingsPage.sceneDescriptions.MAIL_WELCOME).toContain("verifies");
   });
 });

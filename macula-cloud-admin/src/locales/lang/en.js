@@ -69,6 +69,7 @@ export default {
 		senderName: 'Sender display name',
 		htmlContent: 'HTML content',
 		cancel: 'Cancel',
+		confirm: 'Confirm',
 		mailPreview: 'Mail template preview',
 		testSend: 'Test send',
 		phone: 'Phone number',
@@ -105,6 +106,16 @@ export default {
 			SMS_LOGIN: 'Sign-in verification',
 			SMS_WELCOME: 'Welcome SMS',
 			SMS_PASSWORD_EXPIRY: 'Password expiry reminder'
+		},
+		sceneDescriptions: {
+			MAIL_BIND: 'Sent whenever a user binds an email address.',
+			MAIL_CHANGE_BIND: 'Sent whenever a user changes the bound email address and requests a code.',
+			MAIL_FORGOT_PASSWORD: 'Sent whenever a user needs to reset a forgotten password.',
+			MAIL_CHANGE_PASSWORD: 'Sent whenever a user requests a password change.',
+			MAIL_RESET_SUCCESS: 'Sent after an administrator successfully resets a user password.',
+			MAIL_LOGIN: 'Sent whenever a user signs in with an email verification code.',
+			MAIL_PASSWORD_EXPIRY: 'Sent when a user password is approaching its expiry date.',
+			MAIL_WELCOME: 'Sent after a user verifies the email address, or after the first registration or sign-in when email verification is disabled.'
 		}
 	},
 	securityPolicyPage: {

@@ -475,6 +475,53 @@ describe("平台身份、消息与接入应用管理", () => {
     cy.contains("登录验证").should("not.exist");
   });
 
+  it("opens an independent browser view for every mail template", () => {
+    const templates = [
+      ["MAIL_BIND", "绑定邮箱"],
+      ["MAIL_CHANGE_BIND", "修改绑定邮箱"],
+      ["MAIL_FORGOT_PASSWORD", "忘记密码"],
+      ["MAIL_CHANGE_PASSWORD", "修改密码"],
+      ["MAIL_RESET_SUCCESS", "管理员重置密码成功"],
+      ["MAIL_LOGIN", "登录验证"],
+      ["MAIL_PASSWORD_EXPIRY", "密码到期提醒"],
+      ["MAIL_WELCOME", "欢迎邮件"],
+    ].map(([templateKey, title]) => ({
+      templateKey,
+      channel: "MAIL",
+      senderName: "Macula Cloud",
+      title,
+      content: `<p>${templateKey}</p>`,
+      enabled: true,
+      overridden: false,
+      variables: [],
+    }));
+    cy.intercept("GET", "**/message-settings/templates/MAIL*", ok(templates)).as(
+      "allMailTemplates"
+    );
+    cy.intercept("POST", "**/message-settings/templates/MAIL/*/preview", (request) => {
+      const scene = request.url.match(/\/MAIL\/([^/]+)\/preview/)?.[1];
+      request.reply(ok({ content: `<p>preview-${scene}</p>` }));
+    }).as("previewMailTemplate");
+
+    open("/system/message-settings");
+    cy.wait("@allMailTemplates");
+    cy.get(".mail-template-item").should("have.length", 8);
+    templates.forEach(({ templateKey, title }) => {
+      cy.contains(".mail-template-item", title)
+        .contains("button", "浏览")
+        .click();
+      cy.wait("@previewMailTemplate").then(({ request }) => {
+        expect(request.url).to.contain(`/MAIL/${templateKey}/preview`);
+      });
+      cy.get(".el-dialog:visible .el-dialog__title").should("contain.text", title);
+      cy.get(".el-dialog:visible iframe[sandbox]")
+        .should("have.attr", "srcdoc")
+        .and("contain", `preview-${templateKey}`);
+      cy.get(".el-dialog:visible").contains("button", "确定").click();
+      cy.get(".el-dialog:visible").should("not.exist");
+    });
+  });
+
   it("does not save OAuth client before the tenant is selected", () => {
     cy.intercept(
       "GET",

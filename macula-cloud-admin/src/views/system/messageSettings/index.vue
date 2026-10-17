@@ -9,12 +9,22 @@
       <el-tab-pane :label="$t('adminSettings.smsService')" name="SMS_PROVIDER" />
     </el-tabs>
 
-    <el-table v-if="active === 'MAIL_TEMPLATE'" :data="templates" :empty-text="$t('messageSettingsPage.emptyTemplates')" stripe>
-      <el-table-column :label="$t('messageSettingsPage.scene')"><template #default="{ row }">{{ sceneLabel(row.templateKey) }}</template></el-table-column>
-      <el-table-column prop="title" :label="$t('messageSettingsPage.subject')" />
-      <el-table-column :label="$t('messageSettingsPage.custom')" width="100"><template #default="{ row }">{{ row.overridden && row.enabled ? $t("messageSettingsPage.yes") : $t("messageSettingsPage.no") }}</template></el-table-column>
-      <el-table-column :label="$t('messageSettingsPage.actions')" width="160"><template #default="{ row }"><el-button link type="primary" @click="editTemplate(row)">{{ $t("messageSettingsPage.configure") }}</el-button><el-button link type="primary" @click="preview(row)">{{ $t("messageSettingsPage.preview") }}</el-button></template></el-table-column>
-    </el-table>
+    <el-card v-if="active === 'MAIL_TEMPLATE'" class="mail-template-list" shadow="never">
+      <el-empty v-if="!templates.length" :description="$t('messageSettingsPage.emptyTemplates')" />
+      <div v-for="row in templates" :key="row.templateKey" class="mail-template-item">
+        <div class="mail-template-copy">
+          <div class="mail-template-title">
+            {{ sceneLabel(row.templateKey) }}
+            <el-tag v-if="row.overridden && row.enabled" size="small">{{ $t("messageSettingsPage.custom") }}</el-tag>
+          </div>
+          <div class="mail-template-description">{{ sceneDescription(row.templateKey) }}</div>
+        </div>
+        <div class="mail-template-actions">
+          <el-button link type="primary" @click="editTemplate(row)">{{ $t("messageSettingsPage.configure") }}</el-button>
+          <el-button link type="primary" @click="preview(row)">{{ $t("messageSettingsPage.preview") }}</el-button>
+        </div>
+      </div>
+    </el-card>
 
     <template v-else>
       <el-card shadow="never">
@@ -50,8 +60,8 @@
       </template>
     </template>
 
-    <el-drawer v-model="templateDrawer" :title="$t('messageSettingsPage.configureMail')" size="min(680px, 100vw)"><el-form label-width="110px"><el-form-item :label="$t('messageSettingsPage.customMail')"><el-switch v-model="templateForm.enabled" /></el-form-item><template v-if="templateForm.enabled"><el-form-item :label="$t('messageSettingsPage.variables')">{{ (templateForm.variables || []).join(', ') || $t('messageSettingsPage.none') }}</el-form-item><el-form-item :label="$t('messageSettingsPage.senderName')"><el-input v-model="templateForm.senderName" /></el-form-item><el-form-item :label="$t('messageSettingsPage.subject')"><el-input v-model="templateForm.title" /></el-form-item><el-form-item :label="$t('messageSettingsPage.htmlContent')"><el-input v-model="templateForm.content" type="textarea" :rows="10" /></el-form-item></template></el-form><template #footer><el-button @click="templateDrawer=false">{{ $t("messageSettingsPage.cancel") }}</el-button><el-button type="primary" :loading="saving" @click="saveMailTemplate">{{ $t("messageSettingsPage.save") }}</el-button></template></el-drawer>
-    <el-dialog v-model="previewDialog" :title="previewTitle" width="720px"><iframe :title="previewTitle" sandbox="" :srcdoc="previewHtml" class="preview-frame" /></el-dialog>
+    <el-drawer v-model="templateDrawer" :title="templateForm.templateKey ? sceneLabel(templateForm.templateKey) : $t('messageSettingsPage.configureMail')" size="min(680px, 100vw)"><el-form label-width="110px"><el-form-item :label="$t('messageSettingsPage.customMail')"><el-switch v-model="templateForm.enabled" /></el-form-item><template v-if="templateForm.enabled"><el-form-item :label="$t('messageSettingsPage.variables')">{{ (templateForm.variables || []).join(', ') || $t('messageSettingsPage.none') }}</el-form-item><el-form-item :label="$t('messageSettingsPage.senderName')"><el-input v-model="templateForm.senderName" /></el-form-item><el-form-item :label="$t('messageSettingsPage.subject')"><el-input v-model="templateForm.title" /></el-form-item><el-form-item :label="$t('messageSettingsPage.htmlContent')"><el-input v-model="templateForm.content" type="textarea" :rows="10" /></el-form-item></template></el-form><template #footer><el-button @click="templateDrawer=false">{{ $t("messageSettingsPage.cancel") }}</el-button><el-button type="primary" :loading="saving" @click="saveMailTemplate">{{ $t("messageSettingsPage.save") }}</el-button></template></el-drawer>
+    <el-dialog v-model="previewDialog" :title="previewTitle" width="min(800px, calc(100vw - 32px))" destroy-on-close><iframe :title="previewTitle" sandbox="" :srcdoc="previewHtml" class="preview-frame" /><template #footer><el-button @click="previewDialog=false">{{ $t("messageSettingsPage.cancel") }}</el-button><el-button type="primary" @click="previewDialog=false">{{ $t("messageSettingsPage.confirm") }}</el-button></template></el-dialog>
     <el-dialog v-model="testDialog" :title="$t('messageSettingsPage.testSend')" width="460px"><el-input v-model="testTarget" :placeholder="$t('messageSettingsPage.phone')" /><template #footer><el-button @click="testDialog=false">{{ $t("messageSettingsPage.cancel") }}</el-button><el-button type="primary" :loading="saving" @click="sendTest">{{ $t("messageSettingsPage.submit") }}</el-button></template></el-dialog>
   </div>
 </template>
@@ -74,6 +84,7 @@ const templateMessages = { "zh-CN": zhCn, "en-US": en };
 const sceneLabel = (key) => channel.value === "SMS"
   ? templateMessages[language.value]?.messageSettingsPage.scenes[key] || key
   : t(`messageSettingsPage.scenes.${key}`);
+const sceneDescription = (key) => t(`messageSettingsPage.sceneDescriptions.${key}`);
 function unwrap(response){if(response?.success===false)throw new Error(response.cause||response.msg||t("messageSettingsPage.operationFailed"));return response&&Object.prototype.hasOwnProperty.call(response,"data")?response.data:response;}
 function escapeHtml(value){return String(value??"").replace(/[&<>"']/g,character=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[character]);}
 function mailPreviewDocument(row,content){const sender=escapeHtml(row.senderName||"Macula Cloud"),subject=escapeHtml(row.title||sceneLabel(row.templateKey));return `<!doctype html><html><head><meta charset="UTF-8"><meta name="color-scheme" content="light"><style>*{box-sizing:border-box}body{margin:0;padding:28px;background:#f3f5f8;color:#303133;font:14px/1.7 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.mail-preview-card{max-width:600px;margin:0 auto;overflow:hidden;border:1px solid #e4e7ed;border-radius:8px;background:#fff;box-shadow:0 8px 24px rgba(31,45,61,.08)}.mail-preview-sender{padding:22px 30px;background:#263445;color:#fff;font-size:20px;font-weight:600}.mail-preview-body{min-height:260px;padding:30px}.mail-preview-subject{margin:0 0 22px;color:#1f2d3d;font-size:20px;line-height:1.4}.mail-preview-content{word-break:break-word}.mail-preview-content>:first-child{margin-top:0}.mail-preview-content>:last-child{margin-bottom:0}</style></head><body><article class="mail-preview-card"><header class="mail-preview-sender">${sender}</header><main class="mail-preview-body"><h1 class="mail-preview-subject">${subject}</h1><div class="mail-preview-content">${content||""}</div></main></article></body></html>`;}
@@ -93,4 +104,4 @@ async function sendTest(){if(saving.value)return;if(!/^\+?[0-9]{6,20}$/.test(tes
 onMounted(load);
 </script>
 
-<style scoped>.message-page{padding:20px}.sms-toolbar{margin:20px 0}.preview-frame{border:0;width:100%;height:420px;background:#fff}</style>
+<style scoped>.message-page{padding:20px}.mail-template-list{margin-top:4px}.mail-template-list :deep(.el-card__body){padding:0 28px}.mail-template-item{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:22px 4px;border-bottom:1px solid var(--el-border-color-lighter)}.mail-template-item:last-child{border-bottom:0}.mail-template-copy{min-width:0}.mail-template-title{display:flex;align-items:center;gap:10px;color:var(--el-text-color-primary);font-size:16px;font-weight:600}.mail-template-description{margin-top:8px;color:var(--el-text-color-secondary);line-height:1.6}.mail-template-actions{display:flex;flex:none}.sms-toolbar{margin:20px 0}.preview-frame{border:0;width:100%;height:480px;background:#fff}@media(max-width:640px){.mail-template-list :deep(.el-card__body){padding:0 16px}.mail-template-item{align-items:flex-start;flex-direction:column;gap:8px}.mail-template-actions{align-self:flex-end}}</style>
