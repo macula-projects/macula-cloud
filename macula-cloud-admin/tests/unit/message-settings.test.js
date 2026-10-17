@@ -16,6 +16,9 @@ describe("message settings", () => {
     expect(page).not.toContain("EXCHANGE");
     expect(page).not.toContain("QINIU");
     expect(page).toContain('sandbox=""');
+    expect(page).toContain(':title="previewTitle"');
+    expect(page).toContain('class="mail-preview-card"');
+    expect(page).toContain("escapeHtml(row.senderName");
     expect(page).toContain('i18n.global.t');
     expect(page).toContain('@change="providerEnabledChanged"');
     expect(page).toMatch(/providerChanged\(\).*loadTemplates/);

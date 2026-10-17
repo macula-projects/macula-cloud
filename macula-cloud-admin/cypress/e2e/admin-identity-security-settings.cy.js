@@ -408,7 +408,12 @@ describe("平台身份、消息与接入应用管理", () => {
     cy.get(".el-drawer:visible").should("not.exist");
     cy.contains("button", "浏览").click();
     cy.wait("@preview");
-    cy.get("iframe[sandbox]").should("be.visible");
+    cy.contains(".el-dialog:visible .el-dialog__title", "登录验证").should("be.visible");
+    cy.get("iframe[sandbox]")
+      .should("be.visible")
+      .and("have.attr", "srcdoc")
+      .and("contain", 'class="mail-preview-card"')
+      .and("contain", "验证码 123456");
     cy.get(".el-dialog:visible .el-dialog__headerbtn").click();
     cy.get(".el-dialog:visible").should("not.exist");
 
