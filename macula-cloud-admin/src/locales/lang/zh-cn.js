@@ -107,13 +107,13 @@ export default {
 		},
 		sceneDescriptions: {
 			MAIL_BIND: '每当用户绑定邮箱时，都会发送此电子邮件。',
-			MAIL_CHANGE_BIND: '每当用户修改绑定邮箱并获取验证码时，都会发送此电子邮件。',
+			MAIL_CHANGE_BIND: '每当用户需要修改绑定邮箱、发送验证码时，都会发送此电子邮件。',
 			MAIL_FORGOT_PASSWORD: '每当用户忘记密码需要重置时，都会发送此电子邮件。',
-			MAIL_CHANGE_PASSWORD: '每当用户要求修改密码时，都会发送此电子邮件。',
+			MAIL_CHANGE_PASSWORD: '每当用户要求更改密码时，都会发送此电子邮件。',
 			MAIL_RESET_SUCCESS: '每当管理员重置用户密码成功时，都会发送此电子邮件。',
 			MAIL_LOGIN: '每当用户选择邮箱验证码登录时，都会发送此电子邮件。',
-			MAIL_PASSWORD_EXPIRY: '用户密码有效期即将到期时，都会发送此电子邮件。',
-			MAIL_WELCOME: '用户验证电子邮箱地址后发送；关闭邮箱验证时，在用户首次注册或登录后发送。'
+			MAIL_PASSWORD_EXPIRY: '用户距离上次修改密码有效期即将过期时，都会发送此电子邮件。',
+			MAIL_WELCOME: '一旦用户验证其电子邮件地址，将发送此电子邮件。如果验证电子邮件已关闭，则会在用户第一次注册或登录时发送。'
 		}
 	},
 	securityPolicyPage: {
