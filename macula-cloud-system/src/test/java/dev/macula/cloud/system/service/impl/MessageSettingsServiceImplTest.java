@@ -47,7 +47,11 @@ class MessageSettingsServiceImplTest {
 
     @Test void exposesExactSceneCatalogs() {
         when(templates.selectOne(any())).thenReturn(null);
-        assertEquals(8, service.templates("MAIL", "", "zh-CN").size());
+        var mailTemplates = service.templates("MAIL", "", "zh-CN");
+        assertEquals(8, mailTemplates.size());
+        assertTrue(mailTemplates.stream().allMatch(template -> template.getContent().contains("亲爱的用户")));
+        assertTrue(mailTemplates.stream().allMatch(template -> template.getContent().contains("官方团队")));
+        assertTrue(mailTemplates.stream().anyMatch(template -> template.getContent().contains("expire_time")));
         assertEquals(9, service.templates("SMS", "ALIYUN", "en-US").size());
     }
 
@@ -90,7 +94,9 @@ class MessageSettingsServiceImplTest {
 
     @Test void previewEscapesVariablesAndRemovesActiveHtml() {
         when(templates.selectOne(any())).thenReturn(null);
-        String html = service.preview("MAIL_LOGIN", java.util.Map.of("code", "<script>alert(1)</script>"));
+        String html = service.preview("MAIL_LOGIN", java.util.Map.of(
+            "client_name", "Macula Cloud", "user_email", "user@example.com",
+            "code", "<script>alert(1)</script>", "expire_time", "5", "now_time", "2026-10-18 10:00"));
         assertFalse(html.contains("<script>"));
         assertTrue(html.contains("&lt;script&gt;"));
     }

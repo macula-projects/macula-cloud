@@ -276,7 +276,14 @@ public class MessageSettingsServiceImpl implements MessageSettingsService {
 
     private Map<String, String> samples(MessageTemplateType type) {
         return type.variables().stream().collect(Collectors.toMap(key -> key,
-            key -> "days".equals(key) ? "7" : "code".equals(key) ? "123456" : "Macula Cloud"));
+            key -> switch (key) {
+                case "code" -> "123456";
+                case "expire_days" -> "7";
+                case "expire_time" -> "5";
+                case "user_email" -> "user@example.com";
+                case "now_time" -> "2026-10-18 10:00";
+                default -> "Macula Cloud";
+            }));
     }
 
     private String writeJson(Object value) {
