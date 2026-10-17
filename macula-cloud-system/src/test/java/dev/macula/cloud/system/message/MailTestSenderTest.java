@@ -41,7 +41,7 @@ import java.util.concurrent.TimeUnit;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * 使用环回 TLS SMTP AUTH 服务验证 Exchange 邮件的实际协议发送与拒绝路径。
+ * 使用环回 TLS SMTP AUTH 服务验证固定邮件服务的实际协议发送与拒绝路径。
  *
  * @author Rain
  * @since 2026-10-13
@@ -66,13 +66,14 @@ class MailTestSenderTest {
                     return mail;
                 }
             };
-            sender.send(provider, "recipient@example.test", "测试邮件", "投递成功");
+            sender.send(provider, "recipient@example.test", "Macula Cloud", "测试邮件", "投递成功");
             String message = received.get(5, TimeUnit.SECONDS);
             assertTrue(message.contains("recipient@example.test"));
             String mimeSource = message.substring(message.indexOf("===DATA===\n") + "===DATA===\n".length());
             MimeMessage mime = new MimeMessage(Session.getInstance(new Properties()),
                 new ByteArrayInputStream(mimeSource.getBytes(StandardCharsets.UTF_8)));
             assertTrue(mime.getContent().toString().contains("投递成功"));
+            assertTrue(mime.getFrom()[0].toString().contains("Macula Cloud"));
         } finally {
             executor.shutdownNow();
         }
@@ -83,20 +84,20 @@ class MailTestSenderTest {
         SysMessageProvider provider = provider(465);
         MailTestSender sender = new MailTestSender();
         assertThrows(ResponseStatusException.class,
-            () -> sender.send(provider, "invalid-address", "test", "content"));
-        provider.setConfigJson("{\"port\":465,\"startTls\":false,\"ssl\":false}");
+            () -> sender.send(provider, "invalid-address", "Macula Cloud", "test", "content"));
+        provider.setConfigJson("{\"port\":465}");
         assertThrows(ResponseStatusException.class,
-            () -> sender.send(provider, "recipient@example.test", "test", "content"));
+            () -> sender.send(provider, "recipient@example.test", "Macula Cloud", "test", "content"));
     }
 
     private static SysMessageProvider provider(int port) {
         SysMessageProvider provider = new SysMessageProvider();
-        provider.setProviderType("EXCHANGE");
+        provider.setProviderType("CUSTOM");
         provider.setEndpoint("localhost");
         provider.setAccount("smtp-user");
         provider.setCredential("fixture-password");
         provider.setSender("sender@example.test");
-        provider.setConfigJson("{\"port\":" + port + ",\"startTls\":false,\"ssl\":true}");
+        provider.setConfigJson("{\"port\":" + port + ",\"securityMode\":\"SSL\"}");
         return provider;
     }
 

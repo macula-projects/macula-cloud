@@ -19,7 +19,6 @@ package dev.macula.cloud.system.vo;
 import dev.macula.cloud.system.controller.OAuth2ClientConfigController.SecretResetForm;
 import dev.macula.cloud.system.form.MessageTemplateForm;
 import dev.macula.cloud.system.form.MessageTestForm;
-import dev.macula.cloud.system.message.CustomSmsTestSender.Options;
 import dev.macula.cloud.system.message.MailTestSender.MailOptions;
 import dev.macula.cloud.system.message.TencentSmsTestSender.TencentOptions;
 import org.junit.jupiter.api.Test;
@@ -40,12 +39,13 @@ class SettingsModelJsonTest {
 
     @Test
     void messageAndSecretFormsKeepTheirJsonFields() {
-        MessageTemplateForm template = json.readValue("{\"templateKey\":\"MAIL_TEST\",\"content\":\"hello\",\"enabled\":true}",
+        MessageTemplateForm template = json.readValue("{\"content\":\"hello\",\"enabled\":true}",
             MessageTemplateForm.class);
-        assertEquals("MAIL_TEST", template.getTemplateKey());
+        assertEquals("hello", template.getContent());
         assertTrue(template.isEnabled());
-        MessageTestForm test = json.readValue("{\"providerId\":7,\"target\":\"temporary@example.test\",\"variables\":{\"platform\":\"Macula\"}}",
+        MessageTestForm test = json.readValue("{\"scene\":\"MAIL_WELCOME\",\"target\":\"temporary@example.test\",\"variables\":{\"platform\":\"Macula\"}}",
             MessageTestForm.class);
+        assertEquals("MAIL_WELCOME", test.getScene());
         assertEquals("Macula", test.getVariables().get("platform"));
         assertEquals("fixture-secret", json.readValue("{\"secret\":\"fixture-secret\"}", SecretResetForm.class).getSecret());
     }
@@ -63,10 +63,8 @@ class SettingsModelJsonTest {
         assertEquals("GITHUB", json.readValue(catalogJson, IdentityProviderCatalogVO.class)
             .getProviders().get(0).getCode());
 
-        assertEquals(587, json.readValue("{\"port\":587,\"startTls\":true,\"ssl\":false}",
+        assertEquals(587, json.readValue("{\"port\":587,\"securityMode\":\"SSL\"}",
             MailOptions.class).getPort());
         assertEquals("123", json.readValue("{\"smsSdkAppId\":\"123\"}", TencentOptions.class).getSmsSdkAppId());
-        assertEquals("Authorization", json.readValue("{\"authHeader\":\"Authorization\"}",
-            Options.class).getAuthHeader());
     }
 }

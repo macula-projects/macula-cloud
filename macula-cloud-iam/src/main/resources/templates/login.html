@@ -35,7 +35,7 @@
       <form th:if="${enableSmsLogin}" id="sms-login" data-login method="post" th:action="@{/login/sms}" hidden>
         <input th:if="${_csrf != null}" type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"><div class="error" role="alert" tabindex="-1"></div>
         <div class="form-field"><label for="phone">手机号码</label><input class="text-input" id="phone" name="phone" type="tel" autocomplete="tel" placeholder="请输入手机号码" required></div>
-        <div class="form-field"><label for="code">验证码</label><input class="text-input" id="code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="请输入已获取的验证码" required></div>
+        <div class="form-field"><label for="code">验证码</label><div class="password-wrap code-wrap"><input class="text-input" id="code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="请输入验证码" required><button class="reveal" type="button" data-send-code data-send-code-url="api/v1/sms-code">获取验证码</button></div></div>
         <button class="primary" type="submit">验证并登录</button>
       </form>
       <p class="footnote">登录遇到问题？请联系你的企业管理员。</p>

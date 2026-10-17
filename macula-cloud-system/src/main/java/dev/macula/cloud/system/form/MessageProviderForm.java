@@ -16,7 +16,10 @@
  */
 package dev.macula.cloud.system.form;
 
+import com.fasterxml.jackson.annotation.JsonAnySetter;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
@@ -27,18 +30,31 @@ import lombok.Data;
  * @since 2026-10-13
  */
 @Data
+@JsonIgnoreProperties(ignoreUnknown = false)
 public class MessageProviderForm {
     @NotBlank
-    private String channel;
-    @NotBlank
+    @Size(max = 32)
     private String providerType;
-    @NotBlank @Size(max = 100)
-    private String name;
+    @Size(max = 255)
     private String endpoint;
+    private Integer port;
+    @Size(max = 16)
+    private String securityMode;
+    @Size(max = 255)
     private String account;
+    @Size(max = 2048)
     private String credential;
+    @Size(max = 64)
     private String regionCode;
+    @Size(max = 255)
     private String sender;
-    private String configJson;
+    @Size(max = 64)
+    private String smsSdkAppId;
+    @NotNull
     private Boolean enabled;
+
+    @JsonAnySetter
+    public void rejectUnknownField(String name, Object value) {
+        throw new IllegalArgumentException("未知服务配置字段：" + name);
+    }
 }

@@ -16,8 +16,10 @@
  */
 package dev.macula.cloud.system.form;
 
+import com.fasterxml.jackson.annotation.JsonAnySetter;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -33,12 +35,20 @@ import java.util.Map;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@JsonIgnoreProperties(ignoreUnknown = false)
 public class MessageTestForm {
-    @NotNull
-    private Long providerId;
     @NotBlank
-    private String templateKey;
+    @Size(max = 64)
+    private String scene;
     @NotBlank
+    @Size(max = 320)
     private String target;
+    @Size(max = 16)
+    private String languageCode;
     private Map<String, String> variables;
+
+    @JsonAnySetter
+    public void rejectUnknownField(String name, Object value) {
+        throw new IllegalArgumentException("未知测试发送字段：" + name);
+    }
 }

@@ -30,15 +30,15 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class MessageProviderVO {
-    private Long id;
     private String channel;
     private String providerType;
-    private String name;
     private String endpoint;
+    private Integer port;
+    private String securityMode;
     private String account;
     private String regionCode;
     private String sender;
-    private String configJson;
+    private String smsSdkAppId;
     private boolean enabled;
     private boolean credentialConfigured;
 }

@@ -57,9 +57,30 @@ code_challenge_method=S256
 
 采用本地 Thymeleaf + CSS/JavaScript，无外部 CDN。桌面为品牌区与表单，680px 以下为移动单列；包含安全区、触控按钮、16px 输入字号、密码显隐、密码管理器、错误反馈、请求超时和防重复提交。授权页可按 scope 勾选，同意与拒绝由服务端处理，拒绝当前请求不会取消此前授权。
 
-短信入口保留原有默认开启行为，`spring.security.oauth2.server.login.sms.enabled` 控制展示，默认 true；内置 SmsServiceImpl 保留原有占位行为，默认返回 true，不代表已完成真实验证码校验。生产使用需接入真实验证码校验与手机号身份查询。页面不模拟发送验证码。本次不改变该占位行为、不接入短信供应商、不增加注册/找回密码功能。password 与 sms grant 均保留原有兼容接入，不要求旧客户端改用 PKCE/OIDC。
+短信入口保留原有默认开启行为，`spring.security.oauth2.server.login.sms.enabled` 控制展示，默认 true。
+登录页通过同源、CSRF 保护的 `POST /api/v1/sms-code` 请求验证码。IAM 只读共享 System 数据库中的
+唯一启用短信供应商和 `SMS_LOGIN` 中文模板，使用阿里云或腾讯云 SDK 提交；配置缺失、重复、
+不受支持或无法解密时失败关闭。验证码使用安全随机数生成，只以 HMAC-SHA256 摘要存入 Redis，
+默认有效 5 分钟、最多尝试 5 次，手机号 60 秒内仅可申请一次，来源 IP 每个 60 秒窗口最多申请
+20 次，并在供应商受理后
+才激活可验证记录。成功验证原子删除记录，错误达到上限或过期后不能认证。
 
-表单登录和本地退出开启 CSRF，页面自动携带 token；自定义表单客户端需先获取登录页。OAuth 协议端点仍使用标准协议校验。password token endpoint 的兼容参数不变。
+标准 `/iam/` 反向代理部署必须传递 `X-Forwarded-For` 与 `X-Forwarded-Proto`；IAM 使用容器原生的
+受信代理处理恢复客户端地址，且不会信任来自非内部代理的转发头。验证码页面使用相对 URL，确保
+直接访问 `/login` 与代理访问 `/iam/login` 都命中 IAM 本身，而不是管理端 `/api/` Gateway 路由。
+
+IAM 与 System 必须连接同一消息配置库，并注入相同的 `MACULA_CRYPTO_PASSWORD`；验证码摘要密钥
+使用 `IAM_SMS_DIGEST_KEY`，未配置时回退到该加密密码。生产应单独配置强随机摘要密钥。此变更不
+增加注册、找回密码、手机号绑定、欢迎通知或密码到期提醒流程。password 与 sms grant 保留已有
+兼容接入，不要求旧客户端改用 PKCE/OIDC。
+
+发送审计使用独立的 `MACULA_MESSAGE_AUDIT_HMAC_KEY` 对手机号生成 HMAC-SHA-256 摘要；该密钥
+至少 32 个字符，不得复用字段加密密钥或验证码摘要密钥。轮换会切断新旧日志之间的目标关联，
+应由密钥管理系统按审计保留策略执行，日志中不得记录该密钥、原手机号或验证码。
+
+表单登录和本地退出开启 CSRF，页面自动携带 token；验证码请求依赖 Spring Security CSRF 和浏览器
+同源凭据，不手工比较代理前后的端口，因此兼容默认 `5900 → 8080 → 9010` Compose 链路。自定义
+表单客户端需先获取登录页。OAuth 协议端点仍使用标准协议校验。password token endpoint 的兼容参数不变。
 
 ## Redis 授权存储与升级
 

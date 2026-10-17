@@ -1,5 +1,7 @@
 server:
   port: ${SERVER_PORT:9010}
+  # Only trusted/internal proxies are allowed to restore the client address from forwarded headers.
+  forward-headers-strategy: native
 
 spring:
   profiles:
@@ -28,8 +30,21 @@ spring:
       force: true
 
 macula:
+  message-audit:
+    hmac-key: ${MACULA_MESSAGE_AUDIT_HMAC_KEY}
+  crypto:
+    enable: true
+    algorithm: AES
+    encode: BASE64
+    password: ${MACULA_CRYPTO_PASSWORD}
   cloud:
     iam:
+      sms-verification:
+        ttl: 5m
+        send-interval: 60s
+        max-ip-sends-per-interval: 20
+        max-attempts: 5
+        digest-key: ${IAM_SMS_DIGEST_KEY:${MACULA_CRYPTO_PASSWORD}}
       signing-key:
         location: ${IAM_SIGNING_KEY_LOCATION:}
         alias: ${IAM_SIGNING_KEY_ALIAS:jose}

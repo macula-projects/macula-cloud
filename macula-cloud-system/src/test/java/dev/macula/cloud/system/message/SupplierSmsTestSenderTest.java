@@ -105,7 +105,7 @@ class SupplierSmsTestSenderTest {
             };
             SysMessageProvider provider = provider();
             provider.setConfigJson("{\"smsSdkAppId\":\"app-1\"}");
-            sender.send(provider, "13800000000", "TPL-1", MessageTemplateType.SMS_VERIFY,
+            sender.send(provider, "13800000000", "TPL-1", MessageTemplateType.SMS_LOGIN,
                 Map.of("code", "123456"));
             assertNotNull(request.get());
             assertTrue(request.get().contains("13800000000"));
@@ -151,7 +151,7 @@ class SupplierSmsTestSenderTest {
         when(client.SendSms(any(com.tencentcloudapi.sms.v20210111.models.SendSmsRequest.class)))
             .thenReturn(response);
         assertDoesNotThrow(() -> sender.send(provider, "13800000000", "TPL-1",
-            MessageTemplateType.SMS_VERIFY, Map.of("code", "123456")));
+            MessageTemplateType.SMS_LOGIN, Map.of("code", "123456")));
         var request = org.mockito.ArgumentCaptor.forClass(
             com.tencentcloudapi.sms.v20210111.models.SendSmsRequest.class);
         verify(client).SendSms(request.capture());
@@ -162,7 +162,7 @@ class SupplierSmsTestSenderTest {
         rejected.setCode("Failed");
         response.setSendStatusSet(new SendStatus[] {rejected});
         assertThrows(ResponseStatusException.class, () -> sender.send(provider, "13800000000", "TPL-1",
-            MessageTemplateType.SMS_VERIFY, Map.of("code", "123456")));
+            MessageTemplateType.SMS_LOGIN, Map.of("code", "123456")));
     }
 
     private static SysMessageProvider provider() {

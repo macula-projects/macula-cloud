@@ -35,26 +35,26 @@ class TemplateRendererTest {
 
     @Test
     void escapesInsertedValues() {
-        assertEquals("您的验证码是 &lt;123&gt;，请勿泄露。",
-            renderer.render(MessageTemplateType.MAIL_VERIFY, MessageTemplateType.MAIL_VERIFY.content(),
+        assertEquals("登录验证码：&lt;123&gt;，请勿转发。",
+            renderer.render(MessageTemplateType.MAIL_LOGIN, MessageTemplateType.MAIL_LOGIN.content(),
                 Map.of("code", "<123>")));
     }
 
     @Test
     void rejectsUnknownAndMissingVariables() {
-        assertThrows(ResponseStatusException.class, () -> renderer.render(MessageTemplateType.MAIL_VERIFY,
+        assertThrows(ResponseStatusException.class, () -> renderer.render(MessageTemplateType.MAIL_LOGIN,
             "${password}", Map.of("code", "123")));
-        assertThrows(ResponseStatusException.class, () -> renderer.render(MessageTemplateType.MAIL_VERIFY,
+        assertThrows(ResponseStatusException.class, () -> renderer.render(MessageTemplateType.MAIL_LOGIN,
             "${code}", Map.of()));
-        assertThrows(ResponseStatusException.class, () -> renderer.render(MessageTemplateType.MAIL_VERIFY,
+        assertThrows(ResponseStatusException.class, () -> renderer.render(MessageTemplateType.MAIL_LOGIN,
             "${}", Map.of("code", "123")));
-        assertThrows(ResponseStatusException.class, () -> renderer.render(MessageTemplateType.SMS_VERIFY,
+        assertThrows(ResponseStatusException.class, () -> renderer.render(MessageTemplateType.SMS_LOGIN,
             "固定短信内容", Map.of()));
     }
 
     @Test
     void smsValuesAreNotHtmlEncoded() {
-        assertEquals("验证码 <123>，请勿泄露。", renderer.render(MessageTemplateType.SMS_VERIFY,
-            MessageTemplateType.SMS_VERIFY.content(), Map.of("code", "<123>")));
+        assertEquals("登录验证码 <123>，请勿泄露。", renderer.render(MessageTemplateType.SMS_LOGIN,
+            MessageTemplateType.SMS_LOGIN.content(), Map.of("code", "<123>")));
     }
 }

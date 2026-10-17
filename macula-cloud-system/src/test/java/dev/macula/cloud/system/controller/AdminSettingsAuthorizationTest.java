@@ -20,6 +20,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import dev.macula.cloud.system.service.*;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.MediaType;
 import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
@@ -58,14 +59,14 @@ class AdminSettingsAuthorizationTest {
             new TestingAuthenticationToken("config-manager", "unused", "ROLE_CONFIG_MANAGER"));
         when(identity.page(anyInt(), anyInt(), any(), any(), any())).thenReturn(new Page<>());
         when(oauth.page(anyInt(), anyInt(), any())).thenReturn(new Page<>());
-        when(message.providers("MAIL")).thenReturn(List.of());
+        when(message.provider("MAIL")).thenReturn(new dev.macula.cloud.system.vo.MessageProviderVO());
         mvc.perform(get("/api/v1/identity-providers")).andExpect(status().isOk());
         mvc.perform(get("/api/v1/identity-providers/catalog")).andExpect(status().isOk());
-        mvc.perform(get("/api/v1/message-settings/providers").param("channel", "MAIL"))
+        mvc.perform(get("/api/v1/message-settings/providers/MAIL"))
             .andExpect(status().isOk());
         mvc.perform(get("/api/v1/oauth2-clients")).andExpect(status().isOk());
         verify(identity).catalog();
-        verify(message).providers("MAIL");
+        verify(message).provider("MAIL");
     }
 
     @Test
@@ -74,5 +75,14 @@ class AdminSettingsAuthorizationTest {
             new TestingAuthenticationToken("config-manager", "unused", "ROLE_CONFIG_MANAGER"));
         mvc.perform(delete("/api/v1/oauth2-clients/1")).andExpect(status().isOk());
         verify(oauth).delete(1L);
+    }
+
+    @Test
+    void messageProviderWriteRejectsUnknownFields() throws Exception {
+        mvc.perform(put("/api/v1/message-settings/providers/MAIL")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"providerType\":\"CUSTOM\",\"tenantId\":1}"))
+            .andExpect(status().isBadRequest());
+        verify(message, never()).saveProvider(any(), any());
     }
 }

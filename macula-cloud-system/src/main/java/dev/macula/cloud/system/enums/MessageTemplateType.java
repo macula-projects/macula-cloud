@@ -25,9 +25,6 @@ import java.util.List;
  * @since 2026-10-13
  */
 public enum MessageTemplateType {
-    MAIL_TEST("MAIL", "测试邮件", "这是一封来自 ${platform} 的测试邮件。", List.of("platform")),
-    MAIL_VERIFY("MAIL", "验证码", "您的验证码是 ${code}，请勿泄露。", List.of("code")),
-    MAIL_RESET("MAIL", "重置密码", "请使用此验证码重置密码：${code}。", List.of("code")),
     MAIL_BIND("MAIL", "绑定邮箱", "绑定邮箱的验证码：${code}。", List.of("code")),
     MAIL_CHANGE_BIND("MAIL", "变更绑定邮箱", "变更邮箱的验证码：${code}。", List.of("code")),
     MAIL_FORGOT_PASSWORD("MAIL", "找回密码", "找回密码的验证码：${code}。", List.of("code")),
@@ -36,9 +33,6 @@ public enum MessageTemplateType {
     MAIL_LOGIN("MAIL", "登录验证", "登录验证码：${code}，请勿转发。", List.of("code")),
     MAIL_PASSWORD_EXPIRY("MAIL", "密码到期提醒", "您的密码将在 ${days} 天后到期，请及时更新。", List.of("days")),
     MAIL_WELCOME("MAIL", "欢迎使用", "欢迎使用 ${platform}。", List.of("platform")),
-    SMS_TEST("SMS", "", "${platform} 短信通道测试。", List.of("platform")),
-    SMS_VERIFY("SMS", "", "验证码 ${code}，请勿泄露。", List.of("code")),
-    SMS_RESET("SMS", "", "重置密码验证码 ${code}。", List.of("code")),
     SMS_BIND("SMS", "", "绑定手机号验证码 ${code}。", List.of("code")),
     SMS_BIND_SUCCESS("SMS", "", "手机号绑定已完成。", List.of()),
     SMS_CHANGE_PHONE("SMS", "", "更换手机号验证码 ${code}。", List.of("code")),

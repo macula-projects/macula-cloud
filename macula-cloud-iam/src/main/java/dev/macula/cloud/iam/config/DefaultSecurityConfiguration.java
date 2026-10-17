@@ -20,6 +20,9 @@ package dev.macula.cloud.iam.config;
 import dev.macula.cloud.iam.authentication.sms.SmsLoginFilterConfigurer;
 import dev.macula.cloud.iam.authentication.sms.SmsService;
 import dev.macula.cloud.iam.authentication.sms.SmsUserDetailsService;
+import dev.macula.cloud.iam.message.LoginSmsDispatcher;
+import dev.macula.cloud.iam.message.SmsVerificationCodeStore;
+import dev.macula.cloud.iam.message.SmsVerificationProperties;
 import dev.macula.cloud.iam.authentication.weapp.WeappClientService;
 import dev.macula.cloud.iam.authentication.weapp.WeappLoginFilterConfigurer;
 import dev.macula.cloud.iam.authentication.weapp.WeappSessionKeyCache;
@@ -43,6 +46,8 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.security.web.authentication.AuthenticationEntryPointFailureHandler;
 
 /**
@@ -53,6 +58,7 @@ import org.springframework.security.web.authentication.AuthenticationEntryPointF
  */
 @EnableWebSecurity
 @Configuration(proxyBeanMethods = false)
+@EnableConfigurationProperties(SmsVerificationProperties.class)
 public class DefaultSecurityConfiguration {
     @Bean
     @Order(Ordered.HIGHEST_PRECEDENCE + 2)
@@ -75,6 +81,7 @@ public class DefaultSecurityConfiguration {
                 .requestMatchers("/admin/images/**").permitAll()
                 .requestMatchers("/favicon.ico").permitAll()
                 .requestMatchers("/iam/**").permitAll()
+                .requestMatchers("/api/v1/sms-code").permitAll()
                 .anyRequest().authenticated())
             .userDetailsService(userDetailsService)
             .csrf(Customizer.withDefaults());
@@ -110,8 +117,16 @@ public class DefaultSecurityConfiguration {
     }
 
     @Bean
-    public SmsService smsService() {
-        return new SmsServiceImpl();
+    public SmsService smsService(ObjectProvider<SmsVerificationCodeStore> stores,
+        ObjectProvider<LoginSmsDispatcher> dispatchers) {
+        SmsVerificationCodeStore store = stores.getIfAvailable();
+        LoginSmsDispatcher dispatcher = dispatchers.getIfAvailable();
+        if (store != null && dispatcher != null) return new SmsServiceImpl(store, dispatcher);
+        return new SmsService() {
+            @Override public boolean verifyCode(String phone, String rawCode) { return false; }
+            @Override public void sendCode(String phone) { throw new IllegalStateException("短信服务未配置"); }
+            @Override public void sendCode(String phone, String remoteAddress) { sendCode(phone); }
+        };
     }
 
     @Bean

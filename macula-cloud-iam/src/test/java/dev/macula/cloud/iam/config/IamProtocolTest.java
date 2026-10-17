@@ -19,7 +19,9 @@ package dev.macula.cloud.iam.config;
 
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import dev.macula.cloud.iam.authentication.sms.SmsService;
 import dev.macula.cloud.iam.controller.LoginController;
+import dev.macula.cloud.iam.controller.SmsCodeController;
 import dev.macula.cloud.iam.protocol.oauth2.endpoint.AuthorizationConsentController;
 import dev.macula.cloud.iam.pojo.dto.UserAuthInfo;
 import dev.macula.cloud.iam.service.support.*;
@@ -68,7 +70,10 @@ import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppC
 @WebAppConfiguration
 @org.springframework.test.annotation.DirtiesContext(classMode = org.springframework.test.annotation.DirtiesContext.ClassMode.AFTER_CLASS)
 @ActiveProfiles("local")
-@TestPropertySource(properties = "macula.cloud.iam.issuer-uri=https://iam.example")
+@TestPropertySource(properties = {
+    "macula.cloud.iam.issuer-uri=https://iam.example",
+    "macula.cloud.iam.sms-verification.digest-key=fixture-digest-key"
+})
 class IamProtocolTest {
     @Autowired WebApplicationContext context;
     @Autowired JwtDecoder decoder;
@@ -80,7 +85,8 @@ class IamProtocolTest {
     @EnableWebMvc
     @EnableConfigurationProperties
     @Import({ProtocolOAuth2Configuration.class, DefaultSecurityConfiguration.class, JwtConfiguration.class,
-        PasswordEncoderConfig.class, LoginController.class, AuthorizationConsentController.class})
+        PasswordEncoderConfig.class, LoginController.class, SmsCodeController.class,
+        AuthorizationConsentController.class})
     static class App implements WebMvcConfigurer {
         @Bean @Primary RegisteredClientRepository fixtureClients() {
             return new InMemoryRegisteredClientRepository(client("public", ClientAuthenticationMethod.NONE,
@@ -114,6 +120,7 @@ class IamProtocolTest {
             return template;
         }
         @Bean SysOAuth2ClientService clientService() { return mock(SysOAuth2ClientService.class); }
+        @Bean @Primary SmsService fixtureSmsService() { return mock(SmsService.class); }
         @Bean SysUserService userService() {
             SysUserService service = mock(SysUserService.class);
             UserAuthInfo user = new UserAuthInfo();
@@ -181,7 +188,9 @@ class IamProtocolTest {
     @Test void loginPagesAndSessionWorkWithCsrf() throws Exception {
         mvc.perform(get("/login")).andExpect(status().isOk()).andExpect(content().string(
             org.hamcrest.Matchers.containsString("autocomplete=\"current-password\"")))
-            .andExpect(content().string(org.hamcrest.Matchers.containsString("sms-login")));
+            .andExpect(content().string(org.hamcrest.Matchers.containsString("sms-login")))
+            .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                "data-send-code-url=\"api/v1/sms-code\"")));
         mvc.perform(get("/iam/auth.css")).andExpect(status().isOk());
         mvc.perform(post("/login").param("username", "fixture-user").param("password", "fixture-password"))
             .andExpect(status().isForbidden());
@@ -190,6 +199,22 @@ class IamProtocolTest {
         MockHttpSession session = login();
         mvc.perform(get("/").session(session)).andExpect(status().isOk())
             .andExpect(content().string(org.hamcrest.Matchers.containsString("fixture-user")));
+    }
+
+    @Test void smsCodeEndpointRequiresCsrfAndKeepsFailuresGeneric() throws Exception {
+        SmsService smsService = context.getBean(SmsService.class);
+        mvc.perform(post("/api/v1/sms-code").param("phone", "13800000000"))
+            .andExpect(status().isForbidden());
+        mvc.perform(post("/api/v1/sms-code").with(csrf()).header("Origin", "http://localhost:5900")
+            .param("phone", "13800000000"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("submitted"));
+        verify(smsService).sendCode("13800000000", "127.0.0.1");
+
+        doThrow(new IllegalStateException("provider detail must not leak"))
+            .when(smsService).sendCode("13900000000", "127.0.0.1");
+        mvc.perform(post("/api/v1/sms-code").with(csrf()).param("phone", "13900000000"))
+            .andExpect(status().isBadRequest())
+            .andExpect(status().reason("验证码暂时无法发送"));
     }
 
     MockHttpSession login() throws Exception {
@@ -323,21 +348,11 @@ class IamProtocolTest {
         mvc.perform(get("/userinfo").header("Authorization", "Bearer " + access)).andExpect(status().isUnauthorized());
     }
 
-    @Test void smsCompatibilityUsesOriginalParametersAndDefaultVerifierWithoutPkce() throws Exception {
-        MvcResult result = mvc.perform(post("/oauth2/token").with(httpBasic("compat", "fixture-secret"))
-            .param("grant_type", "sms").param("phone", "13800000000").param("code", "fixture-code")
-            .param("scope", "profile")).andExpect(status().isOk())
-            .andExpect(jsonPath("$.access_token").exists()).andExpect(jsonPath("$.refresh_token").exists())
-            .andExpect(jsonPath("$.id_token").doesNotExist()).andReturn();
-        String access = json.readTree(result.getResponse().getContentAsString()).get("access_token").asText();
-        OAuth2Authorization authorization = context.getBean(OAuth2AuthorizationService.class)
-            .findByToken(access, org.springframework.security.oauth2.server.authorization.OAuth2TokenType.ACCESS_TOKEN);
-        org.junit.jupiter.api.Assertions.assertEquals(new AuthorizationGrantType("password"),
-            authorization.getAuthorizationGrantType());
+    @Test void smsCompatibilityFailsClosedWithoutVerificationStore() throws Exception {
         mvc.perform(post("/oauth2/token").with(httpBasic("compat", "fixture-secret"))
-            .param("grant_type", "refresh_token").param("refresh_token",
-                json.readTree(result.getResponse().getContentAsString()).get("refresh_token").asText()))
-            .andExpect(status().isOk()).andExpect(jsonPath("$.access_token").exists());
+            .param("grant_type", "sms").param("phone", "13800000000").param("code", "fixture-code")
+            .param("scope", "profile")).andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.access_token").doesNotExist());
     }
 
     @Test void compatibilityGrantsKeepRequiredParametersAndPasswordError() throws Exception {
@@ -361,7 +376,7 @@ class IamProtocolTest {
 
     @Test void compatibilityOpenidRefreshPreservesScopesWithoutIssuingIdToken() throws Exception {
         for (String client : new String[] {"compat", "jwt", "reuse"}) {
-            for (String grant : new String[] {"password", "sms"}) {
+            for (String grant : new String[] {"password"}) {
                 MvcResult issued = mvc.perform(post("/oauth2/token").with(httpBasic(client, "fixture-secret"))
                     .param("grant_type", grant).param("username", "fixture-user").param("password", "fixture-password")
                     .param("phone", "13800000000").param("code", "fixture-code").param("scope", "openid profile"))

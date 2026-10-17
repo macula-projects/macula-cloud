@@ -32,12 +32,10 @@ import java.util.Map;
  * @since 2026-10-13
  */
 public interface MessageSettingsService {
-    List<MessageProviderVO> providers(String channel);
-    MessageProviderVO provider(Long id);
-    MessageProviderVO saveProvider(Long id, MessageProviderForm form);
-    void deleteProvider(Long id);
-    List<MessageTemplateVO> templates(String channel, String providerType);
-    MessageTemplateVO saveTemplate(String channel, MessageTemplateForm form);
-    String preview(String channel, String templateKey, String providerType, Map<String, String> variables);
+    MessageProviderVO provider(String channel);
+    MessageProviderVO saveProvider(String channel, MessageProviderForm form);
+    List<MessageTemplateVO> templates(String channel, String providerType, String languageCode);
+    MessageTemplateVO saveTemplate(String channel, String scene, MessageTemplateForm form);
+    String preview(String scene, Map<String, String> variables);
     void test(MessageTestForm form);
 }

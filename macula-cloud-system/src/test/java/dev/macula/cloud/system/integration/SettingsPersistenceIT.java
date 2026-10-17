@@ -127,22 +127,22 @@ class SettingsPersistenceIT {
                 "SELECT app_secret FROM sys_identity_provider WHERE id = ?", String.class, identityId));
 
             MessageProviderForm mail = new MessageProviderForm();
-            mail.setChannel("MAIL");
-            mail.setProviderType("EXCHANGE");
-            mail.setName("settings-it-" + UUID.randomUUID());
+            mail.setProviderType("CUSTOM");
             mail.setEndpoint("smtp.example.test");
+            mail.setPort(465);
+            mail.setSecurityMode("SSL");
             mail.setAccount("fixture-user");
             mail.setCredential("fixture-smtp-secret");
             mail.setSender("sender@example.test");
-            mail.setConfigJson("{\"port\":587,\"startTls\":true,\"ssl\":false}");
-            mailId = messageService.saveProvider(null, mail).getId();
+            messageService.saveProvider("MAIL", mail);
+            mailId = jdbc.queryForObject("SELECT id FROM sys_message_provider WHERE channel = 'MAIL'", Long.class);
             mail.setCredential("");
-            messageService.saveProvider(mailId, mail);
-            assertTrue(messageService.provider(mailId).isCredentialConfigured());
+            messageService.saveProvider("MAIL", mail);
+            assertTrue(messageService.provider("MAIL").isCredentialConfigured());
             assertNotEquals("fixture-smtp-secret", jdbc.queryForObject(
                 "SELECT credential FROM sys_message_provider WHERE id = ?", String.class, mailId));
         } finally {
-            if (mailId != null) messageService.deleteProvider(mailId);
+            if (mailId != null) jdbc.update("DELETE FROM sys_message_provider WHERE id = ?", mailId);
             if (identityId != null) identityService.delete(identityId);
         }
     }

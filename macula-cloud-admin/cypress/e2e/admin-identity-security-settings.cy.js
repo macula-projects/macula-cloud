@@ -373,66 +373,63 @@ describe("平台身份、消息与接入应用管理", () => {
     cy.contains(".el-drawer", "强制 PKCE").should("be.visible");
   });
 
-  it("shows template defaults and transient test entry", () => {
-    cy.intercept(
-      "GET",
-      "**/system/api/v1/message-settings/templates*",
-      ok([
-        {
-          templateKey: "MAIL_TEST",
-          channel: "MAIL",
-          title: "测试邮件",
-          content: "测试内容",
-          enabled: true,
-          overridden: false,
-          variables: ["platform"],
-        },
-      ])
-    ).as("templates");
-    cy.intercept(
-      "GET",
-      "**/system/api/v1/message-settings/providers*",
-      ok([
-        {
-          id: 1,
-          name: "Exchange",
-          channel: "MAIL",
-          providerType: "EXCHANGE",
-          enabled: true,
-          credentialConfigured: true,
-        },
-      ])
-    ).as("services");
-    cy.intercept(
-      "POST",
-      "**/system/api/v1/message-settings/test",
-      ok({ status: "submitted" })
-    ).as("sendTest");
+  it("manages the fixed mail and SMS provider/template scope", () => {
+    cy.intercept("GET", "**/message-settings/templates/MAIL*", ok([
+      { templateKey: "MAIL_LOGIN", channel: "MAIL", senderName: "Macula Cloud",
+        title: "登录验证", content: "验证码 ${code}", enabled: true,
+        overridden: false, variables: ["code"] },
+    ])).as("mailTemplates");
+    cy.intercept("POST", "**/message-settings/templates/MAIL/MAIL_LOGIN/preview", ok({
+      content: "<p>验证码 123456</p>",
+    })).as("preview");
+    cy.intercept("GET", "**/message-settings/providers/MAIL*", ok({
+      channel: "MAIL", providerType: "CUSTOM", endpoint: "smtp.example.test", port: 465,
+      securityMode: "SSL", account: "mail-user", sender: "sender@example.test",
+      enabled: true, credentialConfigured: true,
+    })).as("mailProvider");
+    cy.intercept("GET", "**/message-settings/providers/SMS*", ok({
+      channel: "SMS", providerType: "TENCENT", account: "secret-id", sender: "Macula",
+      regionCode: "ap-guangzhou", smsSdkAppId: "1400000000", enabled: true,
+      credentialConfigured: true,
+    })).as("smsProvider");
+    cy.intercept("GET", "**/message-settings/templates/SMS*", ok([
+      { templateKey: "SMS_LOGIN", channel: "SMS", providerType: "TENCENT",
+        languageCode: "zh-CN", providerTemplateCode: "123456", enabled: true,
+        overridden: true, variables: ["code"] },
+    ])).as("smsTemplates");
+    cy.intercept("POST", "**/message-settings/test", ok({ status: "submitted" })).as("sendTest");
+
     open("/system/message-settings");
-    cy.wait("@templates");
-    cy.contains("枚举默认").should("be.visible");
-    cy.contains("button", "编辑").click();
-    cy.contains(".el-drawer:visible", "编辑消息模板").should("be.visible");
-    cy.contains(".el-drawer:visible", "取消").contains("button", "取消").click();
+    cy.wait("@mailTemplates");
+    cy.contains("登录验证").should("be.visible");
+    cy.contains("button", "配置").click();
+    cy.contains(".el-drawer:visible", "发件人显示名").should("be.visible");
+    cy.get(".el-drawer:visible").contains("button", "取消").click();
     cy.get(".el-drawer:visible").should("not.exist");
+    cy.contains("button", "浏览").click();
+    cy.wait("@preview");
+    cy.get("iframe[sandbox]").should("be.visible");
+    cy.get(".el-dialog:visible .el-dialog__headerbtn").click();
+    cy.get(".el-dialog:visible").should("not.exist");
+
     cy.contains(".el-tabs__item", "邮件服务").click();
-    cy.wait("@services");
-    cy.contains("button", "添加服务").click();
-    cy.contains(".el-drawer:visible", "添加消息服务").should("be.visible");
-    cy.contains(".el-drawer:visible", "取消").contains("button", "取消").click();
-    cy.get(".el-drawer:visible").should("not.exist");
-    cy.contains("button", "测试发送").should("be.visible");
-    cy.contains("button", "测试发送").click();
-    cy.wait("@templates");
-    cy.contains(".el-dialog .el-form-item", "临时收件邮箱")
-      .find("input")
-      .type("temporary@example.test");
-    cy.contains(".el-dialog", "提交测试")
-      .contains("button", "提交测试")
-      .click();
+    cy.wait("@mailProvider");
+    cy.contains(".message-page .el-form-item", "SMTP 服务器")
+      .should("be.visible");
+    cy.contains("Exchange").should("not.exist");
+
+    cy.contains(".el-tabs__item", "短信服务").click();
+    cy.wait("@smsProvider");
+    cy.wait("@smsTemplates");
+    cy.contains("登录验证").scrollIntoView().should("be.visible");
+    cy.contains("七牛").should("not.exist");
+    cy.contains("button", "测试").click();
+    cy.get(".el-dialog:visible input").type("13800000000");
+    cy.get(".el-dialog:visible").contains("button", "提交").click();
     cy.wait("@sendTest").then(({ request }) => {
-      expect(request.body.target).to.equal("temporary@example.test");
-      expect(request.body.variables.platform).to.equal("Macula Cloud");
+      expect(request.body.scene).to.equal("SMS_LOGIN");
+      expect(request.body.target).to.equal("13800000000");
+      expect(request.body.variables.code).to.equal("123456");
     });
   });
 

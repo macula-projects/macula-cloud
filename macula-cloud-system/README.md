@@ -52,17 +52,23 @@ System 数据库同时供 IAM 使用，清理后相关账号、权限及认证�
   配置的对外基址显示完整 URL，部署时须核对该基址。历史 `callback_url` 列和值保留，但
   `SysIdentityProvider` 不再映射该列，管理 API 不读取或写入旧值。接入应用的 OAuth
   `redirectUris` 是另一项配置，不受此变更影响。
-- 消息模板初始值定义在 `MessageTemplateType` 枚举；启用或编辑后保存数据库覆盖值。邮件使用
-  SMTP，Exchange 邮箱需在目标邮箱开放 SMTP AUTH，服务器、端口、账号、STARTTLS/SSL 可配置。
-  短信使用阿里、腾讯 SDK 或自定义 HTTPS POST；自定义接口的目标主机必须由环境/配置中心设置
-  `macula.message.custom-sms-allowed-hosts` 允许列表（逗号分隔，默认不允许任何主机），并禁止
-  跳转及内网目标。自定义接口需配置鉴权请求头与凭据。测试发送需要管理员临时输入目标和模板变量，返回供应商提交状态；最终收件应
-  在收件端核实。供应商账户、审核模板和网络由部署环境提供。
+- V5 将消息渠道收敛为每个渠道唯一的平台全局配置；发现同渠道历史重复行时迁移直接失败，
+  由运维显式清理后再执行，不自动选择或删除。邮件只支持自定义 SMTP、阿里云企业邮、腾讯云
+  企业邮和网易企业邮；企业邮 SMTP 地址、端口和 SSL 模式由服务端固定。短信只支持阿里云和
+  腾讯云，七牛云、自定义短信和 Exchange 独立类型不再接受。
+- 消息模板初始值定义在 `MessageTemplateType` 枚举。邮件固定八个场景，可选择内置默认模板或
+  保存发件人显示名、主题和 HTML 覆盖内容；预览只替换场景白名单变量，并经过服务端 HTML
+  允许列表清洗。短信固定九个场景，按供应商及 `zh-CN`/`en-US` 保存审核模板编码。测试发送
+  只使用当前已启用的全局供应商，30 秒内限制重复提交，响应表示供应商受理而非最终送达。
+  供应商账户、审核模板和网络由部署环境提供。
 - 身份源和消息供应商凭据使用 Macula Boot 现有 `@CryptoField` 存储；读取接口只暴露“已配置”
   状态，更新时留空保留旧值。业务代码不记录明文凭据。当前 Boot 加密拦截器在加密失败时可能
   捕获异常后继续写库，本轮按已确认范围不修改 Boot，也不承诺失败必定阻止写库。部署时应确保
   `MACULA_CRYPTO_PASSWORD` 由安全环境注入（AES 密钥必须为 16/24/32 个字符），否则 System
   无法启动；还应监控加密错误。后续要消除此风险需在 Boot 独立修复。
+- 消息发送审计使用独立的 `MACULA_MESSAGE_AUDIT_HMAC_KEY` 对邮箱或手机号生成 HMAC-SHA-256
+  摘要。密钥至少 32 个字符，不得复用字段加密密钥；轮换会切断新旧日志间的目标关联，应结合
+  审计保留策略执行。日志只记录调用方、固定场景、提供商、结果和 HMAC 摘要。
 - OAuth 客户端管理的是 IAM 共用的 `sys_oauth2_client` 表，创建时必须选择有效租户及用户类型。
   机密客户端密钥由 System `PasswordEncoder` 单向哈希保存；公共客户端使用 `none` 且无密钥，
   强制启用 PKCE。表单支持 OIDC `openid` 和 ID Token 签名设置。客户端变更在事务提交后清理
@@ -70,7 +76,7 @@ System 数据库同时供 IAM 使用，清理后相关账号、权限及认证�
   `client_secret_jwt` 不开放新配置，因为现有单向哈希密钥不能用于 HMAC 验签。上线前应针对已有客户端做兼容回归。
 
 隔离数据库集成测试 `SettingsPersistenceIT` 默认不运行；显式设置 `SYSTEM_SETTINGS_IT=true` 后，
-须将 `SPRING_DATASOURCE_URL` 指向名称以 `macula_settings_it_` 开头、已升级至 V4 的隔离测试库，
+须将 `SPRING_DATASOURCE_URL` 指向名称以 `macula_settings_it_` 开头、已升级至 V5 的隔离测试库，
 并提供测试用 `MACULA_CRYPTO_PASSWORD`、MySQL 凭据与独立 Redis database。此测试禁用自动
 Flyway，不会自行执行迁移。测试会核对库名，
 只清理自己创建的行与缓存项，不可指向业务数据库。
