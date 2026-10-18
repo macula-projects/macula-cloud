@@ -413,6 +413,8 @@ describe("平台身份、消息与接入应用管理", () => {
       .should("be.visible")
       .and("have.attr", "srcdoc")
       .and("contain", 'class="mail-preview-card"')
+      .and("contain", 'class="mail-preview-subject"')
+      .and("contain", "登录验证")
       .and("contain", "验证码 123456");
     cy.get(".el-dialog:visible .el-dialog__headerbtn").click();
     cy.get(".el-dialog:visible").should("not.exist");
@@ -473,6 +475,54 @@ describe("平台身份、消息与接入应用管理", () => {
     });
     cy.contains("Sign-in verification").should("be.visible");
     cy.contains("登录验证").should("not.exist");
+  });
+
+  it("keeps SMS templates bound to the latest provider and language request", () => {
+    cy.intercept("GET", "**/message-settings/templates/MAIL*", ok([])).as("emptyMailTemplates");
+    cy.intercept("GET", "**/message-settings/providers/SMS*", ok({
+      channel: "SMS", providerType: "ALIYUN", account: "access-key", sender: "Macula",
+      enabled: true, credentialConfigured: true,
+    })).as("aliyunProvider");
+    cy.intercept("GET", "**/message-settings/templates/SMS*providerType=ALIYUN*", ok([
+      { templateKey: "SMS_LOGIN", channel: "SMS", providerType: "ALIYUN",
+        languageCode: "zh-CN", providerTemplateCode: "ALIYUN_CURRENT", enabled: true,
+        overridden: true, variables: ["code"] },
+    ])).as("aliyunTemplates");
+    let resolveTencent;
+    let tencentCalls = 0;
+    cy.intercept("GET", "**/message-settings/templates/SMS*providerType=TENCENT*", (request) => {
+      tencentCalls += 1;
+      if (tencentCalls > 1) {
+        request.reply({ statusCode: 500, body: { success: false, msg: "腾讯模板加载失败" } });
+        return;
+      }
+      return new Promise((resolve) => { resolveTencent = () => { request.reply(ok([
+      { templateKey: "SMS_LOGIN", channel: "SMS", providerType: "TENCENT",
+        languageCode: "zh-CN", providerTemplateCode: "TENCENT_STALE", enabled: true,
+        overridden: true, variables: ["code"] },
+      ])); resolve(); }; });
+    }).as("tencentTemplates");
+
+    open("/system/message-settings");
+    cy.wait("@emptyMailTemplates");
+    cy.contains(".el-tabs__item", "短信服务").click();
+    cy.wait("@aliyunProvider");
+    cy.wait("@aliyunTemplates");
+    cy.contains(".el-form-item", "服务商").find(".el-select").click();
+    cy.contains(".el-select-dropdown__item", "腾讯云").click();
+    cy.wrap(null).should(() => expect(resolveTencent).to.be.a("function"));
+    cy.contains(".el-form-item", "服务商").find(".el-select").click();
+    cy.contains(".el-select-dropdown__item", "阿里云").click();
+    cy.wait("@aliyunTemplates");
+    cy.get(".el-table input").should("have.value", "ALIYUN_CURRENT");
+    cy.then(() => resolveTencent());
+    cy.get(".el-table input").should("have.value", "ALIYUN_CURRENT");
+
+    cy.contains(".el-form-item", "服务商").find(".el-select").click();
+    cy.contains(".el-select-dropdown__item", "腾讯云").click();
+    cy.wait("@tencentTemplates");
+    cy.contains("腾讯模板加载失败").should("exist");
+    cy.get(".el-table input").should("not.exist");
   });
 
   it("opens an independent browser view for every mail template", () => {

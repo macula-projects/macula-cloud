@@ -18,6 +18,7 @@ describe("message settings", () => {
     expect(page).toContain('sandbox=""');
     expect(page).toContain(':title="previewTitle"');
     expect(page).toContain('class="mail-preview-card"');
+    expect(page).toContain('class="mail-preview-subject"');
     expect(page).toContain('class="mail-template-list"');
     expect(page).toContain('class="mail-template-item"');
     expect(page).toContain('sceneDescription(row.templateKey)');
@@ -26,6 +27,13 @@ describe("message settings", () => {
     expect(page).toContain('i18n.global.t');
     expect(page).toContain('@change="providerEnabledChanged"');
     expect(page).toMatch(/providerChanged\(\).*loadTemplates/);
+    expect(page).toContain("requestId===templateRequestId");
+    expect(page).toContain('channel.value==="SMS"');
+    expect(page).toContain("provider.providerType===providerType");
+    expect(page).toContain("language.value===languageCode");
+    expect(page).toContain("templates.value=[];error.value=");
+    expect(page).toContain("api.preview(row.templateKey)");
+    expect(page).not.toContain("api.preview(row.templateKey,Object");
     expect(page).toContain('templateMessages[language.value]');
     expect(page).not.toContain('useI18n');
     expect(page).toContain("messageSettingsPage.keepSecret");
