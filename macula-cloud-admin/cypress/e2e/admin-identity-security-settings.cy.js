@@ -408,7 +408,14 @@ describe("平台身份、消息与接入应用管理", () => {
     cy.get(".el-drawer:visible").should("not.exist");
     cy.contains("button", "浏览").click();
     cy.wait("@preview");
-    cy.get("iframe[sandbox]").should("be.visible");
+    cy.contains(".el-dialog:visible .el-dialog__title", "登录验证").should("be.visible");
+    cy.get("iframe[sandbox]")
+      .should("be.visible")
+      .and("have.attr", "srcdoc")
+      .and("contain", 'class="mail-preview-card"')
+      .and("contain", 'class="mail-preview-subject"')
+      .and("contain", "登录验证")
+      .and("contain", "验证码 123456");
     cy.get(".el-dialog:visible .el-dialog__headerbtn").click();
     cy.get(".el-dialog:visible").should("not.exist");
 
@@ -430,6 +437,138 @@ describe("平台身份、消息与接入应用管理", () => {
       expect(request.body.scene).to.equal("SMS_LOGIN");
       expect(request.body.target).to.equal("13800000000");
       expect(request.body.variables.code).to.equal("123456");
+    });
+  });
+
+  it("loads SMS templates on first enable and follows the template language", () => {
+    cy.intercept("GET", "**/message-settings/templates/MAIL*", ok([])).as(
+      "emptyMailTemplates"
+    );
+    cy.intercept("GET", "**/message-settings/providers/SMS*", ok({
+      channel: "SMS", providerType: null, enabled: false,
+      credentialConfigured: false,
+    })).as("emptySmsProvider");
+    cy.intercept("GET", "**/message-settings/templates/SMS*", (request) => {
+      const languageCode = new URL(request.url).searchParams.get("languageCode");
+      request.reply(ok([
+        { templateKey: "SMS_LOGIN", channel: "SMS", providerType: "ALIYUN",
+          languageCode, providerTemplateCode: "", enabled: false,
+          overridden: false, variables: ["code"] },
+      ]));
+    }).as("smsTemplatesByLanguage");
+
+    open("/system/message-settings");
+    cy.wait("@emptyMailTemplates");
+    cy.contains(".el-tabs__item", "短信服务").click();
+    cy.wait("@emptySmsProvider");
+    cy.contains(".el-form-item", "启用服务").find(".el-switch").click();
+    cy.contains(".el-form-item", "服务商").find(".el-select").click();
+    cy.contains(".el-select-dropdown__item", "阿里云").click();
+    cy.wait("@smsTemplatesByLanguage").then(({ request }) => {
+      expect(new URL(request.url).searchParams.get("languageCode")).to.equal("zh-CN");
+    });
+    cy.contains("登录验证").should("be.visible");
+
+    cy.contains(".el-radio-button", "English").click();
+    cy.wait("@smsTemplatesByLanguage").then(({ request }) => {
+      expect(new URL(request.url).searchParams.get("languageCode")).to.equal("en-US");
+    });
+    cy.contains("Sign-in verification").should("be.visible");
+    cy.contains("登录验证").should("not.exist");
+  });
+
+  it("keeps SMS templates bound to the latest provider and language request", () => {
+    cy.intercept("GET", "**/message-settings/templates/MAIL*", ok([])).as("emptyMailTemplates");
+    cy.intercept("GET", "**/message-settings/providers/SMS*", ok({
+      channel: "SMS", providerType: "ALIYUN", account: "access-key", sender: "Macula",
+      enabled: true, credentialConfigured: true,
+    })).as("aliyunProvider");
+    cy.intercept("GET", "**/message-settings/templates/SMS*providerType=ALIYUN*", ok([
+      { templateKey: "SMS_LOGIN", channel: "SMS", providerType: "ALIYUN",
+        languageCode: "zh-CN", providerTemplateCode: "ALIYUN_CURRENT", enabled: true,
+        overridden: true, variables: ["code"] },
+    ])).as("aliyunTemplates");
+    let resolveTencent;
+    let tencentCalls = 0;
+    cy.intercept("GET", "**/message-settings/templates/SMS*providerType=TENCENT*", (request) => {
+      tencentCalls += 1;
+      if (tencentCalls > 1) {
+        request.reply({ statusCode: 500, body: { success: false, msg: "腾讯模板加载失败" } });
+        return;
+      }
+      return new Promise((resolve) => { resolveTencent = () => { request.reply(ok([
+      { templateKey: "SMS_LOGIN", channel: "SMS", providerType: "TENCENT",
+        languageCode: "zh-CN", providerTemplateCode: "TENCENT_STALE", enabled: true,
+        overridden: true, variables: ["code"] },
+      ])); resolve(); }; });
+    }).as("tencentTemplates");
+
+    open("/system/message-settings");
+    cy.wait("@emptyMailTemplates");
+    cy.contains(".el-tabs__item", "短信服务").click();
+    cy.wait("@aliyunProvider");
+    cy.wait("@aliyunTemplates");
+    cy.contains(".el-form-item", "服务商").find(".el-select").click();
+    cy.contains(".el-select-dropdown__item", "腾讯云").click();
+    cy.wrap(null).should(() => expect(resolveTencent).to.be.a("function"));
+    cy.contains(".el-form-item", "服务商").find(".el-select").click();
+    cy.contains(".el-select-dropdown__item", "阿里云").click();
+    cy.wait("@aliyunTemplates");
+    cy.get(".el-table input").should("have.value", "ALIYUN_CURRENT");
+    cy.then(() => resolveTencent());
+    cy.get(".el-table input").should("have.value", "ALIYUN_CURRENT");
+
+    cy.contains(".el-form-item", "服务商").find(".el-select").click();
+    cy.contains(".el-select-dropdown__item", "腾讯云").click();
+    cy.wait("@tencentTemplates");
+    cy.contains("腾讯模板加载失败").should("exist");
+    cy.get(".el-table input").should("not.exist");
+  });
+
+  it("opens an independent browser view for every mail template", () => {
+    const templates = [
+      ["MAIL_BIND", "绑定邮箱"],
+      ["MAIL_CHANGE_BIND", "修改绑定邮箱"],
+      ["MAIL_FORGOT_PASSWORD", "忘记密码"],
+      ["MAIL_CHANGE_PASSWORD", "修改密码"],
+      ["MAIL_RESET_SUCCESS", "管理员重置密码成功"],
+      ["MAIL_LOGIN", "登录验证"],
+      ["MAIL_PASSWORD_EXPIRY", "密码到期提醒"],
+      ["MAIL_WELCOME", "欢迎邮件"],
+    ].map(([templateKey, title]) => ({
+      templateKey,
+      channel: "MAIL",
+      senderName: "Macula Cloud",
+      title,
+      content: `<p>${templateKey}</p>`,
+      enabled: true,
+      overridden: false,
+      variables: [],
+    }));
+    cy.intercept("GET", "**/message-settings/templates/MAIL*", ok(templates)).as(
+      "allMailTemplates"
+    );
+    cy.intercept("POST", "**/message-settings/templates/MAIL/*/preview", (request) => {
+      const scene = request.url.match(/\/MAIL\/([^/]+)\/preview/)?.[1];
+      request.reply(ok({ content: `<p>preview-${scene}</p>` }));
+    }).as("previewMailTemplate");
+
+    open("/system/message-settings");
+    cy.wait("@allMailTemplates");
+    cy.get(".mail-template-item").should("have.length", 8);
+    templates.forEach(({ templateKey, title }) => {
+      cy.contains(".mail-template-item", title)
+        .contains("button", "浏览")
+        .click();
+      cy.wait("@previewMailTemplate").then(({ request }) => {
+        expect(request.url).to.contain(`/MAIL/${templateKey}/preview`);
+      });
+      cy.get(".el-dialog:visible .el-dialog__title").should("contain.text", title);
+      cy.get(".el-dialog:visible iframe[sandbox]")
+        .should("have.attr", "srcdoc")
+        .and("contain", `preview-${templateKey}`);
+      cy.get(".el-dialog:visible").contains("button", "确定").click();
+      cy.get(".el-dialog:visible").should("not.exist");
     });
   });
 

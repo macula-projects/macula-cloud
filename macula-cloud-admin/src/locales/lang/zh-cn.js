@@ -67,6 +67,7 @@ export default {
 		senderName: '发件人显示名',
 		htmlContent: 'HTML 内容',
 		cancel: '取消',
+		confirm: '确定',
 		mailPreview: '邮件模板预览',
 		testSend: '测试发送',
 		phone: '手机号',
@@ -103,6 +104,16 @@ export default {
 			SMS_LOGIN: '登录验证',
 			SMS_WELCOME: '欢迎短信',
 			SMS_PASSWORD_EXPIRY: '密码到期提醒'
+		},
+		sceneDescriptions: {
+			MAIL_BIND: '每当用户绑定邮箱时，都会发送此电子邮件。',
+			MAIL_CHANGE_BIND: '每当用户需要修改绑定邮箱、发送验证码时，都会发送此电子邮件。',
+			MAIL_FORGOT_PASSWORD: '每当用户忘记密码需要重置时，都会发送此电子邮件。',
+			MAIL_CHANGE_PASSWORD: '每当用户要求更改密码时，都会发送此电子邮件。',
+			MAIL_RESET_SUCCESS: '每当管理员重置用户密码成功时，都会发送此电子邮件。',
+			MAIL_LOGIN: '每当用户选择邮箱验证码登录时，都会发送此电子邮件。',
+			MAIL_PASSWORD_EXPIRY: '用户距离上次修改密码有效期即将过期时，都会发送此电子邮件。',
+			MAIL_WELCOME: '一旦用户验证其电子邮件地址，将发送此电子邮件。如果验证电子邮件已关闭，则会在用户第一次注册或登录时发送。'
 		}
 	},
 	securityPolicyPage: {

@@ -35,9 +35,13 @@ class TemplateRendererTest {
 
     @Test
     void escapesInsertedValues() {
-        assertEquals("登录验证码：&lt;123&gt;，请勿转发。",
-            renderer.render(MessageTemplateType.MAIL_LOGIN, MessageTemplateType.MAIL_LOGIN.content(),
-                Map.of("code", "<123>")));
+        String html = renderer.render(MessageTemplateType.MAIL_LOGIN, MessageTemplateType.MAIL_LOGIN.content(),
+            Map.of("client_name", "Macula Cloud", "user_email", "user@example.com", "code", "<123>",
+                "expire_time", "5", "now_time", "2026-10-18 10:00"));
+
+        assertTrue(html.contains("亲爱的用户：user@example.com"));
+        assertTrue(html.contains("&lt;123&gt;"));
+        assertTrue(html.contains("Macula Cloud 官方团队"));
     }
 
     @Test

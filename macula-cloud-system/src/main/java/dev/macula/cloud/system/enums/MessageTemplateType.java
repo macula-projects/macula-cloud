@@ -25,14 +25,26 @@ import java.util.List;
  * @since 2026-10-13
  */
 public enum MessageTemplateType {
-    MAIL_BIND("MAIL", "绑定邮箱", "绑定邮箱的验证码：${code}。", List.of("code")),
-    MAIL_CHANGE_BIND("MAIL", "变更绑定邮箱", "变更邮箱的验证码：${code}。", List.of("code")),
-    MAIL_FORGOT_PASSWORD("MAIL", "找回密码", "找回密码的验证码：${code}。", List.of("code")),
-    MAIL_CHANGE_PASSWORD("MAIL", "修改密码", "修改密码的验证码：${code}。", List.of("code")),
-    MAIL_RESET_SUCCESS("MAIL", "密码重置成功", "您的密码已重置。如非本人操作，请立即联系管理员。", List.of()),
-    MAIL_LOGIN("MAIL", "登录验证", "登录验证码：${code}，请勿转发。", List.of("code")),
-    MAIL_PASSWORD_EXPIRY("MAIL", "密码到期提醒", "您的密码将在 ${days} 天后到期，请及时更新。", List.of("days")),
-    MAIL_WELCOME("MAIL", "欢迎使用", "欢迎使用 ${platform}。", List.of("platform")),
+    MAIL_BIND("MAIL", "绑定邮箱", verificationMail("您正在绑定邮箱"),
+        List.of("client_name", "user_email", "code", "now_time")),
+    MAIL_CHANGE_BIND("MAIL", "修改绑定邮箱", verificationMail("您正在修改绑定邮箱"),
+        List.of("client_name", "user_email", "code", "now_time")),
+    MAIL_FORGOT_PASSWORD("MAIL", "忘记密码", verificationMail("您正在重置密码"),
+        List.of("client_name", "user_email", "code", "now_time")),
+    MAIL_CHANGE_PASSWORD("MAIL", "修改密码", verificationMail("您正在修改密码"),
+        List.of("client_name", "user_email", "code", "now_time")),
+    MAIL_RESET_SUCCESS("MAIL", "管理员重置密码成功", noticeMail(
+        "您的密码已由管理员重置，如非本人操作，请立即修改账户密码并联系管理员。"),
+        List.of("client_name", "user_email", "now_time")),
+    MAIL_LOGIN("MAIL", "登录验证", noticeMail(
+        "您正在登录 ${client_name}，您的验证码为：<strong>${code}</strong>，该验证码 ${expire_time} 分钟内有效，请勿泄露给他人。"),
+        List.of("client_name", "user_email", "code", "expire_time", "now_time")),
+    MAIL_PASSWORD_EXPIRY("MAIL", "密码到期提醒", noticeMail(
+        "您的密码将于 <strong>${expire_days}</strong> 天后过期，请尽快修改密码。"),
+        List.of("client_name", "user_email", "expire_days", "now_time")),
+    MAIL_WELCOME("MAIL", "欢迎邮件", noticeMail(
+        "感谢您加入 ${client_name}，您的账户已经创建成功。"),
+        List.of("client_name", "user_email", "now_time")),
     SMS_BIND("SMS", "", "绑定手机号验证码 ${code}。", List.of("code")),
     SMS_BIND_SUCCESS("SMS", "", "手机号绑定已完成。", List.of()),
     SMS_CHANGE_PHONE("SMS", "", "更换手机号验证码 ${code}。", List.of("code")),
@@ -59,4 +71,13 @@ public enum MessageTemplateType {
     public String title() { return title; }
     public String content() { return content; }
     public List<String> variables() { return variables; }
+
+    private static String verificationMail(String action) {
+        return noticeMail(action + "，您的验证码为：<strong>${code}</strong>，请尽快验证并保管好验证码。");
+    }
+
+    private static String noticeMail(String message) {
+        return "<p><b>亲爱的用户：${user_email}</b></p><p>" + message
+            + "</p><p>${client_name} 官方团队</p><p>${now_time}</p>";
+    }
 }
