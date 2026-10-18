@@ -17,6 +17,7 @@
 package dev.macula.cloud.system.integration;
 
 import org.flywaydb.core.Flyway;
+import org.flywaydb.core.api.FlywayException;
 import org.flywaydb.core.api.MigrationVersion;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
@@ -26,6 +27,7 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -84,7 +86,7 @@ class IdentityProviderMigrationIT {
                     "AND table_name = 'sys_identity_provider' AND column_name = 'remark'", database));
         }
         Flyway toV4 = Flyway.configure().dataSource(url, username, password)
-            .locations("classpath:db/migration").load();
+            .locations("classpath:db/migration").target(MigrationVersion.fromVersion("4")).load();
         toV4.migrate();
         try (Connection connection = DriverManager.getConnection(url, username, password)) {
             assertEquals(4L, count(connection,
@@ -92,6 +94,77 @@ class IdentityProviderMigrationIT {
             assertEquals(1L, count(connection,
                 "SELECT COUNT(*) FROM sys_identity_provider WHERE name = 'migration-legacy-fixture' " +
                     "AND app_id = 'legacy-client' AND config_json = '{}'"));
+        }
+        Flyway toV6 = Flyway.configure().dataSource(url, username, password)
+            .locations("classpath:db/migration").cleanDisabled(false).load();
+        toV6.migrate();
+        try (Connection connection = DriverManager.getConnection(url, username, password)) {
+            assertEquals(6L, count(connection,
+                "SELECT COUNT(*) FROM flyway_schema_history WHERE success = 1"));
+            assertEquals(1L, count(connection,
+                "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = ? " +
+                    "AND table_name = 'sys_user_identity_binding'", database));
+            assertEquals(0L, count(connection,
+                "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = ? " +
+                    "AND table_name = 'sys_user_identity_binding' AND column_name IN " +
+                    "('tenant_id', 'user_id', 'user_type', 'access_token')", database));
+            assertEquals(2L, count(connection,
+                "SELECT COUNT(DISTINCT index_name) FROM information_schema.statistics WHERE table_schema = ? " +
+                    "AND table_name = 'sys_user_identity_binding' AND non_unique = 0 " +
+                    "AND index_name LIKE 'uk_user_identity_%'", database));
+            assertEquals(1L, count(connection,
+                "SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = ? " +
+                    "AND table_name = 'sys_identity_provider' " +
+                    "AND index_name = 'uk_identity_provider_enabled_type'", database));
+            assertEquals("utf8mb4", string(connection,
+                "SELECT CHARACTER_SET_NAME FROM information_schema.columns WHERE table_schema = ? " +
+                    "AND table_name = 'sys_user_identity_binding' AND column_name = 'username'", database));
+            assertEquals(64L, count(connection,
+                "SELECT CHARACTER_MAXIMUM_LENGTH FROM information_schema.columns WHERE table_schema = ? " +
+                    "AND table_name = 'sys_user_identity_binding' AND column_name = 'username'", database));
+            execute(connection, "INSERT INTO sys_user_identity_binding " +
+                "(provider_type, provider_subject, username) VALUES ('GITHUB', '123', 'alice')");
+            assertThrows(SQLException.class, () -> execute(connection,
+                "INSERT INTO sys_user_identity_binding (provider_type, provider_subject, username) " +
+                    "VALUES ('GITHUB', '123', 'bob')"));
+            assertThrows(SQLException.class, () -> execute(connection,
+                "INSERT INTO sys_user_identity_binding (provider_type, provider_subject, username) " +
+                    "VALUES ('GITHUB', '456', 'alice')"));
+            assertThrows(SQLException.class, () -> execute(connection,
+                "INSERT INTO sys_identity_provider (name, provider_type, app_id, config_json, enabled, visible) " +
+                    "VALUES ('second-enabled-github', 'GITHUB', 'other', '{}', 1, 1)"));
+        }
+
+        toV6.clean();
+        Flyway toV5 = Flyway.configure().dataSource(url, username, password)
+            .locations("classpath:db/migration").target(MigrationVersion.fromVersion("5")).load();
+        toV5.migrate();
+        try (Connection connection = DriverManager.getConnection(url, username, password)) {
+            execute(connection, "INSERT INTO sys_identity_provider " +
+                "(name, provider_type, app_id, config_json, enabled, visible) VALUES " +
+                "('duplicate-a', 'GITHUB', 'a', '{}', 1, 1), " +
+                "('duplicate-b', 'GITHUB', 'b', '{}', 1, 1)");
+        }
+        Flyway duplicateUpgrade = Flyway.configure().dataSource(url, username, password)
+            .locations("classpath:db/migration").load();
+        assertThrows(FlywayException.class, duplicateUpgrade::migrate,
+            "V6 必须在历史同类型多条启用配置时停止");
+        try (Connection connection = DriverManager.getConnection(url, username, password)) {
+            assertEquals(0L, count(connection,
+                "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = ? " +
+                    "AND table_name = 'sys_user_identity_binding'", database),
+                "迁移预检失败时不得留下后续对象");
+            execute(connection, "DELETE FROM sys_identity_provider WHERE name = 'duplicate-b'");
+        }
+        duplicateUpgrade.repair();
+        duplicateUpgrade.migrate();
+        try (Connection connection = DriverManager.getConnection(url, username, password)) {
+            assertEquals(6L, count(connection,
+                "SELECT COUNT(*) FROM flyway_schema_history WHERE success = 1"));
+            assertEquals(1L, count(connection,
+                "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = ? " +
+                    "AND table_name = 'sys_user_identity_binding'", database),
+                "清理重复数据并 repair 后必须能安全重跑 V6");
         }
     }
 
@@ -112,6 +185,12 @@ class IdentityProviderMigrationIT {
                 assertTrue(result.next());
                 return result.getString(1);
             }
+        }
+    }
+
+    private static void execute(Connection connection, String sql) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.executeUpdate();
         }
     }
 }

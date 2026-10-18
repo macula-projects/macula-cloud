@@ -23,6 +23,7 @@ import dev.macula.cloud.system.pojo.entity.SysIdentityProvider;
 import dev.macula.cloud.system.vo.IdentityProviderVO;
 import org.junit.jupiter.api.Test;
 import org.mapstruct.factory.Mappers;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.HashMap;
@@ -134,6 +135,66 @@ class IdentityProviderServiceImplTest {
         verify(mapper).insert(argThat((SysIdentityProvider entity) ->
             "GitHub Login".equals(entity.getName()) && Boolean.FALSE.equals(entity.getEnabled()) &&
                 Boolean.FALSE.equals(entity.getVisible())));
+    }
+
+    @Test
+    void rejectsSecondEnabledProviderOfTheSameType() {
+        when(mapper.selectCount(any())).thenReturn(0L, 1L);
+
+        ResponseStatusException error = assertThrows(ResponseStatusException.class,
+            () -> service.save(null, form("GITHUB", "social",
+                Map.of("clientId", "github-id", "clientSecret", "secret"))));
+
+        assertEquals(409, error.getStatusCode().value());
+        assertEquals("同类型仅允许一个启用配置", error.getReason());
+        verify(mapper, never()).insert(any(SysIdentityProvider.class));
+    }
+
+    @Test
+    void updatingTheEnabledProviderDoesNotConflictWithItself() {
+        SysIdentityProvider existing = new SysIdentityProvider();
+        existing.setId(7L);
+        existing.setName("GitHub Login");
+        existing.setProviderType("GITHUB");
+        existing.setAppId("github-id");
+        existing.setAppSecret("old-secret");
+        existing.setConfigJson("{\"clientId\":\"github-id\"}");
+        existing.setEnabled(true);
+        existing.setVisible(true);
+        when(mapper.selectById(7L)).thenReturn(existing);
+        when(mapper.selectCount(any())).thenReturn(0L);
+
+        service.save(7L, form("GITHUB", "social",
+            Map.of("clientId", "github-id", "clientSecret", "")));
+
+        verify(mapper).updateById(existing);
+    }
+
+    @Test
+    void mapsDatabaseUniquenessRaceToConflict() {
+        when(mapper.selectCount(any())).thenReturn(0L);
+        doThrow(new DuplicateKeyException("generated enabled-provider key"))
+            .when(mapper).insert(any(SysIdentityProvider.class));
+
+        ResponseStatusException error = assertThrows(ResponseStatusException.class,
+            () -> service.save(null, form("GITHUB", "social",
+                Map.of("clientId", "github-id", "clientSecret", "secret"))));
+
+        assertEquals(409, error.getStatusCode().value());
+        assertEquals("身份提供商配置冲突", error.getReason());
+    }
+
+    @Test
+    void disabledProviderMayCoexist() {
+        when(mapper.selectCount(any())).thenReturn(0L);
+        IdentityProviderForm form = form("GITHUB", "social",
+            Map.of("clientId", "github-id", "clientSecret", "secret"));
+        form.setEnabled(false);
+
+        service.save(null, form);
+
+        verify(mapper, times(1)).selectCount(any());
+        verify(mapper).insert(any(SysIdentityProvider.class));
     }
 
     @Test

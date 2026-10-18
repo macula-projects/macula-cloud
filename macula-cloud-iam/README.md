@@ -58,6 +58,27 @@ code_challenge_method=S256
 采用本地 Thymeleaf + CSS/JavaScript，无外部 CDN。桌面为品牌区与表单，680px 以下为移动单列；包含安全区、触控按钮、16px 输入字号、密码显隐、密码管理器、错误反馈、请求超时和防重复提交。授权页可按 scope 勾选，同意与拒绝由服务端处理，拒绝当前请求不会取消此前授权。
 
 短信入口保留原有默认开启行为，`spring.security.oauth2.server.login.sms.enabled` 控制展示，默认 true。
+
+GitHub 与企业微信网页登录配置直接读取共享 System 数据库的 `sys_identity_provider`。只有有效
+OAuth client（已配置 `tenant_id` 与 `user_type`）且对应 provider 同时 `enabled=true`、
+`visible=true` 时登录页才展示入口；`visible=false` 只隐藏入口，`enabled=false` 还会拒绝直接访问。
+OAuth client 决定最终租户与用户类型。回调账户路由只读取一次 client 配置，将该快照与 state
+绑定值核对后使用同一快照查询账号；回调期间若其配置发生变化会拒绝登录。
+
+GitHub OAuth 不申请额外 scope，只接受 `/user` 返回的公开稳定数值 `id`，并通过 `sys_user_identity_binding` 的
+`(provider_type='GITHUB', provider_subject) -> username` 全局绑定解析账号，不使用 login 或 email
+兜底。绑定表不含 tenant ID、user ID 或 user type，同一 provider 的 subject 与 username 都唯一；
+当前不提供公开写入接口，须由受控数据库/运维流程预置。企业微信使用 `snsapi_base`，只接受企业
+成员 `UserId` 并直接作为 username，不写绑定表。两者随后均按 OAuth client 的 `user_type` 和
+`tenant_id` 调用现有用户身份路由。只有 `EMPLOYEE` 明确复用现有 System 用户源；其他用户类型
+必须由 `UserAuthInfoService` 返回匹配账号，空结果不会回退到同名系统用户。
+
+第三方回调固定由 `macula.cloud.iam.issuer-uri` 生成，state 与浏览器会话、provider、client、租户、
+用户类型和原始 OAuth 授权请求的受控相对目标绑定，五分钟内仅可原子消费一次。成功后只恢复该
+state 自带的服务端目标，不使用会话中可能被其他标签页覆盖的 SavedRequest。第三方授权码和 token
+不持久化，也不写日志。部署时 IAM 与
+System 必须共享 `MACULA_CRYPTO_PASSWORD`；GitHub 回调为 `<issuer>/login/github`，企业微信回调为
+`<issuer>/login/wecom`，应在各开放平台精确登记。企业微信自建应用还需把实际登录成员纳入应用可见范围。
 登录页通过同源、CSRF 保护的 `POST /api/v1/sms-code` 请求验证码。IAM 只读共享 System 数据库中的
 唯一启用短信供应商和 `SMS_LOGIN` 中文模板，使用阿里云或腾讯云 SDK 提交；配置缺失、重复、
 不受支持或无法解密时失败关闭。验证码使用安全随机数生成，只以 HMAC-SHA256 摘要存入 Redis，

@@ -30,6 +30,7 @@ import dev.macula.cloud.system.vo.IdentityProviderCatalogVO;
 import dev.macula.cloud.system.vo.IdentityProviderVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -134,6 +135,15 @@ public class IdentityProviderServiceImpl implements IdentityProviderService {
             .eq(SysIdentityProvider::getName, form.getName().trim())
             .ne(id != null, SysIdentityProvider::getId, id));
         if (duplicates > 0) throw new ResponseStatusException(HttpStatus.CONFLICT, "名称已存在");
+        if (Boolean.TRUE.equals(form.getEnabled())) {
+            long enabledDuplicates = mapper.selectCount(new LambdaQueryWrapper<SysIdentityProvider>()
+                .eq(SysIdentityProvider::getProviderType, type.code())
+                .eq(SysIdentityProvider::getEnabled, true)
+                .ne(id != null, SysIdentityProvider::getId, id));
+            if (enabledDuplicates > 0) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "同类型仅允许一个启用配置");
+            }
+        }
 
         converter.updateEntity(form, entity);
         entity.setName(form.getName().trim());
@@ -142,7 +152,11 @@ public class IdentityProviderServiceImpl implements IdentityProviderService {
         entity.setAppId(publicConfig.get(type.identifierField()));
         entity.setConfigJson(json.writeValueAsString(publicConfig));
         if (StringUtils.hasText(credential)) entity.setAppSecret(credential);
-        if (id == null) mapper.insert(entity); else mapper.updateById(entity);
+        try {
+            if (id == null) mapper.insert(entity); else mapper.updateById(entity);
+        } catch (DuplicateKeyException ex) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "身份提供商配置冲突", ex);
+        }
         return toVO(entity);
     }
 

@@ -20,10 +20,19 @@ package dev.macula.cloud.iam.config;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import dev.macula.cloud.iam.authentication.sms.SmsService;
+import dev.macula.cloud.iam.authentication.github.GithubClient;
+import dev.macula.cloud.iam.authentication.thirdparty.HttpSessionThirdPartyLoginStateRepository;
+import dev.macula.cloud.iam.authentication.thirdparty.IdentityProviderConfigService;
+import dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyUserDetailsService;
+import dev.macula.cloud.iam.authentication.wecom.WecomClient;
 import dev.macula.cloud.iam.controller.LoginController;
+import dev.macula.cloud.iam.mapper.SysIdentityProviderMapper;
+import dev.macula.cloud.iam.mapper.SysUserIdentityBindingMapper;
 import dev.macula.cloud.iam.controller.SmsCodeController;
 import dev.macula.cloud.iam.protocol.oauth2.endpoint.AuthorizationConsentController;
 import dev.macula.cloud.iam.pojo.dto.UserAuthInfo;
+import dev.macula.cloud.iam.pojo.entity.SysOAuth2Client;
+import dev.macula.cloud.iam.pojo.entity.SysIdentityProvider;
 import dev.macula.cloud.iam.service.support.*;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -86,7 +95,9 @@ class IamProtocolTest {
     @EnableConfigurationProperties
     @Import({ProtocolOAuth2Configuration.class, DefaultSecurityConfiguration.class, JwtConfiguration.class,
         PasswordEncoderConfig.class, LoginController.class, SmsCodeController.class,
-        AuthorizationConsentController.class})
+        AuthorizationConsentController.class, GithubClient.class, WecomClient.class,
+        IdentityProviderConfigService.class, HttpSessionThirdPartyLoginStateRepository.class,
+        ThirdPartyUserDetailsService.class})
     static class App implements WebMvcConfigurer {
         @Bean @Primary RegisteredClientRepository fixtureClients() {
             return new InMemoryRegisteredClientRepository(client("public", ClientAuthenticationMethod.NONE,
@@ -120,6 +131,8 @@ class IamProtocolTest {
             return template;
         }
         @Bean SysOAuth2ClientService clientService() { return mock(SysOAuth2ClientService.class); }
+        @Bean SysIdentityProviderMapper identityProviderMapper() { return mock(SysIdentityProviderMapper.class); }
+        @Bean SysUserIdentityBindingMapper identityBindingMapper() { return mock(SysUserIdentityBindingMapper.class); }
         @Bean @Primary SmsService fixtureSmsService() { return mock(SmsService.class); }
         @Bean SysUserService userService() {
             SysUserService service = mock(SysUserService.class);
@@ -199,6 +212,76 @@ class IamProtocolTest {
         MockHttpSession session = login();
         mvc.perform(get("/").session(session)).andExpect(status().isOk())
             .andExpect(content().string(org.hamcrest.Matchers.containsString("fixture-user")));
+    }
+
+    @Test void thirdPartyButtonsRequireValidClientAndVisibleProvider() throws Exception {
+        SysOAuth2ClientService clients = context.getBean(SysOAuth2ClientService.class);
+        SysIdentityProviderMapper providers = context.getBean(SysIdentityProviderMapper.class);
+        SysOAuth2Client client = new SysOAuth2Client();
+        client.setTenantId(7L);
+        client.setUserType(dev.macula.cloud.iam.enums.UserTypeEnum.EMPLOYEE);
+        when(clients.getClientByClientId("portal")).thenReturn(client);
+        when(providers.selectCount(any())).thenReturn(1L);
+
+        mvc.perform(get("/login").with(anonymous()).queryParam("client_id", "portal"))
+            .andExpect(status().isOk())
+            .andExpect(content().string(org.hamcrest.Matchers.containsString("使用 GitHub 登录")))
+            .andExpect(content().string(org.hamcrest.Matchers.containsString("使用企业微信登录")));
+
+        mvc.perform(get("/login").with(anonymous()).queryParam("client_id", "unknown"))
+            .andExpect(status().isOk())
+            .andExpect(content().string(org.hamcrest.Matchers.not(
+                org.hamcrest.Matchers.containsString("使用 GitHub 登录"))));
+    }
+
+    @Test void thirdPartyFiltersUseTrustedIssuerAndClientSnapshot() throws Exception {
+        SysOAuth2ClientService clients = context.getBean(SysOAuth2ClientService.class);
+        SysIdentityProviderMapper providers = context.getBean(SysIdentityProviderMapper.class);
+        SysOAuth2Client client = new SysOAuth2Client();
+        client.setTenantId(7L);
+        client.setUserType(dev.macula.cloud.iam.enums.UserTypeEnum.EMPLOYEE);
+        when(clients.getClientByClientId("portal")).thenReturn(client);
+
+        SysIdentityProvider github = new SysIdentityProvider();
+        github.setProviderType("GITHUB");
+        github.setAppId("github-client");
+        github.setAppSecret("secret");
+        github.setConfigJson("{\"clientId\":\"github-client\"}");
+        github.setEnabled(true);
+        when(providers.selectList(any(com.baomidou.mybatisplus.core.conditions.Wrapper.class)))
+            .thenReturn(List.of(github));
+
+        MvcResult githubStart = mvc.perform(get("/login/github").with(anonymous())
+                .queryParam("client_id", "portal").header("Host", "attacker.example"))
+            .andExpect(status().isFound()).andReturn();
+        assertThat(githubStart.getResponse().getRedirectedUrl())
+            .startsWith("https://github.com/login/oauth/authorize")
+            .contains("redirect_uri=https://iam.example/login/github")
+            .doesNotContain("attacker.example");
+
+        SysIdentityProvider wecom = new SysIdentityProvider();
+        wecom.setProviderType("WECOM");
+        wecom.setAppId("corp");
+        wecom.setAppSecret("secret");
+        wecom.setConfigJson("{\"corpId\":\"corp\",\"agentId\":\"agent\"}");
+        wecom.setEnabled(true);
+        when(providers.selectList(any(com.baomidou.mybatisplus.core.conditions.Wrapper.class)))
+            .thenReturn(List.of(wecom));
+
+        MvcResult wecomStart = mvc.perform(get("/login/wecom").with(anonymous())
+                .queryParam("client_id", "portal").header("Host", "attacker.example"))
+            .andExpect(status().isFound()).andReturn();
+        assertThat(wecomStart.getResponse().getRedirectedUrl())
+            .startsWith("https://open.weixin.qq.com/connect/oauth2/authorize")
+            .contains("scope=snsapi_base")
+            .contains("redirect_uri=https://iam.example/login/wecom")
+            .doesNotContain("attacker.example");
+
+        when(providers.selectList(any(com.baomidou.mybatisplus.core.conditions.Wrapper.class)))
+            .thenReturn(List.of());
+        mvc.perform(get("/login/github").with(anonymous()).queryParam("client_id", "portal"))
+            .andExpect(status().isFound())
+            .andExpect(redirectedUrl("/login?external_error=failed"));
     }
 
     @Test void smsCodeEndpointRequiresCsrfAndKeepsFailuresGeneric() throws Exception {
@@ -459,7 +542,14 @@ class IamProtocolTest {
     @Test void exportsRenderedPagesForResponsiveReview() throws Exception {
         java.nio.file.Path preview = java.nio.file.Path.of("target", "iam-preview");
         java.nio.file.Files.createDirectories(preview.resolve("iam"));
-        String login = mvc.perform(get("/login")).andExpect(status().isOk()).andReturn().getResponse()
+        SysOAuth2Client previewClient = new SysOAuth2Client();
+        previewClient.setTenantId(1L);
+        previewClient.setUserType(dev.macula.cloud.iam.enums.UserTypeEnum.EMPLOYEE);
+        when(context.getBean(SysOAuth2ClientService.class).getClientByClientId("preview"))
+            .thenReturn(previewClient);
+        when(context.getBean(SysIdentityProviderMapper.class).selectCount(any())).thenReturn(1L);
+        String login = mvc.perform(get("/login").queryParam("client_id", "preview"))
+            .andExpect(status().isOk()).andReturn().getResponse()
             .getContentAsString(StandardCharsets.UTF_8);
         String consent = mvc.perform(get("/oauth2/consent").with(user("演示账号"))
             .param("client_id", "public").param("scope", "openid profile").param("state", "preview"))

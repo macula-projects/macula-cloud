@@ -17,7 +17,11 @@
 
 package dev.macula.cloud.iam.config;
 
+import dev.macula.cloud.iam.authentication.github.GithubLoginFilterConfigurer;
 import dev.macula.cloud.iam.authentication.sms.SmsLoginFilterConfigurer;
+import dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyAuthenticationFailureHandler;
+import dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyAuthenticationSuccessHandler;
+import dev.macula.cloud.iam.authentication.wecom.WecomLoginFilterConfigurer;
 import dev.macula.cloud.iam.authentication.sms.SmsService;
 import dev.macula.cloud.iam.authentication.sms.SmsUserDetailsService;
 import dev.macula.cloud.iam.message.LoginSmsDispatcher;
@@ -81,6 +85,7 @@ public class DefaultSecurityConfiguration {
                 .requestMatchers("/admin/images/**").permitAll()
                 .requestMatchers("/favicon.ico").permitAll()
                 .requestMatchers("/iam/**").permitAll()
+                .requestMatchers("/login", "/login/github", "/login/wecom").permitAll()
                 .requestMatchers("/api/v1/sms-code").permitAll()
                 .anyRequest().authenticated())
             .userDetailsService(userDetailsService)
@@ -105,13 +110,26 @@ public class DefaultSecurityConfiguration {
             .successHandler(loginAuthenticationSuccessHandler)
             .failureHandler(authenticationFailureHandler)
             .permitAll());
+
+        ThirdPartyAuthenticationSuccessHandler externalSuccessHandler =
+            new ThirdPartyAuthenticationSuccessHandler();
+        ThirdPartyAuthenticationFailureHandler externalFailureHandler =
+            new ThirdPartyAuthenticationFailureHandler();
+        http.with(new GithubLoginFilterConfigurer<>(), github -> github
+            .successHandler(externalSuccessHandler)
+            .failureHandler(externalFailureHandler)
+            .permitAll());
+        http.with(new WecomLoginFilterConfigurer<>(), wecom -> wecom
+            .successHandler(externalSuccessHandler)
+            .failureHandler(externalFailureHandler)
+            .permitAll());
         return http.build();
         // @formatter:on
     }
 
     @Bean
     @Qualifier("sysUserDetailsService")
-    public UserDetailsService sysUserDetailsService(SysUserService sysUserService, SysOAuth2ClientService clientService,
+    public SysUserDetailsServiceImpl sysUserDetailsService(SysUserService sysUserService, SysOAuth2ClientService clientService,
         @Nullable UserAuthInfoService authInfoService) {
         return new SysUserDetailsServiceImpl(sysUserService, clientService, authInfoService);
     }
