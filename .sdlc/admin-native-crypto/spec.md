@@ -34,7 +34,7 @@ Status: accepted
 ## Flagged concerns
 - AES 方法改为异步且不再接收原字符串密钥或旧密文；`tool.data` 继续同步但不加密，旧缓存会清除：这是用户“不用兼容”后的提案，需要审阅者确认新的接口边界，blocking。
 - Node 构建基线升级：清除开发依赖的严重告警需要兼容 Node 22.12+ 的工具链，并改变当前 Node 20 Docker 构建环境；需要审阅者确认环境约束，blocking。
-- TinyMCE 安全升级后采用 GPL-2.0-or-later 或商业许可，原项目为 Apache-2.0，且 TinyMCE 8 移除了当前组件使用的 template 插件：需要确认是替换为许可兼容的编辑器、提供商业许可，还是接受新的分发许可义务，blocking。
+- TinyMCE 安全升级后采用 GPL-2.0-or-later 或商业许可，原项目为 Apache-2.0，且 TinyMCE 8 移除了当前组件使用的 template 插件：用户已明确选择替换为许可兼容的非商业编辑器；具体库、功能保留范围和验证由实施计划确认，resolved。
 - Web Crypto 在浏览器中需要安全上下文（HTTPS 或可信本地开发环境）；生产 HTTP 部署无法使用新 AES 接口，需要部署方确认 HTTPS，blocking。
 - 审计结果随公告和 registry 数据变化：实施时必须重新审计，若有无修复版本或冲突告警，应提交逐项残余风险供审阅，non-blocking。
 - 完成期限尚未指定：不影响范围与技术方案，按正常开发验证节奏推进，non-blocking。
