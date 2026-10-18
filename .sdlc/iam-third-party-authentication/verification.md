@@ -1,5 +1,21 @@
 # IAM 第三方登录正式验证记录
 
+## 最新远端 main 重放后的交付前复核
+
+日期：2026-10-18。获得人类 LGTM 与 `feat/MAC-6` 推送授权后，先获取最新远端引用，再将已批准的四个 MAC-6 提交无冲突重放到 `origin/main` `ab42cd0`。功能提交重放后的 commit 为 `9b4e865`，相对最新基线为 0 behind / 4 ahead；本节记录最终基线上的新鲜交付前证据。
+
+| 实际命令 | 退出码 | 实际输出摘要 |
+| --- | --- | --- |
+| `mvn test -Plocal` | 0 | 11 个 Reactor 模块全部成功；共 154 项，0 失败、0 错误；`BUILD SUCCESS`，总耗时 36.768 秒。较前轮增加的 1 项来自最新 `main` 的 System 测试 |
+| `SYSTEM_MIGRATION_IT=true SPRING_DATASOURCE_URL='jdbc:mysql://127.0.0.1:32778/macula_settings_it_mac6_delivery?...' ... mvn -pl macula-cloud-system -am -Dtest=IdentityProviderMigrationIT -Dsurefire.failIfNoSpecifiedTests=false test -Plocal` | 0 | MySQL 8.4 上正常 V1→V6 成功；历史重复启用 GITHUB 时 V6 按预期失败；清理冲突后 `repair + migrate` 成功到 V6；测试 1 项通过，`BUILD SUCCESS` |
+| `mvn -pl macula-cloud-iam,macula-cloud-system -am package -DskipTests -Plocal` | 0 | IAM、System 及依赖共 5 个模块打包成功；`BUILD SUCCESS`，总耗时 2.649 秒 |
+| 本机静态服务 + `PLAYWRIGHT_MODULE=<本机缓存>/node_modules/playwright node macula-cloud-iam/src/test/ui/check-ui.cjs` | 0 | 登录/授权页在 1440×960、390×844、320×640、844×390 共 8 组检查中均为 `overflow: false`、`interaction: passed` |
+| `git diff --check origin/main..HEAD` | 0 | 无输出 |
+
+真实 MySQL 使用一次性容器 `macula_mac6_mysql_it_delivery` 和专用数据库 `macula_settings_it_mac6_delivery`；测试结束后容器已删除。浏览器首次尝试临时安装 Playwright 时遭遇 TLS 连接重置，随后复用本机已有 Playwright/Chromium 缓存执行同一脚本并通过；临时 HTTP 服务已精确终止。`AGENTS.md` 与 `.agent_context/` 仍是用户/HiFox 运行时已有内容，未纳入提交。
+
+本次重放没有代码冲突，最新 `main` 的新增内容与本功能不重叠；独立复审的 **Important 0、Nit 0** 结论未被改变。本节只补充最终基线验证证据，不扩展人类授权范围：按顶层任务规则只推送 `feat/MAC-6`，不创建 PR、不合并、不部署。
+
 ## TOCTOU 修复后的重新正式验证（当前结论）
 
 日期：2026-10-18。用户确认第二轮 Stage 5 返工实现完整后再次进入 `sdlc-test`；本节只采用 OAuth client 单次快照修复后的新鲜结果。未提交、推送、部署或自行批准评审门。
