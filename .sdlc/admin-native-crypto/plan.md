@@ -1,18 +1,24 @@
 # Plan: 管理端移除 crypto-js 并修复依赖告警 (from spec.md 2026-10-18)
 
 ## Files that change
-- `macula-cloud-admin/src/utils/tool.js`：一次性缓存迁移、保留同步缓存接口、移除 `crypto-js` 和无人调用的加密工具。
+- `macula-cloud-admin/src/utils/tool.js`：一次性缓存迁移、保留同步缓存接口，移除 `crypto-js`；保留 `tool.crypto`，以浏览器 Web Crypto 实现异步 AES-GCM 与 SHA-256，以浏览器原生编码实现 Base64。
 - `macula-cloud-admin/src/config/index.js`：移除公开的旧 AES 开关与密钥。
 - `macula-cloud-admin/tests/unit/tool-storage.test.js`（新增）：覆盖迁移、缓存语义和登录状态。
+- `macula-cloud-admin/tests/unit/tool-crypto.test.js`（新增）：覆盖 AES-GCM、Base64 与 SHA-256 新契约。
+- `macula-cloud-admin/src/components/scEditor/index.vue`、`macula-cloud-admin/src/style/fix.scss`、`macula-cloud-admin/public/tinymce/`：以 MIT 许可的 Tiptap Vue 3 开源组件替代 TinyMCE；保持 `scEditor` 的 `v-model`、禁用、占位、高度及原默认工具栏的常用格式、链接、图片上传、媒体、表格、模板插入、分页符、源码和预览能力，移除不再使用的 TinyMCE 静态资源与样式。
+- `macula-cloud-admin/tests/unit/sc-editor.test.js`（新增）：覆盖编辑器输入输出、禁用、图片上传和模板插入。
 - `macula-cloud-admin/package.json`、`macula-cloud-admin/package-lock.json`：删除 `crypto-js`，升级有告警的直接及传递依赖，并声明受支持的 Node 版本。
 - `macula-cloud-admin/Dockerfile`、`macula-cloud-admin/README.md`：采用兼容的 Node 24 构建镜像，说明最低版本、缓存迁移与安全边界。
 - `macula-cloud-admin/vite.config.js`、`macula-cloud-admin/cypress.config.js` 及 `macula-cloud-admin/tests/unit/`、`macula-cloud-admin/cypress/e2e/` 下受升级影响的配置和测试：仅在新版本 API 或测试行为确实需要时调整，并记录实际文件。
+- `macula-cloud-admin/.eslintrc.cjs`：`eslint-plugin-vue` 10 移除了旧的 `vue3-essential` 配置名，需要更新引用。
+- `macula-cloud-admin/src/api/index.js`、`macula-cloud-admin/src/views/common/home/widgets/components/index.js`：Vite 7 将旧的 `globEager` 调用迁移为 `glob` 的 `eager` 选项。
+- `macula-cloud-admin/cypress/e2e/admin-identity-security-settings.cy.js`、`macula-cloud-admin/cypress/e2e/security-policy.cy.js`、`macula-cloud-admin/cypress/e2e/tinyid-management.cy.js`：测试预置的是新格式登录缓存，需一并预置缓存版本标记。
 
 ## Order of work
 1. 复核工作区和审计基线；确认 `tool.crypto`、`LS_ENCRYPTION`、`tool.data`、`TOKEN` 的完整调用链，记录受影响的直接依赖、传递依赖和 Node/peer 约束。
-2. 在 `tool.js` 增加模块初始化时的一次性存储版本迁移：删除本应用使用的 `USER_INFO`、`MENU`、`PERMISSIONS`、`APP_LANG`、`tenantId`、`tenantStoreTenantOptions`、`tenantLabel` 等旧本地存储键，删除旧 `TOKEN` cookie，保留同源无关的存储键；用独立版本标记避免再次清理。移除 AES-ECB、MD5、Base64 工具和配置项，保留同步 `tool.data` 与过期行为。添加针对性单元测试。
-3. 分批升级生产依赖，先处理 `axios`、`echarts`、`element-plus`、`tinymce`、`vue`、`vue-i18n` 等直接告警，再解决剩余传递告警；每批核对调用 API 与锁文件差异，仅在有实际兼容问题时调整页面或请求代码。
-4. 升级构建和测试依赖，处理 `vite`、`vitest`、`cypress`、`start-server-and-test`、插件及剩余传递告警；将 Docker 构建镜像升为 Node 24，更新 `engines`、README 和必要的 Vite/Cypress 配置。使用普通 `npm install` 更新锁文件，不运行 `npm audit fix --force`。
+2. 在 `tool.js` 增加模块初始化时的一次性存储版本迁移：删除本应用使用的 `USER_INFO`、`MENU`、`PERMISSIONS`、`APP_LANG`、`tenantId`、`tenantStoreTenantOptions`、`tenantLabel` 等旧本地存储键，删除旧 `TOKEN` cookie，保留同源无关的存储键；用独立版本标记避免再次清理。移除 AES-ECB 和内置密钥配置，保留同步 `tool.data` 与过期行为。实现异步 AES-GCM（调用方提供 `CryptoKey`，密文携带版本与随机 IV）、异步 SHA-256 及同步 UTF-8 Base64。添加针对性单元测试。
+3. 分批升级生产依赖，处理 `axios`、`echarts`、`element-plus`、`vue`、`vue-i18n` 等直接告警；删除 TinyMCE 与 Vue 包装器，安装仅 MIT 许可的 Tiptap 开源包并改造 `scEditor`。保留 `v-model` HTML、禁用、占位、高度和原默认工具栏的常用格式、链接、表格、图片上传、媒体、模板插入、分页符、源码和预览能力；不引入 Tiptap Pro、云服务或商业许可。移除旧静态资源并添加组件测试。继续解决剩余传递告警，每批核对锁文件、许可和调用 API。
+4. 升级构建和测试依赖，处理 `vite`、`vitest`、`cypress`、`start-server-and-test`、插件及剩余传递告警；将 Docker 构建镜像升为 Node 24，更新 `engines`、README 和必要的 Vite/Cypress 配置。Docker 的前端构建跳过 Cypress 二进制下载。使用普通 `npm install` 更新锁文件，不运行 `npm audit fix --force`。
 5. 检查所有实际改动和残余告警；执行锁文件可重现安装、相关单测、生产构建、适用构建模式、端到端测试、lint 和 Docker 构建。若因不可修复告警或外部环境导致验证不完整，逐项记录原因、风险和复验条件。
 
 ## Risks
@@ -20,10 +26,27 @@
 - 迁移必须先于语言模块、路由、请求拦截器和 Pinia 的缓存读取；若模块初始化顺序错误，旧令牌与空权限缓存可能同时存在。
 - `axios`、`echarts` 与前端工具链的主版本升级可能改变运行时 API、构建产物、插件 peer 约束和 Cypress 测试行为；不能用只通过构建替代流程验证。
 - 构建环境由 Node 20 升至 Node 24；本机、CI 与 Docker 的版本不一致可能使安装或测试结论失真。
+- Web Crypto 只在安全上下文提供 `subtle`；AES-GCM 密钥由调用方管理，不能把前端常量当作保密密钥。旧同步 AES 调用及密文不兼容（用户已接受）。
+- Tiptap 是无预置 UI 的编辑器，替换 TinyMCE 时需自行实现工具栏、媒体与图片上传、模板、分页符、源码和预览交互。旧 HTML 中非标准内联样式可能无法原样往返；应保留常用编辑语义并在测试中明确可支持范围。`plugins`、`toolbar`、`options` 属于 TinyMCE 专用配置，仓库内无外部调用，但不能保证外部调用方直接沿用。不可擅自启用付费扩展。
 - 新公告可能在实施过程中增加审计数量；若有告警无法清除，不以静默忽略或覆盖为完成依据。
 
 ## Proof
 - `tests/unit/tool-storage.test.js` 验证首次迁移、再次启动不清理新数据、旧密文和旧令牌被清理、同源无关键保留、同步读写、过期时间及异常缓存处理。
+- `tests/unit/tool-crypto.test.js` 验证 AES-GCM 往返、不同 IV、错误密钥和篡改拒绝、Base64 UTF-8 往返、SHA-256 固定测试向量。
+- `tests/unit/sc-editor.test.js` 和实际表单集成流程验证 HTML 双向同步、禁用和占位、图片上传、媒体、表格、模板插入、分页符、源码和预览；检查原有已保存 HTML 的常用格式能重新加载。核对已安装 Tiptap 包均为 MIT，最终构建无 TinyMCE 资产。
 - 运行全部现有 Vitest，并对实际受升级影响的 `axios` 请求、图表、富文本、i18n 和登录/权限行为增加或修正测试；运行关键 Cypress 流程。
 - 使用 Node 24 运行 `npm ci`、`npm run test:unit`、`npm run build`、适用环境构建、`npm run test:e2e:ci`；`npm run lint` 前后检查 diff，避免改写无关文件。
 - `npm audit --json` 和 `npm audit --omit=dev --json` 目标为零告警；若非零，提供逐项残余风险清单。核对依赖树与构建产物无 `crypto-js`、`node:crypto` 浏览器 polyfill，并验证 Docker 镜像构建。
+
+## Implementation deviations
+- 2026-10-18：移除无人使用的 `sass-loader` 并升级 `sass`，因为 Vite 7 要求 `sass` 1.70+，旧 `sass-loader` 仅供 Webpack 使用。影响：缩小依赖树，不改变应用接口；通过 Vite 构建验证样式。
+- 2026-10-18：新增 `.eslintrc.cjs` 到文件清单，因为 `eslint-plugin-vue` 10 不再提供 `plugin:vue/vue3-essential`。影响：仅调整 lint 配置名；通过完整 lint 验证。
+- 2026-10-18：`.eslintrc.cjs` 同时补充浏览器、Node 和 ES2022 环境，否则升级后会把现有浏览器全局变量误报为未定义。影响：配置范围扩大；使用只读 lint 命令验证，不批量改写旧代码。
+- 2026-10-18：TinyMCE 从原 MIT 许可变为 GPL-2.0-or-later/商业许可，原计划中的直接升级会改变仓库分发许可边界。已暂停编辑器相关适配并请求工程决策；其他独立步骤继续。决定可能需要替换编辑器、提供商业许可或重新审查分发方式，并改变文件清单与验证范围。
+- 2026-10-18：首轮 Cypress 暴露 Vite 7 不再转换 `import.meta.globEager`，导致应用启动失败。新增两个调用方到文件清单并改用 `import.meta.glob(..., {eager: true})`；证明范围增加应用启动和现有 Cypress 流程。
+- 2026-10-18：第二轮 Cypress 的旧模拟登录只写缓存和 Cookie，按新迁移规则被正确清除。更新三个 Cypress fixture 在预置新格式缓存时同时写版本标记；旧缓存被清除的行为由独立单测证明。
+- 2026-10-18：用户纠正原计划中删除所有 `tool.crypto` 方法的决定；修订规格为保留新异步加解密接口且不兼容旧密文，重新提交本计划待工程审批，旧计划不得继续作为接口实现依据。
+- 2026-10-18：用户选择以非商业、许可兼容的编辑器替换 TinyMCE；选用 MIT 许可的 Tiptap 开源包，扩大到 `scEditor`、旧静态资源和组件测试，不使用 Pro 扩展。
+- 2026-10-18：用户随后撤回 Tiptap 方向，要求继续升级 TinyMCE 8。已撤销本次 Tiptap 的组件、静态资源和依赖变更，恢复原编辑器文件；上方 Tiptap 步骤不再有效。TinyMCE 8 自托管的 GPL/商业许可选择和修订计划仍待工程确认，暂停进一步编辑器实施。
+- 2026-10-18：用户又明确拒绝 TinyMCE 8 的 GPL 模式，并要求改回原版。已恢复 `tinymce@6.3.2` 与 `@tinymce/tinymce-vue@5.0.0`；`npm audit` 剩余 1 项高危 `tinymce` 告警，当前计划需重新审批，安全风险是否可接受仍待决定。
+- 2026-10-18：用户澄清“改回去”指回到最初已批准的 Tiptap 开源替换方案，不是保留 TinyMCE 6。恢复 Tiptap 步骤和零告警目标；前两条临时方向变更仅作为决策轨迹保留，不再适用。

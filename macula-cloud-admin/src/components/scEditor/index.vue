@@ -16,150 +16,250 @@
   -->
 
 <template>
-	<div class="sceditor">
-		<Editor v-model="contentValue" :init="init" :disabled="disabled" :placeholder="placeholder" @onClick="onClick" />
-	</div>
+  <div class="sceditor" :class="{ 'is-disabled': disabled }">
+    <div class="sceditor-toolbar" role="toolbar" aria-label="富文本编辑器工具栏">
+      <button type="button" :disabled="disabled" @click="run('undo')">撤销</button>
+      <button type="button" :disabled="disabled" @click="run('redo')">重做</button>
+      <button type="button" :disabled="disabled" @click="run('toggleBold')">粗体</button>
+      <button type="button" :disabled="disabled" @click="run('toggleItalic')">斜体</button>
+      <button type="button" :disabled="disabled" @click="run('toggleUnderline')">下划线</button>
+      <button type="button" :disabled="disabled" @click="run('toggleStrike')">删除线</button>
+      <select aria-label="段落格式" :disabled="disabled" @change="setBlock($event.target.value)">
+        <option value="paragraph">正文</option>
+        <option value="1">标题 1</option>
+        <option value="2">标题 2</option>
+        <option value="3">标题 3</option>
+      </select>
+      <select aria-label="字体" :disabled="disabled" @change="run('setFontFamily', $event.target.value)">
+        <option value="">字体</option>
+        <option value="Arial">Arial</option>
+        <option value="Microsoft YaHei">微软雅黑</option>
+        <option value="SimSun">宋体</option>
+      </select>
+      <select aria-label="字号" :disabled="disabled" @change="run('setFontSize', $event.target.value)">
+        <option value="">字号</option>
+        <option v-for="size in [12, 14, 16, 18, 22, 24, 36, 72]" :key="size" :value="`${size}px`">{{ size }}</option>
+      </select>
+      <label class="sceditor-color">文字色 <input type="color" aria-label="文字颜色" :disabled="disabled" @input="run('setColor', $event.target.value)" /></label>
+      <label class="sceditor-color">背景色 <input type="color" aria-label="背景颜色" :disabled="disabled" @input="run('setBackgroundColor', $event.target.value)" /></label>
+      <button type="button" :disabled="disabled" @click="run('setTextAlign', 'left')">左对齐</button>
+      <button type="button" :disabled="disabled" @click="run('setTextAlign', 'center')">居中</button>
+      <button type="button" :disabled="disabled" @click="run('setTextAlign', 'right')">右对齐</button>
+      <button type="button" :disabled="disabled" @click="run('setTextAlign', 'justify')">两端对齐</button>
+      <button type="button" :disabled="disabled" @click="run('toggleBulletList')">无序列表</button>
+      <button type="button" :disabled="disabled" @click="run('toggleOrderedList')">有序列表</button>
+      <button type="button" :disabled="disabled" @click="setLink">链接</button>
+      <button type="button" :disabled="disabled" @click="$refs.imageInput.click()">图片</button>
+      <input ref="imageInput" class="sceditor-file" type="file" accept="image/*" :disabled="disabled" @change="uploadImage" />
+      <button type="button" :disabled="disabled" @click="insertMedia">媒体</button>
+      <button type="button" :disabled="disabled" @click="insertTable">表格</button>
+      <select v-if="templates.length" aria-label="插入模板" :disabled="disabled" @change="insertTemplate">
+        <option value="">插入模板</option>
+        <option v-for="(item, index) in templates" :key="index" :value="index">{{ item.title }}</option>
+      </select>
+      <button type="button" :disabled="disabled" @click="run('insertContent', { type: 'pageBreak' })">分页符</button>
+      <button type="button" :disabled="disabled" @click="toggleSource">{{ sourceMode ? '完成源码' : '源码' }}</button>
+      <button type="button" @click="previewOpen = true">预览</button>
+    </div>
+    <p v-if="uploadError" class="sceditor-error" role="alert">{{ uploadError }}</p>
+    <textarea v-if="sourceMode" v-model="sourceValue" class="sceditor-source" aria-label="HTML 源码" :disabled="disabled" :style="{ minHeight: `${height}px` }" />
+    <editor-content v-show="!sourceMode" :editor="editor" class="sceditor-content" :style="{ minHeight: `${height}px` }" />
+    <div v-if="previewOpen" class="sceditor-preview">
+      <button type="button" @click="previewOpen = false">关闭预览</button>
+      <iframe title="富文本预览" sandbox="" :srcdoc="sourceMode ? sourceValue : editor?.getHTML() || ''" />
+    </div>
+  </div>
 </template>
 
 <script>
-	import API from "@/api";
-	import Editor from '@tinymce/tinymce-vue'
-	import tinymce from 'tinymce/tinymce'
-	import 'tinymce/themes/silver'
-	import 'tinymce/icons/default'
-	import 'tinymce/models/dom'
+import API from '@/api'
+import {Node} from '@tiptap/core'
+import {Editor, EditorContent} from '@tiptap/vue-3'
+import StarterKit from '@tiptap/starter-kit'
+import Image from '@tiptap/extension-image'
+import {TableKit} from '@tiptap/extension-table'
+import {TextStyleKit} from '@tiptap/extension-text-style'
+import TextAlign from '@tiptap/extension-text-align'
+import Placeholder from '@tiptap/extension-placeholder'
 
-	// 引入编辑器插件
-	import 'tinymce/plugins/code'  //编辑源码
-	import 'tinymce/plugins/image'  //插入编辑图片
-	import 'tinymce/plugins/media'  //插入视频
-	import 'tinymce/plugins/link'  //超链接
-	import 'tinymce/plugins/preview'//预览
-	import 'tinymce/plugins/template'//模板
-	import 'tinymce/plugins/table'  //表格
-	import 'tinymce/plugins/pagebreak'  //分页
-	import 'tinymce/plugins/lists'  //列
-	import 'tinymce/plugins/advlist'  //列
-	import 'tinymce/plugins/quickbars'  //快速工具条
+function safeMediaUrl(value) {
+  try {
+    const url = new URL(value, window.location.href)
+    return ['http:', 'https:'].includes(url.protocol) ? url.href : null
+  } catch {
+    return null
+  }
+}
 
-	export default {
-		components: {
-			Editor
-		},
-		props: {
-			modelValue: {
-				type: String,
-				default: ""
-			},
-			placeholder: {
-				type: String,
-				default: ""
-			},
-			height: {
-				type: Number,
-				default: 300,
-			},
-			disabled: {
-				type: Boolean,
-				default: false
-			},
-			plugins: {
-				type: [String, Array],
-				default: 'code image media link preview table quickbars template pagebreak lists advlist'
-      },
-      toolbar: {
-        type: [String, Array],
-        default: 'undo redo |  forecolor backcolor bold italic underline strikethrough link | blocks fontfamily fontsize | \
-					alignleft aligncenter alignright alignjustify | outdent indent | numlist bullist | pagebreak | \
-					image media table template preview | code selectall'
-      },
-      templates: {
-        type: Array,
-        default: () => []
-      },
-      options: {
-        type: Object,
-        default: () => {
-        }
+const Media = Node.create({
+  name: 'media',
+  group: 'block',
+  atom: true,
+  addAttributes() {
+    return {src: {default: null}, kind: {default: 'iframe'}}
+  },
+  parseHTML() {
+    return [
+      {tag: 'iframe[src]', getAttrs: element => safeMediaUrl(element.getAttribute('src')) ? {src: element.getAttribute('src'), kind: 'iframe'} : false},
+      {tag: 'video[src]', getAttrs: element => safeMediaUrl(element.getAttribute('src')) ? {src: element.getAttribute('src'), kind: 'video'} : false}
+    ]
+  },
+  renderHTML({node}) {
+    const src = safeMediaUrl(node.attrs.src)
+    if (node.attrs.kind === 'video') return ['video', {src, controls: 'controls'}]
+    return ['iframe', {src, allowfullscreen: 'true', title: '嵌入媒体'}]
+  }
+})
+
+const PageBreak = Node.create({
+  name: 'pageBreak',
+  group: 'block',
+  atom: true,
+  parseHTML() {
+    return [{tag: 'div[data-pagebreak]'}, {tag: 'div.mce-pagebreak'}]
+  },
+  renderHTML() {
+    return ['div', {'data-pagebreak': 'true', style: 'page-break-after: always'}]
+  }
+})
+
+export default {
+  name: 'ScEditor',
+  components: {EditorContent},
+  props: {
+    modelValue: {type: String, default: ''},
+    placeholder: {type: String, default: ''},
+    height: {type: Number, default: 300},
+    disabled: {type: Boolean, default: false},
+    templates: {type: Array, default: () => []},
+    // Accepted for old callers, but TinyMCE-specific values are not portable.
+    plugins: {type: [String, Array], default: ''},
+    toolbar: {type: [String, Array], default: ''},
+    options: {type: Object, default: () => ({})}
+  },
+  data() {
+    return {editor: null, sourceMode: false, sourceValue: '', previewOpen: false, uploadError: ''}
+  },
+  watch: {
+    modelValue(value) {
+      if (this.editor && this.editor.getHTML() !== value) {
+        this.editor.commands.setContent(value || '', {emitUpdate: false})
       }
     },
-		data() {
-			return {
-				init: {
-					language_url: 'tinymce/langs/zh_CN.js',
-					language: 'zh_CN',
-					skin_url: 'tinymce/skins/ui/oxide',
-					content_css: "tinymce/skins/content/default/content.css",
-					menubar: false,
-					statusbar: true,
-					plugins: this.plugins,
-					toolbar: this.toolbar,
-					toolbar_mode: 'sliding',
-					font_size_formats: '12px 14px 16px 18px 22px 24px 36px 72px',
-					height: this.height,
-					placeholder: this.placeholder,
-          branding: false,
-          resize: true,
-          elementpath: true,
-          content_style: "",
-          templates: this.templates,
-          quickbars_selection_toolbar: 'forecolor backcolor bold italic underline strikethrough link',
-          quickbars_image_toolbar: 'alignleft aligncenter alignright',
-          quickbars_insert_toolbar: false,
-          image_caption: true,
-          image_advtab: true,
-          convert_urls: false,
-          images_upload_handler: function (blobInfo) {
-            return new Promise((resolve, reject) => {
-              const data = new FormData();
-              data.append("file", blobInfo.blob(), blobInfo.filename());
-              API.common.upload.post(data).then((res) => {
-                resolve(res.data.src)
-              }).catch(() => {
-                reject("Image upload failed")
-              })
-            })
-					},
-					setup: function(editor) {
-						editor.on('init', function() {
-							this.getBody().style.fontSize = '14px';
-						})
-						editor.on('OpenWindow', function(e) {
-							//FIX 编辑器在el-drawer中，编辑器的弹框无法获得焦点
-              var D = document.querySelector('.el-drawer.open')
-              var E = e.target.editorContainer
-              if (D && D.contains(E)) {
-                var nowDA = document.activeElement
-                setTimeout(() => {
-                  document.activeElement.blur()
-                  nowDA.focus()
-                }, 0)
-              }
-            })
-          },
-          ...this.options
-        },
-				contentValue: this.modelValue
-			}
-		},
-		watch: {
-			modelValue(val) {
-				this.contentValue = val
-			},
-			contentValue(val){
-				this.$emit('update:modelValue', val);
-			}
-		},
-		mounted() {
-			tinymce.init({})
-		},
-		methods: {
-			onClick(e){
-				this.$emit('onClick', e, tinymce)
-			}
-		}
-	}
+    disabled(value) {
+      this.editor?.setEditable(!value)
+    },
+    placeholder(value) {
+      const extension = this.editor?.extensionManager.extensions.find(item => item.name === 'placeholder')
+      if (extension) {
+        extension.options.placeholder = value
+        this.editor.view.dispatch(this.editor.state.tr)
+      }
+    }
+  },
+  mounted() {
+    this.editor = new Editor({
+      content: this.modelValue,
+      editable: !this.disabled,
+      extensions: [
+        StarterKit.configure({link: {openOnClick: false}}),
+        Image,
+        TableKit,
+        TextStyleKit,
+        TextAlign.configure({types: ['heading', 'paragraph']}),
+        Placeholder.configure({placeholder: this.placeholder}),
+        Media,
+        PageBreak
+      ],
+      onUpdate: ({editor}) => this.$emit('update:modelValue', editor.getHTML()),
+      editorProps: {
+        handleClick: (_view, _pos, event) => {
+          this.$emit('onClick', event, this.editor)
+          return false
+        }
+      }
+    })
+  },
+  beforeUnmount() {
+    this.editor?.destroy()
+  },
+  methods: {
+    run(command, ...args) {
+      if (!this.editor || this.disabled) return
+      this.editor.chain().focus()[command](...args).run()
+    },
+    setBlock(value) {
+      if (value === 'paragraph') this.run('setParagraph')
+      else this.run('toggleHeading', {level: Number(value)})
+    },
+    setLink() {
+      if (this.disabled || !this.editor) return
+      const url = window.prompt('请输入链接地址', this.editor.getAttributes('link').href || 'https://')
+      if (url === null) return
+      if (!url.trim()) this.run('unsetLink')
+      else if (safeMediaUrl(url)) this.run('setLink', {href: url})
+    },
+    async uploadImage(event) {
+      const file = event.target.files?.[0]
+      event.target.value = ''
+      if (!file || this.disabled || !this.editor) return
+      this.uploadError = ''
+      try {
+        const data = new FormData()
+        data.append('file', file, file.name)
+        const result = await API.common.upload.post(data)
+        const src = result?.data?.src
+        if (!src || !safeMediaUrl(src)) throw new Error('Invalid uploaded image URL')
+        this.run('setImage', {src})
+      } catch {
+        this.uploadError = '图片上传失败'
+      }
+    },
+    insertMedia() {
+      if (this.disabled || !this.editor) return
+      const url = window.prompt('请输入媒体地址')
+      if (!url || !safeMediaUrl(url)) return
+      this.run('insertContent', {type: 'media', attrs: {src: url, kind: /\.(mp4|webm|ogg)(\?|$)/i.test(url) ? 'video' : 'iframe'}})
+    },
+    insertTable() {
+      this.run('insertTable', {rows: 3, cols: 3, withHeaderRow: true})
+    },
+    insertTemplate(event) {
+      const index = Number(event.target.value)
+      event.target.value = ''
+      if (this.disabled || !Number.isInteger(index)) return
+      const content = this.templates[index]?.content
+      if (typeof content === 'string') this.run('insertContent', content)
+    },
+    toggleSource() {
+      if (this.disabled || !this.editor) return
+      if (this.sourceMode) this.editor.commands.setContent(this.sourceValue)
+      else this.sourceValue = this.editor.getHTML()
+      this.sourceMode = !this.sourceMode
+    }
+  }
+}
 </script>
 
-<style>
+<style scoped>
+.sceditor { border: 1px solid #dcdfe6; border-radius: 4px; background: #fff; }
+.sceditor-toolbar { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px; border-bottom: 1px solid #dcdfe6; }
+.sceditor-toolbar button, .sceditor-toolbar select { min-height: 28px; padding: 2px 6px; border: 1px solid #dcdfe6; border-radius: 3px; background: #fff; cursor: pointer; }
+.sceditor-toolbar button:disabled, .sceditor-toolbar select:disabled { cursor: not-allowed; opacity: .5; }
+.sceditor-color { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; }
+.sceditor-color input { width: 26px; height: 28px; padding: 0; border: 0; }
+.sceditor-file { display: none; }
+.sceditor-content { padding: 12px; }
+.sceditor-content :deep(.ProseMirror) { min-height: inherit; outline: 0; line-height: 1.5; }
+.sceditor-content :deep(.ProseMirror p.is-editor-empty:first-child::before) { content: attr(data-placeholder); color: #aaa; float: left; height: 0; pointer-events: none; }
+.sceditor-content :deep(table) { border-collapse: collapse; }
+.sceditor-content :deep(td), .sceditor-content :deep(th) { border: 1px solid #bbb; padding: 4px 8px; }
+.sceditor-content :deep(img), .sceditor-content :deep(video), .sceditor-content :deep(iframe) { max-width: 100%; }
+.sceditor-content :deep([data-pagebreak]) { border-top: 1px dashed #aaa; margin: 16px 0; }
+.sceditor-source { display: block; width: 100%; padding: 12px; border: 0; box-sizing: border-box; font-family: monospace; }
+.sceditor-preview { position: fixed; inset: 10%; z-index: 3000; display: flex; flex-direction: column; padding: 12px; background: #fff; border: 1px solid #bbb; box-shadow: 0 8px 32px #0003; }
+.sceditor-preview button { align-self: flex-end; }
+.sceditor-preview iframe { flex: 1; width: 100%; border: 0; }
+.sceditor-error { color: #f56c6c; margin: 4px 12px; }
+.is-disabled .sceditor-content { background: #f5f7fa; }
 </style>

@@ -71,6 +71,7 @@ describe("平台身份、消息与接入应用管理", () => {
     cy.setCookie("TOKEN", "root-test-token");
     cy.visit(`/#${path}`, {
       onBeforeLoad(win) {
+        win.localStorage.setItem("MACULA_CLOUD_ADMIN_STORAGE_VERSION", "2");
         win.localStorage.setItem(
           "USER_INFO",
           JSON.stringify({

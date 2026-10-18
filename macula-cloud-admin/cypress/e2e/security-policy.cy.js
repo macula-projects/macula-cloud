@@ -41,6 +41,7 @@ describe("租户安全策略", () => {
     cy.setCookie("TOKEN", "root-test-token");
     cy.visit("/#/system/security-policy", {
       onBeforeLoad(win) {
+        win.localStorage.setItem("MACULA_CLOUD_ADMIN_STORAGE_VERSION", "2");
         win.localStorage.setItem(
           "USER_INFO",
           JSON.stringify({

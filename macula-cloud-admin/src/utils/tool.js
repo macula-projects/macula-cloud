@@ -22,18 +22,48 @@
  * @LastEditTime: 2022年5月24日00:28:56
  */
 
-import CryptoJS from 'crypto-js';
 import sysConfig from "@/config";
 
 const tool = {}
 
+const STORAGE_VERSION_KEY = 'MACULA_CLOUD_ADMIN_STORAGE_VERSION'
+const STORAGE_VERSION = '2'
+const LEGACY_STORAGE_KEYS = [
+	'USER_INFO', 'MENU', 'PERMISSIONS', 'APP_LANG', sysConfig.TENANT_ID,
+	'tenantStoreTenantOptions', 'tenantLabel'
+]
+
+function clearLegacyToken() {
+	const paths = ['/']
+	let path = ''
+	for (const segment of location.pathname.split('/').filter(Boolean)) {
+		path += `/${segment}`
+		paths.push(path)
+	}
+	for (const cookiePath of paths) {
+		document.cookie = `TOKEN=; Max-Age=0; Path=${cookiePath}`
+	}
+}
+
+// Run before locale, router, request interceptors, or stores read cached state.
+export function migrateLegacyStorage() {
+	try {
+		if (localStorage.getItem(STORAGE_VERSION_KEY) === STORAGE_VERSION) return
+		for (const key of LEGACY_STORAGE_KEYS) localStorage.removeItem(key)
+		// The old token cannot be used after its related user and permission cache is removed.
+		clearLegacyToken()
+		localStorage.setItem(STORAGE_VERSION_KEY, STORAGE_VERSION)
+	} catch (error) {
+		// Browsers can block storage; still invalidate the token when possible.
+		clearLegacyToken()
+	}
+}
+
+migrateLegacyStorage()
+
 /* localStorage */
 tool.data = {
 	set(key, data, datetime = 0) {
-		//加密
-		if(sysConfig.LS_ENCRYPTION == "AES"){
-			data = tool.crypto.AES.encrypt(JSON.stringify(data), sysConfig.LS_ENCRYPTION_key)
-		}
         let cacheValue = {
             content: data,
             datetime: parseInt(datetime) === 0 ? 0 : new Date().getTime() + parseInt(datetime) * 1000
@@ -49,10 +79,6 @@ tool.data = {
                     localStorage.removeItem(key)
                     return null;
                 }
-				//解密
-				if(sysConfig.LS_ENCRYPTION == "AES"){
-					value.content = JSON.parse(tool.crypto.AES.decrypt(value.content, sysConfig.LS_ENCRYPTION_key))
-				}
                 return value.content
             }
             return null
@@ -196,41 +222,75 @@ tool.groupSeparator = function (num) {
 	}).replace(/\.$/, '');
 }
 
-/* 常用加解密 */
+const encoder = new TextEncoder()
+const decoder = new TextDecoder('utf-8', {fatal: true})
+const AES_GCM_PREFIX = 'gcm1:'
+const AES_GCM_IV_LENGTH = 12
+
+function bytesToBase64(bytes) {
+	let binary = ''
+	for (let index = 0; index < bytes.length; index += 0x8000) {
+		binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000))
+	}
+	return btoa(binary)
+}
+
+function base64ToBytes(value) {
+	return Uint8Array.from(atob(value), character => character.charCodeAt(0))
+}
+
+// Browser cryptography is asynchronous. Keys must be supplied by the caller,
+// never embedded in a client-side configuration value.
 tool.crypto = {
-	//MD5加密
-	MD5(data){
-		return CryptoJS.MD5(data).toString()
+	SHA256: async (data) => {
+		const digest = await globalThis.crypto.subtle.digest('SHA-256', encoder.encode(data))
+		return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')
 	},
-	//BASE64加解密
 	BASE64: {
-		encrypt(data){
-			return CryptoJS.enc.Base64.stringify(CryptoJS.enc.Utf8.parse(data))
+		encrypt(data) {
+			return bytesToBase64(encoder.encode(data))
 		},
-		decrypt(cipher){
-			return CryptoJS.enc.Base64.parse(cipher).toString(CryptoJS.enc.Utf8)
+		decrypt(cipher) {
+			return decoder.decode(base64ToBytes(cipher))
 		}
 	},
-	//AES加解密
 	AES: {
-		encrypt(data, secretKey, config={}){
-			if(secretKey.length % 8 != 0){
-				console.warn("[SCUI error]: 秘钥长度需为8的倍数，否则解密将会失败。")
-			}
-			const result = CryptoJS.AES.encrypt(data, CryptoJS.enc.Utf8.parse(secretKey), {
-				iv: CryptoJS.enc.Utf8.parse(config.iv || ""),
-				mode: CryptoJS.mode[config.mode || "ECB"],
-				padding: CryptoJS.pad[config.padding || "Pkcs7"]
-			})
-			return result.toString()
+		generateKey() {
+			return globalThis.crypto.subtle.generateKey(
+				{name: 'AES-GCM', length: 256}, false, ['encrypt', 'decrypt']
+			)
 		},
-		decrypt(cipher, secretKey, config={}){
-			const result = CryptoJS.AES.decrypt(cipher, CryptoJS.enc.Utf8.parse(secretKey), {
-				iv: CryptoJS.enc.Utf8.parse(config.iv || ""),
-				mode: CryptoJS.mode[config.mode || "ECB"],
-				padding: CryptoJS.pad[config.padding || "Pkcs7"]
-			})
-			return CryptoJS.enc.Utf8.stringify(result);
+		importKey(rawKey) {
+			const bytes = new Uint8Array(rawKey)
+			if (![16, 24, 32].includes(bytes.byteLength)) {
+				throw new TypeError('AES key must contain 16, 24, or 32 bytes')
+			}
+			return globalThis.crypto.subtle.importKey('raw', bytes, 'AES-GCM', false, ['encrypt', 'decrypt'])
+		},
+		async encrypt(data, key) {
+			const iv = globalThis.crypto.getRandomValues(new Uint8Array(AES_GCM_IV_LENGTH))
+			const encrypted = new Uint8Array(await globalThis.crypto.subtle.encrypt(
+				{name: 'AES-GCM', iv}, key, encoder.encode(data)
+			))
+			const payload = new Uint8Array(iv.length + encrypted.length)
+			payload.set(iv)
+			payload.set(encrypted, iv.length)
+			return AES_GCM_PREFIX + bytesToBase64(payload)
+		},
+		async decrypt(cipher, key) {
+			if (typeof cipher !== 'string' || !cipher.startsWith(AES_GCM_PREFIX)) {
+				throw new TypeError('Unsupported AES ciphertext format')
+			}
+			const payload = base64ToBytes(cipher.slice(AES_GCM_PREFIX.length))
+			if (payload.length < AES_GCM_IV_LENGTH + 16) {
+				throw new TypeError('Invalid AES ciphertext')
+			}
+			const decrypted = await globalThis.crypto.subtle.decrypt(
+				{name: 'AES-GCM', iv: payload.subarray(0, AES_GCM_IV_LENGTH)},
+				key,
+				payload.subarray(AES_GCM_IV_LENGTH)
+			)
+			return decoder.decode(decrypted)
 		}
 	}
 }

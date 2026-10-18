@@ -81,12 +81,6 @@ const DEFAULT_CONFIG = {
     //主题颜色
     COLOR: '',
 
-    //是否加密localStorage, 为空不加密，可填写AES(模式ECB,移位Pkcs7)加密
-    LS_ENCRYPTION: '',
-
-    //localStorageAES加密秘钥，位数建议填写8的倍数
-    LS_ENCRYPTION_key: '2XNN4K8LC0ELVWN4',
-
     MODEL: {
         system: 'system',
         oss: 'oss',

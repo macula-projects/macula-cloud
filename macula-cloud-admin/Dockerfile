@@ -1,8 +1,8 @@
 # syntax=docker/dockerfile:1.7
-FROM node:20.19.5-alpine AS build
+FROM node:24.19.0-alpine AS build
 WORKDIR /workspace
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN CYPRESS_INSTALL_BINARY=0 npm ci
 COPY . .
 ARG VITE_MODE=docker
 ARG VITE_APP_API_BASEURL=/api
