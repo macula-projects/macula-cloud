@@ -77,6 +77,14 @@ System 数据库同时供 IAM 使用，清理后相关账号、权限及认证�
   强制启用 PKCE。表单支持 OIDC `openid` 和 ID Token 签名设置。客户端变更在事务提交后清理
   IAM 共享缓存，但不会撤销已签发的授权或令牌。仅 `client_credentials` 的应用无需回调 URI；
   `client_secret_jwt` 不开放新配置，因为现有单向哈希密钥不能用于 HMAC 验签。上线前应针对已有客户端做兼容回归。
+- V6 新增 `sys_user_identity_binding`，只维护第三方 provider subject 到 username 的全局绑定，不含
+  tenant ID、user ID、user type 或 token。`(provider_type, provider_subject)` 与
+  `(provider_type, username)` 均唯一；当前仅由受控运维流程预置。V6 还通过生成列唯一键约束每种
+  `provider_type` 最多一条 `enabled=1` 配置，禁用配置可并存。升级前须执行
+  `SELECT provider_type, COUNT(*) FROM sys_identity_provider WHERE enabled=1 GROUP BY provider_type HAVING COUNT(*)>1`；
+  若有结果，迁移会在创建绑定表前按设计停止，必须备份后人工选择保留项，不会自动禁用或删除。
+  清理重复项后按 Flyway 标准流程执行 `repair` 再重跑迁移；隔离 MySQL 测试覆盖该恢复路径。回滚需
+  恢复升级前数据库备份并同时回退 IAM/System 应用，不能只删除 Flyway 历史或索引。
 
 隔离数据库集成测试 `SettingsPersistenceIT` 默认不运行；显式设置 `SYSTEM_SETTINGS_IT=true` 后，
 须将 `SPRING_DATASOURCE_URL` 指向名称以 `macula_settings_it_` 开头、已升级至 V5 的隔离测试库，
@@ -87,7 +95,9 @@ Flyway，不会自行执行迁移。测试会核对库名，
 Flyway 增量验证 `IdentityProviderMigrationIT` 默认禁用；仅将 `SYSTEM_MIGRATION_IT=true`、
 `SPRING_DATASOURCE_URL/USERNAME/PASSWORD` 指向**全新空的** `macula_settings_it_*` 隔离库后运行。
 测试先应用 V1、V2，插入虚构旧行，再应用 V3/V4，核对 `flyway_schema_history`、列类型和旧行；
-测试不会删除该库，执行者须核实库名后单独清理。若切换分支后 `target/classes` 有旧迁移残留，
+测试会在首轮成功升级与约束验证后清理该专用测试库中的对象，再构造历史重复启用数据证明 V6
+安全停止、未留下绑定表，并验证清理重复项后 `repair` 与重跑成功；不会删除数据库本身，执行者须
+核实库名后单独清理。若切换分支后 `target/classes` 有旧迁移残留，
 先对目标模块执行 Maven `clean`，不要修改已执行的 Flyway 源文件。
 ## 租户安全策略
 

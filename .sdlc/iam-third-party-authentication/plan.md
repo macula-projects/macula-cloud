@@ -2,7 +2,7 @@
 
 ## Files that change
 - SDLC 与基线：保留 `.sdlc/iam-third-party-authentication/intent.md`、`spec.md`，新增本 `plan.md`。Phase B 开始前先把当前临时工作分支安全刷新到远端 `main`，保留已提交 SDLC 工件以及用户已有的 `AGENTS.md`、`.agent_context/`，不把运行时文件纳入提交。
-- System 数据库：新增 `macula-cloud-system/src/main/resources/db/migration/V5__iam_third_party_authentication.sql`。创建不含租户、用户 ID 和用户类型的 `sys_user_identity_binding(id, provider_type, provider_subject, username, create_by, create_time, last_update_by, last_update_time)`，建立 `(provider_type, provider_subject)` 与 `(provider_type, username)` 唯一约束；为 `sys_identity_provider` 增加只约束 `enabled=1` 行的同类型唯一键，迁移前发现重复启用配置时安全停止，不自动选择或禁用记录。
+- System 数据库：新增 `macula-cloud-system/src/main/resources/db/migration/V6__iam_third_party_authentication.sql`。创建不含租户、用户 ID 和用户类型的 `sys_user_identity_binding(id, provider_type, provider_subject, username, create_by, create_time, last_update_by, last_update_time)`，建立 `(provider_type, provider_subject)` 与 `(provider_type, username)` 唯一约束；为 `sys_identity_provider` 增加只约束 `enabled=1` 行的同类型唯一键，迁移前发现重复启用配置时安全停止，不自动选择或禁用记录。
 - System 服务与文档：修改 `macula-cloud-system/src/main/java/dev/macula/cloud/system/service/impl/IdentityProviderServiceImpl.java`，在启用配置时主动返回同类型冲突并由数据库约束兜底；修改 `macula-cloud-system/README.md`，记录绑定表语义、预置方式、启用唯一性、迁移预检与回滚边界。
 - System 测试：修改 `macula-cloud-system/src/test/java/dev/macula/cloud/system/service/impl/IdentityProviderServiceImplTest.java` 与 `macula-cloud-system/src/test/java/dev/macula/cloud/system/integration/IdentityProviderMigrationIT.java`，覆盖 Service 冲突、空库升级、历史重复安全停止、生成唯一键和绑定表双唯一约束。
 - IAM 持久化：新增 `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/pojo/entity/SysIdentityProvider.java`、`SysUserIdentityBinding.java`，以及 `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/mapper/SysIdentityProviderMapper.java`、`SysUserIdentityBindingMapper.java`。配置查询区分不含 secret 的登录页投影与回调阶段的凭据读取；绑定只把 provider subject 映射为 username。
@@ -17,7 +17,7 @@
 
 ## Order of work
 1. 在不覆盖 `AGENTS.md` 和 `.agent_context/` 的前提下获取远端 refs，将已批准的 intent/spec/plan 提交安全重放到当前远端 `main` 基线；核对 `git status`、merge-base 和差异，解决 spec 中的基线 blocker 后才触碰业务源码。
-2. 先增加失败测试与 V5 迁移：固定绑定表没有 `tenant_id/user_id/user_type`，验证双唯一键；对现有 `sys_identity_provider` 做重复启用预检，再增加数据库并发唯一约束。同步 System Service 的主动冲突检查和异常语义，不改已有 V1–V4。
+2. 先增加失败测试与 V6 迁移：固定绑定表没有 `tenant_id/user_id/user_type`，验证双唯一键；对现有 `sys_identity_provider` 做重复启用预检，再增加数据库并发唯一约束。同步 System Service 的主动冲突检查和异常语义，不改已有 V1–V5。
 3. 建立 IAM 只读持久化与配置服务：登录页列表查询不读取密钥，回调按 provider type 唯一读取启用配置并解密凭据；任何缺失、重复、禁用、非法 JSON 或解密失败都对该 provider 失败关闭，日志不得包含 secret、code、token 或原始响应。
 4. 提取 OAuth client 用户路由：用显式 client ID 读取 `tenantId + UserTypeEnum`，把这两个值与 provider、会话、state、创建时间和 SavedRequest 关联；回调重新读取 client 并比对快照。账号查询继续走 `UserAuthInfoService(userType, tenantId, username)`/系统用户回退，不让绑定表或请求参数决定租户、用户类型或权限。
 5. 实现公共 state/Filter/失败处理：使用安全随机 state，每个会话每个 provider 只保留一个、五分钟过期、先原子消费再交换 code；发起请求与回调共用 `/login/github`、`/login/wecom`，回调 URL只由受信任 issuer 生成。恢复服务端 SavedRequest，拒绝 Host/return URL/Cookie 改写目标。
@@ -28,7 +28,13 @@
 10. Stage 3 运行定向单测、编译、模板/UI 检查和 `git diff --check` 作为实现反馈；记录任何实际文件或方案偏差。业务代码完成后停在 “Is the implementation complete per the plan?” 门，不以本阶段结果替代 Stage 4 正式验证。
 
 ## Risks
-- V5 的启用唯一约束依赖目标 MySQL 对生成列/唯一索引的支持；必须在隔离 MySQL 用真实迁移证明。历史同类型多条启用配置会使迁移按设计停止，环境负责人需先备份并选择保留记录；迁移不得自动清洗。回滚应停止 IAM/System 写入并恢复升级前数据库备份与匹配应用版本，不能只删除 Flyway 历史。
+- Stage 5 review return（2026-10-18）：独立 Bugs/Security/Compliance 评审发现五条 Important，用户明确要求解决，Stage 3 因此重新打开。修复保持既有 spec，不扩大功能范围：把受控 OAuth SavedRequest 相对目标绑定到 state 并由专用成功处理器恢复；仅允许 `EMPLOYEE` 显式回退系统用户；调整 V6 DDL 顺序并证明 repair/rerun；原子消费 session state；移除 GitHub `read:user`。新增 `ThirdPartyAuthenticationSuccessHandler.java` 与 `ThirdPartyAuthenticationFlowTest.java`，并修改已有 state、用户路由、GitHub 和迁移测试。修复后旧 verification/review 结论作历史记录，必须重新执行 Stage 4 与 Stage 5。
+- Stage 5 second review return（2026-10-18）：修复后独立复审确认前五条已关闭，但发现 client 快照校验与用户路由二次读取之间存在 TOCTOU。用户同意返回 Stage 3。修复把 state 中期望的 tenantId/userType 传入 `OAuthClientUserDetailsService`，由实现只读取一次 client、核对并使用同一快照查询账号；同步调整 `ThirdPartyUserDetailsServiceTest` 证明精确快照传递、路由变化失败关闭且 client 仅读取一次。该修复不改变接口范围或用户语义，完成后须再次执行 Stage 4 与 Stage 5。
+- Phase B deviation（2026-10-18）：仓库中不存在 `CLAUDE.md`，无法执行原计划所依赖技能要求中的该项读取；实现继续以根 `AGENTS.md`、`.agents/rules/*`、accepted spec 和本计划作为项目指令。该偏差不改变文件范围、实现顺序或 Proof。
+- Phase B deviation（2026-10-18）：刷新到远端 `main` 后发现消息渠道功能已经占用 Flyway `V5`；本功能迁移由计划中的 `V5__iam_third_party_authentication.sql` 顺延为 `V6__iam_third_party_authentication.sql`，迁移内容和证明目标不变。
+- Phase B deviation（2026-10-18）：远端 `main` 已为 IAM 配置 `macula.crypto` 并在 Compose 注入与 System 相同的 `MACULA_CRYPTO_PASSWORD`，因此未重复修改 `application.yml` 和 `deploy/docker-compose.yml`；本功能只复用现有安全注入，README 补充第三方登录约束。现有基线在缺少该密钥时已因短信配置而启动失败，本变更不新增启动期依赖；单个 provider 的缺失、重复、非法 JSON 或读取异常仍在运行时失败关闭。
+- Phase B deviation（2026-10-18）：计划中的独立 `GithubAuthenticationFilterTest`、`WecomAuthenticationFilterTest` 合并到真实 SecurityFilterChain 的 `IamProtocolTest`，以同一测试同时证明匿名放行、受信 issuer 回调、Host 注入拒绝、client 快照和登录页开关；provider 路由仍由两个独立 Provider 单测覆盖。未修改 `auth.js`。
+- V6 的启用唯一约束依赖目标 MySQL 对生成列/唯一索引的支持；必须在隔离 MySQL 用真实迁移证明。历史同类型多条启用配置会使迁移按设计停止，环境负责人需先备份并选择保留记录；迁移不得自动清洗。回滚应停止 IAM/System 写入并恢复升级前数据库备份与匹配应用版本，不能只删除 Flyway 历史。
 - `sys_user_identity_binding` 是全局 username 绑定，不含租户和用户类型；若同一 username 在不同用户体系代表不同主体，OAuth client 的 `user_type/tenant_id` 会决定最终解析结果。实现必须每次重新走现有用户服务，不能缓存某次租户结果或直接联查默认 `sys_user`。
 - 当前 `UserAuthInfoService` 为可选扩展且现有代码存在系统用户回退。重构必须保持密码/短信行为兼容，同时证明 `MEMBER/EMPLOYEE/ODC/SUPPLIER` 的 client 选择不会被第三方流程绕过；如发现现有回退会导致跨用户类型误匹配，须暂停并记录为计划级安全偏差，不能自行扩大修复。
 - IAM 直接读取 System 加密凭据要求同一外部密钥。Crypto 能力未配置、密钥错误或历史密文不兼容时，对应 provider 必须不可用但 IAM 本地认证仍可启动；初始化时不得把密文误当明文发给第三方，也不得输出诊断明文。
@@ -39,7 +45,7 @@
 
 ## Proof
 - System 单元测试：`IdentityProviderServiceImplTest` 覆盖创建/更新第二条同类型启用配置返回冲突、更新自身不误判、禁用或隐藏配置允许共存、凭据不回显和数据库异常映射。
-- MySQL 迁移测试：`IdentityProviderMigrationIT` 从 V1–V4 升到 V5，验证无重复时成功、重复启用时停止、启用唯一键的并发兜底、两个绑定唯一约束、username 长度/字符集及表中不存在 tenant/user ID/user type/token 字段；测试只使用命名受限的隔离数据库。
+- MySQL 迁移测试：`IdentityProviderMigrationIT` 从 V1–V5 升到 V6，验证无重复时成功、重复启用时停止、启用唯一键的并发兜底、两个绑定唯一约束、username 长度/字符集及表中不存在 tenant/user ID/user type/token 字段；测试只使用命名受限的隔离数据库。
 - 公共 IAM 单测：state 的随机性、provider/client/tenant/user type/会话绑定、五分钟边界、一次消费、错配与重放；OAuth client 在回调期间变更时拒绝；`enabled/visible`、缺失/重复配置和解密失败；稳定错误分类且 secret/code/token/原始响应不出现在日志或响应。
 - 用户路由测试：显式 client ID 分别选择 `MEMBER`、`EMPLOYEE`、`ODC`、`SUPPLIER`，把相同 username 传给正确的 `UserAuthInfoService`，验证 tenant ID、禁用账号、空结果和系统用户回退兼容；证明绑定表不能改变 client 的用户类型或租户。
 - GitHub 单元测试：授权 URI、state、精确回调，token 交换和 `GET /user`；只使用稳定数值 `id`，拒绝 login/email 兜底；全局绑定成功、未绑定、重复/非法数据、不同 client 用户类型/租户的成功或拒绝，以及 HTTP 超时/错误/非法 JSON。

@@ -15,6 +15,8 @@ const baseUrl = process.env.IAM_PREVIEW_URL || 'http://127.0.0.1:18743';
       for (const button of await page.locator('button:visible').all()) assert.ok((await button.boundingBox()).height>=44);
       await page.screenshot({path:artifacts+'/'+view+'-'+name+'.png',fullPage:true});
       if(view==='login'){
+        assert.equal(await page.locator('.external-button').count(),2);
+        for (const link of await page.locator('.external-button').all()) assert.ok((await link.boundingBox()).height>=44);
         await page.getByRole('tab',{name:'手机验证码'}).click();
         await page.getByLabel('手机号码',{exact:true}).fill('13800000000');
         const sendCodeUrl=await page.locator('[data-send-code]').getAttribute('data-send-code-url');
@@ -23,6 +25,7 @@ const baseUrl = process.env.IAM_PREVIEW_URL || 'http://127.0.0.1:18743';
         await page.route('**/api/v1/sms-code',route=>route.fulfill({status:200,contentType:'application/json',body:'{"status":"submitted"}'}));
         await page.getByRole('button',{name:'获取验证码'}).click();
         assert.equal(await page.locator('[data-send-code]').isDisabled(),true);
+        await page.locator('[data-send-code]').filter({hasText:'60 秒后重试'}).waitFor();
         assert.match(await page.locator('[data-send-code]').textContent(),/60 秒后重试/);
         await page.unroute('**/api/v1/sms-code');
         await page.getByRole('tab',{name:'账号密码'}).click();

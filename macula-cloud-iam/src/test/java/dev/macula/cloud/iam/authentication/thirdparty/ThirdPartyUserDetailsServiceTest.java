@@ -1,0 +1,139 @@
+/*
+ * Copyright (c) 2026 Macula
+ *   macula.dev, China
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package dev.macula.cloud.iam.authentication.thirdparty;
+
+import dev.macula.cloud.iam.enums.UserTypeEnum;
+import dev.macula.cloud.iam.pojo.entity.SysOAuth2Client;
+import dev.macula.cloud.iam.pojo.dto.UserAuthInfo;
+import dev.macula.cloud.iam.service.support.SysOAuth2ClientService;
+import dev.macula.cloud.iam.service.support.SysUserService;
+import dev.macula.cloud.iam.service.support.UserAuthInfoService;
+import dev.macula.cloud.iam.service.userdetails.OAuthClientUserDetailsService;
+import dev.macula.cloud.iam.service.userdetails.SysUserDetailsServiceImpl;
+import org.junit.jupiter.api.Test;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+
+import java.time.Instant;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+/**
+ * 验证回调不会绕过 OAuth client 的租户和用户类型快照。
+ *
+ * @author Rain
+ * @since 6.1.0
+ */
+class ThirdPartyUserDetailsServiceTest {
+    @Test
+    void delegatesStateBoundRoutingSnapshot() {
+        OAuthClientUserDetailsService users = mock(OAuthClientUserDetailsService.class);
+        when(users.loadUserByClient("portal", 7L, UserTypeEnum.EMPLOYEE, "alice"))
+            .thenReturn(User.withUsername("alice").password("n/a").authorities("USER").build());
+
+        var service = new ThirdPartyUserDetailsService(users);
+        var context = new ThirdPartyLoginContext("GITHUB", "portal", 7L, UserTypeEnum.EMPLOYEE, Instant.now());
+        assertEquals("alice", service.load(context, "alice").getUsername());
+        verify(users).loadUserByClient("portal", 7L, UserTypeEnum.EMPLOYEE, "alice");
+    }
+
+    @Test
+    void rejectsChangedClientRouting() {
+        SysUserService systemUsers = mock(SysUserService.class);
+        SysOAuth2ClientService clients = mock(SysOAuth2ClientService.class);
+        UserAuthInfoService routedUsers = mock(UserAuthInfoService.class);
+        SysOAuth2Client client = new SysOAuth2Client();
+        client.setTenantId(8L);
+        client.setUserType(UserTypeEnum.MEMBER);
+        when(clients.getClientByClientId("portal")).thenReturn(client);
+
+        var users = new SysUserDetailsServiceImpl(systemUsers, clients, routedUsers);
+        var service = new ThirdPartyUserDetailsService(users);
+        var context = new ThirdPartyLoginContext("WECOM", "portal", 7L, UserTypeEnum.EMPLOYEE, Instant.now());
+        assertThrows(BadCredentialsException.class, () -> service.load(context, "alice"));
+        verify(clients, times(1)).getClientByClientId("portal");
+        verifyNoInteractions(routedUsers, systemUsers);
+    }
+
+    @Test
+    void oauthClientSelectsEachSupportedUserTypeAndTenant() {
+        SysUserService systemUsers = mock(SysUserService.class);
+        SysOAuth2ClientService clients = mock(SysOAuth2ClientService.class);
+        UserAuthInfoService routedUsers = mock(UserAuthInfoService.class);
+        UserAuthInfo user = new UserAuthInfo();
+        user.setUserId(1L);
+        user.setUsername("same-name");
+        user.setStatus(1);
+        user.setDataScope(1);
+        user.setRoles(java.util.Set.of("USER"));
+        when(routedUsers.getUserAuthInfo(any(), eq(99L), eq("same-name"))).thenReturn(user);
+        SysUserDetailsServiceImpl service = new SysUserDetailsServiceImpl(systemUsers, clients, routedUsers);
+
+        for (UserTypeEnum type : UserTypeEnum.values()) {
+            SysOAuth2Client client = new SysOAuth2Client();
+            client.setTenantId(99L);
+            client.setUserType(type);
+            when(clients.getClientByClientId(type.getType())).thenReturn(client);
+            assertEquals("same-name",
+                service.loadUserByClient(type.getType(), 99L, type, "same-name").getUsername());
+            verify(routedUsers).getUserAuthInfo(type, 99L, "same-name");
+        }
+        verifyNoInteractions(systemUsers);
+    }
+
+    @Test
+    void nonEmployeeClientNeverFallsBackToSameNamedSystemUser() {
+        SysUserService systemUsers = mock(SysUserService.class);
+        SysOAuth2ClientService clients = mock(SysOAuth2ClientService.class);
+        UserAuthInfoService routedUsers = mock(UserAuthInfoService.class);
+        SysOAuth2Client client = new SysOAuth2Client();
+        client.setTenantId(99L);
+        client.setUserType(UserTypeEnum.MEMBER);
+        when(clients.getClientByClientId("member-client")).thenReturn(client);
+
+        SysUserDetailsServiceImpl service = new SysUserDetailsServiceImpl(systemUsers, clients, routedUsers);
+
+        assertThrows(UsernameNotFoundException.class,
+            () -> service.loadUserByClient("member-client", 99L, UserTypeEnum.MEMBER, "same-name"));
+        verify(routedUsers).getUserAuthInfo(UserTypeEnum.MEMBER, 99L, "same-name");
+        verifyNoInteractions(systemUsers);
+    }
+
+    @Test
+    void employeeClientMayUseTheExistingSystemUserSource() {
+        SysUserService systemUsers = mock(SysUserService.class);
+        SysOAuth2ClientService clients = mock(SysOAuth2ClientService.class);
+        SysOAuth2Client client = new SysOAuth2Client();
+        client.setTenantId(99L);
+        client.setUserType(UserTypeEnum.EMPLOYEE);
+        when(clients.getClientByClientId("employee-client")).thenReturn(client);
+        UserAuthInfo user = new UserAuthInfo();
+        user.setUserId(1L);
+        user.setUsername("employee");
+        user.setStatus(1);
+        user.setDataScope(1);
+        user.setRoles(java.util.Set.of("USER"));
+        when(systemUsers.getUserAuthInfo(99L, "employee", null)).thenReturn(user);
+
+        SysUserDetailsServiceImpl service = new SysUserDetailsServiceImpl(systemUsers, clients, null);
+
+        assertEquals("employee",
+            service.loadUserByClient("employee-client", 99L, UserTypeEnum.EMPLOYEE, "employee").getUsername());
+        verify(clients, times(1)).getClientByClientId("employee-client");
+    }
+}

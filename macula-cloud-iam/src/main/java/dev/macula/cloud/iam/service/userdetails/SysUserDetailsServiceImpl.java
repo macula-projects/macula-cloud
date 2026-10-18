@@ -21,6 +21,7 @@ import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import dev.macula.boot.enums.StatusEnum;
 import dev.macula.cloud.iam.authentication.sms.SmsUserDetailsService;
+import dev.macula.cloud.iam.enums.UserTypeEnum;
 import dev.macula.cloud.iam.pojo.dto.UserAuthInfo;
 import dev.macula.cloud.iam.pojo.entity.SysOAuth2Client;
 import dev.macula.cloud.iam.pojo.entity.SysUser;
@@ -31,6 +32,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsPasswordService;
@@ -55,7 +57,7 @@ import static dev.macula.boot.starter.web.utils.RequestUtil.getCurrentRequest;
 @Slf4j
 @RequiredArgsConstructor
 public class SysUserDetailsServiceImpl implements UserDetailsService, UserDetailsPasswordService,
-    SmsUserDetailsService {
+    SmsUserDetailsService, OAuthClientUserDetailsService {
 
     private final SysUserService sysUserService;
     private final SysOAuth2ClientService sysOAuth2ClientService;
@@ -86,6 +88,34 @@ public class SysUserDetailsServiceImpl implements UserDetailsService, UserDetail
 
         Assert.isTrue(userAuthInfo != null, "用户不存在");
 
+        if (!StatusEnum.ENABLE.getValue().equals(userAuthInfo.getStatus())) {
+            throw new DisabledException("该账户已被禁用!");
+        }
+        SysUserDetails details = new SysUserDetails(userAuthInfo);
+        details.setTenantId(tenantId);
+        return details;
+    }
+
+    @Override
+    public UserDetails loadUserByClient(String clientId, Long expectedTenantId, UserTypeEnum expectedUserType,
+        String username) {
+        Assert.hasText(clientId, "OAuth client ID 不能为空");
+        Assert.notNull(expectedTenantId, "OAuth client 租户快照不能为空");
+        Assert.notNull(expectedUserType, "OAuth client 用户类型快照不能为空");
+        SysOAuth2Client oauth2Client = sysOAuth2ClientService.getClientByClientId(clientId);
+        if (oauth2Client == null || oauth2Client.getTenantId() == null || oauth2Client.getUserType() == null) {
+            throw new UsernameNotFoundException("OAuth client 不存在或用户路由未配置");
+        }
+        if (!expectedTenantId.equals(oauth2Client.getTenantId()) || expectedUserType != oauth2Client.getUserType()) {
+            throw new BadCredentialsException("OAuth client 配置已变化");
+        }
+        Long tenantId = oauth2Client.getTenantId();
+        UserAuthInfo userAuthInfo = userAuthInfoService == null ? null
+            : userAuthInfoService.getUserAuthInfo(oauth2Client.getUserType(), tenantId, username);
+        if (userAuthInfo == null && UserTypeEnum.EMPLOYEE == oauth2Client.getUserType()) {
+            userAuthInfo = sysUserService.getUserAuthInfo(tenantId, username, null);
+        }
+        if (userAuthInfo == null) throw new UsernameNotFoundException("用户不存在");
         if (!StatusEnum.ENABLE.getValue().equals(userAuthInfo.getStatus())) {
             throw new DisabledException("该账户已被禁用!");
         }
