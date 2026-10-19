@@ -18,6 +18,7 @@ package dev.macula.cloud.iam.authentication.github;
 
 import dev.macula.cloud.iam.authentication.thirdparty.AbstractThirdPartyAuthenticationFilter;
 import dev.macula.cloud.iam.authentication.thirdparty.IdentityProviderConfigService.ProviderConfig;
+import dev.macula.cloud.iam.enums.ThirdPartyProviderType;
 
 /**
  * GitHub 登录发起与回调过滤器。
@@ -29,7 +30,7 @@ public class GithubAuthenticationFilter extends AbstractThirdPartyAuthentication
     private GithubClient client;
 
     public GithubAuthenticationFilter() {
-        super("GITHUB", "/login/github");
+        super(ThirdPartyProviderType.GITHUB.providerType(), ThirdPartyProviderType.GITHUB.loginPath());
     }
 
     void githubClient(GithubClient client) {

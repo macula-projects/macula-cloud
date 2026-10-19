@@ -31,6 +31,7 @@ import dev.macula.cloud.iam.authentication.weapp.WeappClientService;
 import dev.macula.cloud.iam.authentication.weapp.WeappLoginFilterConfigurer;
 import dev.macula.cloud.iam.authentication.weapp.WeappSessionKeyCache;
 import dev.macula.cloud.iam.authentication.weapp.WeappUserDetailsService;
+import dev.macula.cloud.iam.enums.ThirdPartyProviderType;
 import dev.macula.cloud.iam.handler.JsonAuthenticationEntryPoint;
 import dev.macula.cloud.iam.handler.RedirectLoginAuthenticationSuccessHandler;
 import dev.macula.cloud.iam.service.support.SysOAuth2ClientService;
@@ -85,7 +86,8 @@ public class DefaultSecurityConfiguration {
                 .requestMatchers("/admin/images/**").permitAll()
                 .requestMatchers("/favicon.ico").permitAll()
                 .requestMatchers("/iam/**").permitAll()
-                .requestMatchers("/login", "/login/github", "/login/wecom").permitAll()
+                .requestMatchers("/login", ThirdPartyProviderType.GITHUB.loginPath(),
+                    ThirdPartyProviderType.WECOM.loginPath()).permitAll()
                 .requestMatchers("/api/v1/sms-code").permitAll()
                 .anyRequest().authenticated())
             .userDetailsService(userDetailsService)

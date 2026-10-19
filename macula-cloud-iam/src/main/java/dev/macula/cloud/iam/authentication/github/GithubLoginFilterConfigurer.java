@@ -17,6 +17,7 @@
 package dev.macula.cloud.iam.authentication.github;
 
 import dev.macula.cloud.iam.authentication.thirdparty.*;
+import dev.macula.cloud.iam.enums.ThirdPartyProviderType;
 import dev.macula.cloud.iam.service.support.SysOAuth2ClientService;
 import org.springframework.context.ApplicationContext;
 import org.springframework.http.HttpMethod;
@@ -41,7 +42,7 @@ import static org.springframework.security.config.annotation.web.builders.Filter
 public class GithubLoginFilterConfigurer<H extends HttpSecurityBuilder<H>>
     extends AbstractAuthenticationFilterConfigurer<H, GithubLoginFilterConfigurer<H>, GithubAuthenticationFilter> {
     public GithubLoginFilterConfigurer() {
-        super(new GithubAuthenticationFilter(), "/login/github");
+        super(new GithubAuthenticationFilter(), ThirdPartyProviderType.GITHUB.loginPath());
     }
 
     @Override

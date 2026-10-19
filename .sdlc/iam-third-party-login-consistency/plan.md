@@ -18,6 +18,7 @@
 6. Stage 3 运行定向测试及 `git diff --check` 作为实现反馈，搜索受影响目录确认运行时重复字面量已收敛且测试字面量仍可独立保护契约；记录实际偏差。完成后停在 Build 实现确认门，正式测试与环境差异由 Stage 4 记录。
 
 ## Risks
+- Phase B deviation（2026-10-19）：仓库中没有 `CLAUDE.md`；按技能要求完成检查后，改用仓库实际存在的 `AGENTS.md` 和已读取的相关 `.agents/rules/*` 作为实现指令。此偏差不改变文件清单、实施顺序或验证范围。
 - 登录模板改为动态路径时，Thymeleaf URL 表达式可能丢失上下文路径、编码或 `client_id`；必须看实际渲染 HTML，而非只查模板源码。
 - Filter matcher、Configurer processing URL 与 Security 匿名放行若取得不同路径，会导致入口不可达或放行过宽；保留现有两条精确路径，并分别验证允许与拒绝路径。
 - `providerType` 仍作为数据库、state 和 token 的字符串；若只替换部分调用点或误用枚举名，可能破坏配置/绑定查询及回调校验。测试必须固定大写 code、小写 URL 和 Provider 拒绝另一类型。
