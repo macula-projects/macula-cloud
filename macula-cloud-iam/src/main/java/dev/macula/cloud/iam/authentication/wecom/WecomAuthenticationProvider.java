@@ -19,6 +19,7 @@ package dev.macula.cloud.iam.authentication.wecom;
 import dev.macula.cloud.iam.authentication.thirdparty.IdentityProviderConfigService;
 import dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyAuthenticationToken;
 import dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyUserDetailsService;
+import dev.macula.cloud.iam.enums.ThirdPartyProviderType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.core.Authentication;
@@ -39,11 +40,12 @@ public class WecomAuthenticationProvider implements AuthenticationProvider {
     @Override
     public Authentication authenticate(Authentication authentication) {
         ThirdPartyAuthenticationToken token = (ThirdPartyAuthenticationToken)authentication;
-        if (!"WECOM".equals(token.getProviderType())) return null;
-        var config = configService.requireEnabled("WECOM");
+        if (!ThirdPartyProviderType.WECOM.providerType().equals(token.getProviderType())) return null;
+        var config = configService.requireEnabled(ThirdPartyProviderType.WECOM.providerType());
         String username = wecomClient.fetchUserId(config, token.getCredentials().toString());
         UserDetails user = userDetailsService.load(token.getLoginContext(), username);
-        return ThirdPartyAuthenticationToken.authenticated("WECOM", user, token.getLoginContext());
+        return ThirdPartyAuthenticationToken.authenticated(ThirdPartyProviderType.WECOM.providerType(), user,
+            token.getLoginContext());
     }
 
     @Override

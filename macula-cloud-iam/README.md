@@ -79,6 +79,9 @@ state 自带的服务端目标，不使用会话中可能被其他标签页覆�
 不持久化，也不写日志。部署时 IAM 与
 System 必须共享 `MACULA_CRYPTO_PASSWORD`；GitHub 回调为 `<issuer>/login/github`，企业微信回调为
 `<issuer>/login/wecom`，应在各开放平台精确登记。企业微信自建应用还需把实际登录成员纳入应用可见范围。
+IAM 的 `ThirdPartyProviderType` 将已接入登录的 `GITHUB`/`/login/github`、`WECOM`/`/login/wecom`
+作为内部统一映射；数据库中的 provider type 和对外回调路径保持原值。System 的身份源管理目录独立维护，
+新增登录源时应同时核对两侧的类型与回调路径。
 登录页通过同源、CSRF 保护的 `POST /api/v1/sms-code` 请求验证码。IAM 只读共享 System 数据库中的
 唯一启用短信供应商和 `SMS_LOGIN` 中文模板，使用阿里云或腾讯云 SDK 提交；配置缺失、重复、
 不受支持或无法解密时失败关闭。验证码使用安全随机数生成，只以 HMAC-SHA256 摘要存入 Redis，

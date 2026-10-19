@@ -19,6 +19,7 @@ package dev.macula.cloud.iam.controller;
 
 import cn.hutool.core.util.StrUtil;
 import dev.macula.cloud.iam.authentication.thirdparty.IdentityProviderConfigService;
+import dev.macula.cloud.iam.enums.ThirdPartyProviderType;
 import dev.macula.cloud.iam.pojo.entity.SysOAuth2Client;
 import dev.macula.cloud.iam.service.support.SysOAuth2ClientService;
 import jakarta.servlet.http.Cookie;
@@ -84,8 +85,12 @@ public class LoginController {
         SysOAuth2Client client = StrUtil.isBlank(resolvedClientId) ? null
             : clientService.getClientByClientId(resolvedClientId);
         boolean validClient = client != null && client.getTenantId() != null && client.getUserType() != null;
-        model.addAttribute("githubLoginEnabled", validClient && providerConfigService.isVisible("GITHUB"));
-        model.addAttribute("wecomLoginEnabled", validClient && providerConfigService.isVisible("WECOM"));
+        model.addAttribute("githubLoginEnabled", validClient
+            && providerConfigService.isVisible(ThirdPartyProviderType.GITHUB.providerType()));
+        model.addAttribute("wecomLoginEnabled", validClient
+            && providerConfigService.isVisible(ThirdPartyProviderType.WECOM.providerType()));
+        model.addAttribute("githubLoginPath", ThirdPartyProviderType.GITHUB.loginPath());
+        model.addAttribute("wecomLoginPath", ThirdPartyProviderType.WECOM.loginPath());
         if (StrUtil.isNotBlank(externalError)) {
             model.addAttribute("externalLoginError", "第三方登录失败，请重试或联系企业管理员。");
         }

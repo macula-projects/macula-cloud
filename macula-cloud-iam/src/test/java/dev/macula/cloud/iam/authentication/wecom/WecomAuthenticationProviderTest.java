@@ -29,6 +29,7 @@ import java.time.Instant;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
@@ -60,7 +61,23 @@ class WecomAuthenticationProviderTest {
                 "https://iam.example/login/wecom"));
 
         assertEquals("zhangsan", result.getName());
+        assertEquals("WECOM", ((ThirdPartyAuthenticationToken)result).getProviderType());
         verify(users).load(context, "zhangsan");
+    }
+
+    @Test
+    void rejectsAnotherProviderWithoutCallingExternalServices() {
+        WecomClient wecom = mock(WecomClient.class);
+        IdentityProviderConfigService configs = mock(IdentityProviderConfigService.class);
+        ThirdPartyUserDetailsService users = mock(ThirdPartyUserDetailsService.class);
+        var context = new ThirdPartyLoginContext("GITHUB", "staff", 6L, UserTypeEnum.EMPLOYEE, Instant.now());
+
+        var result = new WecomAuthenticationProvider(wecom, configs, users).authenticate(
+            ThirdPartyAuthenticationToken.unauthenticated("GITHUB", "code", context,
+                "https://iam.example/login/github"));
+
+        assertNull(result);
+        verifyNoInteractions(wecom, configs, users);
     }
 
     @Test

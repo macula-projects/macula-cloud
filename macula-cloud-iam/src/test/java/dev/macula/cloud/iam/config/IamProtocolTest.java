@@ -226,7 +226,28 @@ class IamProtocolTest {
         mvc.perform(get("/login").with(anonymous()).queryParam("client_id", "portal"))
             .andExpect(status().isOk())
             .andExpect(content().string(org.hamcrest.Matchers.containsString("使用 GitHub 登录")))
-            .andExpect(content().string(org.hamcrest.Matchers.containsString("使用企业微信登录")));
+            .andExpect(content().string(org.hamcrest.Matchers.containsString("使用企业微信登录")))
+            .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                "href=\"/login/github?client_id=portal\"")))
+            .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                "href=\"/login/wecom?client_id=portal\"")));
+
+        when(clients.getClientByClientId("portal + 1")).thenReturn(client);
+        mvc.perform(get("/iam/login").contextPath("/iam").with(anonymous())
+                .queryParam("client_id", "portal + 1"))
+            .andExpect(status().isOk())
+            .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                "href=\"/iam/login/github?client_id=portal%20%2B%201\"")))
+            .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                "href=\"/iam/login/wecom?client_id=portal%20%2B%201\"")));
+
+        when(providers.selectCount(any())).thenReturn(0L);
+        mvc.perform(get("/login").with(anonymous()).queryParam("client_id", "portal"))
+            .andExpect(status().isOk())
+            .andExpect(content().string(org.hamcrest.Matchers.not(
+                org.hamcrest.Matchers.containsString("使用 GitHub 登录"))))
+            .andExpect(content().string(org.hamcrest.Matchers.not(
+                org.hamcrest.Matchers.containsString("使用企业微信登录"))));
 
         mvc.perform(get("/login").with(anonymous()).queryParam("client_id", "unknown"))
             .andExpect(status().isOk())

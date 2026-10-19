@@ -18,6 +18,7 @@ package dev.macula.cloud.iam.authentication.wecom;
 
 import dev.macula.cloud.iam.authentication.thirdparty.AbstractThirdPartyAuthenticationFilter;
 import dev.macula.cloud.iam.authentication.thirdparty.IdentityProviderConfigService.ProviderConfig;
+import dev.macula.cloud.iam.enums.ThirdPartyProviderType;
 
 /**
  * 企业微信登录发起与回调过滤器。
@@ -29,7 +30,7 @@ public class WecomAuthenticationFilter extends AbstractThirdPartyAuthenticationF
     private WecomClient client;
 
     public WecomAuthenticationFilter() {
-        super("WECOM", "/login/wecom");
+        super(ThirdPartyProviderType.WECOM.providerType(), ThirdPartyProviderType.WECOM.loginPath());
     }
 
     void wecomClient(WecomClient client) {

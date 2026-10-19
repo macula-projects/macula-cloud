@@ -29,6 +29,7 @@ import java.time.Instant;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.client.ExpectedCount.once;
@@ -65,7 +66,23 @@ class GithubAuthenticationProviderTest {
                 "https://iam.example/login/github"));
 
         assertEquals("alice", result.getName());
+        assertEquals("GITHUB", ((ThirdPartyAuthenticationToken)result).getProviderType());
         verify(configs).requireBoundUsername("GITHUB", "12345");
+    }
+
+    @Test
+    void rejectsAnotherProviderWithoutCallingExternalServices() {
+        GithubClient github = mock(GithubClient.class);
+        IdentityProviderConfigService configs = mock(IdentityProviderConfigService.class);
+        ThirdPartyUserDetailsService users = mock(ThirdPartyUserDetailsService.class);
+        var context = new ThirdPartyLoginContext("WECOM", "portal", 3L, UserTypeEnum.MEMBER, Instant.now());
+
+        var result = new GithubAuthenticationProvider(github, configs, users).authenticate(
+            ThirdPartyAuthenticationToken.unauthenticated("WECOM", "code", context,
+                "https://iam.example/login/wecom"));
+
+        assertNull(result);
+        verifyNoInteractions(github, configs, users);
     }
 
     @Test

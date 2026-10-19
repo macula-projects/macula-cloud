@@ -41,8 +41,8 @@
       </form>
       <div th:if="${githubLoginEnabled or wecomLoginEnabled}" class="external-login">
         <div class="external-divider"><span>其他登录方式</span></div>
-        <a th:if="${githubLoginEnabled}" class="external-button" th:href="@{/login/github(client_id=${client_id})}">使用 GitHub 登录</a>
-        <a th:if="${wecomLoginEnabled}" class="external-button wecom" th:href="@{/login/wecom(client_id=${client_id})}">使用企业微信登录</a>
+        <a th:if="${githubLoginEnabled}" class="external-button" th:href="@{${githubLoginPath}(client_id=${client_id})}">使用 GitHub 登录</a>
+        <a th:if="${wecomLoginEnabled}" class="external-button wecom" th:href="@{${wecomLoginPath}(client_id=${client_id})}">使用企业微信登录</a>
       </div>
       <p class="footnote">登录遇到问题？请联系你的企业管理员。</p>
     </div>

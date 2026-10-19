@@ -17,6 +17,7 @@
 package dev.macula.cloud.iam.authentication.wecom;
 
 import dev.macula.cloud.iam.authentication.thirdparty.*;
+import dev.macula.cloud.iam.enums.ThirdPartyProviderType;
 import dev.macula.cloud.iam.service.support.SysOAuth2ClientService;
 import org.springframework.context.ApplicationContext;
 import org.springframework.http.HttpMethod;
@@ -41,7 +42,7 @@ import static org.springframework.security.config.annotation.web.builders.Filter
 public class WecomLoginFilterConfigurer<H extends HttpSecurityBuilder<H>>
     extends AbstractAuthenticationFilterConfigurer<H, WecomLoginFilterConfigurer<H>, WecomAuthenticationFilter> {
     public WecomLoginFilterConfigurer() {
-        super(new WecomAuthenticationFilter(), "/login/wecom");
+        super(new WecomAuthenticationFilter(), ThirdPartyProviderType.WECOM.loginPath());
     }
 
     @Override
