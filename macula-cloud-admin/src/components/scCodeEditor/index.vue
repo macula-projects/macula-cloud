@@ -49,6 +49,7 @@
 	import 'codemirror/mode/sql/sql'
 
 	export default {
+		name: 'ScCodeEditor',
 		props: {
 			modelValue: {
 				type: String,

@@ -63,10 +63,12 @@
 </template>
 
 <script>
+import { ElMessage, ElMessageBox } from 'element-plus'
 	import config from "@/config/upload"
 	import Sortable from 'sortablejs'
 
 	export default {
+		name: 'ScUploadMultiple',
 		props: {
 			modelValue: { type: [String, Array], default: "" },
 			tip: { type: String, default: "" },

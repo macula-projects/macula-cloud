@@ -8,7 +8,8 @@ describe('TinyID management', () => {
 
 	function openPage() {
 		cy.visit('/#/tinyid/management', {
-			onBeforeLoad(win) {
+				onBeforeLoad(win) {
+				win.localStorage.setItem('MACULA_CLOUD_ADMIN_STORAGE_VERSION', '2')
 				win.localStorage.setItem('USER_INFO', JSON.stringify({content: {username: 'root', roles: ['ROOT']}, datetime: 0}))
 				win.localStorage.setItem('MENU', JSON.stringify({content: [{
 					path: '/system',

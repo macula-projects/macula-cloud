@@ -49,7 +49,9 @@
 </template>
 
 <script>
+import { ElMessage, ElMessageBox } from 'element-plus'
 	export default {
+		name: 'SystemDeptSave',
 		emits: ['success', 'closed'],
 		data() {
 			return {
@@ -114,11 +116,12 @@
 				this.$refs.dialogForm.validate(async (valid) => {
 					if (valid) {
 						this.isSaveing = true;
+						let res;
 						if (this.mode == 'add') {
 							// 调用相关接口
-							var res = await this.$API.system_dept.dept.add.post(this.form);
+							res = await this.$API.system_dept.dept.add.post(this.form);
 						} else {
-							var res = await this.$API.system_dept.dept.edit.put(this.form, this.form.id);
+							res = await this.$API.system_dept.dept.edit.put(this.form, this.form.id);
 						}
 						this.isSaveing = false;
 						if(res.success){

@@ -46,12 +46,13 @@
 </template>
 
 <script>
+import { ElMessage, ElMessageBox } from 'element-plus'
 	import saveDialog from './save'
 	import listDialog from './addMaintainer'
 	import showDialog from './showMaintainer'
 
 	export default {
-		name: 'application',
+		name: 'SystemApplicationPage',
 		components: {
 			saveDialog,
 			listDialog,
@@ -101,7 +102,7 @@
 				})
 			},
 			//删除
-			async table_del(row, index){
+			async table_del(row){
 				var reqData = row.id
 				var res = await this.$API.system_application.application.del.delete(reqData);
 				if(res.success){
@@ -125,7 +126,7 @@
 					this.selection.forEach(item => {
 						this.$refs.table.tableData.forEach((itemI, indexI) => {
 							if (item.id === itemI.id) {
-								var res = this.$API.system_application.application.del.delete(itemI.id)
+								this.$API.system_application.application.del.delete(itemI.id)
 								this.$refs.table.tableData.splice(indexI, 1)
 							}
 						})
@@ -139,7 +140,7 @@
 				this.$refs.table.upData(this.search)
 			},
 			//本地更新数据
-			handleSuccess(data, mode){
+			handleSuccess(){
 				this.$refs.table.refresh()
 			},			
 		}

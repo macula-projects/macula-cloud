@@ -26,6 +26,7 @@
 
 <script>
 	export default {
+		name: 'HomeWidgetTime',
 		title: "时钟",
 		icon: "el-icon-clock",
 		description: "演示部件效果",

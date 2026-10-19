@@ -59,9 +59,6 @@
 	import Sortable from 'sortablejs'
 
 	export default {
-		components: {
-			Sortable
-		},
 		props: {
 			column: { type: Object, default: () => {} }
 		},

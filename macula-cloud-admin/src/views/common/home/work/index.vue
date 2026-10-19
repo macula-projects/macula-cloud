@@ -32,6 +32,7 @@
 	import myapp from './components/myapp';
 
 	export default {
+		name: 'HomeWorkPage',
 		components: {
 			myapp
 		},

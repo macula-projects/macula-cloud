@@ -50,6 +50,7 @@
 </template>
 
 <script>
+import { ElMessage, ElMessageBox } from 'element-plus'
 import config from '@/config';
 import { useTenantStore } from '@/stores/tenant';
 import { mapActions } from 'pinia';

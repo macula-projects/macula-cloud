@@ -53,6 +53,7 @@
 
 <script>
 	export default {
+		name: 'ScDialog',
 		props: {
 			modelValue: { type: Boolean, default: false },
 			title: { type: String, default: "" },

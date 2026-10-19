@@ -58,6 +58,7 @@
 	import Sortable from 'sortablejs'
 
 	export default {
+		name: 'ScFormTable',
 		props: {
       modelValue: {type: Array, default: () => []},
       addTemplate: {

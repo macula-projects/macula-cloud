@@ -43,7 +43,9 @@
 </template>
 
 <script>
+import { ElMessage, ElMessageBox } from 'element-plus'
 export default {
+  name: 'SystemUserSave',
   emits: ['success', 'closed'],
   props: {
     roleNames: {
@@ -153,14 +155,15 @@ export default {
           this.handleSubmitDept()
           this.handleSubmitRoleId()
           this.isSaveing = true;
+          let res;
           if(this.mode == 'add'){
-            var res = await this.$API.system_user.user.add.post(this.form);
+            res = await this.$API.system_user.user.add.post(this.form);
           }else if(this.mode == 'edit'){
-            var res = await this.$API.system_user.user.edit.put(this.form, this.form.id);
+            res = await this.$API.system_user.user.edit.put(this.form, this.form.id);
           }else if(this.mode == 'resetPassword'){
             this.form.password = this.form.newPassword;
             console.log("form",this.form)
-            var res = await this.$API.system_user.user.resetPassword.patch(this.form);
+            res = await this.$API.system_user.user.resetPassword.patch(this.form);
           }
           this.isSaveing = false;
           if(res.success){

@@ -31,10 +31,12 @@
 </template>
 
 <script>
+import { ElMessage } from 'element-plus'
 export default {
+	name: 'SystemRoleResource',
 	emits: ['success', 'closed'],
 	props: {
-		dataScopeEnum: {type: Array, default: []}
+		dataScopeEnum: {type: Array, default: () => []}
 	},
 	data(){
 		return {

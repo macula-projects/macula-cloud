@@ -133,13 +133,3 @@
 .el-tag {
   transition: all 0s !important;
 }
-
-/* 覆盖tinymce样式 */
-.sceditor .tox-tinymce {
-  border: 1px solid #DCDFE6;
-  border-radius: 0;
-}
-
-body .tox-tinymce-aux {
-  z-index: 5700;
-}

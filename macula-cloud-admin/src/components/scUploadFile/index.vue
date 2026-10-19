@@ -47,9 +47,11 @@
 </template>
 
 <script>
+import { ElMessage, ElMessageBox } from 'element-plus'
 	import config from "@/config/upload"
 
 	export default {
+		name: 'ScUploadFile',
 		props: {
 			modelValue: { type: [String, Array], default: "" },
 			tip: { type: String, default: "" },

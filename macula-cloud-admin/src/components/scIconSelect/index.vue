@@ -67,6 +67,7 @@
 	import config from "@/config/iconSelect"
 
 	export default {
+		name: 'ScIconSelect',
 		props: {
 			modelValue: { type: String, default: "" },
 			disabled: { type: Boolean, default: false },

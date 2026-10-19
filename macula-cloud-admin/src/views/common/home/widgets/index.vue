@@ -111,6 +111,7 @@
 	import allComps from './components'
 
 	export default {
+		name: 'HomeWidgetPanel',
 		components: {
 			draggable
 		},

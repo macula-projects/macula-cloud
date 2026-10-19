@@ -89,12 +89,12 @@
 </template>
 
 <script>
+import { ElMessage, ElMessageBox } from 'element-plus'
 	import dicDialog from './dic'
 	import listDialog from './list'
-	import Sortable from 'sortablejs'
 
 	export default {
-		name: 'dic',
+		name: 'SystemDictPage',
 		components: {
 			dicDialog,
 			listDialog
@@ -240,7 +240,7 @@
 					this.selection.forEach(item => {
 						this.$refs.table.tableData.forEach((itemI, indexI) => {
 							if (item.id === itemI.id) {
-								var res = this.$API.system_dict.dict.delItem.delete(itemI.id);
+								this.$API.system_dict.dict.delItem.delete(itemI.id);
 								this.$refs.table.tableData.splice(indexI, 1)
 							}
 						})
@@ -286,7 +286,7 @@
 				}
 			},
 			//本地更新数据
-			handleListSuccess(data, mode){
+			handleListSuccess(data){
 				this.$refs.table.reload({
 					typeCode: data.oldTypeCode
 				})

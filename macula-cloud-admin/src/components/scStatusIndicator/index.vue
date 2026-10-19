@@ -30,6 +30,7 @@
 
 <script>
 	export default {
+		name: 'ScStatusIndicator',
 		props: {
 			type: { type: String, default: "primary" },
 			pulse: { type: Boolean, default: false }

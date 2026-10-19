@@ -23,6 +23,7 @@
 
 <script>
 	export default {
+		name: 'ScTitle',
 		props: {
 			title: { type: String, required: true, default: "" },
 		},

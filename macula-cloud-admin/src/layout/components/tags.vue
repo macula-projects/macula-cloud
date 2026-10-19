@@ -44,6 +44,7 @@
 </template>
 
 <script>
+import { ElMessageBox } from 'element-plus'
 	import Sortable from 'sortablejs'
 	import { mapActions, mapState } from 'pinia'
 	import { useViewTagsStore } from '@/stores/viewTags'
@@ -51,7 +52,7 @@
 	import { useIframeStore } from '@/stores/iframe'
 
 	export default {
-		name: "tags",
+		name: 'LayoutTags',
 		data() {
 			return {
 				contextMenuVisible: false,

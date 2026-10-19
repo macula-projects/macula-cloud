@@ -57,7 +57,7 @@
 				<Tags v-if="!ismobile && layoutTags"></Tags>
 				<div class="adminui-main" id="adminui-main">
 					<router-view v-slot="{ Component }">
-					    <keep-alive :include="keepLiveRoute">
+					    <keep-alive :include="cacheComponentNames">
 					        <component :is="Component" :key="$route.fullPath" v-if="routeShow"/>
 					    </keep-alive>
 					</router-view>
@@ -99,7 +99,7 @@
 				<Tags v-if="!ismobile && layoutTags"></Tags>
 				<div class="adminui-main" id="adminui-main">
 					<router-view v-slot="{ Component }">
-					    <keep-alive :include="keepLiveRoute">
+					    <keep-alive :include="cacheComponentNames">
 					        <component :is="Component" :key="$route.fullPath" v-if="routeShow"/>
 					    </keep-alive>
 					</router-view>
@@ -133,7 +133,7 @@
 				<Tags v-if="!ismobile && layoutTags"></Tags>
 				<div class="adminui-main" id="adminui-main">
 					<router-view v-slot="{ Component }">
-					    <keep-alive :include="keepLiveRoute">
+					    <keep-alive :include="cacheComponentNames">
 					        <component :is="Component" :key="$route.fullPath" v-if="routeShow"/>
 					    </keep-alive>
 					</router-view>
@@ -187,7 +187,7 @@
 				<Tags v-if="!ismobile && layoutTags"></Tags>
 				<div class="adminui-main" id="adminui-main">
 					<router-view v-slot="{ Component }">
-					    <keep-alive :include="keepLiveRoute">
+					    <keep-alive :include="cacheComponentNames">
 					        <component :is="Component" :key="$route.fullPath" v-if="routeShow"/>
 					    </keep-alive>
 					</router-view>
@@ -218,8 +218,19 @@
 	import { useGlobalStore } from '../stores/global';
 	import { useKeepAliveStore } from '../stores/keepAlive';
 
+	const cacheComponentNameByRoute = {
+		dashboard: 'HomeDashboardPage',
+		application: 'SystemApplicationPage',
+		dept: 'SystemDeptPage',
+		dic: 'SystemDictPage',
+		log: 'SystemLogPage',
+		role: 'SystemRolePage',
+		tenant: 'SystemTenantPage',
+		user: 'SystemUserPage'
+	};
+
 	export default {
-		name: 'index',
+		name: 'AdminLayout',
 		components: {
 			SideM,
 			Topbar,
@@ -241,6 +252,9 @@
 		computed:{
 			...mapState(useGlobalStore, ['ismobile', 'layout', 'menuIsCollapse', 'layoutTags', 'theme']),
 			...mapState(useKeepAliveStore, ['keepLiveRoute', 'routeKey', 'routeShow']),
+			cacheComponentNames() {
+				return this.keepLiveRoute.map(routeName => cacheComponentNameByRoute[routeName] || routeName)
+			},
 		},
 		created() {
 			this.onLayoutResize();

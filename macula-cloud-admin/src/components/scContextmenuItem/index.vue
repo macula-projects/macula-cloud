@@ -43,6 +43,7 @@
 
 <script>
 	export default {
+		name: 'ScContextmenuItem',
 		props: {
 			command: { type: String, default: "" },
 			title: { type: String, default: "" },

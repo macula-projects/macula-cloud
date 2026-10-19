@@ -16,6 +16,7 @@
 	import { useTenantStore } from '@/stores/tenant';
 	import { mapState, mapActions } from 'pinia';
 	export default{
+		name: 'LayoutTenant',
 		data(){
 			return {
 				userName: ''
@@ -29,7 +30,7 @@
 			changeTenant(tenantOption){
 				this.updateTenantId(tenantOption.value)
 				this.updateTenantLabel(tenantOption.label)
-				let reg = /\#reloaded$/
+				let reg = /#reloaded$/
 				if (!reg.test(location.href)) {
 					location.href = location.href + "#reloaded"
 				} else {

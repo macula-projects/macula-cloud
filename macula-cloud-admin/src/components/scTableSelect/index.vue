@@ -50,6 +50,7 @@
 	import config from "@/config/tableSelect";
 
 	export default {
+		name: 'ScTableSelect',
 		props: {
 			modelValue: null,
 			apiObj: { type: Object, default: () => {} },

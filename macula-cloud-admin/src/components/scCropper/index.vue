@@ -42,6 +42,7 @@
 	import 'cropperjs/dist/cropper.css'
 
 	export default {
+		name: 'ScCropper',
 		props: {
 			src: { type: String, default: "" },
 			compress: {type: Number, default: 1},

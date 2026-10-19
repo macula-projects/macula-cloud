@@ -316,7 +316,9 @@
 </template>
 
 <script>
+import { ElMessage } from 'element-plus'
 	export default {
+		name: 'ScCron',
 		props: {
 			modelValue: { type: String, default: "* * * * * ?" },
 			shortcuts: { type: Array, default: () => [] }

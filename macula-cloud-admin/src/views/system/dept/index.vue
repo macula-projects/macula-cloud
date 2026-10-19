@@ -69,10 +69,11 @@
 </template>
 
 <script>
+import { ElMessage, ElMessageBox } from 'element-plus'
 	import saveDialog from './save'
 
 	export default {
-		name: 'dept',
+		name: 'SystemDeptPage',
 		components: {
 			saveDialog
 		},
@@ -159,7 +160,7 @@
 				return target
 			},
 			//本地更新数据
-			handleSaveSuccess(data, mode){
+			handleSaveSuccess(){
 				this.$refs.table.refresh()
 			}
 		}

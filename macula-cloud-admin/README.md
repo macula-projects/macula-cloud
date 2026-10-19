@@ -12,7 +12,7 @@
          <img src="https://img.shields.io/npm/v/element-plus.svg" />
     </a>
     <a>
-        <img src="https://img.shields.io/badge/node-%20%3E%3D%2016-47c219" >
+         <img src="https://img.shields.io/badge/node-24%20LTS-47c219" >
     </a>
 	<a href="https://v3.vuejs.org/" target="_blank">
 		<img src="https://img.shields.io/badge/VueCLI-5-green" alt="VueCLI">
@@ -76,12 +76,23 @@ git clone https://github.com/macula-projects/macula-cloud-admin
 # 进入项目目录
 cd macula-cloud-admin
 
-# 安装依赖
-npm i
+# 安装锁定的依赖（推荐 Node 24；最低 Node 22.12）
+npm ci
 
 # 启动项目(开发模式)
 npm run dev
 ```
+
+## 本地缓存与依赖安全
+
+管理端已移除 `crypto-js`、旧的 AES-ECB 本地缓存选项和随前端发布的密钥。前端内置密钥无法为浏览器本地数据提供可靠的保密边界；本地缓存仍同步读取，供路由、权限与租户状态使用。`tool.crypto` 继续提供浏览器原生能力：`await tool.crypto.AES.generateKey()`、`await tool.crypto.AES.encrypt(plaintext, cryptoKey)`、`await tool.crypto.AES.decrypt(ciphertext, cryptoKey)` 使用带随机 IV 的 AES-GCM；`await tool.crypto.SHA256(text)` 取代旧 MD5；`tool.crypto.BASE64.encrypt/decrypt(text)` 处理 UTF-8 文本。AES 方法不兼容旧密文，且 Web Crypto 需要 HTTPS 或可信本地环境。密钥由调用方管理，不得硬编码进前端或将 Base64 当作加密。
+
+升级后首次打开页面会清除本应用的旧缓存与登录 Cookie，用户需要重新登录；同源其他应用的存储键不会被清除。回滚到仍启用旧 AES 的版本时，也可能需要清除这些缓存后重新登录。
+
+依赖安全检查使用 `npm audit` 和 `npm audit --omit=dev`；更新 `package.json` 时须同步提交 `package-lock.json`。构建镜像使用 Node 24，开发和 CI 使用 Node 22.12、24 或 26 及更新版本中受支持的版本。
+
+富文本编辑器已从 TinyMCE 替换为 MIT 许可的 Tiptap 开源组件，不使用商业扩展或云服务。`scEditor` 保持 HTML `v-model` 和默认编辑功能；TinyMCE 专用的 `plugins`、`toolbar`、`options` 参数不能直接迁移，扩展编辑器时应针对 Tiptap 实现并测试。
+
 
 ## 环境模式
 

@@ -42,6 +42,7 @@
 
 <script>
 	export default {
+		name: 'LayoutTopbar',
 		data() {
 			return {
 				breadList: []

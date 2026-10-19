@@ -42,7 +42,9 @@
 </template>
 
 <script>
+import { ElMessage, ElMessageBox } from 'element-plus'
 	export default {
+		name: 'SystemDictList',
 		emits: ['success', 'closed'],
 		data() {
 			return {

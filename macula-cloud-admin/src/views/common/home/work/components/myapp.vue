@@ -69,9 +69,11 @@
 </template>
 
 <script>
+import { ElMessage } from 'element-plus'
 	import draggable from 'vuedraggable'
 
 	export default {
+		name: 'HomeWorkMyapp',
 		components: {
 			draggable
 		},

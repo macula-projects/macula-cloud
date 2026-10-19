@@ -32,6 +32,7 @@
 
 <script>
 	export default {
+		name: 'ScWaterMark',
 		props: {
 			text: { type: String, required: true, default: "" },
 			subtext: { type: String, default: "" },

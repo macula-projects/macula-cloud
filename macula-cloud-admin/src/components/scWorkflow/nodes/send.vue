@@ -63,6 +63,7 @@
 	import addNode from './addNode'
 
 	export default {
+		name: 'ScWorkflowSendNode',
 		inject: ['select'],
 		props: {
 			modelValue: { type: Object, default: () => {} }

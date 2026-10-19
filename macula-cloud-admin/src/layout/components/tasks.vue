@@ -56,6 +56,7 @@
 
 <script>
 	export default {
+		name: 'LayoutTasks',
 		data() {
 			return {
 				loading: false,

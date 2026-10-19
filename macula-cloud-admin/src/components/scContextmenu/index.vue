@@ -37,6 +37,7 @@
 
 <script>
 	export default {
+		name: 'ScContextmenu',
 		provide() {
 			return {
 				menuClick: this.menuClick

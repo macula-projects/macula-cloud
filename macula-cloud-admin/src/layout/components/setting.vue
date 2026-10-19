@@ -57,6 +57,7 @@
 	import { useGlobalStore } from '../../stores/global'
 
 	export default {
+		name: 'LayoutSetting',
 		data() {
 			return {
 				lang: this.$TOOL.data.get('APP_LANG') || this.$CONFIG.LANG,

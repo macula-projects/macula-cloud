@@ -47,6 +47,7 @@
 
 <script>
 	export default {
+		name: 'ScPageHeader',
 		props: {
 			title: { type: String, required: true, default: "" },
 			description: { type: String, default: "" },

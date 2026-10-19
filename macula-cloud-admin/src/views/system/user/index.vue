@@ -64,10 +64,11 @@
 </template>
 
 <script>
+import { ElMessage, ElMessageBox } from 'element-plus'
 import saveDialog from './save'
 
 export default {
-  name: 'user',
+  name: 'SystemUserPage',
   components: {
     saveDialog
   },
@@ -140,7 +141,7 @@ export default {
         this.selection.forEach(item => {
           this.$refs.table.tableData.forEach((itemI, indexI) => {
             if (item.id === itemI.id) {
-              var res = this.$API.system_user.user.del.delete(itemI.id)
+				this.$API.system_user.user.del.delete(itemI.id)
               this.$refs.table.tableData.splice(indexI, 1)
 
             }
@@ -155,7 +156,7 @@ export default {
       if(this.selection.length == 1){
         let data;
         this.selection.forEach(item => {
-          this.$refs.table.tableData.forEach((itemI, indexI) => {
+		  this.$refs.table.tableData.forEach((itemI) => {
             if (item.id === itemI.id) {
               data = itemI;
             }

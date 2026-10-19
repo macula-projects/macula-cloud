@@ -45,6 +45,7 @@
 
 <script>
 	export default {
+		name: 'HomeWidgetWelcome',
 		title: "欢迎",
 		icon: "el-icon-present",
 		description: "项目特色以及文档链接",

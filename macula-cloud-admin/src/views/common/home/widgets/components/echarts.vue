@@ -23,6 +23,7 @@
 
 <script>
 	export default {
+		name: 'HomeWidgetEcharts',
 		title: "实时收入",
 		icon: "el-icon-data-line",
 		description: "Echarts组件演示",

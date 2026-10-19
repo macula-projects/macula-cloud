@@ -97,6 +97,7 @@
 	import { useViewTagsStore } from '@/stores/viewTags'
 
 	export default {
+		name: 'LoginPage',
 		components: {
 			passwordForm,
 			phoneForm

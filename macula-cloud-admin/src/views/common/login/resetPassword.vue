@@ -56,6 +56,7 @@
 </template>
 
 <script>
+import { ElMessage } from 'element-plus'
 	import commonPage from './components/commonPage'
 
 	export default {
