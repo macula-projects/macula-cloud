@@ -33,7 +33,7 @@ Status: accepted
 - System 仍有独立的六类身份源目录：它与 IAM 的两类登录枚举不能直接共享服务实现；当前两组 code/callback URL 一致，设计选择不改 System，但未来扩展可能漂移，需由 Reviewer 确认本次 IAM-only 范围，non-blocking。
 - Thymeleaf 链接改为由 IAM 提供路径：模板 URL 表达式必须继续正确处理 `client_id`、上下文路径与编码；需要渲染测试证明，不可仅靠字符串搜索，non-blocking。
 - 认证链属于高风险路径：即使只是值提取，Filter 匹配和匿名放行不一致也会中断登录或误开放入口；必须覆盖允许与拒绝路径并保留回调的 state 校验，non-blocking。
-- 意图中的 Author 署名与是否存在其他必须解决的问题仍未得到单独回答：当前已批准的主要目标足以限定本次设计；如提出额外目标，需回到意图/规格重新确认，non-blocking。
+- 意图中是否存在其他必须解决的问题仍未得到单独回答：当前已批准的主要目标足以限定本次设计；如提出额外目标，需回到意图/规格重新确认，non-blocking。
 
 ## Verification strategy
 1. 枚举单元测试逐字断言两组 `providerType` 和 `loginPath`，不从实现反推期望值；同时检查枚举仅含本期两种 IAM 登录源。
