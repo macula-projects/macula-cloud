@@ -106,12 +106,13 @@
 </template>
 
 <script>
+import { ElMessage, ElMessageBox } from 'element-plus'
 	export default {
+		name: 'SystemMenuSave',
 		props: {
 			menu: { type: Object, default: () => {} },
 		},
 		data(){
-			let that = this;
 			return {
 				form: {
 					id: "",
@@ -310,7 +311,7 @@
 					apiData['codeVisible'] = true
 					return false
 				}
-				const reg = /^([\u4e00-\u9fa5]|[a-z]|[A-Z]|[0-9]|[_]|[\.])*$/
+				const reg = /^([\u4e00-\u9fa5]|[a-z]|[A-Z]|[0-9]|[_]|[.])*$/
 				if(!reg.test(code)){
 					apiData['codeErrMsg'] = '标识含非法字符'
 					apiData['codeVisible'] = true

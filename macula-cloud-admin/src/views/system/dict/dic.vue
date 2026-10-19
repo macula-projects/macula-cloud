@@ -39,7 +39,9 @@
 </template>
 
 <script>
+import { ElMessage, ElMessageBox } from 'element-plus'
 	export default {
+		name: 'SystemDictDic',
 		emits: ['success', 'closed'],
 		data() {
 			return {

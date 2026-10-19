@@ -31,6 +31,7 @@
 
 <script>
 	export default {
+		name: 'HomeWidgetProgress',
 		title: "进度环",
 		icon: "el-icon-odometer",
 		description: "进度环原子组件演示",

@@ -52,6 +52,7 @@
 
 <script>
 	export default {
+		name: 'ScStatistic',
 		props: {
 			title: { type: String, required: true, default: "" },
 			value: { type: String, required: true, default: "" },

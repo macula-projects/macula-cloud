@@ -44,6 +44,7 @@
 	import Sortable from 'sortablejs'
 
 	export default {
+		name: 'ScFileExportColumn',
 		emits: ['success'],
 		props: {
 			column: { type: Array, default: () => [] }

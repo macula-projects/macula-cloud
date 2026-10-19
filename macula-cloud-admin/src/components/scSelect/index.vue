@@ -42,6 +42,7 @@
 	import config from "@/config/select";
 
 	export default {
+		name: 'ScSelect',
 		props: {
       apiObj: {
         type: Object, default: () => {

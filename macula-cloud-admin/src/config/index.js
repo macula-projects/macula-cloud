@@ -109,8 +109,9 @@ export const mergeRuntimeConfig = (config, runtimeConfig = {}) => Object.assign(
 
 // 如果生产模式，就合并动态的APP_CONFIG
 // public/config.js
+/* global APP_CONFIG */
 if(process.env.NODE_ENV === 'production'){
-	mergeRuntimeConfig(DEFAULT_CONFIG, APP_CONFIG)
+	mergeRuntimeConfig(DEFAULT_CONFIG, globalThis.APP_CONFIG || APP_CONFIG)
 }
 
 export default DEFAULT_CONFIG

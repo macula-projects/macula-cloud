@@ -34,10 +34,12 @@
 </template>
 
 <script>
+import { ElMessage, ElMessageBox } from 'element-plus'
 	export default {
+		name: 'SystemRoleSave',
 		emits: ['success', 'closed'],
 		props: {
-			dataScopeEnum: {type: Array, default: []}
+			dataScopeEnum: {type: Array, default: () => []}
 		},
 		data() {
 			let that = this

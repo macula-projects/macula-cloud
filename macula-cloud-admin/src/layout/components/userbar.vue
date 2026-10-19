@@ -43,11 +43,13 @@
   </template>
   
   <script>
+  import { ElMessageBox, ElLoading } from 'element-plus'
   import tenant from './tenant'
   import {useTenantStore} from '@/stores/tenant';
   import {mapActions} from 'pinia';
   
   export default {
+	name: 'LayoutUserbar',
 	components: {
 	  tenant
 	},
@@ -194,4 +196,3 @@
 	background: #383838;
   }
   </style>
-  

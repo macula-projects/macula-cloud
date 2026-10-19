@@ -32,6 +32,7 @@
 	import QRcode from "./qrcode"
 
 	export default {
+		name: 'ScQrCode',
 		props: {
 			text: { type: String, required: true, default: "" },
 			size: { type: Number, default: 100 },

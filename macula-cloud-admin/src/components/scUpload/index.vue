@@ -71,10 +71,11 @@
 </template>
 
 <script>
-	import { defineAsyncComponent } from 'vue'
+import { ElMessage, genFileId } from 'element-plus'
 	import config from "@/config/upload"
 
 	export default {
+		name: 'ScUpload',
 		props: {
 			modelValue: { type: String, default: "" },
 			height: {type: Number, default: 148},

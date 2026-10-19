@@ -37,6 +37,7 @@
 
 <script>
 	export default {
+		name: 'LayoutSearch',
 		data() {
 			return {
 				input: "",

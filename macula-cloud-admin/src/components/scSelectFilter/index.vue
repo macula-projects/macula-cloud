@@ -45,6 +45,7 @@
 
 <script>
 	export default {
+		name: 'ScSelectFilter',
 		props: {
 			data: { type: Array, default: () => [] },
 			selectedValues: { type: Object, default: () => { return {} } },

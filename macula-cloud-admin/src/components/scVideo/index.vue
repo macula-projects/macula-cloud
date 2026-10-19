@@ -33,6 +33,7 @@
 	import HlsPlayer from 'xgplayer-hls'
 
 	export default {
+		name: 'ScVideo',
 		props: {
 			src: { type: String, required: true, default: "" },
 			autoplay: { type: Boolean, default: false },

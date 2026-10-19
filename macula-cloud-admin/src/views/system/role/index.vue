@@ -61,11 +61,12 @@
 </template>
 
 <script>
+import { ElMessageBox, ElLoading, ElMessage } from 'element-plus'
 import saveDialog from './save'
 import resourceDialog from './resource'
 
 export default{
-	name: 'role',
+	name: 'SystemRolePage',
 	data () {
 		return {
 			dialog: {
@@ -156,7 +157,7 @@ export default{
 			}
 		},
 		//本地更新数据
-		handleSaveSuccess(data, mode){
+	handleSaveSuccess(){
 			this.$refs.table.refresh()
 		}
 	}

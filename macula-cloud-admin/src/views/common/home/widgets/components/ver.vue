@@ -31,6 +31,7 @@
 
 <script>
 	export default {
+		name: 'HomeWidgetVer',
 		title: "版本信息",
 		icon: "el-icon-monitor",
 		description: "当前项目版本信息",

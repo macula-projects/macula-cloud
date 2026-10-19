@@ -32,6 +32,7 @@
 
 <script>
 	export default {
+		name: 'ScPasswordStrength',
 		props: {
 			modelValue: { type: String, default: "" },
 		},

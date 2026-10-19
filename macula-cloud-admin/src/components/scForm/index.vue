@@ -140,6 +140,7 @@
 	const tableselectRender = defineAsyncComponent(() => import('./items/tableselect'))
 
 	export default {
+		name: 'ScForm',
 		props: {
 			modelValue: { type: Object, default: () => {} },
 			config: { type: Object, default: () => {} },

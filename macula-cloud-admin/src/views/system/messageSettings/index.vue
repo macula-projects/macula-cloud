@@ -67,6 +67,7 @@
 </template>
 
 <script setup>
+defineOptions({ name: 'SystemMessageSettingsPage' })
 import { computed, onMounted, reactive, ref } from "vue";
 import { ElMessage } from "element-plus";
 import i18n from "@/locales";

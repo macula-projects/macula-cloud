@@ -36,3 +36,5 @@ const APP_CONFIG = {
 	//DEMO_USERNAME: "admin",
 	//DEMO_PASSWORD: "admin"
 }
+
+globalThis.APP_CONFIG = APP_CONFIG

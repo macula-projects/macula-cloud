@@ -123,6 +123,7 @@
 	import addNode from './addNode'
 
 	export default {
+		name: 'ScWorkflowBranchNode',
 		props: {
 			modelValue: { type: Object, default: () => {} }
 		},

@@ -68,7 +68,9 @@
 </template>
 
 <script>
+import { ElMessage } from 'element-plus'
 	export default {
+		name: 'ScFileImport',
 		emits: ['success'],
 		props: {
 			apiObj: { type: Object, default: () => {} },

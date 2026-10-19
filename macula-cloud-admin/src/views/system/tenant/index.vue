@@ -46,12 +46,12 @@
 </template>
 
 <script>
+import { ElMessage, ElMessageBox, ElLoading } from 'element-plus'
 import saveDialog from './save'
 import showMaintainerDialog from './showMaintainer'
 export default{
-	name: 'tenant',
+	name: 'SystemTenantPage',
 	data(){
-		let that =this
 		return{
 			keyWord: '',
 			apiObj: this.$API.system_tenant.tenant.pages,
@@ -68,7 +68,7 @@ export default{
 		showMaintainerDialog
 	},
 	methods: {
-		table_show(row, rowIndex){
+		table_show(row){
 			this.dialog.show = true
 			this.$nextTick(() => {
 				this.$refs.showMaintainerDialog.open(row)
@@ -86,13 +86,13 @@ export default{
 				this.$refs.saveDialog.open("show").setData(row)
 			})
 		},
-		edit(row, index){
+		edit(row){
 			this.dialog.save=true
 			this.$nextTick(()=>{
 				this.$refs.saveDialog.open("edit").setData(row)
 			})
 		},
-		async del(row, index){
+		async del(row){
 			var res = await this.$API.system_tenant.tenant.del.delete(row.id)
 			if(res.success){
 				this.$refs.table.refresh()

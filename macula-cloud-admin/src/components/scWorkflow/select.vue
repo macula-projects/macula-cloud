@@ -108,6 +108,7 @@
 	import config from "@/config/workflow";
 
 	export default {
+		name: 'ScWorkflowSelect',
 		props: {
 			modelValue: { type: Boolean, default: false }
 		},

@@ -80,6 +80,7 @@
 </template>
 
 <script>
+import { ElMessage } from 'element-plus'
 	import config from "@/config/table";
 	import columnSetting from './columnSetting'
 

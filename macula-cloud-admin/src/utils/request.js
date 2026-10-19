@@ -25,7 +25,6 @@ axios.defaults.baseURL = ''
 
 axios.defaults.timeout = sysConfig.TIMEOUT
 let loadQuitMsgBox = false
-let menuRouteSuffixReg = /\/menus\/(my|routes)$/
 
 // HTTP request 拦截器
 axios.interceptors.request.use(

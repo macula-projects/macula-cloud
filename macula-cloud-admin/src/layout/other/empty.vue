@@ -15,6 +15,10 @@
   - limitations under the License.
   -->
 
+<script>
+export default { name: 'LayoutEmptyPage' }
+</script>
+
 <template>
 	<router-view></router-view>
 </template>

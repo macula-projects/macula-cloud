@@ -1,4 +1,5 @@
 <script setup>
+defineOptions({ name: 'IconWecom' })
 </script><!--
   - Copyright (c) 2023 Macula
   -   macula.dev, China

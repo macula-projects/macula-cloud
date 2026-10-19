@@ -38,6 +38,7 @@
 </template>
 
 <script>
+import { ElMessage } from 'element-plus'
 	export default {
 		data() {
 			return {

@@ -32,6 +32,7 @@
 
 <script>
 	export default {
+		name: 'LayoutNotFoundPage',
 		methods: {
 			gohome(){
 				location.href="#/"

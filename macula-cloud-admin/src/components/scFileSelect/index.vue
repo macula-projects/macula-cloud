@@ -95,9 +95,11 @@
 </template>
 
 <script>
+import { ElMessage } from 'element-plus'
 	import config from "@/config/fileSelect"
 
 	export default {
+		name: 'ScFileSelect',
 		props: {
 			modelValue: null,
 			hideUpload: { type: Boolean, default: false },

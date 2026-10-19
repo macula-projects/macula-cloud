@@ -37,6 +37,7 @@
 
 <script>
 	export default {
+		name: 'ScTrend',
 		props: {
 			modelValue: { type: Number, default: 0 },
 			prefix: { type: String, default: "" },

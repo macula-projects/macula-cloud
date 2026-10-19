@@ -53,9 +53,11 @@
 </template>
 
 <script>
+import { ElMessage } from 'element-plus'
 	import config from "@/config/filterBar";
 
 	export default {
+		name: 'ScFilterBarMy',
 		props: {
 			filterName: { type: String, default: "" },
 			data: { type: Object, default: () => {} }

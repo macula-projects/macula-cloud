@@ -18,7 +18,7 @@
 import router from '@/router'
 import { defineStore } from "pinia";
 
-const reg = /\#reloaded$/
+const reg = /#reloaded$/
 
 export const useViewTagsStore = defineStore({
 	id: 'viewTags',

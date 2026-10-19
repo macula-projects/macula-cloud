@@ -66,9 +66,11 @@
 </template>
 
 <script>
+import { ElMessageBox } from 'element-plus'
 	import columnSet from './column'
 
 	export default {
+		name: 'ScFileExport',
 		components: {
 			columnSet
 		},

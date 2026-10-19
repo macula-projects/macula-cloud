@@ -28,6 +28,7 @@
 
 <script>
 	export default {
+		name: 'HomeWidgetAbout',
 		title: "关于项目",
 		icon: "el-icon-setting",
 		description: "点个星星支持一下",

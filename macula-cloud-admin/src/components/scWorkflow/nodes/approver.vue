@@ -122,6 +122,7 @@
 	import addNode from './addNode'
 
 	export default {
+		name: 'ScWorkflowApproverNode',
 		inject: ['select'],
 		props: {
 			modelValue: { type: Object, default: () => {} }

@@ -55,6 +55,7 @@
 </template>
 
 <script>
+import { ElMessage, ElMessageBox } from 'element-plus'
 let newMenuIndex = 1;
 import save from './save'
 
@@ -78,7 +79,7 @@ export default {
 		}
 	},
 	watch: {
-		async menuFilterText(val) {
+		async menuFilterText() {
 			await this.getMenu({ keywords: this.menuFilterText })
 		}
 	},

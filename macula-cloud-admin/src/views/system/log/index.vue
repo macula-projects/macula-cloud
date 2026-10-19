@@ -30,7 +30,7 @@
 <script>
 
 	export default {
-		name: 'log',
+		name: 'SystemLogPage',
 		data() {
 			return {
 				infoDrawer: false,

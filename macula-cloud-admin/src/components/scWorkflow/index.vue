@@ -42,6 +42,7 @@
 	import useSelect from './select'
 
 	export default {
+		name: 'ScWorkflowIndex',
 		provide(){
 			return {
 				select: this.selectHandle

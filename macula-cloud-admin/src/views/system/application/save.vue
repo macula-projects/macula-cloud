@@ -60,7 +60,9 @@
 
 
 <script>
+import { ElMessage, ElMessageBox } from 'element-plus'
 export default {
+	name: 'SystemApplicationSave',
 	emits: ['success', 'closed'],
 	data() {
 		let that = this
@@ -125,11 +127,12 @@ export default {
 				if (valid) {
 					this.isSaveing = true;
 					this.form.manager = this.form.manager.map(item => item.username).join(',')
+					let res;
 					if (this.mode == 'add') {
 						// 调用相关接口
-						var res = await this.$API.system_application.application.add.post(this.form);
+						res = await this.$API.system_application.application.add.post(this.form);
 					} else {
-						var res = await this.$API.system_application.application.edit.put(this.form, this.form.id);
+						res = await this.$API.system_application.application.edit.put(this.form, this.form.id);
 					}
 					this.isSaveing = false;
 					if (res.success) {
@@ -185,7 +188,7 @@ export default {
 			if (value.trim().length === 0) {
 				callback(new Error('请输入应用编码'))
 			}
-			const regx = /^[a-zA-Z0-9_\-]+$/
+			const regx = /^[a-zA-Z0-9_-]+$/
 			if (!regx.test(value)) {
 				callback(new Error('应用编码由字母、数字、横线及下划线组成'))
 			}
