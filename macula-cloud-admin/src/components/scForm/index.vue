@@ -112,7 +112,7 @@
 						</template>
 						<!-- editor -->
 						<template v-else-if="item.component=='editor'" >
-							<sc-editor v-model="form[item.name]" placeholder="请输入" :height="400"></sc-editor>
+							<sc-editor :key="`${item.name}-${editorRevision}`" v-model="form[item.name]" placeholder="请输入" :height="400"></sc-editor>
 						</template>
 						<!-- noComponent -->
 						<template v-else>
@@ -152,16 +152,21 @@
 		data() {
 			return {
 				form: {},
+				editorRevision: 0,
 				renderLoading: false
 			}
 		},
 		watch:{
-			modelValue(){
-				if(this.hasConfig){
+			modelValue(value){
+				if(this.hasConfig && value !== this.form){
+					// Reuse for a different record must discard pending editor uploads,
+					// even when both records have identical HTML.
+					this.editorRevision += 1
 					this.deepMerge(this.form, this.modelValue)
 				}
 			},
 			config(){
+				this.editorRevision += 1
 				this.render()
 			},
 			form:{

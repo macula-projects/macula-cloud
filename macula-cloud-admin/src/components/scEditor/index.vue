@@ -207,7 +207,9 @@ export default {
   },
   beforeUnmount() {
     this.uploadGeneration += 1
-    this.editor?.destroy()
+    const editor = this.editor
+    this.editor = null
+    editor?.destroy()
   },
   methods: {
     run(command, ...args) {

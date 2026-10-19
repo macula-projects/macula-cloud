@@ -166,6 +166,45 @@ describe('open-source rich text editor', () => {
         expect(wrapper.emitted('submit')?.at(-1)[0].body).toContain('源码新内容')
     })
 
+    it('does not insert an old upload after the form switches to a record with the same HTML', async () => {
+        let finishUpload
+        API.common.upload.post.mockReturnValue(new Promise(resolve => { finishUpload = resolve }))
+        const slot = {template: '<div><slot /></div>'}
+        const wrapper = mount(ScForm, {
+            props: {
+                modelValue: {id: 'A', body: '<p>相同正文</p>'},
+                config: {formItems: [{component: 'editor', name: 'body', label: '正文', value: '', rules: []}]}
+            },
+            global: {components: {ScEditor}, stubs: {
+                ElForm: slot, ElRow: slot, ElCol: slot, ElFormItem: slot, ElSkeleton: slot, ElButton: slot
+            }}
+        })
+        mounted.push(wrapper)
+        await flushPromises()
+
+        const oldEditor = wrapper.findComponent(ScEditor)
+        const file = new File(['image'], 'image.png', {type: 'image/png'})
+        const request = oldEditor.vm.uploadImage({target: {files: [file], value: 'image.png'}})
+        await wrapper.setProps({modelValue: {id: 'B', body: '<p>相同正文</p>'}})
+        expect(wrapper.findComponent(ScEditor).vm).not.toBe(oldEditor.vm)
+
+        finishUpload({data: {src: 'https://example.com/old-record.png'}})
+        await request
+        expect(wrapper.vm.form.id).toBe('B')
+        expect(wrapper.vm.form.body).not.toContain('old-record.png')
+        expect(wrapper.findComponent(ScEditor).vm.editor.getHTML()).not.toContain('old-record.png')
+
+        const activeEditor = wrapper.findComponent(ScEditor).vm
+        activeEditor.editor.commands.setContent('<p>记录 B 的本地编辑</p>')
+        await flushPromises()
+        await wrapper.setProps({modelValue: wrapper.vm.form})
+        expect(wrapper.findComponent(ScEditor).vm).toBe(activeEditor)
+
+        await wrapper.setProps({config: {formItems: [{component: 'editor', name: 'body', label: '正文', value: '', rules: []}]}})
+        await flushPromises()
+        expect(wrapper.findComponent(ScEditor).vm).not.toBe(activeEditor)
+    })
+
     it('keeps every visual editing entry inert while source mode is active', async () => {
         const wrapper = createEditor({modelValue: '<p>原文</p>', templates: [{title: '通知', content: '<p>模板</p>'}]})
         await wrapper.findAll('button').find(button => button.text() === '源码').trigger('click')
