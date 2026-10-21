@@ -249,8 +249,6 @@ class MaculaOAuth2AuthorizationServiceTest {
         oldMapper.registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
         oldMapper.addMixIn(dev.macula.cloud.iam.authentication.sms.SmsAuthenticationToken.class,
             LegacyAuthenticationMixin.class);
-        oldMapper.addMixIn(dev.macula.cloud.iam.authentication.weapp.WeappAuthenticationToken.class,
-            LegacyAuthenticationMixin.class);
         var oldRecordMapper = new com.fasterxml.jackson.databind.ObjectMapper()
             .registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
         var user = new dev.macula.cloud.iam.service.userdetails.SysUserDetails();
@@ -258,9 +256,7 @@ class MaculaOAuth2AuthorizationServiceTest {
         user.setAuthorities(List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("USER")));
         var tokens = List.of(
             new dev.macula.cloud.iam.authentication.sms.SmsAuthenticationToken(user, null, user.getAuthorities()),
-            new dev.macula.cloud.iam.authentication.sms.SmsAuthenticationToken("fixture-user", null),
-            new dev.macula.cloud.iam.authentication.weapp.WeappAuthenticationToken(user, user.getAuthorities()),
-            new dev.macula.cloud.iam.authentication.weapp.WeappAuthenticationToken("fixture-user"));
+            new dev.macula.cloud.iam.authentication.sms.SmsAuthenticationToken("fixture-user", null));
         for (var token : tokens) {
             token.setDetails(new org.springframework.security.web.authentication.WebAuthenticationDetails("127.0.0.1", "fixture"));
             OAuth2Authorization original = OAuth2Authorization.from(authorization())

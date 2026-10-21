@@ -18,6 +18,7 @@ package dev.macula.cloud.iam.authentication.github;
 
 import dev.macula.cloud.iam.authentication.thirdparty.AbstractThirdPartyAuthenticationFilter;
 import dev.macula.cloud.iam.authentication.thirdparty.IdentityProviderConfigService.ProviderConfig;
+import dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyLoginContext;
 import dev.macula.cloud.iam.enums.ThirdPartyProviderType;
 
 /**
@@ -38,7 +39,8 @@ public class GithubAuthenticationFilter extends AbstractThirdPartyAuthentication
     }
 
     @Override
-    protected String authorizationUri(ProviderConfig config, String state, String redirectUri) {
+    protected String authorizationUri(ProviderConfig config, String state, String redirectUri,
+        ThirdPartyLoginContext context) {
         return client.authorizationUri(config, state, redirectUri);
     }
 }

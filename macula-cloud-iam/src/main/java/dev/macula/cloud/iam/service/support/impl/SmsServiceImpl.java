@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package dev.macula.cloud.iam.service.userdetails;
+package dev.macula.cloud.iam.service.support.impl;
 
 import dev.macula.cloud.iam.authentication.sms.SmsService;
 import dev.macula.cloud.iam.message.LoginSmsDispatcher;
@@ -58,7 +58,9 @@ public class SmsServiceImpl implements SmsService {
 
     private String normalize(String phone) {
         String value = phone == null ? "" : phone.replace(" ", "").replace("-", "");
-        if (!value.matches("^\\+?[0-9]{6,20}$")) throw new IllegalArgumentException("手机号格式无效");
+        if (!value.matches("^\\+?[0-9]{6,20}$")) {
+            throw new IllegalArgumentException("手机号格式无效");
+        }
         return value;
     }
 }

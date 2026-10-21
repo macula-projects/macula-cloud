@@ -20,10 +20,11 @@ package dev.macula.cloud.iam.config;
 import cn.hutool.core.lang.Assert;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
+import dev.macula.boot.constants.GlobalConstants;
 import dev.macula.cloud.iam.authentication.sms.SmsAuthenticationProvider;
 import dev.macula.cloud.iam.authentication.sms.SmsService;
 import dev.macula.cloud.iam.authentication.sms.SmsUserDetailsService;
-import dev.macula.cloud.iam.handler.OAuth2AuthenticationExceptionEntryPoint;
+import dev.macula.cloud.iam.protocol.oauth2.endpoint.OAuth2AuthenticationExceptionEntryPoint;
 import dev.macula.cloud.iam.protocol.oauth2.CustomOAuth2TokenCustomizer;
 import dev.macula.cloud.iam.protocol.oauth2.CustomOidcTokenCustomizer;
 import dev.macula.cloud.iam.protocol.oauth2.LocalAccessTokenIntrospector;
@@ -44,6 +45,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -55,13 +58,30 @@ import org.springframework.security.oauth2.core.OAuth2Token;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsentService;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
-import org.springframework.security.oauth2.server.authorization.authentication.*;
+import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationCodeRequestAuthenticationException;
+import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationCodeRequestAuthenticationToken;
+import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationConsentAuthenticationProvider;
+import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationConsentAuthenticationToken;
+import org.springframework.security.oauth2.server.authorization.authentication.OAuth2RefreshTokenAuthenticationProvider;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
-import org.springframework.security.oauth2.server.authorization.token.*;
+import org.springframework.security.oauth2.server.authorization.token.DelegatingOAuth2TokenGenerator;
+import org.springframework.security.oauth2.server.authorization.token.JwtGenerator;
+import org.springframework.security.oauth2.server.authorization.token.OAuth2RefreshTokenGenerator;
+import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenClaimsContext;
+import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenCustomizer;
+import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenGenerator;
 import org.springframework.security.oauth2.server.resource.authentication.OpaqueTokenAuthenticationProvider;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.util.matcher.OrRequestMatcher;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.time.Duration;
+import java.util.List;
 
 /**
  * {@code AuthorizationServerConfiguration} 基于Oauth2协议的配置
@@ -73,15 +93,20 @@ import org.springframework.security.web.util.matcher.RequestMatcher;
 @ConfigurationProperties(prefix = "macula.cloud.iam")
 public class ProtocolOAuth2Configuration {
     private static final String CUSTOM_CONSENT_PAGE_URI = "/oauth2/consent";
+    private static final Duration TOKEN_CORS_MAX_AGE = Duration.ofMinutes(30);
 
     @Setter
     private String issuerUri;
+
+    @Setter
+    private List<String> tokenCorsAllowedOrigins = List.of();
 
     @Bean("authorizationServerSecurityFilterChain")
     @Order(Ordered.HIGHEST_PRECEDENCE)
     SecurityFilterChain authorizationServerSecurityFilterChain(HttpSecurity http,
         OAuth2AuthorizationService authorizationService, OAuth2TokenGenerator<OAuth2Token> tokenGenerator,
-        SmsUserDetailsService smsUsers, SmsService smsService) throws Exception {
+        SmsUserDetailsService smsUsers, SmsService smsService,
+        AuthorizationServerSettings authorizationServerSettings) throws Exception {
 
         // @formatter:off
 
@@ -96,7 +121,9 @@ public class ProtocolOAuth2Configuration {
                         if (provider instanceof OAuth2AuthorizationConsentAuthenticationProvider consentProvider) {
                             consentProvider.setAuthorizationConsentCustomizer(context -> {
                                 OAuth2AuthorizationConsentAuthenticationToken consent = context.getAuthentication();
-                                if (!"deny".equals(consent.getAdditionalParameters().get("decision"))) return;
+                                if (!"deny".equals(consent.getAdditionalParameters().get("decision"))) {
+                                    return;
+                                }
                                 // The framework has already validated state, principal and registered redirect.
                                 // Deny this request even when previous consent exists; preserve that earlier consent.
                                 var request = context.getAuthorizationRequest();
@@ -132,10 +159,14 @@ public class ProtocolOAuth2Configuration {
             .oidc(Customizer.withDefaults());
 
         RequestMatcher endpointsMatcher = authorizationServerConfigurer.getEndpointsMatcher();
+        RequestMatcher protocolMatcher = new OrRequestMatcher(endpointsMatcher,
+            PathPatternRequestMatcher.pathPattern(HttpMethod.OPTIONS,
+                authorizationServerSettings.getTokenEndpoint()));
 
         // 拦截 授权服务器相关的请求端点
         http
-            .securityMatcher(endpointsMatcher)
+            .securityMatcher(protocolMatcher)
+            .cors(cors -> cors.configurationSource(tokenCorsConfigurationSource(authorizationServerSettings)))
             .authorizeHttpRequests(authorize -> authorize
                 .anyRequest().authenticated())
             // 忽略掉相关端点的csrf
@@ -156,6 +187,28 @@ public class ProtocolOAuth2Configuration {
 
         // @formatter:on
         return http.build();
+    }
+
+    private CorsConfigurationSource tokenCorsConfigurationSource(
+        AuthorizationServerSettings authorizationServerSettings) {
+        List<String> allowedOrigins = tokenCorsAllowedOrigins.stream()
+            .map(String::trim)
+            .filter(origin -> !origin.isEmpty())
+            .toList();
+        if (allowedOrigins.contains(CorsConfiguration.ALL)) {
+            throw new IllegalStateException("OAuth2 token CORS 不允许通配来源");
+        }
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOrigins(allowedOrigins);
+        configuration.setAllowedMethods(List.of(HttpMethod.POST.name(), HttpMethod.OPTIONS.name()));
+        configuration.setAllowedHeaders(List.of(HttpHeaders.AUTHORIZATION, HttpHeaders.CONTENT_TYPE,
+            GlobalConstants.TENANT_ID_NAME));
+        configuration.setAllowCredentials(false);
+        configuration.setMaxAge(TOKEN_CORS_MAX_AGE);
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration(authorizationServerSettings.getTokenEndpoint(), configuration);
+        return source;
     }
 
     @Bean

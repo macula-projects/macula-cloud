@@ -18,6 +18,7 @@
 package dev.macula.cloud.iam.service.support.impl;
 
 import cn.hutool.core.collection.CollectionUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import dev.macula.boot.enums.DataScopeEnum;
 import dev.macula.cloud.iam.mapper.SysUserMapper;
@@ -27,9 +28,12 @@ import dev.macula.cloud.iam.service.support.SysRoleService;
 import dev.macula.cloud.iam.service.support.SysUserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.security.authentication.AuthenticationServiceException;
+import org.springframework.util.StringUtils;
 
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
@@ -44,6 +48,29 @@ import java.util.Set;
 public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> implements SysUserService {
 
     private final SysRoleService roleService;
+
+    @Override
+    public SysUser findUniqueByUsername(String username) {
+        if (!StringUtils.hasText(username)) {
+            return null;
+        }
+        return unique(this.list(new LambdaQueryWrapper<SysUser>().eq(SysUser::getUsername, username)));
+    }
+
+    @Override
+    public SysUser findUniqueByMobile(String mobile) {
+        if (!StringUtils.hasText(mobile)) {
+            return null;
+        }
+        return unique(this.list(new LambdaQueryWrapper<SysUser>().eq(SysUser::getMobile, mobile)));
+    }
+
+    private SysUser unique(List<SysUser> users) {
+        if (users.size() > 1) {
+            throw new AuthenticationServiceException("本地账号不唯一");
+        }
+        return users.isEmpty() ? null : users.get(0);
+    }
 
     @Override
     public UserAuthInfo getUserAuthInfo(Long tenantId, String username, Set<Long> groupIds) {

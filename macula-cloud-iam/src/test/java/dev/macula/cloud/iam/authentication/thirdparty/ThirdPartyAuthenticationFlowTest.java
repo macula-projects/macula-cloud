@@ -16,16 +16,14 @@
  */
 package dev.macula.cloud.iam.authentication.thirdparty;
 
-import dev.macula.cloud.iam.enums.UserTypeEnum;
-import dev.macula.cloud.iam.pojo.entity.SysOAuth2Client;
-import dev.macula.cloud.iam.service.support.SysOAuth2ClientService;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.mock.web.MockHttpSession;
+import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationServiceException;
-import org.springframework.security.core.userdetails.User;
+import org.springframework.security.oauth2.core.endpoint.OAuth2ParameterNames;
 import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
 
 import java.time.Instant;
@@ -35,7 +33,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 /**
- * 验证第三方 state 绑定原始授权请求，并只恢复对应的服务端目标。
+ * 验证第三方登录无需 client，state 只保存服务端受控的原请求续转目标。
  *
  * @author Rain
  * @since 6.1.0
@@ -43,7 +41,7 @@ import static org.mockito.Mockito.*;
 class ThirdPartyAuthenticationFlowTest {
     @Test
     void initiationBindsTheMatchingSavedAuthorizationRequest() throws Exception {
-        Fixture fixture = fixture("portal");
+        Fixture fixture = fixture();
         MockHttpSession session = new MockHttpSession();
         saveAuthorizationRequest(session, "portal", "original-state");
         MockHttpServletRequest request = loginRequest(session, "portal");
@@ -53,57 +51,158 @@ class ThirdPartyAuthenticationFlowTest {
 
         ArgumentCaptor<ThirdPartyLoginContext> context = ArgumentCaptor.forClass(ThirdPartyLoginContext.class);
         verify(fixture.states).create(eq(request), context.capture());
-        assertEquals("portal", context.getValue().clientId());
+        assertEquals("GITHUB", context.getValue().providerType());
         assertTrue(context.getValue().savedRequestTarget().startsWith("/oauth2/authorize?"));
         assertTrue(context.getValue().savedRequestTarget().contains("client_id=portal"));
     }
 
     @Test
-    void initiationRejectsAClientDifferentFromTheSavedRequest() {
-        Fixture fixture = fixture("portal");
+    void initiationDoesNotDependOnAClientParameter() throws Exception {
+        Fixture fixture = fixture();
         MockHttpSession session = new MockHttpSession();
         saveAuthorizationRequest(session, "other-client", "other-state");
 
+        MockHttpServletRequest request = loginRequest(session, "portal");
+        fixture.filter.attemptAuthentication(request, new MockHttpServletResponse());
+        verify(fixture.states).create(eq(request), any());
+    }
+
+    @Test
+    void initiationRestoresAProtectedNonOauthRequestWithoutClient() throws Exception {
+        Fixture fixture = fixture();
+        MockHttpSession session = new MockHttpSession();
+        saveRequest(session, "/private/profile", "tab=security");
+        MockHttpServletRequest request = loginRequest(session, null);
+
+        fixture.filter.attemptAuthentication(request, new MockHttpServletResponse());
+
+        ArgumentCaptor<ThirdPartyLoginContext> context = ArgumentCaptor.forClass(ThirdPartyLoginContext.class);
+        verify(fixture.states).create(eq(request), context.capture());
+        assertTrue(context.getValue().savedRequestTarget().startsWith("/private/profile?tab=security"));
+    }
+
+    @Test
+    void directLoginDefaultsToRoot() throws Exception {
+        Fixture fixture = fixture();
+        MockHttpServletRequest request = loginRequest(new MockHttpSession(), null);
+
+        fixture.filter.attemptAuthentication(request, new MockHttpServletResponse());
+
+        ArgumentCaptor<ThirdPartyLoginContext> context = ArgumentCaptor.forClass(ThirdPartyLoginContext.class);
+        verify(fixture.states).create(eq(request), context.capture());
+        assertEquals("/", context.getValue().savedRequestTarget());
+    }
+
+    @Test
+    void rejectsProtocolRelativeSavedRequest() {
+        Fixture fixture = fixture();
+        MockHttpSession session = new MockHttpSession();
+        saveRequest(session, "//attacker.example/steal", null);
+        MockHttpServletRequest request = loginRequest(session, null);
+
         assertThrows(AuthenticationServiceException.class,
-            () -> fixture.filter.attemptAuthentication(loginRequest(session, "portal"),
-                new MockHttpServletResponse()));
+            () -> fixture.filter.attemptAuthentication(request, new MockHttpServletResponse()));
         verifyNoInteractions(fixture.states);
     }
 
     @Test
-    void successIgnoresAReplacedSharedSavedRequest() throws Exception {
-        MockHttpSession session = new MockHttpSession();
-        saveAuthorizationRequest(session, "other-client", "other-state");
-        ThirdPartyLoginContext context = new ThirdPartyLoginContext("GITHUB", "portal", 7L,
-            UserTypeEnum.EMPLOYEE, Instant.now(),
-            "/oauth2/authorize?response_type=code&client_id=portal&state=original-state");
-        ThirdPartyAuthenticationToken token = ThirdPartyAuthenticationToken.authenticated("GITHUB",
-            User.withUsername("alice").password("n/a").authorities("USER").build(), context);
-        MockHttpServletRequest callback = new MockHttpServletRequest();
-        callback.setSession(session);
-        MockHttpServletResponse response = new MockHttpServletResponse();
+    void rejectsSavedRequestsFromUntrustedOrigins() {
+        for (SavedRequestOrigin origin : new SavedRequestOrigin[]{
+            new SavedRequestOrigin("https", "attacker.example", 443),
+            new SavedRequestOrigin("http", "iam.example", 80),
+            new SavedRequestOrigin("https", "iam.example", 8443)}) {
+            Fixture fixture = fixture();
+            MockHttpSession session = new MockHttpSession();
+            saveRequest(session, "/private/profile", null, origin);
+            MockHttpServletRequest request = loginRequest(session, null);
 
-        new ThirdPartyAuthenticationSuccessHandler().onAuthenticationSuccess(callback, response, token);
-
-        assertEquals(context.savedRequestTarget(), response.getRedirectedUrl());
-        assertNull(new HttpSessionRequestCache().getRequest(callback, response));
+            assertThrows(AuthenticationServiceException.class,
+                () -> fixture.filter.attemptAuthentication(request, new MockHttpServletResponse()));
+            verifyNoInteractions(fixture.states);
+        }
     }
 
-    private Fixture fixture(String clientId) {
-        SysOAuth2ClientService clients = mock(SysOAuth2ClientService.class);
+    @Test
+    void rejectsEncodedSlashAndCrossContextSavedRequests() {
+        for (String unsafePath : new String[]{"/%2Fevil.example", "/other/private"}) {
+            Fixture fixture = fixture();
+            MockHttpSession session = new MockHttpSession();
+            saveRequest(session, unsafePath, null);
+            MockHttpServletRequest request = loginRequest(session, null);
+            request.setContextPath("/iam");
+
+            assertThrows(AuthenticationServiceException.class,
+                () -> fixture.filter.attemptAuthentication(request, new MockHttpServletResponse()));
+            verifyNoInteractions(fixture.states);
+        }
+    }
+
+    @Test
+    void acceptsSavedRequestWithinAContextPath() throws Exception {
+        Fixture fixture = fixture();
+        MockHttpSession session = new MockHttpSession();
+        saveRequest(session, "/iam/private/profile", null);
+        MockHttpServletRequest request = loginRequest(session, null);
+        request.setContextPath("/iam");
+
+        fixture.filter.attemptAuthentication(request, new MockHttpServletResponse());
+
+        ArgumentCaptor<ThirdPartyLoginContext> context = ArgumentCaptor.forClass(ThirdPartyLoginContext.class);
+        verify(fixture.states).create(eq(request), context.capture());
+        assertTrue(context.getValue().savedRequestTarget().startsWith("/iam/private/profile"));
+    }
+
+    @Test
+    void callbackRejectsAReplacedSharedSavedRequest() {
+        Fixture fixture = fixture();
+        MockHttpSession session = new MockHttpSession();
+        saveAuthorizationRequest(session, "other-client", "other-state");
+        ThirdPartyLoginContext context = new ThirdPartyLoginContext("GITHUB", "", Instant.now(),
+            "/oauth2/authorize?response_type=code&client_id=portal&state=original-state");
+        when(fixture.states.consume(any(), eq("GITHUB"), eq("valid-state"))).thenReturn(context);
+        MockHttpServletRequest callback = new MockHttpServletRequest("GET", "/login/github");
+        callback.setSession(session);
+        callback.addParameter("state", "valid-state");
+        callback.addParameter("code", "authorization-code");
+
+        assertThrows(AuthenticationServiceException.class,
+            () -> fixture.filter.attemptAuthentication(callback, new MockHttpServletResponse()));
+        verify(fixture.states).consume(callback, "GITHUB", "valid-state");
+    }
+
+    @Test
+    void callbackAcceptsTheSameNormalizedSavedRequest() throws Exception {
+        Fixture fixture = fixture();
+        MockHttpSession session = new MockHttpSession();
+        saveAuthorizationRequest(session, "portal", "original-state");
+        MockHttpServletRequest initiation = loginRequest(session, null);
+        fixture.filter.attemptAuthentication(initiation, new MockHttpServletResponse());
+        ArgumentCaptor<ThirdPartyLoginContext> context = ArgumentCaptor.forClass(ThirdPartyLoginContext.class);
+        verify(fixture.states).create(eq(initiation), context.capture());
+        when(fixture.states.consume(any(), eq("GITHUB"), eq("valid-state"))).thenReturn(context.getValue());
+
+        MockHttpServletRequest callback = new MockHttpServletRequest("GET", "/login/github");
+        callback.setSession(session);
+        callback.addParameter(OAuth2ParameterNames.STATE, "valid-state");
+        callback.addParameter(OAuth2ParameterNames.CODE, "authorization-code");
+
+        assertNotNull(fixture.filter.attemptAuthentication(callback, new MockHttpServletResponse()));
+        verify(fixture.authenticationManager).authenticate(any(ThirdPartyAuthenticationToken.class));
+    }
+
+    private Fixture fixture() {
         IdentityProviderConfigService configs = mock(IdentityProviderConfigService.class);
         ThirdPartyLoginStateRepository states = mock(ThirdPartyLoginStateRepository.class);
-        SysOAuth2Client client = new SysOAuth2Client();
-        client.setTenantId(7L);
-        client.setUserType(UserTypeEnum.EMPLOYEE);
-        when(clients.getClientByClientId(clientId)).thenReturn(client);
         when(configs.requireEnabled("GITHUB")).thenReturn(
             new IdentityProviderConfigService.ProviderConfig("GITHUB", "id", "secret",
                 java.util.Map.of("clientId", "id")));
         when(states.create(any(), any())).thenReturn("generated-state");
         FixtureFilter filter = new FixtureFilter();
-        filter.configure(clients, configs, states, "https://iam.example");
-        return new Fixture(filter, states);
+        filter.configure(configs, states, "https://iam.example");
+        AuthenticationManager authenticationManager = mock(AuthenticationManager.class);
+        when(authenticationManager.authenticate(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        filter.setAuthenticationManager(authenticationManager);
+        return new Fixture(filter, states, authenticationManager);
     }
 
     private void saveAuthorizationRequest(MockHttpSession session, String clientId, String state) {
@@ -113,8 +212,27 @@ class ThirdPartyAuthenticationFlowTest {
         request.addParameter("response_type", "code");
         request.addParameter("client_id", clientId);
         request.addParameter("state", state);
+        request.setScheme("https");
+        request.setServerName("iam.example");
+        request.setServerPort(443);
         new HttpSessionRequestCache().saveRequest(request, new MockHttpServletResponse());
     }
+
+    private void saveRequest(MockHttpSession session, String path, String query) {
+        saveRequest(session, path, query, new SavedRequestOrigin("https", "iam.example", 443));
+    }
+
+    private void saveRequest(MockHttpSession session, String path, String query, SavedRequestOrigin origin) {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", path);
+        request.setSession(session);
+        request.setQueryString(query);
+        request.setScheme(origin.scheme());
+        request.setServerName(origin.host());
+        request.setServerPort(origin.port());
+        new HttpSessionRequestCache().saveRequest(request, new MockHttpServletResponse());
+    }
+
+    private record SavedRequestOrigin(String scheme, String host, int port) { }
 
     private MockHttpServletRequest loginRequest(MockHttpSession session, String clientId) {
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/login/github");
@@ -123,7 +241,8 @@ class ThirdPartyAuthenticationFlowTest {
         return request;
     }
 
-    private record Fixture(FixtureFilter filter, ThirdPartyLoginStateRepository states) {
+    private record Fixture(FixtureFilter filter, ThirdPartyLoginStateRepository states,
+                           AuthenticationManager authenticationManager) {
     }
 
     private static final class FixtureFilter extends AbstractThirdPartyAuthenticationFilter {
@@ -133,7 +252,7 @@ class ThirdPartyAuthenticationFlowTest {
 
         @Override
         protected String authorizationUri(IdentityProviderConfigService.ProviderConfig config, String state,
-            String redirectUri) {
+            String redirectUri, ThirdPartyLoginContext context) {
             return "https://github.example/authorize?state=" + state;
         }
     }

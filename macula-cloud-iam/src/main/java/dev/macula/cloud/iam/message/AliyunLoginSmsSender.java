@@ -19,6 +19,8 @@ package dev.macula.cloud.iam.message;
 import com.aliyun.dysmsapi20170525.Client;
 import com.aliyun.dysmsapi20170525.models.SendSmsRequest;
 import com.aliyun.teaopenapi.models.Config;
+import dev.macula.cloud.iam.pojo.entity.SysMessageTemplate;
+import dev.macula.cloud.iam.pojo.entity.SysMessageProvider;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -34,7 +36,7 @@ import java.util.Map;
 public class AliyunLoginSmsSender {
     private final JsonMapper json = JsonMapper.builder().build();
 
-    public void send(IamMessageProvider provider, IamMessageTemplate template, String phone, String code) {
+    public void send(SysMessageProvider provider, SysMessageTemplate template, String phone, String code) {
         try {
             Config config = new Config().setAccessKeyId(provider.getAccount())
                 .setAccessKeySecret(provider.getCredential()).setEndpoint("dysmsapi.aliyuncs.com");

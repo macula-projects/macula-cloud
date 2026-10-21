@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2026 Macula
  *   macula.dev, China
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -16,12 +17,17 @@
 package dev.macula.cloud.iam.authentication.github;
 
 import dev.macula.cloud.iam.authentication.thirdparty.IdentityProviderConfigService.ProviderConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.security.authentication.AuthenticationServiceException;
+import org.springframework.security.oauth2.core.endpoint.OAuth2ParameterNames;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.util.UriComponentsBuilder;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -36,9 +42,13 @@ import java.time.Duration;
  */
 @Component
 public class GithubClient {
+    private static final Logger LOGGER = LoggerFactory.getLogger(GithubClient.class);
     private static final String AUTHORIZE = "https://github.com/login/oauth/authorize";
     private static final String TOKEN = "https://github.com/login/oauth/access_token";
     private static final String USER = "https://api.github.com/user";
+    private static final String CLIENT_ID_CONFIG = "clientId";
+    private static final String TOKEN_STAGE = "token";
+    private static final String USER_STAGE = "user";
     private final RestClient restClient;
     private final JsonMapper json = JsonMapper.builder().build();
 
@@ -55,34 +65,54 @@ public class GithubClient {
 
     public String authorizationUri(ProviderConfig config, String state, String redirectUri) {
         return UriComponentsBuilder.fromUriString(AUTHORIZE)
-            .queryParam("client_id", config.require("clientId"))
-            .queryParam("redirect_uri", redirectUri)
-            .queryParam("state", state).build().encode().toUriString();
+            .queryParam(OAuth2ParameterNames.CLIENT_ID, config.require(CLIENT_ID_CONFIG))
+            .queryParam(OAuth2ParameterNames.REDIRECT_URI, redirectUri)
+            .queryParam(OAuth2ParameterNames.STATE, state).build().encode().toUriString();
     }
 
     public String fetchSubject(ProviderConfig config, String code, String redirectUri) {
+        String stage = TOKEN_STAGE;
         try {
             LinkedMultiValueMap<String, String> form = new LinkedMultiValueMap<>();
-            form.add("client_id", config.require("clientId"));
-            form.add("client_secret", config.appSecret());
-            form.add("code", code);
-            form.add("redirect_uri", redirectUri);
+            form.add(OAuth2ParameterNames.CLIENT_ID, config.require(CLIENT_ID_CONFIG));
+            form.add(OAuth2ParameterNames.CLIENT_SECRET, config.appSecret());
+            form.add(OAuth2ParameterNames.CODE, code);
+            form.add(OAuth2ParameterNames.REDIRECT_URI, redirectUri);
             String tokenBody = restClient.post().uri(TOKEN).contentType(MediaType.APPLICATION_FORM_URLENCODED)
                 .accept(MediaType.APPLICATION_JSON).body(form).retrieve().body(String.class);
             JsonNode tokenJson = json.readTree(tokenBody);
-            String accessToken = tokenJson.path("access_token").asText();
-            if (accessToken.isBlank()) throw failed();
+            String accessToken = tokenJson.path(OAuth2ParameterNames.ACCESS_TOKEN).asText();
+            if (accessToken.isBlank()) {
+                String failure = tokenJson.path(OAuth2ParameterNames.ERROR).asText().isBlank()
+                    ? "missing_access_token" : "provider_rejected";
+                LOGGER.warn("第三方接口响应无效 provider=GITHUB stage={} failure={}", stage, failure);
+                throw failed();
+            }
+            stage = USER_STAGE;
             String userBody = restClient.get().uri(USER)
                 .header("Authorization", "Bearer " + accessToken)
                 .header("Accept", "application/vnd.github+json")
                 .header("X-GitHub-Api-Version", "2022-11-28")
                 .retrieve().body(String.class);
             JsonNode userJson = json.readTree(userBody);
-            if (!userJson.path("id").isIntegralNumber()) throw failed();
+            if (!userJson.path("id").isIntegralNumber()) {
+                LOGGER.warn("第三方接口响应无效 provider=GITHUB stage={} failure=missing_or_invalid_subject", stage);
+                throw failed();
+            }
             return userJson.path("id").asText();
         } catch (AuthenticationServiceException ex) {
             throw ex;
+        } catch (RestClientResponseException ex) {
+            LOGGER.warn("第三方接口 HTTP 失败 provider=GITHUB stage={} status={}", stage,
+                ex.getStatusCode().value());
+            throw failed();
+        } catch (RestClientException ex) {
+            LOGGER.warn("第三方接口调用失败 provider=GITHUB stage={} failure=transport_error exception={}",
+                stage, ex.getClass().getSimpleName());
+            throw failed();
         } catch (RuntimeException ex) {
+            LOGGER.error("第三方接口响应处理失败 provider=GITHUB stage={} failure=invalid_response exception={}",
+                stage, ex.getClass().getSimpleName());
             throw failed();
         }
     }

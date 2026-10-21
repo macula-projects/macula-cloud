@@ -21,53 +21,44 @@ import dev.macula.cloud.iam.pojo.dto.UserAuthInfo;
 import dev.macula.cloud.iam.service.support.SysOAuth2ClientService;
 import dev.macula.cloud.iam.service.support.SysUserService;
 import dev.macula.cloud.iam.service.support.UserAuthInfoService;
-import dev.macula.cloud.iam.service.userdetails.OAuthClientUserDetailsService;
+import dev.macula.cloud.iam.pojo.entity.SysUser;
 import dev.macula.cloud.iam.service.userdetails.SysUserDetailsServiceImpl;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 
-import java.time.Instant;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 /**
- * 验证回调不会绕过 OAuth client 的租户和用户类型快照。
+ * 验证第三方回调按全局系统账号登录，不依赖 OAuth client。
  *
  * @author Rain
  * @since 6.1.0
  */
 class ThirdPartyUserDetailsServiceTest {
     @Test
-    void delegatesStateBoundRoutingSnapshot() {
-        OAuthClientUserDetailsService users = mock(OAuthClientUserDetailsService.class);
-        when(users.loadUserByClient("portal", 7L, UserTypeEnum.EMPLOYEE, "alice"))
-            .thenReturn(User.withUsername("alice").password("n/a").authorities("USER").build());
+    void loadsGlobalAccountWithoutClient() {
+        SysUserService users = mock(SysUserService.class);
+        SysUser account = new SysUser();
+        account.setId(1L);
+        account.setUsername("alice");
+        account.setStatus(1);
+        when(users.findUniqueByUsername("alice")).thenReturn(account);
 
         var service = new ThirdPartyUserDetailsService(users);
-        var context = new ThirdPartyLoginContext("GITHUB", "portal", 7L, UserTypeEnum.EMPLOYEE, Instant.now());
-        assertEquals("alice", service.load(context, "alice").getUsername());
-        verify(users).loadUserByClient("portal", 7L, UserTypeEnum.EMPLOYEE, "alice");
+        assertEquals("alice", service.load("alice").getUsername());
+        assertTrue(service.load("alice").getAuthorities().isEmpty());
+        verify(users, times(2)).findUniqueByUsername("alice");
     }
 
     @Test
-    void rejectsChangedClientRouting() {
+    void rejectsMissingGlobalAccount() {
         SysUserService systemUsers = mock(SysUserService.class);
-        SysOAuth2ClientService clients = mock(SysOAuth2ClientService.class);
-        UserAuthInfoService routedUsers = mock(UserAuthInfoService.class);
-        SysOAuth2Client client = new SysOAuth2Client();
-        client.setTenantId(8L);
-        client.setUserType(UserTypeEnum.MEMBER);
-        when(clients.getClientByClientId("portal")).thenReturn(client);
-
-        var users = new SysUserDetailsServiceImpl(systemUsers, clients, routedUsers);
-        var service = new ThirdPartyUserDetailsService(users);
-        var context = new ThirdPartyLoginContext("WECOM", "portal", 7L, UserTypeEnum.EMPLOYEE, Instant.now());
-        assertThrows(BadCredentialsException.class, () -> service.load(context, "alice"));
-        verify(clients, times(1)).getClientByClientId("portal");
-        verifyNoInteractions(routedUsers, systemUsers);
+        var service = new ThirdPartyUserDetailsService(systemUsers);
+        assertThrows(UsernameNotFoundException.class, () -> service.load("alice"));
     }
 
     @Test

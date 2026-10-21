@@ -24,11 +24,17 @@ import dev.macula.cloud.iam.authentication.github.GithubClient;
 import dev.macula.cloud.iam.authentication.thirdparty.HttpSessionThirdPartyLoginStateRepository;
 import dev.macula.cloud.iam.authentication.thirdparty.IdentityProviderConfigService;
 import dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyUserDetailsService;
+import dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyIdentityResolutionService;
+import dev.macula.cloud.iam.authentication.thirdparty.PendingThirdPartyBindingRepository;
+import dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyBindingService;
+import dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyLoginContext;
+import dev.macula.cloud.iam.controller.ThirdPartyBindingController;
 import dev.macula.cloud.iam.authentication.wecom.WecomClient;
 import dev.macula.cloud.iam.controller.LoginController;
 import dev.macula.cloud.iam.mapper.SysIdentityProviderMapper;
 import dev.macula.cloud.iam.mapper.SysUserIdentityBindingMapper;
 import dev.macula.cloud.iam.controller.SmsCodeController;
+import dev.macula.cloud.iam.handler.AuthenticationFailureReason;
 import dev.macula.cloud.iam.protocol.oauth2.endpoint.AuthorizationConsentController;
 import dev.macula.cloud.iam.pojo.dto.UserAuthInfo;
 import dev.macula.cloud.iam.pojo.entity.SysOAuth2Client;
@@ -40,8 +46,11 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.*;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.oauth2.core.*;
+import org.springframework.security.oauth2.core.endpoint.OAuth2ParameterNames;
 import org.springframework.security.oauth2.server.authorization.*;
 import org.springframework.security.oauth2.server.authorization.client.*;
 import org.springframework.security.oauth2.server.authorization.settings.*;
@@ -53,6 +62,7 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.*;
 import org.springframework.web.context.WebApplicationContext;
+import org.springframework.web.filter.ForwardedHeaderFilter;
 import org.springframework.web.servlet.config.annotation.*;
 import org.thymeleaf.spring6.SpringTemplateEngine;
 import org.thymeleaf.spring6.templateresolver.SpringResourceTemplateResolver;
@@ -60,6 +70,7 @@ import org.thymeleaf.spring6.view.ThymeleafViewResolver;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.time.Instant;
 import java.util.*;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -81,6 +92,7 @@ import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppC
 @ActiveProfiles("local")
 @TestPropertySource(properties = {
     "macula.cloud.iam.issuer-uri=https://iam.example",
+    "macula.cloud.iam.token-cors-allowed-origins=https://admin.example",
     "macula.cloud.iam.sms-verification.digest-key=fixture-digest-key"
 })
 class IamProtocolTest {
@@ -90,14 +102,48 @@ class IamProtocolTest {
     ObjectMapper json = tools.jackson.databind.json.JsonMapper.builder().build();
     final String verifier = "01234567890123456789012345678901234567890123456789";
 
+    @Test void tokenCorsAllowsOnlyConfiguredOriginAndEndpoint() throws Exception {
+        mvc.perform(options("/oauth2/token")
+                .header(HttpHeaders.ORIGIN, "https://admin.example")
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, HttpMethod.POST.name())
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS,
+                    HttpHeaders.AUTHORIZATION + ", " + HttpHeaders.CONTENT_TYPE + ", tenantId"))
+            .andExpect(status().isOk())
+            .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "https://admin.example"))
+            .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS,
+                org.hamcrest.Matchers.containsString(HttpMethod.POST.name())))
+            .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS,
+                org.hamcrest.Matchers.containsStringIgnoringCase(HttpHeaders.AUTHORIZATION)))
+            .andExpect(header().doesNotExist(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS));
+
+        mvc.perform(post("/oauth2/token")
+                .header(HttpHeaders.ORIGIN, "https://admin.example")
+                .contentType(org.springframework.http.MediaType.APPLICATION_FORM_URLENCODED))
+            .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "https://admin.example"))
+            .andExpect(header().doesNotExist(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS));
+
+        mvc.perform(options("/oauth2/token")
+                .header(HttpHeaders.ORIGIN, "https://attacker.example")
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, HttpMethod.POST.name()))
+            .andExpect(status().isForbidden())
+            .andExpect(header().doesNotExist(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN));
+
+        mvc.perform(options("/login")
+                .header(HttpHeaders.ORIGIN, "https://admin.example")
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, HttpMethod.POST.name()))
+            .andExpect(header().doesNotExist(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN));
+    }
+
     @Configuration
     @EnableWebMvc
     @EnableConfigurationProperties
     @Import({ProtocolOAuth2Configuration.class, DefaultSecurityConfiguration.class, JwtConfiguration.class,
         PasswordEncoderConfig.class, LoginController.class, SmsCodeController.class,
+        ThirdPartyBindingController.class,
         AuthorizationConsentController.class, GithubClient.class, WecomClient.class,
         IdentityProviderConfigService.class, HttpSessionThirdPartyLoginStateRepository.class,
-        ThirdPartyUserDetailsService.class})
+        ThirdPartyUserDetailsService.class, ThirdPartyIdentityResolutionService.class,
+        PendingThirdPartyBindingRepository.class})
     static class App implements WebMvcConfigurer {
         @Bean @Primary RegisteredClientRepository fixtureClients() {
             return new InMemoryRegisteredClientRepository(client("public", ClientAuthenticationMethod.NONE,
@@ -134,6 +180,7 @@ class IamProtocolTest {
         @Bean SysIdentityProviderMapper identityProviderMapper() { return mock(SysIdentityProviderMapper.class); }
         @Bean SysUserIdentityBindingMapper identityBindingMapper() { return mock(SysUserIdentityBindingMapper.class); }
         @Bean @Primary SmsService fixtureSmsService() { return mock(SmsService.class); }
+        @Bean ThirdPartyBindingService fixtureBindingService() { return mock(ThirdPartyBindingService.class); }
         @Bean SysUserService userService() {
             SysUserService service = mock(SysUserService.class);
             UserAuthInfo user = new UserAuthInfo();
@@ -204,42 +251,71 @@ class IamProtocolTest {
             .andExpect(content().string(org.hamcrest.Matchers.containsString("sms-login")))
             .andExpect(content().string(org.hamcrest.Matchers.containsString(
                 "data-send-code-url=\"api/v1/sms-code\"")));
+        mvc.perform(get("/login").queryParam(OAuth2ParameterNames.ERROR,
+                AuthenticationFailureReason.AUTHENTICATION_REJECTED.code()))
+            .andExpect(status().isOk())
+            .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                AuthenticationFailureReason.AUTHENTICATION_REJECTED.message())));
+        mvc.perform(get("/login").queryParam(OAuth2ParameterNames.ERROR, "forged-error"))
+            .andExpect(status().isOk())
+            .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                AuthenticationFailureReason.AUTHENTICATION_UNAVAILABLE.message())))
+            .andExpect(content().string(org.hamcrest.Matchers.not(
+                org.hamcrest.Matchers.containsString("forged-error"))));
         mvc.perform(get("/iam/auth.css")).andExpect(status().isOk());
         mvc.perform(post("/login").param("username", "fixture-user").param("password", "fixture-password"))
             .andExpect(status().isForbidden());
         mvc.perform(post("/login").with(csrf()).param("username", "fixture-user").param("password", "wrong"))
-            .andExpect(jsonPath("$.success").value(false));
+            .andExpect(status().isFound())
+            .andExpect(redirectedUrl("https://iam.example/login?error=authentication_rejected"));
         MockHttpSession session = login();
         mvc.perform(get("/").session(session)).andExpect(status().isOk())
             .andExpect(content().string(org.hamcrest.Matchers.containsString("fixture-user")));
     }
 
-    @Test void thirdPartyButtonsRequireValidClientAndVisibleProvider() throws Exception {
-        SysOAuth2ClientService clients = context.getBean(SysOAuth2ClientService.class);
+    @Test void bindingPageRequiresPendingIdentityAndPostRequiresCsrf() throws Exception {
+        mvc.perform(get("/login/bind")).andExpect(status().is3xxRedirection())
+            .andExpect(redirectedUrl("/login?error=authentication_rejected"));
+        org.springframework.mock.web.MockHttpServletRequest request = new org.springframework.mock.web.MockHttpServletRequest();
+        context.getBean(PendingThirdPartyBindingRepository.class).save(request,
+            new ThirdPartyIdentityResolutionService.BindingRequiredException("GITHUB", "123",
+                new ThirdPartyLoginContext("GITHUB", "", Instant.now(), "/")));
+        MockHttpSession session = (MockHttpSession) request.getSession();
+        mvc.perform(get("/login/bind").session(session)).andExpect(status().isOk())
+            .andExpect(content().string(org.hamcrest.Matchers.containsString("name=\"_csrf\"")))
+            .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                "action=\"/login/bind/cancel\"")));
+        mvc.perform(post("/login/bind").session(session).param("username", "fixture-user")
+            .param("method", "password").param("password", "fixture-password"))
+            .andExpect(status().isForbidden());
+        mvc.perform(post("/login/bind/cancel").session(session))
+            .andExpect(status().isForbidden());
+        mvc.perform(post("/login/bind/cancel").session(session).with(csrf()))
+            .andExpect(status().isFound()).andExpect(redirectedUrl("/login"));
+        mvc.perform(get("/login/bind").session(session)).andExpect(status().isFound())
+            .andExpect(redirectedUrl("/login?error=authentication_rejected"));
+    }
+
+    @Test void thirdPartyButtonsNeedOnlyVisibleProvider() throws Exception {
         SysIdentityProviderMapper providers = context.getBean(SysIdentityProviderMapper.class);
-        SysOAuth2Client client = new SysOAuth2Client();
-        client.setTenantId(7L);
-        client.setUserType(dev.macula.cloud.iam.enums.UserTypeEnum.EMPLOYEE);
-        when(clients.getClientByClientId("portal")).thenReturn(client);
         when(providers.selectCount(any())).thenReturn(1L);
 
-        mvc.perform(get("/login").with(anonymous()).queryParam("client_id", "portal"))
+        mvc.perform(get("/login").with(anonymous()))
             .andExpect(status().isOk())
             .andExpect(content().string(org.hamcrest.Matchers.containsString("使用 GitHub 登录")))
             .andExpect(content().string(org.hamcrest.Matchers.containsString("使用企业微信登录")))
             .andExpect(content().string(org.hamcrest.Matchers.containsString(
-                "href=\"/login/github?client_id=portal\"")))
+                "href=\"/login/github\"")))
             .andExpect(content().string(org.hamcrest.Matchers.containsString(
-                "href=\"/login/wecom?client_id=portal\"")));
+                "href=\"/login/wecom\"")));
 
-        when(clients.getClientByClientId("portal + 1")).thenReturn(client);
         mvc.perform(get("/iam/login").contextPath("/iam").with(anonymous())
                 .queryParam("client_id", "portal + 1"))
             .andExpect(status().isOk())
             .andExpect(content().string(org.hamcrest.Matchers.containsString(
-                "href=\"/iam/login/github?client_id=portal%20%2B%201\"")))
+                "href=\"/iam/login/github\"")))
             .andExpect(content().string(org.hamcrest.Matchers.containsString(
-                "href=\"/iam/login/wecom?client_id=portal%20%2B%201\"")));
+                "href=\"/iam/login/wecom\"")));
 
         when(providers.selectCount(any())).thenReturn(0L);
         mvc.perform(get("/login").with(anonymous()).queryParam("client_id", "portal"))
@@ -249,19 +325,80 @@ class IamProtocolTest {
             .andExpect(content().string(org.hamcrest.Matchers.not(
                 org.hamcrest.Matchers.containsString("使用企业微信登录"))));
 
+        when(providers.selectCount(any())).thenReturn(1L);
         mvc.perform(get("/login").with(anonymous()).queryParam("client_id", "unknown"))
             .andExpect(status().isOk())
-            .andExpect(content().string(org.hamcrest.Matchers.not(
-                org.hamcrest.Matchers.containsString("使用 GitHub 登录"))));
+            .andExpect(content().string(org.hamcrest.Matchers.containsString("使用 GitHub 登录")));
     }
 
-    @Test void thirdPartyFiltersUseTrustedIssuerAndClientSnapshot() throws Exception {
-        SysOAuth2ClientService clients = context.getBean(SysOAuth2ClientService.class);
+    @Test void proxiedLoginKeepsExternalIamPrefix() throws Exception {
         SysIdentityProviderMapper providers = context.getBean(SysIdentityProviderMapper.class);
-        SysOAuth2Client client = new SysOAuth2Client();
-        client.setTenantId(7L);
-        client.setUserType(dev.macula.cloud.iam.enums.UserTypeEnum.EMPLOYEE);
-        when(clients.getClientByClientId("portal")).thenReturn(client);
+        when(providers.selectCount(any())).thenReturn(1L);
+        MockMvc proxiedMvc = webAppContextSetup(context).addFilters(new ForwardedHeaderFilter())
+            .apply(springSecurity()).build();
+
+        proxiedMvc.perform(get("/login").with(anonymous())
+                .header("Host", "localhost:8080")
+                .header("X-Forwarded-Host", "127.0.0.1:5900")
+                .header("X-Forwarded-Proto", "http")
+                .header("X-Forwarded-Prefix", "/iam"))
+            .andExpect(status().isOk())
+            .andExpect(content().string(org.hamcrest.Matchers.containsString("href=\"/iam/login/github\"")))
+            .andExpect(content().string(org.hamcrest.Matchers.containsString("href=\"/iam/login/wecom\"")))
+            .andExpect(content().string(org.hamcrest.Matchers.containsString("action=\"/iam/login\"")));
+
+        SysIdentityProvider github = new SysIdentityProvider();
+        github.setProviderType("GITHUB");
+        github.setAppId("github-client");
+        github.setAppSecret("secret");
+        github.setConfigJson("{\"clientId\":\"github-client\"}");
+        github.setEnabled(true);
+        when(providers.selectList(any(com.baomidou.mybatisplus.core.conditions.Wrapper.class)))
+            .thenReturn(List.of(github));
+        proxiedMvc.perform(get("/login/github").with(anonymous())
+                .header("Host", "localhost:8080")
+                .header("X-Forwarded-Host", "127.0.0.1:5900")
+                .header("X-Forwarded-Proto", "http")
+                .header("X-Forwarded-Prefix", "/iam"))
+            .andExpect(status().isFound())
+            .andExpect(header().string("Location", org.hamcrest.Matchers.containsString(
+                "redirect_uri=https://iam.example/login/github")));
+    }
+
+    @Test void thirdPartyLoginRejectsSavedRequestFromForwardedHost() throws Exception {
+        SysIdentityProviderMapper providers = context.getBean(SysIdentityProviderMapper.class);
+        SysIdentityProvider github = new SysIdentityProvider();
+        github.setProviderType("GITHUB");
+        github.setAppId("github-client");
+        github.setAppSecret("secret");
+        github.setConfigJson("{\"clientId\":\"github-client\"}");
+        github.setEnabled(true);
+        when(providers.selectList(any(com.baomidou.mybatisplus.core.conditions.Wrapper.class)))
+            .thenReturn(List.of(github));
+        MockMvc proxiedMvc = webAppContextSetup(context).addFilters(new ForwardedHeaderFilter())
+            .apply(springSecurity()).build();
+
+        MvcResult protectedRequest = proxiedMvc.perform(get("/private/profile").with(anonymous())
+                .header("Host", "localhost:8080")
+                .header("X-Forwarded-Host", "attacker.example")
+                .header("X-Forwarded-Proto", "https")
+                .header("X-Forwarded-Prefix", "/iam"))
+            .andExpect(status().isFound()).andReturn();
+        MockHttpSession session = (MockHttpSession) protectedRequest.getRequest().getSession(false);
+
+        proxiedMvc.perform(get("/login/github").session(session).with(anonymous())
+                .header("Host", "localhost:8080")
+                .header("X-Forwarded-Host", "attacker.example")
+                .header("X-Forwarded-Proto", "https")
+                .header("X-Forwarded-Prefix", "/iam"))
+            .andExpect(status().isFound())
+            .andExpect(header().string("Location", org.hamcrest.Matchers.not(
+                org.hamcrest.Matchers.containsString("attacker.example"))))
+            .andExpect(redirectedUrl("https://iam.example/login?error=authentication_unavailable"));
+    }
+
+    @Test void thirdPartyFiltersUseTrustedIssuerWithoutClientSnapshot() throws Exception {
+        SysIdentityProviderMapper providers = context.getBean(SysIdentityProviderMapper.class);
 
         SysIdentityProvider github = new SysIdentityProvider();
         github.setProviderType("GITHUB");
@@ -290,19 +427,30 @@ class IamProtocolTest {
             .thenReturn(List.of(wecom));
 
         MvcResult wecomStart = mvc.perform(get("/login/wecom").with(anonymous())
-                .queryParam("client_id", "portal").header("Host", "attacker.example"))
+                .header("User-Agent", "Mozilla/5.0 Chrome/120.0").header("Host", "attacker.example"))
             .andExpect(status().isFound()).andReturn();
         assertThat(wecomStart.getResponse().getRedirectedUrl())
-            .startsWith("https://open.weixin.qq.com/connect/oauth2/authorize")
-            .contains("scope=snsapi_base")
+            .startsWith("https://login.work.weixin.qq.com/wwlogin/sso/login")
+            .contains("login_type=CorpApp")
             .contains("redirect_uri=https://iam.example/login/wecom")
             .doesNotContain("attacker.example");
+        mvc.perform(get("/login/wecom/browser").with(anonymous()))
+            .andExpect(status().isFound())
+            .andExpect(header().string("Location", org.hamcrest.Matchers.startsWith(
+                "https://login.work.weixin.qq.com/wwlogin/sso/login")));
+        mvc.perform(get("/login/wecom/webview").with(anonymous()))
+            .andExpect(status().isFound())
+            .andExpect(header().string("Location", org.hamcrest.Matchers.containsString("scope=snsapi_base")));
+        mvc.perform(get("/login/wecom/browser").with(anonymous())
+                .queryParam("code", "forged").queryParam("state", "forged"))
+            .andExpect(status().isFound())
+            .andExpect(redirectedUrl("https://iam.example/login?error=authentication_unavailable"));
 
         when(providers.selectList(any(com.baomidou.mybatisplus.core.conditions.Wrapper.class)))
             .thenReturn(List.of());
         mvc.perform(get("/login/github").with(anonymous()).queryParam("client_id", "portal"))
             .andExpect(status().isFound())
-            .andExpect(redirectedUrl("/login?external_error=failed"));
+            .andExpect(redirectedUrl("https://iam.example/login?error=authentication_unavailable"));
     }
 
     @Test void smsCodeEndpointRequiresCsrfAndKeepsFailuresGeneric() throws Exception {
@@ -323,8 +471,8 @@ class IamProtocolTest {
 
     MockHttpSession login() throws Exception {
         MvcResult result = mvc.perform(post("/login").with(csrf()).param("username", "fixture-user")
-            .param("password", "fixture-password")).andExpect(status().isOk())
-            .andExpect(jsonPath("$.success").value(true)).andReturn();
+            .param("password", "fixture-password")).andExpect(status().isFound())
+            .andExpect(redirectedUrl("/")).andReturn();
         return (MockHttpSession) result.getRequest().getSession(false);
     }
 
@@ -575,11 +723,21 @@ class IamProtocolTest {
         String consent = mvc.perform(get("/oauth2/consent").with(user("演示账号"))
             .param("client_id", "public").param("scope", "openid profile").param("state", "preview"))
             .andExpect(status().isOk()).andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+        org.springframework.mock.web.MockHttpServletRequest bindingRequest =
+            new org.springframework.mock.web.MockHttpServletRequest();
+        context.getBean(PendingThirdPartyBindingRepository.class).save(bindingRequest,
+            new ThirdPartyIdentityResolutionService.BindingRequiredException("GITHUB", "preview-subject",
+                new ThirdPartyLoginContext("GITHUB", "", Instant.now(), "/")));
+        String binding = mvc.perform(get("/login/bind")
+                .session((MockHttpSession) bindingRequest.getSession()))
+            .andExpect(status().isOk()).andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
         java.nio.file.Files.writeString(preview.resolve("login.html"), login);
         java.nio.file.Files.writeString(preview.resolve("consent.html"), consent);
-        for (String asset : List.of("auth.css", "auth.js"))
+        java.nio.file.Files.writeString(preview.resolve("binding.html"), binding);
+        for (String asset : List.of("auth.css", "auth.js")) {
             java.nio.file.Files.copy(java.nio.file.Path.of("src/main/resources/static/iam", asset),
                 preview.resolve("iam").resolve(asset), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        }
     }
 
     @Test void oidcLogoutRejectsUnregisteredRedirectAndEndsSession() throws Exception {
@@ -621,8 +779,8 @@ class IamProtocolTest {
             .andExpect(status().is3xxRedirection()).andReturn();
         MockHttpSession session = (MockHttpSession) pending.getRequest().getSession(false);
         MvcResult loggedIn = mvc.perform(post("/login").session(session).with(csrf()).param("username", "fixture-user")
-            .param("password", "fixture-password")).andExpect(jsonPath("$.success").value(true)).andReturn();
-        String target = json.readTree(loggedIn.getResponse().getContentAsString()).at("/data/targetUrl").asText();
+            .param("password", "fixture-password")).andExpect(status().isFound()).andReturn();
+        String target = loggedIn.getResponse().getRedirectedUrl();
         assertThat(query(target, "code_challenge")).isEqualTo(challenge());
         assertThat(query(target, "nonce")).isEqualTo("saved-nonce");
         mvc.perform(get(target).session(session)).andExpect(status().is3xxRedirection());

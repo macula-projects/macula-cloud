@@ -18,7 +18,7 @@ package dev.macula.cloud.iam.authentication.github;
 
 import dev.macula.cloud.iam.authentication.thirdparty.IdentityProviderConfigService;
 import dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyAuthenticationToken;
-import dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyUserDetailsService;
+import dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyIdentityResolutionService;
 import dev.macula.cloud.iam.enums.ThirdPartyProviderType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationProvider;
@@ -35,16 +35,18 @@ import org.springframework.security.core.userdetails.UserDetails;
 public class GithubAuthenticationProvider implements AuthenticationProvider {
     private final GithubClient githubClient;
     private final IdentityProviderConfigService configService;
-    private final ThirdPartyUserDetailsService userDetailsService;
+    private final ThirdPartyIdentityResolutionService identities;
 
     @Override
     public Authentication authenticate(Authentication authentication) {
         ThirdPartyAuthenticationToken token = (ThirdPartyAuthenticationToken)authentication;
-        if (!ThirdPartyProviderType.GITHUB.providerType().equals(token.getProviderType())) return null;
+        if (!ThirdPartyProviderType.GITHUB.providerType().equals(token.getProviderType())) {
+            return null;
+        }
         var config = configService.requireEnabled(ThirdPartyProviderType.GITHUB.providerType());
         String subject = githubClient.fetchSubject(config, token.getCredentials().toString(), token.getRedirectUri());
-        String username = configService.requireBoundUsername(ThirdPartyProviderType.GITHUB.providerType(), subject);
-        UserDetails user = userDetailsService.load(token.getLoginContext(), username);
+        UserDetails user = identities.resolve(ThirdPartyProviderType.GITHUB.providerType(), subject,
+            token.getLoginContext());
         return ThirdPartyAuthenticationToken.authenticated(ThirdPartyProviderType.GITHUB.providerType(), user,
             token.getLoginContext());
     }

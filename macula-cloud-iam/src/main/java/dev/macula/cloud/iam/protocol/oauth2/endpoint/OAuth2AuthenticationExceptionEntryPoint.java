@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package dev.macula.cloud.iam.handler;
+package dev.macula.cloud.iam.protocol.oauth2.endpoint;
 
 import cn.hutool.core.util.StrUtil;
 import org.springframework.security.core.AuthenticationException;

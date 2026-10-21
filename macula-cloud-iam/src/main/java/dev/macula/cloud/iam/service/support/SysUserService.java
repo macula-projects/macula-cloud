@@ -41,4 +41,10 @@ public interface SysUserService extends IService<SysUser> {
      */
     UserAuthInfo getUserAuthInfo(Long tenantId, String username, Set<Long> groupIds);
 
+    /** Returns the only active record for a global username, or {@code null} when absent. */
+    SysUser findUniqueByUsername(String username);
+
+    /** Returns the only active record for a phone, or {@code null} when absent. */
+    SysUser findUniqueByMobile(String mobile);
+
 }

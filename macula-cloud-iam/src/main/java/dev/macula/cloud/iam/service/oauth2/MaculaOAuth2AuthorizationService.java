@@ -19,7 +19,6 @@ package dev.macula.cloud.iam.service.oauth2;
 
 import dev.macula.boot.constants.CacheConstants;
 import dev.macula.cloud.iam.authentication.sms.SmsAuthenticationToken;
-import dev.macula.cloud.iam.authentication.weapp.WeappAuthenticationToken;
 import dev.macula.cloud.iam.jackson.MaculaIamJacksonModule;
 import dev.macula.cloud.iam.pojo.dto.Authorization;
 import dev.macula.cloud.iam.service.userdetails.SysUserDetails;
@@ -29,7 +28,15 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.security.jackson.SecurityJacksonModules;
-import org.springframework.security.oauth2.core.*;
+import org.springframework.security.oauth2.core.AuthorizationGrantType;
+import org.springframework.security.oauth2.core.OAuth2AccessToken;
+import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
+import org.springframework.security.oauth2.core.OAuth2DeviceCode;
+import org.springframework.security.oauth2.core.OAuth2Error;
+import org.springframework.security.oauth2.core.OAuth2ErrorCodes;
+import org.springframework.security.oauth2.core.OAuth2RefreshToken;
+import org.springframework.security.oauth2.core.OAuth2Token;
+import org.springframework.security.oauth2.core.OAuth2UserCode;
 import org.springframework.security.oauth2.core.endpoint.OAuth2ParameterNames;
 import org.springframework.security.oauth2.core.oidc.OidcIdToken;
 import org.springframework.security.oauth2.server.authorization.OAuth2Authorization;
@@ -50,7 +57,13 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HexFormat;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
@@ -107,8 +120,7 @@ public class MaculaOAuth2AuthorizationService implements OAuth2AuthorizationServ
         this.strings = new StringRedisTemplate(Objects.requireNonNull(redisTemplate.getConnectionFactory()));
         ClassLoader classLoader = MaculaOAuth2AuthorizationService.class.getClassLoader();
         var allowedTypes = BasicPolymorphicTypeValidator.builder().allowIfSubType(SysUserDetails.class)
-            .allowIfSubType(SmsAuthenticationToken.class).allowIfSubType(WeappAuthenticationToken.class)
-            .allowIfSubType(Long.class);
+            .allowIfSubType(SmsAuthenticationToken.class).allowIfSubType(Long.class);
         // Includes OAuth2AuthorizationServerJacksonModule and its constrained type validator.
         this.objectMapper =
             JsonMapper.builder().addModules(SecurityJacksonModules.getModules(classLoader, allowedTypes))
@@ -131,8 +143,9 @@ public class MaculaOAuth2AuthorizationService implements OAuth2AuthorizationServ
     public void remove(OAuth2Authorization authorization) {
         Assert.notNull(authorization, "authorization cannot be null");
         Authorization current = readRecord(authorization.getId());
-        if (current != null && current.isDeleted())
+        if (current != null && current.isDeleted()) {
             return;
+        }
         Authorization previous = current != null ? current : toEntity(authorization);
         Authorization deleted = toEntity(authorization);
         deleted.setDeleted(true);
@@ -164,8 +177,9 @@ public class MaculaOAuth2AuthorizationService implements OAuth2AuthorizationServ
                     : expiry == null ? Instant.now().plusSeconds(600) : Instant.ofEpochMilli(expiry));
         }
         Instant expires = retention(record);
-        if (previous != null && retention(previous).isAfter(expires))
+        if (previous != null && retention(previous).isAfter(expires)) {
             expires = retention(previous);
+        }
         record.setRetentionExpiresAt(expires);
         persist(previous, record, indexes(record), version);
     }
@@ -174,8 +188,9 @@ public class MaculaOAuth2AuthorizationService implements OAuth2AuthorizationServ
         List<String> keys = new ArrayList<>();
         keys.add(recordKey(record.getId()));
         // Keep expired old keys in the delete set as well.
-        if (previous != null)
+        if (previous != null) {
             keys.addAll(indexes(previous).keySet());
+        }
         int oldCount = keys.size() - 1;
         List<String> args = new ArrayList<>(List.of(Long.toString(version), writeRecord(record),
             Long.toString(Math.max(1, Duration.between(Instant.now(), retention(record)).toMillis())),
@@ -209,8 +224,9 @@ public class MaculaOAuth2AuthorizationService implements OAuth2AuthorizationServ
     }
 
     private void addIndex(Map<String, Instant> indexes, String type, String value, Instant expiry) {
-        if (value != null && expiry != null)
+        if (value != null && expiry != null) {
             indexes.put(indexKey(type, value), expiry);
+        }
     }
 
     private Instant retention(Authorization record) {
@@ -218,8 +234,9 @@ public class MaculaOAuth2AuthorizationService implements OAuth2AuthorizationServ
         for (Instant expiry : new Instant[] {record.getStateExpiresAt(), record.getAuthorizationCodeExpiresAt(),
             record.getAccessTokenExpiresAt(), record.getRefreshTokenExpiresAt(), record.getOidcIdTokenExpiresAt(),
             record.getDeviceCodeExpiresAt(), record.getUserCodeExpiresAt()}) {
-            if (expiry != null && expiry.isAfter(latest))
+            if (expiry != null && expiry.isAfter(latest)) {
                 latest = expiry;
+            }
         }
         return latest;
     }
@@ -228,12 +245,14 @@ public class MaculaOAuth2AuthorizationService implements OAuth2AuthorizationServ
     @Nullable
     public OAuth2Authorization findByToken(String token, @Nullable OAuth2TokenType tokenType) {
         Assert.hasText(token, "token cannot be empty");
-        if (tokenType != null)
+        if (tokenType != null) {
             return TOKEN_TYPES.containsKey(tokenType.getValue()) ? findByType(token, tokenType.getValue()) : null;
+        }
         for (String type : TOKEN_TYPES.keySet()) {
             OAuth2Authorization result = findByType(token, type);
-            if (result != null)
+            if (result != null) {
                 return result;
+            }
         }
         return null;
     }
@@ -245,10 +264,12 @@ public class MaculaOAuth2AuthorizationService implements OAuth2AuthorizationServ
             record = readRecord(id);
         } else {
             Object legacy = redisTemplate.opsForValue().get(String.format("%s:%s:%s", AUTHORIZATION, type, value));
-            if (legacy == null)
+            if (legacy == null) {
                 return null;
-            if (!(legacy instanceof Authorization))
+            }
+            if (!(legacy instanceof Authorization)) {
                 throw new IllegalStateException("Unsupported authorization cache format");
+            }
             Authorization old = (Authorization)legacy;
             record = readRecord(old.getId());
             if (record == null) {
@@ -256,18 +277,21 @@ public class MaculaOAuth2AuthorizationService implements OAuth2AuthorizationServ
                 if ("state".equals(type)) {
                     Long ttl = redisTemplate.getExpire(String.format("%s:%s:%s", AUTHORIZATION, type, value),
                         TimeUnit.MILLISECONDS);
-                    if (ttl == null || ttl <= 0)
+                    if (ttl == null || ttl <= 0) {
                         return null;
+                    }
                     record.setStateExpiresAt(Instant.now().plusMillis(Math.min(ttl, 600_000)));
                 }
             }
         }
-        if (record == null || record.isDeleted())
+        if (record == null || record.isDeleted()) {
             return null;
+        }
         OAuth2Authorization result = toObject(record);
-        if ("state".equals(type))
+        if ("state".equals(type)) {
             return value.equals(record.getState()) && record.getStateExpiresAt() != null && record.getStateExpiresAt()
                 .isAfter(Instant.now()) ? result : null;
+        }
         OAuth2Authorization.Token<?> found = result.getToken(TOKEN_TYPES.get(type));
         // Preserve invalidation metadata for the protocol provider; don't resurrect replaced tokens.
         return found != null && value.equals(found.getToken().getTokenValue()) && ("id_token".equals(
@@ -276,8 +300,9 @@ public class MaculaOAuth2AuthorizationService implements OAuth2AuthorizationServ
 
     private Authorization readRecord(String id) {
         String data = strings.opsForValue().get(recordKey(id));
-        if (data == null)
+        if (data == null) {
             return null;
+        }
         try {
             return recordMapper.readValue(data, Authorization.class);
         } catch (Exception ex) {
@@ -326,8 +351,9 @@ public class MaculaOAuth2AuthorizationService implements OAuth2AuthorizationServ
                 .attributes(attributes -> {
                     attributes.putAll(parseMap(entity.getAttributes()));
                     attributes.put(VERSION, entity.getVersion());
-                    if (entity.getStateExpiresAt() != null)
+                    if (entity.getStateExpiresAt() != null) {
                         attributes.put(STATE_EXPIRY, entity.getStateExpiresAt().toEpochMilli());
+                    }
                 });
         if (entity.getState() != null) {
             builder.attribute(OAuth2ParameterNames.STATE, entity.getState());

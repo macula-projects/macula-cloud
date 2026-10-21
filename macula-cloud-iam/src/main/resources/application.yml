@@ -1,7 +1,7 @@
 server:
   port: ${SERVER_PORT:9010}
-  # Only trusted/internal proxies are allowed to restore the client address from forwarded headers.
-  forward-headers-strategy: native
+  # Only expose IAM behind trusted proxies when accepting forwarded headers.
+  forward-headers-strategy: framework
 
 spring:
   profiles:
@@ -87,6 +87,7 @@ macula:
   cloud:
     iam:
       issuer-uri: ${IAM_ISSUER_URI:http://127.0.0.1:${IAM_HOST_PORT:9010}}
+      token-cors-allowed-origins: ${IAM_TOKEN_CORS_ALLOWED_ORIGINS:http://127.0.0.1:${ADMIN_HOST_PORT:5900}}
 
 mybatis-plus:
   configuration:
@@ -145,7 +146,7 @@ spring:
 macula:
   cloud:
     iam:
-      issuer-uri: ${IAM_ISSUER_URI:http://macula-cloud-iam:9010}
+      issuer-uri: ${IAM_ISSUER_URI:http://127.0.0.1:${IAM_HOST_PORT:9010}}
 
 ---
 # 共享环境只保留配置中心连接信息，其余配置由 Nacos Data ID 提供

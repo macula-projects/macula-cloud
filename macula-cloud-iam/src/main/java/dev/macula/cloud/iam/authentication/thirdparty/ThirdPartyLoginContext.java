@@ -16,22 +16,14 @@
  */
 package dev.macula.cloud.iam.authentication.thirdparty;
 
-import dev.macula.cloud.iam.enums.UserTypeEnum;
-
 import java.io.Serializable;
 import java.time.Instant;
 
 /**
- * 与一次性 state 绑定的 OAuth client 安全快照。
+ * 与一次性 state 绑定的第三方登录模式和受控续转目标。
  *
  * @author Rain
  * @since 6.1.0
  */
-public record ThirdPartyLoginContext(String providerType, String clientId, Long tenantId,
-                                     UserTypeEnum userType, Instant createdAt,
-                                     String savedRequestTarget) implements Serializable {
-    public ThirdPartyLoginContext(String providerType, String clientId, Long tenantId,
-        UserTypeEnum userType, Instant createdAt) {
-        this(providerType, clientId, tenantId, userType, createdAt, "/");
-    }
-}
+public record ThirdPartyLoginContext(String providerType, String loginMode, Instant createdAt,
+                                     String savedRequestTarget) implements Serializable { }
