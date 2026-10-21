@@ -57,6 +57,7 @@ cp deploy/.env.example deploy/.env
 - `SERVER_PORT` 是 Spring Boot 进程监听端口；容器运行时就是容器端口。
 - SnailJob gRPC 和 Seata service 分别使用 `SNAILJOB_GRPC_PORT`、`SEATA_SERVER_SERVICE_PORT`。
 - `*_HOST_PORT` 只控制 Compose 的宿主机发布端口，不传入应用。
+- IAM 是例外：Compose 将 `IAM_HOST_PORT` 用于本机默认公开 issuer `http://127.0.0.1:${IAM_HOST_PORT}`；`IAM_ISSUER_URI` 可覆盖为浏览器可访问的固定公开地址。
 - 本机端口默认绑定 `127.0.0.1`，可在 `deploy/.env` 中调整。
 
 ## 配置规则
@@ -110,7 +111,11 @@ IAM 与 System 共用 `macula-system`，但只有 System 管理 migration。新�
 6. 在 `macula-cloud-admin/` 执行 `npm ci && npm run dev`
 
 System 首次启动完成 Flyway migration 后再启动 IAM。
-Admin 的 `development` mode 对应本地 `local` 环境：`/api`、`/iam` 由 Vite 分别代理到本机 Gateway、IAM。容器构建固定使用 `docker` mode，内置 Nginx 将相同前缀代理到 Compose 服务，因此浏览器始终使用同源地址。
+Admin 的 `development` mode 对应本地 `local` 环境：`/api` 由 Vite 代理到本机 Gateway，IAM 使用配置的直连地址。容器构建固定使用 `docker` mode，内置 Nginx 将 `/api`、`/iam` 分别代理到 Compose 服务；第三方身份提供商的回调地址仍由固定公开 issuer 决定。
+
+第三方登录的 GitHub/企业微信回调按固定 `IAM_ISSUER_URI` 生成，不能从请求 Host 推导。默认本机直连入口 `http://127.0.0.1:${IAM_HOST_PORT}/login` 的回调会回到 IAM 端口；若要从 Admin 的 `/iam/login` 进入并回到 Admin 同源地址，请在 `deploy/.env` 中设置例如 `IAM_ISSUER_URI=http://127.0.0.1:5900/iam`（按实际公开域名、协议和端口替换），并在各身份提供商登记 `<issuer>/login/github`、`<issuer>/login/wecom`。一个部署只使用一个固定公开回调基址；改变该值后需同步更新提供商登记和已有 OIDC issuer 消费方。`/iam/` 代理会覆盖客户端转发头并传递 `X-Forwarded-Prefix`，不要将 IAM 容器端口直接暴露给不受信客户端。
+
+`IAM_TOKEN_CORS_ALLOWED_ORIGINS` 仅为需要直接访问 IAM `/oauth2/token` 的浏览器配置精确来源，多个来源以英文逗号分隔；禁止 `*`，留空表示禁用跨域。登录、绑定及授权页面不开放跨域，正常容器部署优先使用 Admin 同源 `/iam` 代理。
 
 ## 常用命令
 

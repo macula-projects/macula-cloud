@@ -57,26 +57,32 @@ code_challenge_method=S256
 
 采用本地 Thymeleaf + CSS/JavaScript，无外部 CDN。桌面为品牌区与表单，680px 以下为移动单列；包含安全区、触控按钮、16px 输入字号、密码显隐、密码管理器、错误反馈、请求超时和防重复提交。授权页可按 scope 勾选，同意与拒绝由服务端处理，拒绝当前请求不会取消此前授权。
 
+密码、短信、小程序及第三方登录均按浏览器认证闭环处理：成功后由 Spring Security 恢复 SavedRequest 或跳转 `/`，失败后回到登录页；登录 Handler 不返回 JSON。JSON 响应只由 OAuth2/OIDC、Token、UserInfo 等协议端点及独立业务 API 提供。
+
 短信入口保留原有默认开启行为，`spring.security.oauth2.server.login.sms.enabled` 控制展示，默认 true。
 
-GitHub 与企业微信网页登录配置直接读取共享 System 数据库的 `sys_identity_provider`。只有有效
-OAuth client（已配置 `tenant_id` 与 `user_type`）且对应 provider 同时 `enabled=true`、
-`visible=true` 时登录页才展示入口；`visible=false` 只隐藏入口，`enabled=false` 还会拒绝直接访问。
-OAuth client 决定最终租户与用户类型。回调账户路由只读取一次 client 配置，将该快照与 state
-绑定值核对后使用同一快照查询账号；回调期间若其配置发生变化会拒绝登录。
+GitHub 与企业微信登录配置直接读取共享 System 数据库的 `sys_identity_provider`。登录发起、回调、
+本地账号关联及登录不需要 IAM OAuth2 client，也不以租户为前置条件。provider 同时
+`enabled=true`、`visible=true` 时登录页展示入口；`visible=false` 仅隐藏入口，`enabled=false`
+拒绝发起和回调。OAuth2/OIDC 协议仍独立校验自身 client；客户端的租户配置用于后续按租户加载角色
+权限，不决定第三方身份绑定的账号。具体 `UserAuthInfoService` 实现由接入方提供。
 
-GitHub OAuth 不申请额外 scope，只接受 `/user` 返回的公开稳定数值 `id`，并通过 `sys_user_identity_binding` 的
-`(provider_type='GITHUB', provider_subject) -> username` 全局绑定解析账号，不使用 login 或 email
-兜底。绑定表不含 tenant ID、user ID 或 user type，同一 provider 的 subject 与 username 都唯一；
-当前不提供公开写入接口，须由受控数据库/运维流程预置。企业微信使用 `snsapi_base`，只接受企业
-成员 `UserId` 并直接作为 username，不写绑定表。两者随后均按 OAuth client 的 `user_type` 和
-`tenant_id` 调用现有用户身份路由。只有 `EMPLOYEE` 明确复用现有 System 用户源；其他用户类型
-必须由 `UserAuthInfoService` 返回匹配账号，空结果不会回退到同名系统用户。
+GitHub OAuth 不申请额外 scope，只接受 `/user` 返回的稳定数值 `id`；已有全局绑定直接登录，
+未绑定时进入已有账号绑定页面，不使用 GitHub login/email 兜底。企业微信只接受企业成员
+`UserId`，优先匹配全局唯一的 System `username`，其次查询已有绑定，仍未关联则进入绑定页面；
+匹配与绑定冲突时拒绝。绑定表不含租户 ID。绑定只能通过已有账号密码、与目标账号登记手机号一致的
+一次性短信验证码，或目标账号的已登录会话完成；手机号重复时拒绝，不在此流程注册或静默改绑。
 
-第三方回调固定由 `macula.cloud.iam.issuer-uri` 生成，state 与浏览器会话、provider、client、租户、
-用户类型和原始 OAuth 授权请求的受控相对目标绑定，五分钟内仅可原子消费一次。成功后只恢复该
-state 自带的服务端目标，不使用会话中可能被其他标签页覆盖的 SavedRequest。第三方授权码和 token
-不持久化，也不写日志。部署时 IAM 与
+企业微信系统浏览器入口 `/login/wecom/browser` 使用新版 `CorpApp` 自构造网页登录链接；内置
+WebView 入口 `/login/wecom/webview` 使用 `snsapi_base`。`/login/wecom` 根据可识别的客户端环境选择；
+无法识别时让用户在登录页选择明确入口。两种模式沿用 `<issuer>/login/wecom` 登记回调。
+第三方回调固定由 `macula.cloud.iam.issuer-uri` 生成，`state` 使用 Spring Security 的 URL-safe
+`Base64StringKeyGenerator`，与浏览器会话、provider、登录模式和受控相对续转目标绑定，五分钟内
+仅可消费一次。续转目标取自 Spring Security 会话中保存的原请求，限制为当前应用上下文内的安全相对路径，
+不限于 OAuth2 授权端点，也不在第三方认证层检查 `client_id`；目标协议返回后仍自行校验请求。成功后只恢复
+该 state 自带的服务端目标；无待续转请求时转到 `/`，不使用回调参数或请求 Host 决定回跳。未绑定状态
+同样限时、限次且不授本地权限。第三方授权码和 token 不持久化、
+不写日志。部署时 IAM 与
 System 必须共享 `MACULA_CRYPTO_PASSWORD`；GitHub 回调为 `<issuer>/login/github`，企业微信回调为
 `<issuer>/login/wecom`，应在各开放平台精确登记。企业微信自建应用还需把实际登录成员纳入应用可见范围。
 IAM 的 `ThirdPartyProviderType` 将已接入登录的 `GITHUB`/`/login/github`、`WECOM`/`/login/wecom`
@@ -89,8 +95,10 @@ IAM 的 `ThirdPartyProviderType` 将已接入登录的 `GITHUB`/`/login/github`�
 20 次，并在供应商受理后
 才激活可验证记录。成功验证原子删除记录，错误达到上限或过期后不能认证。
 
-标准 `/iam/` 反向代理部署必须传递 `X-Forwarded-For` 与 `X-Forwarded-Proto`；IAM 使用容器原生的
-受信代理处理恢复客户端地址，且不会信任来自非内部代理的转发头。验证码页面使用相对 URL，确保
+标准 `/iam/` 反向代理部署必须由受信代理覆盖客户端提交的 `Forwarded`、`X-Forwarded-*`，并提供
+实际外部主机、协议和 `X-Forwarded-Prefix: /iam`；IAM 使用 Spring 的 forwarded-header 处理恢复
+外部上下文路径。IAM 端口只应供本机或受信网络访问，不能让任意客户端直连并提交伪造的转发头。
+验证码页面使用相对 URL，确保
 直接访问 `/login` 与代理访问 `/iam/login` 都命中 IAM 本身，而不是管理端 `/api/` Gateway 路由。
 
 IAM 与 System 必须连接同一消息配置库，并注入相同的 `MACULA_CRYPTO_PASSWORD`；验证码摘要密钥
@@ -105,6 +113,12 @@ IAM 与 System 必须连接同一消息配置库，并注入相同的 `MACULA_CR
 表单登录和本地退出开启 CSRF，页面自动携带 token；验证码请求依赖 Spring Security CSRF 和浏览器
 同源凭据，不手工比较代理前后的端口，因此兼容默认 `5900 → 8080 → 9010` Compose 链路。自定义
 表单客户端需先获取登录页。OAuth 协议端点仍使用标准协议校验。password token endpoint 的兼容参数不变。
+
+IAM 不再通过全局 Servlet Filter 向所有端点开放 CORS。仅 `/oauth2/token` 在 OAuth2 协议安全链中
+支持显式来源跨域，来源由 `macula.cloud.iam.token-cors-allowed-origins` 或环境变量
+`IAM_TOKEN_CORS_ALLOWED_ORIGINS` 配置，多个来源使用英文逗号分隔；不允许 `*`，留空表示禁用跨域。
+允许的方法仅为 `POST`/`OPTIONS`，且不携带浏览器 Cookie。登录、绑定、授权页面及其他端点应使用
+同源 `/iam` 代理，不因 Token 端点需要跨域而扩大暴露范围。
 
 ## Redis 授权存储与升级
 
@@ -124,12 +138,13 @@ v2 使用授权主记录＋七类索引：access_token、refresh_token、code、
 
 | 环境变量 | 说明 |
 | --- | --- |
-| IAM_ISSUER_URI | 客户端可访问且稳定的外部 issuer；反向代理场景必须显式配置 |
+| IAM_ISSUER_URI | 浏览器和外部身份提供商可访问且稳定的公开 issuer；通过 Admin `/iam` 回调时须设为该公开地址（含 `/iam`） |
+| IAM_TOKEN_CORS_ALLOWED_ORIGINS | 允许跨域调用 `/oauth2/token` 的精确浏览器来源，多个值以英文逗号分隔；留空禁用，禁止 `*` |
 | IAM_SIGNING_KEY_LOCATION | Spring Resource 地址，例如 file:/run/secrets/iam.jks |
 | IAM_SIGNING_KEY_ALIAS | keystore alias，默认 jose |
 | IAM_SIGNING_KEY_PASSWORD | 外部注入的 keystore 密码 |
 
-仅 local/docker 可回退到仓库已有的公开演示 keystore。共享/生产环境必须提供独立密钥；未配置时启动失败。Docker 默认内部 issuer 仅供本地开发，浏览器接入时应覆盖为可访问的外部地址。不提交真实签名密钥或密码。
+仅 local/docker 可回退到仓库已有的公开演示 keystore。共享/生产环境必须提供独立密钥；未配置时启动失败。Docker Compose 本机默认 issuer 为 `http://127.0.0.1:${IAM_HOST_PORT}`，因此直接从该端口发起 GitHub/企微登录时会回到同一地址；如果从 Admin 的 `/iam/login` 进入且希望回到该同源地址，应显式设置 `IAM_ISSUER_URI` 为 Admin 的公开 `/iam` 地址，并在 GitHub/企业微信后台精确登记对应的 `<issuer>/login/github` 与 `<issuer>/login/wecom`。跨机器、HTTPS 或反向代理部署同样必须显式配置公开 issuer；一个身份源登记的固定回调不随请求 Host 动态变化。不提交真实签名密钥或密码。
 
 ## 开发验证
 

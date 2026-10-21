@@ -14,17 +14,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package dev.macula.cloud.iam.message;
+package dev.macula.cloud.iam.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import dev.macula.cloud.iam.pojo.entity.SysMessageProvider;
 import org.apache.ibatis.annotations.Mapper;
 
 /**
- * IAM 只读消息模板 Mapper。
+ * IAM 只读消息供应商 Mapper。
  *
  * @author Rain
  * @since 2026-10-17
  */
 @Mapper
-public interface IamMessageTemplateMapper extends BaseMapper<IamMessageTemplate> {
+public interface SysMessageProviderMapper extends BaseMapper<SysMessageProvider> {
 }

@@ -49,7 +49,7 @@ public final class ThirdPartyAuthenticationToken extends AbstractAuthenticationT
 
     public static ThirdPartyAuthenticationToken unauthenticated(String providerType, String code,
         ThirdPartyLoginContext context, String redirectUri) {
-        return new ThirdPartyAuthenticationToken(providerType, context.clientId(), code, context,
+        return new ThirdPartyAuthenticationToken(providerType, providerType, code, context,
             redirectUri, java.util.List.of());
     }
 
@@ -59,10 +59,31 @@ public final class ThirdPartyAuthenticationToken extends AbstractAuthenticationT
             user.getAuthorities());
     }
 
-    @Override public Object getCredentials() { return code == null ? "" : code; }
-    @Override public Object getPrincipal() { return principal; }
-    public String getProviderType() { return providerType; }
-    public ThirdPartyLoginContext getLoginContext() { return loginContext; }
-    public String getRedirectUri() { return redirectUri; }
-    @Override public void eraseCredentials() { super.eraseCredentials(); code = null; }
+    @Override
+    public Object getCredentials() {
+        return code == null ? "" : code;
+    }
+
+    @Override
+    public Object getPrincipal() {
+        return principal;
+    }
+
+    public String getProviderType() {
+        return providerType;
+    }
+
+    public ThirdPartyLoginContext getLoginContext() {
+        return loginContext;
+    }
+
+    public String getRedirectUri() {
+        return redirectUri;
+    }
+
+    @Override
+    public void eraseCredentials() {
+        super.eraseCredentials();
+        code = null;
+    }
 }

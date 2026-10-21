@@ -15,13 +15,13 @@
  */
 package dev.macula.cloud.iam.authentication.thirdparty;
 
-import dev.macula.cloud.iam.enums.UserTypeEnum;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.authentication.BadCredentialsException;
 
-import java.security.SecureRandom;
+import org.springframework.security.crypto.keygen.Base64StringKeyGenerator;
+import java.util.Base64;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -40,13 +40,13 @@ import static org.junit.jupiter.api.Assertions.*;
 class HttpSessionThirdPartyLoginStateRepositoryTest {
     private static final Instant NOW = Instant.parse("2026-10-18T00:00:00Z");
     private final HttpSessionThirdPartyLoginStateRepository repository =
-        new HttpSessionThirdPartyLoginStateRepository(new SecureRandom(), Clock.fixed(NOW, ZoneOffset.UTC));
+        new HttpSessionThirdPartyLoginStateRepository(new Base64StringKeyGenerator(Base64.getUrlEncoder()),
+            Clock.fixed(NOW, ZoneOffset.UTC));
 
     @Test
     void consumesStateExactlyOnce() {
         MockHttpServletRequest request = new MockHttpServletRequest();
-        ThirdPartyLoginContext expected = new ThirdPartyLoginContext("GITHUB", "client", 9L,
-            UserTypeEnum.MEMBER, NOW);
+        ThirdPartyLoginContext expected = new ThirdPartyLoginContext("GITHUB", "", NOW, "/");
         String state = repository.create(request, expected);
 
         assertEquals(expected, repository.consume(request, "GITHUB", state));
@@ -56,8 +56,7 @@ class HttpSessionThirdPartyLoginStateRepositoryTest {
     @Test
     void createsRandomStateAndReplacesThePreviousProviderState() {
         MockHttpServletRequest request = new MockHttpServletRequest();
-        ThirdPartyLoginContext context = new ThirdPartyLoginContext("GITHUB", "client", 9L,
-            UserTypeEnum.MEMBER, NOW);
+        ThirdPartyLoginContext context = new ThirdPartyLoginContext("GITHUB", "", NOW, "/");
 
         String first = repository.create(request, context);
         String second = repository.create(request, context);
@@ -70,13 +69,11 @@ class HttpSessionThirdPartyLoginStateRepositoryTest {
     @Test
     void rejectsWrongProviderAndExpiredState() {
         MockHttpServletRequest request = new MockHttpServletRequest();
-        String state = repository.create(request, new ThirdPartyLoginContext("GITHUB", "client", 9L,
-            UserTypeEnum.EMPLOYEE, NOW.minusSeconds(301)));
+        String state = repository.create(request, new ThirdPartyLoginContext("GITHUB", "", NOW.minusSeconds(301), "/"));
         assertThrows(BadCredentialsException.class, () -> repository.consume(request, "GITHUB", state));
 
         MockHttpServletRequest another = new MockHttpServletRequest();
-        String anotherState = repository.create(another, new ThirdPartyLoginContext("GITHUB", "client", 9L,
-            UserTypeEnum.EMPLOYEE, NOW));
+        String anotherState = repository.create(another, new ThirdPartyLoginContext("GITHUB", "", NOW, "/"));
         assertThrows(BadCredentialsException.class,
             () -> repository.consume(another, "WECOM", anotherState));
     }
@@ -86,8 +83,7 @@ class HttpSessionThirdPartyLoginStateRepositoryTest {
         RacingSession session = new RacingSession();
         MockHttpServletRequest createRequest = new MockHttpServletRequest();
         createRequest.setSession(session);
-        String state = repository.create(createRequest, new ThirdPartyLoginContext("GITHUB", "client", 9L,
-            UserTypeEnum.EMPLOYEE, NOW));
+        String state = repository.create(createRequest, new ThirdPartyLoginContext("GITHUB", "", NOW, "/"));
         MockHttpServletRequest first = new MockHttpServletRequest();
         first.setSession(session);
         MockHttpServletRequest second = new MockHttpServletRequest();

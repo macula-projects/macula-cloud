@@ -19,9 +19,10 @@ package dev.macula.cloud.iam.authentication.thirdparty;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.crypto.keygen.Base64StringKeyGenerator;
+import org.springframework.security.crypto.keygen.StringKeyGenerator;
 import org.springframework.stereotype.Component;
 
-import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -37,23 +38,21 @@ import java.util.Base64;
 public class HttpSessionThirdPartyLoginStateRepository implements ThirdPartyLoginStateRepository {
     private static final String ATTRIBUTE_PREFIX = HttpSessionThirdPartyLoginStateRepository.class.getName() + ".";
     private static final Duration MAX_AGE = Duration.ofMinutes(5);
-    private final SecureRandom random;
+    private final StringKeyGenerator generator;
     private final Clock clock;
 
     public HttpSessionThirdPartyLoginStateRepository() {
-        this(new SecureRandom(), Clock.systemUTC());
+        this(new Base64StringKeyGenerator(Base64.getUrlEncoder()), Clock.systemUTC());
     }
 
-    HttpSessionThirdPartyLoginStateRepository(SecureRandom random, Clock clock) {
-        this.random = random;
+    HttpSessionThirdPartyLoginStateRepository(StringKeyGenerator generator, Clock clock) {
+        this.generator = generator;
         this.clock = clock;
     }
 
     @Override
     public String create(HttpServletRequest request, ThirdPartyLoginContext context) {
-        byte[] bytes = new byte[32];
-        random.nextBytes(bytes);
-        String state = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+        String state = generator.generateKey();
         request.getSession(true).setAttribute(key(context.providerType()), new StoredState(state, context));
         return state;
     }
@@ -83,6 +82,11 @@ public class HttpSessionThirdPartyLoginStateRepository implements ThirdPartyLogi
         return ATTRIBUTE_PREFIX + providerType;
     }
 
+    /**
+     * 会话中保存的一次性登录状态。
+     *
+     * @since 6.1.0
+     */
     private record StoredState(String state, ThirdPartyLoginContext context) implements java.io.Serializable {
     }
 }

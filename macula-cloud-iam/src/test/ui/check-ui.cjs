@@ -8,14 +8,20 @@ const baseUrl = process.env.IAM_PREVIEW_URL || 'http://127.0.0.1:18743';
   for (const [name, width, height] of [['desktop',1440,960],['phone',390,844],['small',320,640],['landscape',844,390]]) {
     const page = await browser.newPage({viewport:{width,height},isMobile:width<700,hasTouch:width<700});
     const errors=[]; page.on('pageerror',e=>errors.push(e.message));
-    for (const view of ['login','consent']) {
+    for (const view of ['login','binding','consent']) {
       await page.goto(baseUrl+'/'+view+'.html');
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true,name+' '+view+' overflow');
       assert.equal(await page.locator('h1').last().isVisible(),true);
       for (const button of await page.locator('button:visible').all()) assert.ok((await button.boundingBox()).height>=44);
       await page.screenshot({path:artifacts+'/'+view+'-'+name+'.png',fullPage:true});
       if(view==='login'){
-        assert.equal(await page.locator('.external-button').count(),2);
+        assert.deepEqual(await page.locator('.external-button').evaluateAll(links =>
+          links.map(link => link.getAttribute('href'))), [
+          '/login/github',
+          '/login/wecom',
+          '/login/wecom/browser',
+          '/login/wecom/webview'
+        ]);
         for (const link of await page.locator('.external-button').all()) assert.ok((await link.boundingBox()).height>=44);
         await page.getByRole('tab',{name:'手机验证码'}).click();
         await page.getByLabel('手机号码',{exact:true}).fill('13800000000');
@@ -36,42 +42,24 @@ const baseUrl = process.env.IAM_PREVIEW_URL || 'http://127.0.0.1:18743';
         await page.getByLabel('密码',{exact:true}).fill('fixture-password');
         await page.getByRole('button',{name:'显示或隐藏密码'}).click();
         assert.equal(await page.locator('#password').getAttribute('type'),'text');
-        await page.route('**/login',route=>route.fulfill({status:401,contentType:'application/json',body:'{"success":false}'}));
-        await page.getByRole('button',{name:'登录并继续'}).click();
-        await page.locator('[role=alert]').filter({hasText:'登录失败'}).waitFor();
-        assert.equal(await page.getByRole('button',{name:'登录并继续'}).isEnabled(),true);
-        await page.unroute('**/login');
-        await page.route('**/login',route=>route.abort('failed'));
-        await page.getByRole('button',{name:'登录并继续'}).click();
-        await page.locator('[role=alert]').filter({hasText:'网络连接失败'}).waitFor();
-        await page.unroute('**/login');
-        // Accelerate only the application's 20-second deadline; exercise its real AbortController path.
-        await page.evaluate(()=>{
-          const original=window.setTimeout;
-          window.setTimeout=(fn,ms,...args)=>original(fn,ms===20000?50:ms,...args);
-        });
-        await page.route('**/login',()=>{});
-        await page.getByRole('button',{name:'登录并继续'}).click();
-        await page.locator('[role=alert]').filter({hasText:'请求超时'}).waitFor();
-        await page.unroute('**/login');
-        await page.reload();
-        await page.getByLabel('账号',{exact:true}).fill('fixture-user');
-        await page.getByLabel('密码',{exact:true}).fill('fixture-password');
-        let calls=0, release;
-        const received=new Promise(resolve=>{
-          page.route('**/login',route=>{calls++;release=()=>route.fulfill({status:200,contentType:'application/json',
-            body:JSON.stringify({success:true,data:{targetUrl:'/consent.html'}})});resolve();});
+        let submitted;
+        await page.route('**/login', route => {
+          submitted = route.request();
+          return route.fulfill({status:302,headers:{location:'/consent.html'},body:''});
         });
         await page.getByRole('button',{name:'登录并继续'}).click();
-        await received;
-        assert.equal(await page.locator('#password-login button[type=submit]').isDisabled(),true);
-        await page.locator('#password-login').evaluate(form=>{
-          form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));
-        });
-        assert.equal(calls,1);
-        await release();
         await page.waitForURL('**/consent.html');
+        assert.equal(submitted.method(),'POST');
+        const loginData = new URLSearchParams(submitted.postData());
+        assert.equal(loginData.get('username'),'fixture-user');
+        assert.equal(loginData.get('password'),'fixture-password');
+        assert.ok(loginData.get('_csrf'));
         await page.unroute('**/login');
+      } else if(view==='binding') {
+        const cancel = page.locator('form[action="/login/bind/cancel"]');
+        assert.equal(await cancel.getAttribute('method'),'post');
+        assert.ok(await cancel.locator('input[name="_csrf"]').getAttribute('value'));
+        assert.ok((await cancel.getByRole('button',{name:'取消并返回登录'}).boundingBox()).height>=44);
       } else {
         const check = page.locator('input[type=checkbox][name=scope]');
         if(await check.count()) await check.first().check();

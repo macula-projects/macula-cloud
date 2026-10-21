@@ -16,6 +16,10 @@
  */
 package dev.macula.cloud.iam.message;
 
+import dev.macula.cloud.iam.mapper.SysMessageTemplateMapper;
+import dev.macula.cloud.iam.mapper.SysMessageProviderMapper;
+import dev.macula.cloud.iam.pojo.entity.SysMessageTemplate;
+import dev.macula.cloud.iam.pojo.entity.SysMessageProvider;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -34,8 +38,8 @@ import static org.mockito.Mockito.when;
  * @since 2026-10-17
  */
 class LoginSmsDispatcherTest {
-    private final IamMessageProviderMapper providers = mock(IamMessageProviderMapper.class);
-    private final IamMessageTemplateMapper templates = mock(IamMessageTemplateMapper.class);
+    private final SysMessageProviderMapper providers = mock(SysMessageProviderMapper.class);
+    private final SysMessageTemplateMapper templates = mock(SysMessageTemplateMapper.class);
     private final AliyunLoginSmsSender aliyun = mock(AliyunLoginSmsSender.class);
     private final TencentLoginSmsSender tencent = mock(TencentLoginSmsSender.class);
     private final MessageAuditHasher auditHasher = new MessageAuditHasher("fixture-iam-audit-key-32-characters");
@@ -44,8 +48,8 @@ class LoginSmsDispatcherTest {
 
     @Test
     void dispatchesAliyunLoginTemplate() {
-        IamMessageProvider provider = provider("ALIYUN");
-        IamMessageTemplate template = template("ALIYUN");
+        SysMessageProvider provider = provider("ALIYUN");
+        SysMessageTemplate template = template("ALIYUN");
         when(providers.selectList(any())).thenReturn(List.of(provider));
         when(templates.selectOne(any())).thenReturn(template);
 
@@ -61,7 +65,7 @@ class LoginSmsDispatcherTest {
         assertThatThrownBy(() -> dispatcher.send("13800000000", "123456"))
             .isInstanceOf(IllegalStateException.class).hasMessageContaining("未启用");
 
-        IamMessageProvider provider = provider("TENCENT");
+        SysMessageProvider provider = provider("TENCENT");
         when(providers.selectList(any())).thenReturn(List.of(provider, provider));
         assertThatThrownBy(() -> dispatcher.send("13800000000", "123456"))
             .isInstanceOf(IllegalStateException.class).hasMessageContaining("不唯一");
@@ -86,8 +90,8 @@ class LoginSmsDispatcherTest {
             .isNotEqualTo(second);
     }
 
-    private IamMessageProvider provider(String type) {
-        IamMessageProvider provider = new IamMessageProvider();
+    private SysMessageProvider provider(String type) {
+        SysMessageProvider provider = new SysMessageProvider();
         provider.setChannel("SMS");
         provider.setProviderType(type);
         provider.setCredential("fixture-secret");
@@ -95,8 +99,8 @@ class LoginSmsDispatcherTest {
         return provider;
     }
 
-    private IamMessageTemplate template(String type) {
-        IamMessageTemplate template = new IamMessageTemplate();
+    private SysMessageTemplate template(String type) {
+        SysMessageTemplate template = new SysMessageTemplate();
         template.setChannel("SMS");
         template.setTemplateKey("SMS_LOGIN");
         template.setProviderType(type);

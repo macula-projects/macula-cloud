@@ -20,7 +20,8 @@ package dev.macula.cloud.iam.controller;
 import cn.hutool.core.util.StrUtil;
 import dev.macula.cloud.iam.authentication.thirdparty.IdentityProviderConfigService;
 import dev.macula.cloud.iam.enums.ThirdPartyProviderType;
-import dev.macula.cloud.iam.pojo.entity.SysOAuth2Client;
+import dev.macula.cloud.iam.authentication.wecom.WecomLoginMode;
+import dev.macula.cloud.iam.handler.AuthenticationFailureReason;
 import dev.macula.cloud.iam.service.support.SysOAuth2ClientService;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
@@ -66,7 +67,7 @@ public class LoginController {
         @CurrentSecurityContext(expression = "authentication") Authentication authentication,
         @Value("${spring.security.oauth2.server.login.sms.enabled:true}") boolean enableSmsLogin,
         @RequestParam(name = OAuth2ParameterNames.CLIENT_ID, required = false) String clientId,
-        @RequestParam(name = "external_error", required = false) String externalError,
+        @RequestParam(name = OAuth2ParameterNames.ERROR, required = false) String authenticationError,
         HttpServletRequest request,
         @RequestAttribute(name = "org.springframework.security.web.csrf.CsrfToken",
             required = false) CsrfToken csrfToken) {
@@ -82,25 +83,29 @@ public class LoginController {
         if (StrUtil.isNotBlank(resolvedClientId)) {
             model.addAttribute(OAuth2ParameterNames.CLIENT_ID, resolvedClientId);
         }
-        SysOAuth2Client client = StrUtil.isBlank(resolvedClientId) ? null
-            : clientService.getClientByClientId(resolvedClientId);
-        boolean validClient = client != null && client.getTenantId() != null && client.getUserType() != null;
-        model.addAttribute("githubLoginEnabled", validClient
-            && providerConfigService.isVisible(ThirdPartyProviderType.GITHUB.providerType()));
-        model.addAttribute("wecomLoginEnabled", validClient
-            && providerConfigService.isVisible(ThirdPartyProviderType.WECOM.providerType()));
+        model.addAttribute("githubLoginEnabled",
+            providerConfigService.isVisible(ThirdPartyProviderType.GITHUB.providerType()));
+        model.addAttribute("wecomLoginEnabled",
+            providerConfigService.isVisible(ThirdPartyProviderType.WECOM.providerType()));
         model.addAttribute("githubLoginPath", ThirdPartyProviderType.GITHUB.loginPath());
         model.addAttribute("wecomLoginPath", ThirdPartyProviderType.WECOM.loginPath());
-        if (StrUtil.isNotBlank(externalError)) {
-            model.addAttribute("externalLoginError", "第三方登录失败，请重试或联系企业管理员。");
+        model.addAttribute("wecomBrowserPath", WecomLoginMode.BROWSER.loginPath());
+        model.addAttribute("wecomWebviewPath", WecomLoginMode.WEBVIEW.loginPath());
+        if (StrUtil.isNotBlank(authenticationError)) {
+            model.addAttribute("authenticationError",
+                AuthenticationFailureReason.fromCode(authenticationError).message());
         }
         model.addAttribute("enableSmsLogin", enableSmsLogin);
         return "login";
     }
 
     private String resolveClientId(String parameter, HttpServletRequest request) {
-        if (StrUtil.isNotBlank(parameter)) return parameter;
-        if (request.getCookies() == null) return null;
+        if (StrUtil.isNotBlank(parameter)) {
+            return parameter;
+        }
+        if (request.getCookies() == null) {
+            return null;
+        }
         return Arrays.stream(request.getCookies())
             .filter(cookie -> OAuth2ParameterNames.CLIENT_ID.equals(cookie.getName()))
             .map(Cookie::getValue).findFirst().orElse(null);

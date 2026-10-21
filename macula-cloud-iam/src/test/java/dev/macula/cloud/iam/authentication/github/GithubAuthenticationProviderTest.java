@@ -17,8 +17,10 @@
 package dev.macula.cloud.iam.authentication.github;
 
 import dev.macula.cloud.iam.authentication.thirdparty.*;
-import dev.macula.cloud.iam.enums.UserTypeEnum;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AuthenticationServiceException;
@@ -41,52 +43,52 @@ import static org.springframework.http.HttpMethod.GET;
 import static org.springframework.http.HttpMethod.POST;
 
 /**
- * 验证 GitHub 稳定 subject 经过全局绑定后再按 client 路由用户。
+ * 验证 GitHub 稳定 subject 仅经过全局绑定解析用户。
  *
  * @author Rain
  * @since 6.1.0
  */
+@ExtendWith(OutputCaptureExtension.class)
 class GithubAuthenticationProviderTest {
     @Test
     void authenticatesOnlyThroughNumericSubjectBinding() {
         GithubClient github = mock(GithubClient.class);
         IdentityProviderConfigService configs = mock(IdentityProviderConfigService.class);
-        ThirdPartyUserDetailsService users = mock(ThirdPartyUserDetailsService.class);
+        ThirdPartyIdentityResolutionService identities = mock(ThirdPartyIdentityResolutionService.class);
         var config = new IdentityProviderConfigService.ProviderConfig("GITHUB", "id", "secret",
             Map.of("clientId", "id"));
-        var context = new ThirdPartyLoginContext("GITHUB", "portal", 3L, UserTypeEnum.MEMBER, Instant.now());
+        var context = new ThirdPartyLoginContext("GITHUB", "", Instant.now(), "/");
         when(configs.requireEnabled("GITHUB")).thenReturn(config);
         when(github.fetchSubject(config, "code", "https://iam.example/login/github")).thenReturn("12345");
-        when(configs.requireBoundUsername("GITHUB", "12345")).thenReturn("alice");
-        when(users.load(context, "alice"))
+        when(identities.resolve("GITHUB", "12345", context))
             .thenReturn(User.withUsername("alice").password("n/a").authorities("USER").build());
 
-        var result = new GithubAuthenticationProvider(github, configs, users).authenticate(
+        var result = new GithubAuthenticationProvider(github, configs, identities).authenticate(
             ThirdPartyAuthenticationToken.unauthenticated("GITHUB", "code", context,
                 "https://iam.example/login/github"));
 
         assertEquals("alice", result.getName());
         assertEquals("GITHUB", ((ThirdPartyAuthenticationToken)result).getProviderType());
-        verify(configs).requireBoundUsername("GITHUB", "12345");
+        verify(identities).resolve("GITHUB", "12345", context);
     }
 
     @Test
     void rejectsAnotherProviderWithoutCallingExternalServices() {
         GithubClient github = mock(GithubClient.class);
         IdentityProviderConfigService configs = mock(IdentityProviderConfigService.class);
-        ThirdPartyUserDetailsService users = mock(ThirdPartyUserDetailsService.class);
-        var context = new ThirdPartyLoginContext("WECOM", "portal", 3L, UserTypeEnum.MEMBER, Instant.now());
+        ThirdPartyIdentityResolutionService identities = mock(ThirdPartyIdentityResolutionService.class);
+        var context = new ThirdPartyLoginContext("WECOM", "BROWSER", Instant.now(), "/");
 
-        var result = new GithubAuthenticationProvider(github, configs, users).authenticate(
+        var result = new GithubAuthenticationProvider(github, configs, identities).authenticate(
             ThirdPartyAuthenticationToken.unauthenticated("WECOM", "code", context,
                 "https://iam.example/login/wecom"));
 
         assertNull(result);
-        verifyNoInteractions(github, configs, users);
+        verifyNoInteractions(github, configs, identities);
     }
 
     @Test
-    void clientUsesTokenAndUserEndpointsButNeverFallsBackToLogin() {
+    void clientUsesTokenAndUserEndpointsButNeverFallsBackToLogin(CapturedOutput output) {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         GithubClient client = new GithubClient(builder.build());
@@ -124,6 +126,32 @@ class GithubAuthenticationProviderTest {
         AuthenticationServiceException failure = assertThrows(AuthenticationServiceException.class,
             () -> failedClient.fetchSubject(config, "sensitive-code", "https://iam.example/login/github"));
         assertEquals("GitHub 身份校验失败", failure.getMessage());
+        org.assertj.core.api.Assertions.assertThat(output)
+            .contains("provider=GITHUB", "stage=token", "status=500")
+            .doesNotContain("sensitive-code", "secret");
         failedServer.verify();
+    }
+
+    @Test
+    void logsGithubFailureCategoryWithoutProviderTextOrCredentials(CapturedOutput output) {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        GithubClient client = new GithubClient(builder.build());
+        var config = new IdentityProviderConfigService.ProviderConfig("GITHUB", "id", "client-secret-marker",
+            Map.of("clientId", "id"));
+        server.expect(requestTo("https://github.com/login/oauth/access_token"))
+            .andRespond(withSuccess("{\"error\":\"sensitive-provider-error\","
+                + "\"error_description\":\"sensitive-provider-description\"}", MediaType.APPLICATION_JSON));
+
+        AuthenticationServiceException failure = assertThrows(AuthenticationServiceException.class,
+            () -> client.fetchSubject(config, "authorization-code-marker",
+                "https://iam.example/login/github"));
+
+        assertEquals("GitHub 身份校验失败", failure.getMessage());
+        org.assertj.core.api.Assertions.assertThat(output)
+            .contains("provider=GITHUB", "stage=token", "failure=provider_rejected")
+            .doesNotContain("sensitive-provider-error", "sensitive-provider-description",
+                "authorization-code-marker", "client-secret-marker");
+        server.verify();
     }
 }

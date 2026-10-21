@@ -16,9 +16,10 @@
  */
 package dev.macula.cloud.iam.authentication.wecom;
 
-import dev.macula.cloud.iam.authentication.thirdparty.*;
+import dev.macula.cloud.iam.authentication.thirdparty.IdentityProviderConfigService;
+import dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyIdentityResolutionService;
+import dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyLoginStateRepository;
 import dev.macula.cloud.iam.enums.ThirdPartyProviderType;
-import dev.macula.cloud.iam.service.support.SysOAuth2ClientService;
 import org.springframework.context.ApplicationContext;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.HttpSecurityBuilder;
@@ -27,6 +28,7 @@ import org.springframework.security.config.annotation.web.configurers.AbstractAu
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
+import org.springframework.security.web.util.matcher.OrRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 
 import static org.springframework.security.config.annotation.web.builders.FilterOrderRegUtils.Position.AFTER;
@@ -50,12 +52,12 @@ public class WecomLoginFilterConfigurer<H extends HttpSecurityBuilder<H>>
         ApplicationContext context = http.getSharedObject(ApplicationContext.class);
         WecomClient client = context.getBean(WecomClient.class);
         IdentityProviderConfigService configs = context.getBean(IdentityProviderConfigService.class);
-        ThirdPartyUserDetailsService users = context.getBean(ThirdPartyUserDetailsService.class);
+        ThirdPartyIdentityResolutionService identities = context.getBean(ThirdPartyIdentityResolutionService.class);
         getAuthenticationFilter().wecomClient(client);
-        getAuthenticationFilter().configure(context.getBean(SysOAuth2ClientService.class), configs,
+        getAuthenticationFilter().configure(configs,
             context.getBean(ThirdPartyLoginStateRepository.class),
             context.getBean(AuthorizationServerSettings.class).getIssuer());
-        http.authenticationProvider(postProcess(new WecomAuthenticationProvider(client, configs, users)));
+        http.authenticationProvider(postProcess(new WecomAuthenticationProvider(client, configs, identities)));
         registryFilterOrder((HttpSecurity)http, getAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class,
             AFTER);
         super.init(http);
@@ -63,6 +65,9 @@ public class WecomLoginFilterConfigurer<H extends HttpSecurityBuilder<H>>
 
     @Override
     protected RequestMatcher createLoginProcessingUrlMatcher(String loginProcessingUrl) {
-        return PathPatternRequestMatcher.pathPattern(HttpMethod.GET, loginProcessingUrl);
+        return new OrRequestMatcher(
+            PathPatternRequestMatcher.pathPattern(HttpMethod.GET, loginProcessingUrl),
+            PathPatternRequestMatcher.pathPattern(HttpMethod.GET, WecomLoginMode.BROWSER.loginPath()),
+            PathPatternRequestMatcher.pathPattern(HttpMethod.GET, WecomLoginMode.WEBVIEW.loginPath()));
     }
 }

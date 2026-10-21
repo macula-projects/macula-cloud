@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package dev.macula.cloud.iam.message;
+package dev.macula.cloud.iam.pojo.entity;
 
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
@@ -28,7 +28,7 @@ import lombok.Data;
  */
 @Data
 @TableName("sys_message_template")
-public class IamMessageTemplate {
+public class SysMessageTemplate {
     @TableId
     private Long id;
     private String channel;

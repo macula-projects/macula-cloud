@@ -20,6 +20,8 @@ import com.tencentcloudapi.common.Credential;
 import com.tencentcloudapi.sms.v20210111.SmsClient;
 import com.tencentcloudapi.sms.v20210111.models.SendSmsRequest;
 import com.tencentcloudapi.sms.v20210111.models.SendStatus;
+import dev.macula.cloud.iam.pojo.entity.SysMessageTemplate;
+import dev.macula.cloud.iam.pojo.entity.SysMessageProvider;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import tools.jackson.databind.json.JsonMapper;
@@ -36,7 +38,7 @@ import java.util.Map;
 public class TencentLoginSmsSender {
     private final JsonMapper json = JsonMapper.builder().build();
 
-    public void send(IamMessageProvider provider, IamMessageTemplate template, String phone, String code) {
+    public void send(SysMessageProvider provider, SysMessageTemplate template, String phone, String code) {
         try {
             Map<?, ?> options = json.readValue(provider.getConfigJson(), Map.class);
             Object appId = options.get("smsSdkAppId");

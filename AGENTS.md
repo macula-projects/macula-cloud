@@ -46,6 +46,7 @@ npm run lint
 
 - 保持 Java 17 兼容，包名沿用 `dev.macula.cloud...`；管理端沿用现有 Vue 3、Vite、Pinia、Vue Router、Element Plus 与 JavaScript 风格。
 - 新增 Java 文件使用仓库现有 Apache License 2.0 版权头。新增或实质修改的顶层 Java 类型应有说明职责的类级 Javadoc，并包含非空的 `@author`、`@since`。
+- 新增或修改 Java 代码必须符合 `.config/checkstyle.xml` 与 `.config/checkstyle-header.txt`：使用标准版权头，为所有具名类型编写含 `@since` 的 Javadoc（顶层类型还须含非空 `@author`），避免星号、冗余和未使用导入，控制语句一律使用花括号，并保持每行仅一条语句。
 - 通用框架能力应进入 Macula Boot；本仓库只承载可部署的平台服务、服务间 API 契约和对应管理端，避免复制 Starter 或框架基础设施。
 - `macula-cloud-api` 只放跨服务契约及必要模型、Feign 客户端和回退抽象，不放数据库访问、服务实现或运行时配置。
 - Controller 只处理协议适配、校验和服务编排；事务与业务规则放在 Service，数据访问留在 Mapper。延续 Query、Form、DTO、VO、BO、Entity 的现有语义，不直接把 Entity 暴露为新的远程契约。

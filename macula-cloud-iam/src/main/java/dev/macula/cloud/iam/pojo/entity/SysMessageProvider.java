@@ -14,17 +14,31 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package dev.macula.cloud.iam.message;
+package dev.macula.cloud.iam.pojo.entity;
 
-import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import org.apache.ibatis.annotations.Mapper;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
+import dev.macula.boot.starter.crypto.annotation.CryptoField;
+import lombok.Data;
 
 /**
- * IAM 只读消息供应商 Mapper。
+ * 共享 System 表的 IAM 只读短信供应商映射。
  *
  * @author Rain
  * @since 2026-10-17
  */
-@Mapper
-public interface IamMessageProviderMapper extends BaseMapper<IamMessageProvider> {
+@Data
+@TableName("sys_message_provider")
+public class SysMessageProvider {
+    @TableId
+    private Long id;
+    private String channel;
+    private String providerType;
+    private String account;
+    @CryptoField
+    private String credential;
+    private String regionCode;
+    private String sender;
+    private String configJson;
+    private Boolean enabled;
 }

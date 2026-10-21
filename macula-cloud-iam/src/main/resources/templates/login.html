@@ -19,7 +19,7 @@
     <div class="brand mobile-brand"><span class="brand-mark" aria-hidden="true">M</span>Macula</div>
     <div class="card">
       <span class="step">统一身份认证</span><h1>欢迎回来</h1><p class="subtitle">使用你的企业账号登录，继续访问应用。</p>
-      <div th:if="${externalLoginError}" class="external-error" role="alert" th:text="${externalLoginError}"></div>
+      <div th:if="${authenticationError}" class="external-error" role="alert" th:text="${authenticationError}"></div>
       <div th:if="${enableSmsLogin}" class="tabs" role="tablist" aria-label="登录方式">
         <button class="tab" type="button" role="tab" data-tab="password-login" aria-selected="true" aria-controls="password-login">账号密码</button>
         <button class="tab" type="button" role="tab" data-tab="sms-login" aria-selected="false" aria-controls="sms-login">手机验证码</button>
@@ -41,8 +41,10 @@
       </form>
       <div th:if="${githubLoginEnabled or wecomLoginEnabled}" class="external-login">
         <div class="external-divider"><span>其他登录方式</span></div>
-        <a th:if="${githubLoginEnabled}" class="external-button" th:href="@{${githubLoginPath}(client_id=${client_id})}">使用 GitHub 登录</a>
-        <a th:if="${wecomLoginEnabled}" class="external-button wecom" th:href="@{${wecomLoginPath}(client_id=${client_id})}">使用企业微信登录</a>
+        <a th:if="${githubLoginEnabled}" class="external-button" th:href="@{${githubLoginPath}}">使用 GitHub 登录</a>
+        <a th:if="${wecomLoginEnabled}" class="external-button wecom" th:href="@{${wecomLoginPath}}">使用企业微信登录（自动选择）</a>
+        <a th:if="${wecomLoginEnabled}" class="external-button wecom" th:href="@{${wecomBrowserPath}}">使用系统浏览器登录企业微信</a>
+        <a th:if="${wecomLoginEnabled}" class="external-button wecom" th:href="@{${wecomWebviewPath}}">在企业微信内登录</a>
       </div>
       <p class="footnote">登录遇到问题？请联系你的企业管理员。</p>
     </div>

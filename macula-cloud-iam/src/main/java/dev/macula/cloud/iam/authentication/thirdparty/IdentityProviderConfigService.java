@@ -30,6 +30,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * 从数据库读取唯一启用的身份源配置及全局账号绑定。
@@ -61,9 +62,13 @@ public class IdentityProviderConfigService {
                 new LambdaQueryWrapper<SysIdentityProvider>()
                     .eq(SysIdentityProvider::getProviderType, providerType)
                     .eq(SysIdentityProvider::getEnabled, true));
-            if (providers.size() != 1) throw unavailable();
+            if (providers.size() != 1) {
+                throw unavailable();
+            }
             SysIdentityProvider provider = providers.get(0);
-            if (!StringUtils.hasText(provider.getAppSecret())) throw unavailable();
+            if (!StringUtils.hasText(provider.getAppSecret())) {
+                throw unavailable();
+            }
             Map<String, String> config = StringUtils.hasText(provider.getConfigJson())
                 ? json.readValue(provider.getConfigJson(), new TypeReference<>() { }) : Map.of();
             return new ProviderConfig(providerType, provider.getAppId(), provider.getAppSecret(), config);
@@ -75,25 +80,37 @@ public class IdentityProviderConfigService {
     }
 
     public String requireBoundUsername(String providerType, String providerSubject) {
+        return findBoundUsername(providerType, providerSubject)
+            .orElseThrow(() -> new AuthenticationServiceException("第三方账号尚未绑定"));
+    }
+
+    public Optional<String> findBoundUsername(String providerType, String providerSubject) {
         List<SysUserIdentityBinding> bindings = bindingMapper.selectList(
             new LambdaQueryWrapper<SysUserIdentityBinding>()
                 .eq(SysUserIdentityBinding::getProviderType, providerType)
                 .eq(SysUserIdentityBinding::getProviderSubject, providerSubject));
-        if (bindings.size() != 1 || !StringUtils.hasText(bindings.get(0).getUsername())) {
-            throw new AuthenticationServiceException("第三方账号尚未绑定");
+        if (bindings.size() > 1 || (bindings.size() == 1 && !StringUtils.hasText(bindings.get(0).getUsername()))) {
+            throw new AuthenticationServiceException("第三方账号绑定异常");
         }
-        return bindings.get(0).getUsername();
+        return bindings.isEmpty() ? Optional.empty() : Optional.of(bindings.get(0).getUsername());
     }
 
     private AuthenticationServiceException unavailable() {
         return new AuthenticationServiceException("第三方登录暂不可用");
     }
 
+    /**
+     * 身份提供商的受控运行时配置。
+     *
+     * @since 6.1.0
+     */
     public record ProviderConfig(String providerType, String appId, String appSecret,
                                  Map<String, String> values) {
         public String require(String key) {
             String value = values.get(key);
-            if (!StringUtils.hasText(value)) throw new AuthenticationServiceException("第三方登录暂不可用");
+            if (!StringUtils.hasText(value)) {
+                throw new AuthenticationServiceException("第三方登录暂不可用");
+            }
             return value;
         }
     }

@@ -86,6 +86,14 @@ System 数据库同时供 IAM 使用，清理后相关账号、权限及认证�
   清理重复项后按 Flyway 标准流程执行 `repair` 再重跑迁移；隔离 MySQL 测试覆盖该恢复路径。回滚需
   恢复升级前数据库备份并同时回退 IAM/System 应用，不能只删除 Flyway 历史或索引。
 
+- V7 为 `sys_user.username` 增加全局唯一索引，供第三方身份绑定与登录按用户名唯一解析账号。
+  升级前备份数据库并预检：
+  `SELECT username, COUNT(*) FROM sys_user WHERE username IS NOT NULL GROUP BY username HAVING COUNT(*) > 1`。
+  有结果时先由账号数据负责人处理，再运行迁移；唯一索引会拒绝重复值，不会自动选取、合并或删除账号。
+  迁移失败时检查表结构和 `flyway_schema_history`，修复数据后按 Flyway 标准流程 `repair` 并重跑；
+  不得修改已执行的 V7 文件。回滚需停写 IAM/System，恢复迁移前备份和匹配的应用版本，不能只删除
+  唯一索引或 Flyway 历史。
+
 隔离数据库集成测试 `SettingsPersistenceIT` 默认不运行；显式设置 `SYSTEM_SETTINGS_IT=true` 后，
 须将 `SPRING_DATASOURCE_URL` 指向名称以 `macula_settings_it_` 开头、已升级至 V5 的隔离测试库，
 并提供测试用 `MACULA_CRYPTO_PASSWORD`、MySQL 凭据与独立 Redis database。此测试禁用自动

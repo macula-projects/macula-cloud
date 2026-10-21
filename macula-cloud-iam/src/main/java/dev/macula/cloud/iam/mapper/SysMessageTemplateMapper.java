@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Macula
+ * Copyright (c) 2026 Macula
  *   macula.dev, China
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,22 +14,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package dev.macula.cloud.iam.mapper;
 
-package dev.macula.cloud.iam.service.userdetails;
-
-import dev.macula.cloud.iam.authentication.weapp.WeappClient;
-import dev.macula.cloud.iam.authentication.weapp.WeappClientService;
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import dev.macula.cloud.iam.pojo.entity.SysMessageTemplate;
+import org.apache.ibatis.annotations.Mapper;
 
 /**
- * {@code WeappClientServiceImpl} 获取微信Client配置信息
+ * IAM 只读消息模板 Mapper。
  *
- * @author rain
- * @since 2023/4/12 19:49
+ * @author Rain
+ * @since 2026-10-17
  */
-public class WeappClientServiceImpl implements WeappClientService {
-    @Override
-    public WeappClient get(String clientId) {
-        // TODO 获取微信CLIENT信息
-        return null;
-    }
+@Mapper
+public interface SysMessageTemplateMapper extends BaseMapper<SysMessageTemplate> {
 }

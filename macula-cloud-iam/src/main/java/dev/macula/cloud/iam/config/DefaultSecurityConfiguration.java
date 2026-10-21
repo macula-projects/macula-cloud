@@ -19,41 +19,37 @@ package dev.macula.cloud.iam.config;
 
 import dev.macula.cloud.iam.authentication.github.GithubLoginFilterConfigurer;
 import dev.macula.cloud.iam.authentication.sms.SmsLoginFilterConfigurer;
-import dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyAuthenticationFailureHandler;
-import dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyAuthenticationSuccessHandler;
-import dev.macula.cloud.iam.authentication.wecom.WecomLoginFilterConfigurer;
 import dev.macula.cloud.iam.authentication.sms.SmsService;
 import dev.macula.cloud.iam.authentication.sms.SmsUserDetailsService;
+import dev.macula.cloud.iam.authentication.thirdparty.PendingThirdPartyBindingRepository;
+import dev.macula.cloud.iam.authentication.wecom.WecomLoginFilterConfigurer;
+import dev.macula.cloud.iam.authentication.wecom.WecomLoginMode;
+import dev.macula.cloud.iam.controller.ThirdPartyBindingController;
+import dev.macula.cloud.iam.enums.ThirdPartyProviderType;
+import dev.macula.cloud.iam.handler.BrowserAuthenticationFailureHandler;
 import dev.macula.cloud.iam.message.LoginSmsDispatcher;
 import dev.macula.cloud.iam.message.SmsVerificationCodeStore;
 import dev.macula.cloud.iam.message.SmsVerificationProperties;
-import dev.macula.cloud.iam.authentication.weapp.WeappClientService;
-import dev.macula.cloud.iam.authentication.weapp.WeappLoginFilterConfigurer;
-import dev.macula.cloud.iam.authentication.weapp.WeappSessionKeyCache;
-import dev.macula.cloud.iam.authentication.weapp.WeappUserDetailsService;
-import dev.macula.cloud.iam.enums.ThirdPartyProviderType;
-import dev.macula.cloud.iam.handler.JsonAuthenticationEntryPoint;
-import dev.macula.cloud.iam.handler.RedirectLoginAuthenticationSuccessHandler;
 import dev.macula.cloud.iam.service.support.SysOAuth2ClientService;
 import dev.macula.cloud.iam.service.support.SysUserService;
 import dev.macula.cloud.iam.service.support.UserAuthInfoService;
-import dev.macula.cloud.iam.service.userdetails.*;
+import dev.macula.cloud.iam.service.support.impl.SmsServiceImpl;
+import dev.macula.cloud.iam.service.userdetails.SysUserDetailsServiceImpl;
 import org.jspecify.annotations.Nullable;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.security.web.authentication.AuthenticationEntryPointFailureHandler;
+import org.springframework.security.web.authentication.SavedRequestAwareAuthenticationSuccessHandler;
 
 /**
  * {@code AuthenticationDefaultConfiguration} 默认的登录认证配置
@@ -68,12 +64,11 @@ public class DefaultSecurityConfiguration {
     @Bean
     @Order(Ordered.HIGHEST_PRECEDENCE + 2)
     SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http,
-        @Qualifier("sysUserDetailsService") UserDetailsService userDetailsService) throws Exception {
+        @Qualifier("sysUserDetailsService") UserDetailsService userDetailsService,
+        BrowserAuthenticationFailureHandler authenticationFailureHandler) throws Exception {
         // @formatter:off
-        JsonAuthenticationEntryPoint authenticationEntryPoint = new JsonAuthenticationEntryPoint();
-        AuthenticationEntryPointFailureHandler authenticationFailureHandler = new AuthenticationEntryPointFailureHandler(authenticationEntryPoint);
-        RedirectLoginAuthenticationSuccessHandler loginAuthenticationSuccessHandler = new RedirectLoginAuthenticationSuccessHandler();
-
+        SavedRequestAwareAuthenticationSuccessHandler authenticationSuccessHandler =
+            new SavedRequestAwareAuthenticationSuccessHandler();
         http.authorizeHttpRequests(authorize -> authorize
                 .requestMatchers("/component/**").permitAll()
                 .requestMatchers("/actuator/health").permitAll()
@@ -87,7 +82,9 @@ public class DefaultSecurityConfiguration {
                 .requestMatchers("/favicon.ico").permitAll()
                 .requestMatchers("/iam/**").permitAll()
                 .requestMatchers("/login", ThirdPartyProviderType.GITHUB.loginPath(),
-                    ThirdPartyProviderType.WECOM.loginPath()).permitAll()
+                    ThirdPartyProviderType.WECOM.loginPath(), WecomLoginMode.BROWSER.loginPath(),
+                    WecomLoginMode.WEBVIEW.loginPath(), ThirdPartyBindingController.BINDING_PATH,
+                    ThirdPartyBindingController.BINDING_CANCEL_PATH).permitAll()
                 .requestMatchers("/api/v1/sms-code").permitAll()
                 .anyRequest().authenticated())
             .userDetailsService(userDetailsService)
@@ -96,37 +93,33 @@ public class DefaultSecurityConfiguration {
         // FORM登录
         http.formLogin(form -> form
             .loginPage("/login")
-            .successHandler(loginAuthenticationSuccessHandler)
+            .successHandler(authenticationSuccessHandler)
             .failureHandler(authenticationFailureHandler)
             .permitAll());
 
         // 短信验证码登录
         http.with(new SmsLoginFilterConfigurer<>(), code -> code
             .smsUserDetailsService((SmsUserDetailsService)userDetailsService)
-            .successHandler(loginAuthenticationSuccessHandler)
+            .successHandler(authenticationSuccessHandler)
             .failureHandler(authenticationFailureHandler)
             .permitAll());
 
-        // 微信小程序登录
-        http.with(new WeappLoginFilterConfigurer<>(), weapp -> weapp
-            .successHandler(loginAuthenticationSuccessHandler)
-            .failureHandler(authenticationFailureHandler)
-            .permitAll());
-
-        ThirdPartyAuthenticationSuccessHandler externalSuccessHandler =
-            new ThirdPartyAuthenticationSuccessHandler();
-        ThirdPartyAuthenticationFailureHandler externalFailureHandler =
-            new ThirdPartyAuthenticationFailureHandler();
         http.with(new GithubLoginFilterConfigurer<>(), github -> github
-            .successHandler(externalSuccessHandler)
-            .failureHandler(externalFailureHandler)
+            .successHandler(authenticationSuccessHandler)
+            .failureHandler(authenticationFailureHandler)
             .permitAll());
         http.with(new WecomLoginFilterConfigurer<>(), wecom -> wecom
-            .successHandler(externalSuccessHandler)
-            .failureHandler(externalFailureHandler)
+            .successHandler(authenticationSuccessHandler)
+            .failureHandler(authenticationFailureHandler)
             .permitAll());
         return http.build();
         // @formatter:on
+    }
+
+    @Bean
+    public BrowserAuthenticationFailureHandler browserAuthenticationFailureHandler(
+        PendingThirdPartyBindingRepository pendingBindings, AuthorizationServerSettings authorizationServerSettings) {
+        return new BrowserAuthenticationFailureHandler(pendingBindings, authorizationServerSettings.getIssuer());
     }
 
     @Bean
@@ -141,26 +134,13 @@ public class DefaultSecurityConfiguration {
         ObjectProvider<LoginSmsDispatcher> dispatchers) {
         SmsVerificationCodeStore store = stores.getIfAvailable();
         LoginSmsDispatcher dispatcher = dispatchers.getIfAvailable();
-        if (store != null && dispatcher != null) return new SmsServiceImpl(store, dispatcher);
+        if (store != null && dispatcher != null) {
+            return new SmsServiceImpl(store, dispatcher);
+        }
         return new SmsService() {
             @Override public boolean verifyCode(String phone, String rawCode) { return false; }
             @Override public void sendCode(String phone) { throw new IllegalStateException("短信服务未配置"); }
             @Override public void sendCode(String phone, String remoteAddress) { sendCode(phone); }
         };
-    }
-
-    @Bean
-    WeappClientService weappClientService() {
-        return new WeappClientServiceImpl();
-    }
-
-    @Bean
-    WeappSessionKeyCache weappSessionKeyCache(RedisTemplate<String, Object> redisTemplate) {
-        return new WeappSessionKeyCacheImpl(redisTemplate);
-    }
-
-    @Bean
-    WeappUserDetailsService weappUserDetailsService() {
-        return new WeappUserDetailsServiceImpl();
     }
 }

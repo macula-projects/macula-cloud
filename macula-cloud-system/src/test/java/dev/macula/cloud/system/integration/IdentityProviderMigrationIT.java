@@ -96,7 +96,8 @@ class IdentityProviderMigrationIT {
                     "AND app_id = 'legacy-client' AND config_json = '{}'"));
         }
         Flyway toV6 = Flyway.configure().dataSource(url, username, password)
-            .locations("classpath:db/migration").cleanDisabled(false).load();
+            .locations("classpath:db/migration").target(MigrationVersion.fromVersion("6"))
+            .cleanDisabled(false).load();
         toV6.migrate();
         try (Connection connection = DriverManager.getConnection(url, username, password)) {
             assertEquals(6L, count(connection,
@@ -146,7 +147,7 @@ class IdentityProviderMigrationIT {
                 "('duplicate-b', 'GITHUB', 'b', '{}', 1, 1)");
         }
         Flyway duplicateUpgrade = Flyway.configure().dataSource(url, username, password)
-            .locations("classpath:db/migration").load();
+            .locations("classpath:db/migration").target(MigrationVersion.fromVersion("6")).load();
         assertThrows(FlywayException.class, duplicateUpgrade::migrate,
             "V6 必须在历史同类型多条启用配置时停止");
         try (Connection connection = DriverManager.getConnection(url, username, password)) {

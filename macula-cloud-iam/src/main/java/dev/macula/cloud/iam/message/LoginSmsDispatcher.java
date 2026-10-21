@@ -17,6 +17,10 @@
 package dev.macula.cloud.iam.message;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import dev.macula.cloud.iam.mapper.SysMessageTemplateMapper;
+import dev.macula.cloud.iam.mapper.SysMessageProviderMapper;
+import dev.macula.cloud.iam.pojo.entity.SysMessageTemplate;
+import dev.macula.cloud.iam.pojo.entity.SysMessageProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -34,8 +38,8 @@ import java.util.List;
 @RequiredArgsConstructor
 @Slf4j
 public class LoginSmsDispatcher {
-    private final IamMessageProviderMapper providerMapper;
-    private final IamMessageTemplateMapper templateMapper;
+    private final SysMessageProviderMapper providerMapper;
+    private final SysMessageTemplateMapper templateMapper;
     private final AliyunLoginSmsSender aliyunSender;
     private final TencentLoginSmsSender tencentSender;
     private final MessageAuditHasher auditHasher;
@@ -43,17 +47,17 @@ public class LoginSmsDispatcher {
     public void send(String phone, String code) {
         String providerType = "UNRESOLVED";
         try {
-            List<IamMessageProvider> providers = providerMapper.selectList(new LambdaQueryWrapper<IamMessageProvider>()
-                .eq(IamMessageProvider::getChannel, "SMS").eq(IamMessageProvider::getEnabled, true));
+            List<SysMessageProvider> providers = providerMapper.selectList(new LambdaQueryWrapper<SysMessageProvider>()
+                .eq(SysMessageProvider::getChannel, "SMS").eq(SysMessageProvider::getEnabled, true));
             if (providers.size() != 1) {
                 throw new IllegalStateException("短信渠道未启用或配置不唯一");
             }
-            IamMessageProvider provider = providers.get(0);
+            SysMessageProvider provider = providers.get(0);
             providerType = provider.getProviderType();
-            IamMessageTemplate template = templateMapper.selectOne(new LambdaQueryWrapper<IamMessageTemplate>()
-                .eq(IamMessageTemplate::getChannel, "SMS").eq(IamMessageTemplate::getTemplateKey, "SMS_LOGIN")
-                .eq(IamMessageTemplate::getProviderType, providerType)
-                .eq(IamMessageTemplate::getLanguageCode, "zh-CN").eq(IamMessageTemplate::getEnabled, true));
+            SysMessageTemplate template = templateMapper.selectOne(new LambdaQueryWrapper<SysMessageTemplate>()
+                .eq(SysMessageTemplate::getChannel, "SMS").eq(SysMessageTemplate::getTemplateKey, "SMS_LOGIN")
+                .eq(SysMessageTemplate::getProviderType, providerType)
+                .eq(SysMessageTemplate::getLanguageCode, "zh-CN").eq(SysMessageTemplate::getEnabled, true));
             if (template == null || !StringUtils.hasText(template.getProviderTemplateCode()) ||
                 !StringUtils.hasText(provider.getCredential())) {
                 throw new IllegalStateException("登录短信配置不完整");

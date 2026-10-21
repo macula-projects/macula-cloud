@@ -16,9 +16,10 @@
  */
 package dev.macula.cloud.iam.authentication.github;
 
-import dev.macula.cloud.iam.authentication.thirdparty.*;
+import dev.macula.cloud.iam.authentication.thirdparty.IdentityProviderConfigService;
+import dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyIdentityResolutionService;
+import dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyLoginStateRepository;
 import dev.macula.cloud.iam.enums.ThirdPartyProviderType;
-import dev.macula.cloud.iam.service.support.SysOAuth2ClientService;
 import org.springframework.context.ApplicationContext;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.HttpSecurityBuilder;
@@ -50,12 +51,12 @@ public class GithubLoginFilterConfigurer<H extends HttpSecurityBuilder<H>>
         ApplicationContext context = http.getSharedObject(ApplicationContext.class);
         GithubClient client = context.getBean(GithubClient.class);
         IdentityProviderConfigService configs = context.getBean(IdentityProviderConfigService.class);
-        ThirdPartyUserDetailsService users = context.getBean(ThirdPartyUserDetailsService.class);
+        ThirdPartyIdentityResolutionService identities = context.getBean(ThirdPartyIdentityResolutionService.class);
         getAuthenticationFilter().githubClient(client);
-        getAuthenticationFilter().configure(context.getBean(SysOAuth2ClientService.class), configs,
+        getAuthenticationFilter().configure(configs,
             context.getBean(ThirdPartyLoginStateRepository.class),
             context.getBean(AuthorizationServerSettings.class).getIssuer());
-        http.authenticationProvider(postProcess(new GithubAuthenticationProvider(client, configs, users)));
+        http.authenticationProvider(postProcess(new GithubAuthenticationProvider(client, configs, identities)));
         registryFilterOrder((HttpSecurity)http, getAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class,
             AFTER);
         super.init(http);

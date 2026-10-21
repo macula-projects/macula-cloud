@@ -18,7 +18,9 @@ package dev.macula.cloud.iam.authentication.wecom;
 
 import dev.macula.cloud.iam.authentication.thirdparty.AbstractThirdPartyAuthenticationFilter;
 import dev.macula.cloud.iam.authentication.thirdparty.IdentityProviderConfigService.ProviderConfig;
+import dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyLoginContext;
 import dev.macula.cloud.iam.enums.ThirdPartyProviderType;
+import jakarta.servlet.http.HttpServletRequest;
 
 /**
  * 企业微信登录发起与回调过滤器。
@@ -38,7 +40,15 @@ public class WecomAuthenticationFilter extends AbstractThirdPartyAuthenticationF
     }
 
     @Override
-    protected String authorizationUri(ProviderConfig config, String state, String redirectUri) {
-        return client.authorizationUri(config, state, redirectUri);
+    protected String loginMode(HttpServletRequest request) {
+        WecomLoginMode mode = WecomLoginMode.from(request);
+        return mode == WecomLoginMode.UNKNOWN ? null : mode.name();
+    }
+
+    @Override
+    protected String authorizationUri(ProviderConfig config, String state, String redirectUri,
+        ThirdPartyLoginContext context) {
+        return client.authorizationUri(config, state, redirectUri,
+            WecomLoginMode.valueOf(context.loginMode()));
     }
 }

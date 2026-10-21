@@ -18,6 +18,7 @@ package dev.macula.cloud.iam.service.userdetails;
 
 import dev.macula.cloud.iam.message.LoginSmsDispatcher;
 import dev.macula.cloud.iam.message.SmsVerificationCodeStore;
+import dev.macula.cloud.iam.service.support.impl.SmsServiceImpl;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
