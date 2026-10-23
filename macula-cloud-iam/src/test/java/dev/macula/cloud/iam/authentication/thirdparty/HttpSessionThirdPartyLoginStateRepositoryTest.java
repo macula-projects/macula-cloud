@@ -46,7 +46,7 @@ class HttpSessionThirdPartyLoginStateRepositoryTest {
     @Test
     void consumesStateExactlyOnce() {
         MockHttpServletRequest request = new MockHttpServletRequest();
-        ThirdPartyLoginContext expected = new ThirdPartyLoginContext("GITHUB", "", NOW, "/");
+        ThirdPartyLoginContext expected = new ThirdPartyLoginContext("GITHUB", "", "test-client", NOW, "/");
         String state = repository.create(request, expected);
 
         assertEquals(expected, repository.consume(request, "GITHUB", state));
@@ -56,7 +56,7 @@ class HttpSessionThirdPartyLoginStateRepositoryTest {
     @Test
     void createsRandomStateAndReplacesThePreviousProviderState() {
         MockHttpServletRequest request = new MockHttpServletRequest();
-        ThirdPartyLoginContext context = new ThirdPartyLoginContext("GITHUB", "", NOW, "/");
+        ThirdPartyLoginContext context = new ThirdPartyLoginContext("GITHUB", "", "test-client", NOW, "/");
 
         String first = repository.create(request, context);
         String second = repository.create(request, context);
@@ -69,11 +69,13 @@ class HttpSessionThirdPartyLoginStateRepositoryTest {
     @Test
     void rejectsWrongProviderAndExpiredState() {
         MockHttpServletRequest request = new MockHttpServletRequest();
-        String state = repository.create(request, new ThirdPartyLoginContext("GITHUB", "", NOW.minusSeconds(301), "/"));
+        String state = repository.create(request,
+            new ThirdPartyLoginContext("GITHUB", "", "test-client", NOW.minusSeconds(301), "/"));
         assertThrows(BadCredentialsException.class, () -> repository.consume(request, "GITHUB", state));
 
         MockHttpServletRequest another = new MockHttpServletRequest();
-        String anotherState = repository.create(another, new ThirdPartyLoginContext("GITHUB", "", NOW, "/"));
+        String anotherState = repository.create(another,
+            new ThirdPartyLoginContext("GITHUB", "", "test-client", NOW, "/"));
         assertThrows(BadCredentialsException.class,
             () -> repository.consume(another, "WECOM", anotherState));
     }
@@ -83,7 +85,8 @@ class HttpSessionThirdPartyLoginStateRepositoryTest {
         RacingSession session = new RacingSession();
         MockHttpServletRequest createRequest = new MockHttpServletRequest();
         createRequest.setSession(session);
-        String state = repository.create(createRequest, new ThirdPartyLoginContext("GITHUB", "", NOW, "/"));
+        String state = repository.create(createRequest,
+            new ThirdPartyLoginContext("GITHUB", "", "test-client", NOW, "/"));
         MockHttpServletRequest first = new MockHttpServletRequest();
         first.setSession(session);
         MockHttpServletRequest second = new MockHttpServletRequest();

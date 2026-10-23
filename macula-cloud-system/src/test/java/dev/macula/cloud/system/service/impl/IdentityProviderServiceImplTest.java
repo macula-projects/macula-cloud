@@ -29,12 +29,22 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.HashMap;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 /**
- * 验证六类身份源字段、分类及敏感配置的管理边界。
+ * 验证身份源字段、分类及敏感配置的管理边界。
  *
  * @author Rain
  * @since 2026-10-14
@@ -47,9 +57,10 @@ class IdentityProviderServiceImplTest {
     @Test
     void catalogIsTheSourceOfProviderCodesAndValidationFields() {
         var catalog = service.catalog();
-        assertEquals(java.util.List.of("social", "enterprise"),
+        assertEquals(java.util.List.of("social", "enterprise", "mobile"),
             catalog.getCategories().stream().map(category -> category.getCode()).toList());
-        assertEquals(java.util.List.of("GITHUB", "ALIPAY", "WECHAT", "WECOM", "FEISHU", "DINGTALK"),
+        assertEquals(java.util.List.of("GITHUB", "ALIPAY", "WECHAT", "WECOM", "FEISHU", "DINGTALK",
+                "ALIYUN_MOBILE"),
             catalog.getProviders().stream().map(provider -> provider.getCode()).toList());
         assertTrue(catalog.getProviders().stream().allMatch(provider ->
             provider.getCreateUrl().startsWith("https://") && !provider.getCreateHint().isBlank() &&
@@ -65,6 +76,18 @@ class IdentityProviderServiceImplTest {
             .findFirst().orElseThrow();
         assertTrue(dingtalk.getFields().stream().anyMatch(field -> field.getKey().equals("appKey")
             && field.getHelp().contains("Client ID")));
+        assertTrue(dingtalk.getFields().stream().anyMatch(field -> field.getKey().equals("corpId")
+            && field.isRequired() && !field.isSecret()));
+        assertFalse(dingtalk.getFields().stream().anyMatch(field -> field.getKey().equals("webviewBridgeUri")));
+        var feishu = catalog.getProviders().stream().filter(provider -> provider.getCode().equals("FEISHU"))
+            .findFirst().orElseThrow();
+        assertFalse(feishu.getFields().stream().anyMatch(field -> field.getKey().equals("webviewBridgeUri")));
+        var wechat = catalog.getProviders().stream().filter(provider -> provider.getCode().equals("WECHAT"))
+            .findFirst().orElseThrow();
+        assertTrue(wechat.getFields().stream().anyMatch(field -> field.getKey().equals("officialAccountAppId")
+            && field.isRequired() && !field.isSecret()));
+        assertTrue(wechat.getFields().stream().anyMatch(field -> field.getKey().equals("officialAccountAppSecret")
+            && field.isRequired() && field.isSecret()));
         assertFalse(alipay.getFields().stream().anyMatch(field -> field.getKey().equals("callbackUrl")));
         verifyNoInteractions(mapper);
     }
@@ -85,11 +108,15 @@ class IdentityProviderServiceImplTest {
         assertProvider("GITHUB", "social", Map.of("clientId", "github-id", "clientSecret", "secret"));
         assertProvider("ALIPAY", "social", Map.of("appId", "ali-id", "appPrivateKey", "private-key",
             "alipayPublicKey", "public-key"));
-        assertProvider("WECHAT", "social", Map.of("appId", "wechat-id", "appSecret", "secret"));
+        assertProvider("WECHAT", "social", Map.of("appId", "wechat-id", "appSecret", "secret",
+            "officialAccountAppId", "official-id", "officialAccountAppSecret", "official-secret"));
         assertProvider("WECOM", "enterprise", Map.of("corpId", "corp-id", "agentId", "agent-id",
             "appSecret", "secret"));
         assertProvider("FEISHU", "enterprise", Map.of("appId", "feishu-id", "appSecret", "secret"));
-        assertProvider("DINGTALK", "enterprise", Map.of("appKey", "ding-key", "appSecret", "secret"));
+        assertProvider("DINGTALK", "enterprise", Map.of("appKey", "ding-key", "appSecret", "secret",
+            "corpId", "ding-corp"));
+        assertProvider("ALIYUN_MOBILE", "mobile", Map.of("accessKeyId", "aliyun-key",
+            "accessKeySecret", "secret"));
     }
 
     @Test
@@ -116,6 +143,56 @@ class IdentityProviderServiceImplTest {
         assertFalse(result.getConfig().containsKey("appPrivateKey"));
         assertEquals(Boolean.TRUE, result.getConfiguredSecrets().get("appPrivateKey"));
         assertEquals("/login/alipay", result.getCallbackUrl());
+    }
+
+    @Test
+    void storesAdditionalSecretsSeparatelyAndRetainsBlankValuesOnUpdate() {
+        when(mapper.selectCount(any())).thenReturn(0L);
+        IdentityProviderVO result = service.save(null, form("WECHAT", "social", Map.of(
+            "appId", "website-id", "appSecret", "website-secret",
+            "officialAccountAppId", "official-id", "officialAccountAppSecret", "official-secret")));
+
+        verify(mapper).insert((SysIdentityProvider)argThat((SysIdentityProvider entity) ->
+            "website-secret".equals(entity.getAppSecret()) &&
+                "{\"officialAccountAppSecret\":\"official-secret\"}".equals(entity.getSecretConfigJson()) &&
+                !entity.getConfigJson().contains("official-secret")));
+        assertEquals(Map.of("appSecret", true, "officialAccountAppSecret", true,
+            "mobileAppSecret", false, "miniAppSecret", false), result.getConfiguredSecrets());
+        assertFalse(result.getConfig().containsKey("officialAccountAppSecret"));
+
+        SysIdentityProvider existing = new SysIdentityProvider();
+        existing.setId(9L);
+        existing.setName("微信登录");
+        existing.setProviderType("WECHAT");
+        existing.setAppId("website-id");
+        existing.setAppSecret("website-secret");
+        existing.setSecretConfigJson("{\"officialAccountAppSecret\":\"old-official-secret\"}");
+        existing.setConfigJson("{\"appId\":\"website-id\",\"officialAccountAppId\":\"official-id\"}");
+        when(mapper.selectById(9L)).thenReturn(existing);
+
+        service.save(9L, form("WECHAT", "social", Map.of(
+            "appId", "website-id", "appSecret", "",
+            "officialAccountAppId", "official-id", "officialAccountAppSecret", "")));
+
+        assertEquals("website-secret", existing.getAppSecret());
+        assertEquals("{\"officialAccountAppSecret\":\"old-official-secret\"}", existing.getSecretConfigJson());
+    }
+
+    @Test
+    void rejectsUnknownOrMalformedAdditionalSecretJson() {
+        SysIdentityProvider existing = new SysIdentityProvider();
+        existing.setId(10L);
+        existing.setName("微信登录");
+        existing.setProviderType("WECHAT");
+        existing.setAppId("website-id");
+        existing.setAppSecret("website-secret");
+        existing.setConfigJson("{\"appId\":\"website-id\",\"officialAccountAppId\":\"official-id\"}");
+        when(mapper.selectById(10L)).thenReturn(existing);
+
+        existing.setSecretConfigJson("{\"unknownSecret\":\"value\"}");
+        assertThrows(ResponseStatusException.class, () -> service.get(10L));
+        existing.setSecretConfigJson("[]");
+        assertThrows(ResponseStatusException.class, () -> service.get(10L));
     }
 
     @Test

@@ -37,6 +37,8 @@ public class SmsVerificationProperties {
     private Duration ttl = Duration.ofMinutes(5);
     private Duration sendInterval = Duration.ofMinutes(1);
     @Positive
+    private int maxClientSendsPerInterval = 200;
+    @Positive
     private int maxIpSendsPerInterval = 20;
     @Positive
     private int maxAttempts = 5;

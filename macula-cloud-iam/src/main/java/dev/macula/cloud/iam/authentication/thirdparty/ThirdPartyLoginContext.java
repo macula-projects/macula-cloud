@@ -25,5 +25,5 @@ import java.time.Instant;
  * @author Rain
  * @since 6.1.0
  */
-public record ThirdPartyLoginContext(String providerType, String loginMode, Instant createdAt,
+public record ThirdPartyLoginContext(String providerType, String loginMode, String clientId, Instant createdAt,
                                      String savedRequestTarget) implements Serializable { }

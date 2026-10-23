@@ -58,4 +58,7 @@ public interface OAuth2ErrorCodesExpand {
      */
     String INVALID_BEARER_TOKEN = "invalid_bearer_token";
 
+    /** 已核验的外部身份需要绑定已有本地账号。 */
+    String BINDING_REQUIRED = "binding_required";
+
 }

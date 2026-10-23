@@ -65,6 +65,14 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         return unique(this.list(new LambdaQueryWrapper<SysUser>().eq(SysUser::getMobile, mobile)));
     }
 
+    @Override
+    public SysUser findUniqueByEmail(String email) {
+        if (!StringUtils.hasText(email)) {
+            return null;
+        }
+        return unique(this.list(new LambdaQueryWrapper<SysUser>().eq(SysUser::getEmail, email)));
+    }
+
     private SysUser unique(List<SysUser> users) {
         if (users.size() > 1) {
             throw new AuthenticationServiceException("本地账号不唯一");

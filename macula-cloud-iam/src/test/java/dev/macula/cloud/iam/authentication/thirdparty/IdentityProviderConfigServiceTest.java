@@ -25,9 +25,13 @@ import org.springframework.security.authentication.AuthenticationServiceExceptio
 
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * 验证第三方配置与全局账号绑定在缺失、重复或损坏时失败关闭。
@@ -56,6 +60,23 @@ class IdentityProviderConfigServiceTest {
     }
 
     @Test
+    void loadsAdditionalSecretsWithoutMixingThemIntoPublicValues() {
+        SysIdentityProvider provider = new SysIdentityProvider();
+        provider.setProviderType("WECHAT");
+        provider.setAppId("website-id");
+        provider.setAppSecret("website-secret");
+        provider.setConfigJson("{\"appId\":\"website-id\",\"officialAccountAppId\":\"official-id\"}");
+        provider.setSecretConfigJson("{\"officialAccountAppSecret\":\"official-secret\"}");
+        when(providers.selectList(any())).thenReturn(List.of(provider));
+
+        IdentityProviderConfigService.ProviderConfig config = service.requireEnabled("WECHAT");
+
+        assertEquals("official-id", config.require("officialAccountAppId"));
+        assertEquals("official-secret", config.requireSecret("officialAccountAppSecret"));
+        assertFalse(config.values().containsKey("officialAccountAppSecret"));
+    }
+
+    @Test
     void rejectsMissingDuplicateAndMalformedEnabledProviders() {
         when(providers.selectList(any())).thenReturn(List.of());
         assertThrows(AuthenticationServiceException.class, () -> service.requireEnabled("GITHUB"));
@@ -65,6 +86,33 @@ class IdentityProviderConfigServiceTest {
         when(providers.selectList(any())).thenReturn(List.of(first, second), List.of(provider("secret", "not-json")));
         assertThrows(AuthenticationServiceException.class, () -> service.requireEnabled("GITHUB"));
         assertThrows(AuthenticationServiceException.class, () -> service.requireEnabled("GITHUB"));
+    }
+
+    @Test
+    void rejectsMalformedAdditionalSecrets() {
+        SysIdentityProvider malformed = provider("secret", "{\"appId\":\"id\"}");
+        malformed.setSecretConfigJson("not-json");
+        SysIdentityProvider nonObject = provider("secret", "{\"appId\":\"id\"}");
+        nonObject.setSecretConfigJson("[]");
+        SysIdentityProvider unknown = provider("secret", "{\"appId\":\"id\"}");
+        unknown.setSecretConfigJson("{\"unknownSecret\":\"value\"}");
+        when(providers.selectList(any())).thenReturn(List.of(malformed), List.of(nonObject), List.of(unknown));
+
+        assertThrows(AuthenticationServiceException.class, () -> service.requireEnabled("WECHAT"));
+        assertThrows(AuthenticationServiceException.class, () -> service.requireEnabled("WECHAT"));
+        assertThrows(AuthenticationServiceException.class, () -> service.requireEnabled("WECHAT"));
+    }
+
+    @Test
+    void rejectsEnabledProviderWithIncompleteModeConfiguration() {
+        SysIdentityProvider legacyWechat = new SysIdentityProvider();
+        legacyWechat.setProviderType("WECHAT");
+        legacyWechat.setAppId("website-id");
+        legacyWechat.setAppSecret("website-secret");
+        legacyWechat.setConfigJson("{\"appId\":\"website-id\"}");
+        when(providers.selectList(any())).thenReturn(List.of(legacyWechat));
+
+        assertThrows(AuthenticationServiceException.class, () -> service.requireEnabled("WECHAT"));
     }
 
     @Test

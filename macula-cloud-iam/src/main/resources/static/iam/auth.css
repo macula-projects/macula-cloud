@@ -9,3 +9,4 @@
 @media(max-width:360px){.content-panel{padding-left:18px;padding-right:18px}.actions{grid-template-columns:1fr}.mobile-brand{margin-bottom:32px}}
 @media(max-height:500px) and (max-width:900px){.mobile-brand{margin-bottom:22px}.content-panel{padding-top:24px;justify-content:flex-start}.footer{padding-top:20px;margin-top:0}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+.external-button.wechat{color:#147c43}.external-button.feishu{color:#3370ff}.external-button.dingtalk{color:#1677ff}

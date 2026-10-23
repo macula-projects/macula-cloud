@@ -45,6 +45,10 @@ public class SysOAuth2ClientConfig extends BaseEntity {
     private String authorizationGrantTypes;
     private String redirectUris;
     private String scopes;
+    private String externalCodeTypes;
+    private String allowedOrigins;
+    private String browserLoginProviderTypes;
+    private String directLoginProviderType;
     private Boolean requireProofKey;
     private Boolean requireAuthorizationConsent;
     private String jwkSetUrl;

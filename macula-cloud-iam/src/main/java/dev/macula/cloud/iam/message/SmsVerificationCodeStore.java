@@ -23,8 +23,6 @@ import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.HexFormat;
 
@@ -40,8 +38,9 @@ import javax.crypto.spec.SecretKeySpec;
 @Component
 @RequiredArgsConstructor
 public class SmsVerificationCodeStore {
+    private static final String BROWSER_CONTEXT = "browser";
     private static final SecureRandom RANDOM = new SecureRandom();
-    private static final DefaultRedisScript<Long> IP_RATE = new DefaultRedisScript<>(
+    private static final DefaultRedisScript<Long> RATE = new DefaultRedisScript<>(
         "local n=redis.call('incr',KEYS[1]); " +
         "if n==1 then redis.call('pexpire',KEYS[1],ARGV[1]) end; return n", Long.class);
     private static final DefaultRedisScript<Long> CONSUME = new DefaultRedisScript<>(
@@ -53,12 +52,23 @@ public class SmsVerificationCodeStore {
     private final SmsVerificationProperties properties;
 
     public String issue(String phone, String ip) {
-        String phoneHash = sha(phone);
+        return issue(phone, ip, BROWSER_CONTEXT);
+    }
+
+    public String issue(String phone, String ip, String clientId) {
+        String context = context(clientId);
+        String phoneHash = hmac("sms-send", context, phone);
         String phoneRateKey = phoneRateKey(phoneHash);
         if (!Boolean.TRUE.equals(redis.opsForValue().setIfAbsent(phoneRateKey, "1", properties.getSendInterval()))) {
             throw new IllegalStateException("发送过于频繁");
         }
-        Long ipAttempts = redis.execute(IP_RATE, java.util.List.of(ipRateKey(ip)),
+        Long clientAttempts = redis.execute(RATE, java.util.List.of(clientRateKey(context)),
+            String.valueOf(properties.getSendInterval().toMillis()));
+        if (clientAttempts == null || clientAttempts > properties.getMaxClientSendsPerInterval()) {
+            redis.delete(phoneRateKey);
+            throw new IllegalStateException("发送过于频繁");
+        }
+        Long ipAttempts = redis.execute(RATE, java.util.List.of(ipRateKey(context, ip)),
             String.valueOf(properties.getSendInterval().toMillis()));
         if (ipAttempts == null || ipAttempts > properties.getMaxIpSendsPerInterval()) {
             redis.delete(phoneRateKey);
@@ -68,32 +78,57 @@ public class SmsVerificationCodeStore {
     }
 
     public void activate(String phone, String code) {
-        redis.opsForValue().set(key(phone), digest(phone, code) + ":" + properties.getMaxAttempts(), properties.getTtl());
+        activate(phone, code, BROWSER_CONTEXT);
+    }
+
+    public void activate(String phone, String code, String clientId) {
+        String context = context(clientId);
+        redis.opsForValue().set(key(context, phone), digest(context, phone, code) + ":" + properties.getMaxAttempts(),
+            properties.getTtl());
     }
 
     public boolean consume(String phone, String code) {
-        return Long.valueOf(1).equals(redis.execute(CONSUME, java.util.List.of(key(phone)), digest(phone, code)));
+        return consume(phone, code, BROWSER_CONTEXT);
     }
 
-    private String key(String phone) { return "iam:sms:code:" + sha(phone); }
-    private String phoneRateKey(String phoneHash) { return "iam:sms:send:" + phoneHash; }
-    private String ipRateKey(String ip) { return "iam:sms:ip:" + sha(ip); }
-    private String digest(String phone, String code) {
+    public boolean consume(String phone, String code, String clientId) {
+        String context = context(clientId);
+        return Long.valueOf(1).equals(redis.execute(CONSUME, java.util.List.of(key(context, phone)),
+            digest(context, phone, code)));
+    }
+
+    private String key(String context, String phone) {
+        return "iam:sms:code:" + hmac("sms-code", context, phone);
+    }
+
+    private String phoneRateKey(String phoneHash) {
+        return "iam:sms:send:" + phoneHash;
+    }
+
+    private String ipRateKey(String context, String ip) {
+        return "iam:sms:ip:" + hmac("sms-ip", context, ip);
+    }
+
+    private String clientRateKey(String context) {
+        return "iam:sms:client:" + hmac("sms-client", context);
+    }
+
+    private String digest(String context, String phone, String code) {
+        return hmac("sms-value", context, phone, code);
+    }
+
+    private String hmac(String... values) {
         try {
             Mac mac = Mac.getInstance("HmacSHA256");
             mac.init(new SecretKeySpec(properties.getDigestKey().getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
-            return HexFormat.of().formatHex(mac.doFinal((phone + ':' + code).getBytes(StandardCharsets.UTF_8)));
+            return HexFormat.of().formatHex(mac.doFinal(String.join("\0", values)
+                .getBytes(StandardCharsets.UTF_8)));
         } catch (GeneralSecurityException ex) {
             throw new IllegalStateException("验证码摘要失败", ex);
         }
     }
 
-    private String sha(String value) {
-        try {
-            return HexFormat.of().formatHex(
-                MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8)));
-        } catch (NoSuchAlgorithmException ex) {
-            throw new IllegalStateException(ex);
-        }
+    private String context(String clientId) {
+        return clientId == null || clientId.isBlank() ? BROWSER_CONTEXT : clientId;
     }
 }

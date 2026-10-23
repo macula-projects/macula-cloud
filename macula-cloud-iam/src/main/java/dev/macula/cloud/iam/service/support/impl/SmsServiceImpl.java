@@ -20,6 +20,7 @@ package dev.macula.cloud.iam.service.support.impl;
 import dev.macula.cloud.iam.authentication.sms.SmsService;
 import dev.macula.cloud.iam.message.LoginSmsDispatcher;
 import dev.macula.cloud.iam.message.SmsVerificationCodeStore;
+import dev.macula.cloud.system.security.UserIdentifierNormalizer;
 import lombok.RequiredArgsConstructor;
 
 /**
@@ -32,10 +33,30 @@ import lombok.RequiredArgsConstructor;
 public class SmsServiceImpl implements SmsService {
     private final SmsVerificationCodeStore store;
     private final LoginSmsDispatcher dispatcher;
+    private final UserIdentifierNormalizer normalizer;
 
     @Override
     public boolean verifyCode(String phone, String rawCode) {
-        return phone != null && rawCode != null && store.consume(normalize(phone), rawCode);
+        if (phone == null || rawCode == null) {
+            return false;
+        }
+        try {
+            return store.consume(normalize(phone), rawCode);
+        } catch (IllegalArgumentException ex) {
+            return false;
+        }
+    }
+
+    @Override
+    public boolean verifyCode(String phone, String rawCode, String clientId) {
+        if (phone == null || rawCode == null || clientId == null) {
+            return false;
+        }
+        try {
+            return store.consume(normalize(phone), rawCode, clientId);
+        } catch (IllegalArgumentException ex) {
+            return false;
+        }
     }
 
     @Override
@@ -48,19 +69,20 @@ public class SmsServiceImpl implements SmsService {
         String normalized = normalize(phone);
         String source = remoteAddress == null ? "unknown" : remoteAddress;
         String code = store.issue(normalized, source);
-        try {
-            dispatcher.send(normalized, code);
-        } catch (RuntimeException ex) {
-            throw ex;
-        }
+        dispatcher.send(normalized, code);
         store.activate(normalized, code);
     }
 
+    @Override
+    public void sendCode(String phone, String remoteAddress, String clientId) {
+        String normalized = normalize(phone);
+        String source = remoteAddress == null ? "unknown" : remoteAddress;
+        String code = store.issue(normalized, source, clientId);
+        dispatcher.send(normalized, code);
+        store.activate(normalized, code, clientId);
+    }
+
     private String normalize(String phone) {
-        String value = phone == null ? "" : phone.replace(" ", "").replace("-", "");
-        if (!value.matches("^\\+?[0-9]{6,20}$")) {
-            throw new IllegalArgumentException("手机号格式无效");
-        }
-        return value;
+        return normalizer.mobile(phone).orElseThrow(() -> new IllegalArgumentException("手机号格式无效"));
     }
 }

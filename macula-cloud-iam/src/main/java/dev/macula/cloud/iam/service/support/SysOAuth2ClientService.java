@@ -27,4 +27,12 @@ import dev.macula.cloud.iam.pojo.entity.SysOAuth2Client;
  */
 public interface SysOAuth2ClientService {
     SysOAuth2Client getClientByClientId(String clientId);
+
+    /**
+     * 判断精确 Origin 是否至少属于一个 OAuth Client。
+     *
+     * @param origin 已规范化的 Origin
+     * @return 是否允许预检
+     */
+    boolean hasAllowedOrigin(String origin);
 }
