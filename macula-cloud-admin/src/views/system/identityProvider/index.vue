@@ -171,7 +171,7 @@
         </el-form-item>
         <el-form-item v-if="callbackUrl" label="回调地址">
           <span class="callback-url">{{ callbackUrl }}</span>
-          <span class="field-help">只读地址，供第三方平台配置；IAM 登录回调尚未接入。</span>
+          <span class="field-help">只读地址，供第三方平台配置 IAM 登录回调。</span>
         </el-form-item>
         <el-form-item label="是否显示"
         >

@@ -67,7 +67,7 @@ class ThirdPartyBindingServiceTest {
         when(configs.findBoundUsername("GITHUB", "123")).thenReturn(Optional.empty());
         when(bindings.selectList(any())).thenReturn(List.of());
         pending.save(request, new ThirdPartyIdentityResolutionService.BindingRequiredException("GITHUB", "123",
-            new ThirdPartyLoginContext("GITHUB", "", Instant.now(), "/")));
+            new ThirdPartyLoginContext("GITHUB", "", "test-client", Instant.now(), "/")));
     }
 
     @Test

@@ -34,6 +34,16 @@ public interface SmsService {
     boolean verifyCode(String phone, String rawCode);
 
     /**
+     * 校验绑定到 OAuth Client 的短信验证码。
+     *
+     * @param phone 手机号
+     * @param rawCode 验证码
+     * @param clientId OAuth Client ID
+     * @return 是否通过
+     */
+    boolean verifyCode(String phone, String rawCode, String clientId);
+
+    /**
      * 发送验证码
      * @param phone 手机号
      */
@@ -45,4 +55,13 @@ public interface SmsService {
      * @param remoteAddress 来源地址
      */
     void sendCode(String phone, String remoteAddress);
+
+    /**
+     * 发送绑定到 OAuth Client 的协议短信验证码。
+     *
+     * @param phone 手机号
+     * @param remoteAddress 来源地址
+     * @param clientId OAuth Client ID
+     */
+    void sendCode(String phone, String remoteAddress, String clientId);
 }

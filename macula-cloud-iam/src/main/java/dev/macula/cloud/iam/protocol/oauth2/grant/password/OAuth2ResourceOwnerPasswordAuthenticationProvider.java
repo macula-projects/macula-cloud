@@ -56,9 +56,12 @@ public class OAuth2ResourceOwnerPasswordAuthenticationProvider
     }
 
     @Override
-    public UsernamePasswordAuthenticationToken buildToken(Map<String, Object> reqParameters) {
-        String username = (String)reqParameters.get(OAuth2ResourceOwnerPasswordAuthenticationConverter.USERNAME_PARAMETER);
-        String password = (String)reqParameters.get(OAuth2ResourceOwnerPasswordAuthenticationConverter.PASSWORD_PARAMETER);
+    public UsernamePasswordAuthenticationToken buildToken(Map<String, Object> reqParameters,
+        RegisteredClient registeredClient) {
+        String username = (String)reqParameters.get(
+            OAuth2ResourceOwnerPasswordAuthenticationConverter.USERNAME_PARAMETER);
+        String password = (String)reqParameters.get(
+            OAuth2ResourceOwnerPasswordAuthenticationConverter.PASSWORD_PARAMETER);
         return new UsernamePasswordAuthenticationToken(username, password);
     }
 

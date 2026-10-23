@@ -40,4 +40,13 @@ public class SysOAuth2ClientServiceImpl extends ServiceImpl<SysOAuth2ClientMappe
     public SysOAuth2Client getClientByClientId(String clientId) {
         return this.getOne(new LambdaQueryWrapper<SysOAuth2Client>().eq(SysOAuth2Client::getClientId, clientId));
     }
+
+    @Override
+    public boolean hasAllowedOrigin(String origin) {
+        if (origin == null || origin.isBlank()) {
+            return false;
+        }
+        return this.count(new LambdaQueryWrapper<SysOAuth2Client>()
+            .apply("FIND_IN_SET({0}, allowed_origins)", origin)) > 0;
+    }
 }

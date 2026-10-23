@@ -46,6 +46,7 @@ import dev.macula.cloud.system.pojo.bo.UserFormBO;
 import dev.macula.cloud.system.pojo.entity.SysUser;
 import dev.macula.cloud.system.pojo.entity.SysUserRole;
 import dev.macula.cloud.system.query.UserPageQuery;
+import dev.macula.cloud.system.security.UserIdentifierNormalizer;
 import dev.macula.cloud.system.service.SysMenuService;
 import dev.macula.cloud.system.service.SysRoleService;
 import dev.macula.cloud.system.service.SysUserRoleService;
@@ -61,7 +62,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -82,6 +89,7 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
     private final SysMenuService menuService;
     private final SysRoleService roleService;
     private final RedisTemplate<String, Object> redisTemplate;
+    private final UserIdentifierNormalizer identifierNormalizer;
 
     @Override
     @SuppressWarnings("unchecked")
@@ -99,10 +107,12 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         // 用户权限集合
         Long tenantId = SecurityUtils.getTenantId();
         if (StrUtil.isNotBlank(tokenId)) {
-            Set<String> perms = (Set<String>)redisTemplate.opsForValue().get(buildBtnPermKey(username, tokenId, tenantId));
+            Set<String> perms = (Set<String>)redisTemplate.opsForValue()
+                .get(buildBtnPermKey(username, tokenId, tenantId));
             if (perms == null) {
                 perms = menuService.listRolePerms(roles);
-                redisTemplate.opsForValue().set(buildBtnPermKey(username, tokenId, tenantId), perms, 30, TimeUnit.MINUTES);
+                redisTemplate.opsForValue().set(buildBtnPermKey(username, tokenId, tenantId), perms, 30,
+                    TimeUnit.MINUTES);
             }
             userLoginVO.setPerms(perms);
         } else {
@@ -186,14 +196,16 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
     @Override
     @Transactional
     public boolean saveUser(UserForm userForm) {
-
-        String username = userForm.getUsername();
-
-        long count = this.count(new LambdaQueryWrapper<SysUser>().eq(SysUser::getUsername, username));
-        Assert.isTrue(count == 0, "用户名已存在");
+        String username = normalizeUsername(userForm.getUsername());
+        String mobile = normalizeMobile(userForm.getMobile());
+        String email = normalizeEmail(userForm.getEmail());
+        assertIdentifiersAvailable(username, mobile, email, null);
 
         // 实体转换 form->entity
         SysUser entity = userConverter.form2Entity(userForm);
+        entity.setUsername(username);
+        entity.setMobile(mobile);
+        entity.setEmail(email);
 
         // 加密密码
         String encryptPwd = passwordEncoder.encode(userForm.getPassword());
@@ -212,15 +224,17 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
     @Override
     @Transactional
     public boolean updateUser(Long userId, UserForm userForm) {
-
-        String username = userForm.getUsername();
-
-        long count =
-            this.count(new LambdaQueryWrapper<SysUser>().eq(SysUser::getUsername, username).ne(SysUser::getId, userId));
-        Assert.isTrue(count == 0, "用户名已存在");
+        String username = normalizeUsername(userForm.getUsername());
+        String mobile = normalizeMobile(userForm.getMobile());
+        String email = normalizeEmail(userForm.getEmail());
+        assertIdentifiersAvailable(username, mobile, email, userId);
 
         // form -> entity
         SysUser entity = userConverter.form2Entity(userForm);
+        entity.setId(userId);
+        entity.setUsername(username);
+        entity.setMobile(mobile);
+        entity.setEmail(email);
 
         // 修改用户
         boolean result = this.updateById(entity);
@@ -272,20 +286,21 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
 
         Assert.isTrue(CollectionUtil.isNotEmpty(validDataList), "未检测到有效数据");
 
-        long distinctCount = validDataList.stream().map(UserImportDTO.UserItem::getUsername).distinct().count();
-        Assert.isTrue(validDataList.size() == distinctCount, "导入数据中有重复的用户名，请检查！");
-
         List<SysUser> saveUserList = new ArrayList<>();
+        Set<String> usernames = new HashSet<>();
+        Set<String> mobiles = new HashSet<>();
+        Set<String> emails = new HashSet<>();
 
         StringBuilder errMsg = new StringBuilder();
         for (int i = 0; i < validDataList.size(); i++) {
             UserImportDTO.UserItem userItem = validDataList.get(i);
 
-            String username = userItem.getUsername();
-            if (StrUtil.isBlank(username)) {
+            Optional<String> normalizedUsername = identifierNormalizer.username(userItem.getUsername());
+            if (normalizedUsername.isEmpty()) {
                 errMsg.append(StrUtil.format("第{}条数据导入失败，原因：用户名为空", i + 1));
                 continue;
             }
+            String username = normalizedUsername.get();
 
             String nickname = userItem.getNickname();
             if (StrUtil.isBlank(nickname)) {
@@ -293,11 +308,25 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
                 continue;
             }
 
+            Optional<String> normalizedMobile = normalizeImportMobile(userItem.getMobile(), i, errMsg);
+            if (normalizedMobile == null) {
+                continue;
+            }
+            Optional<String> normalizedEmail = normalizeImportEmail(userItem.getEmail(), i, errMsg);
+            if (normalizedEmail == null) {
+                continue;
+            }
+            String mobile = normalizedMobile.orElse(null);
+            String email = normalizedEmail.orElse(null);
+            if (!identifiersAvailableForImport(username, mobile, email, usernames, mobiles, emails, i, errMsg)) {
+                continue;
+            }
+
             SysUser user = new SysUser();
             user.setUsername(username);
             user.setNickname(nickname);
-            user.setMobile(userItem.getMobile());
-            user.setEmail(userItem.getEmail());
+            user.setMobile(mobile);
+            user.setEmail(email);
             user.setDeptId(deptId);
             // 默认密码
             user.setPassword(passwordEncoder.encode(SecurityConstants.DEFAULT_USER_PASSWORD));
@@ -325,8 +354,8 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
             userRoleService.saveBatch(userRoleList);
         }
 
-        errMsg.append(StrUtil.format("一共{}条数据，成功导入{}条数据，导入失败数据{}条", list.size(), saveUserList.size(),
-            list.size() - saveUserList.size()));
+        errMsg.append(StrUtil.format("一共{}条数据，成功导入{}条数据，导入失败数据{}条", list.size(),
+            saveUserList.size(), list.size() - saveUserList.size()));
         return errMsg.toString();
 
     }
@@ -350,5 +379,108 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
 
     private String buildBtnPermKey(String username, String tokenId, Long tenantId) {
         return StrUtil.format("{}{}:{}:{}", CacheConstants.SECURITY_USER_BTN_PERMS_KEY, username, tokenId, tenantId);
+    }
+
+    private String normalizeUsername(String value) {
+        Optional<String> normalized = identifierNormalizer.username(value);
+        Assert.isTrue(normalized.isPresent(), "用户名不能为空");
+        return normalized.get();
+    }
+
+    private String normalizeMobile(String value) {
+        if (StrUtil.isBlank(value)) {
+            return null;
+        }
+        Optional<String> normalized = identifierNormalizer.mobile(value);
+        Assert.isTrue(normalized.isPresent(), "手机号码格式不正确");
+        return normalized.get();
+    }
+
+    private String normalizeEmail(String value) {
+        if (StrUtil.isBlank(value)) {
+            return null;
+        }
+        Optional<String> normalized = identifierNormalizer.email(value);
+        Assert.isTrue(normalized.isPresent(), "邮箱格式不正确");
+        return normalized.get();
+    }
+
+    private void assertIdentifiersAvailable(String username, String mobile, String email, Long excludedUserId) {
+        Assert.isTrue(isUsernameAvailable(username, excludedUserId), "用户名已存在");
+        Assert.isTrue(mobile == null || isMobileAvailable(mobile, excludedUserId), "手机号码已存在");
+        Assert.isTrue(email == null || isEmailAvailable(email, excludedUserId), "邮箱已存在");
+    }
+
+    private boolean isUsernameAvailable(String username, Long excludedUserId) {
+        LambdaQueryWrapper<SysUser> query = new LambdaQueryWrapper<SysUser>().eq(SysUser::getUsername, username);
+        if (excludedUserId != null) {
+            query.ne(SysUser::getId, excludedUserId);
+        }
+        return this.count(query) == 0;
+    }
+
+    private boolean isMobileAvailable(String mobile, Long excludedUserId) {
+        LambdaQueryWrapper<SysUser> query = new LambdaQueryWrapper<SysUser>().eq(SysUser::getMobile, mobile);
+        if (excludedUserId != null) {
+            query.ne(SysUser::getId, excludedUserId);
+        }
+        return this.count(query) == 0;
+    }
+
+    private boolean isEmailAvailable(String email, Long excludedUserId) {
+        LambdaQueryWrapper<SysUser> query = new LambdaQueryWrapper<SysUser>().eq(SysUser::getEmail, email);
+        if (excludedUserId != null) {
+            query.ne(SysUser::getId, excludedUserId);
+        }
+        return this.count(query) == 0;
+    }
+
+    private Optional<String> normalizeImportMobile(String value, int index, StringBuilder errMsg) {
+        if (StrUtil.isBlank(value)) {
+            return Optional.empty();
+        }
+        Optional<String> normalized = identifierNormalizer.mobile(value);
+        if (normalized.isEmpty()) {
+            errMsg.append(StrUtil.format("第{}条数据导入失败，原因：手机号码格式不正确",
+                index + 1));
+            return null;
+        }
+        return normalized;
+    }
+
+    private Optional<String> normalizeImportEmail(String value, int index, StringBuilder errMsg) {
+        if (StrUtil.isBlank(value)) {
+            return Optional.empty();
+        }
+        Optional<String> normalized = identifierNormalizer.email(value);
+        if (normalized.isEmpty()) {
+            errMsg.append(StrUtil.format("第{}条数据导入失败，原因：邮箱格式不正确", index + 1));
+            return null;
+        }
+        return normalized;
+    }
+
+    private boolean identifiersAvailableForImport(String username, String mobile, String email, Set<String> usernames,
+        Set<String> mobiles, Set<String> emails, int index, StringBuilder errMsg) {
+        if (usernames.contains(username) || !isUsernameAvailable(username, null)) {
+            errMsg.append(StrUtil.format("第{}条数据导入失败，原因：用户名已存在", index + 1));
+            return false;
+        }
+        if (mobile != null && (mobiles.contains(mobile) || !isMobileAvailable(mobile, null))) {
+            errMsg.append(StrUtil.format("第{}条数据导入失败，原因：手机号码已存在", index + 1));
+            return false;
+        }
+        if (email != null && (emails.contains(email) || !isEmailAvailable(email, null))) {
+            errMsg.append(StrUtil.format("第{}条数据导入失败，原因：邮箱已存在", index + 1));
+            return false;
+        }
+        usernames.add(username);
+        if (mobile != null) {
+            mobiles.add(mobile);
+        }
+        if (email != null) {
+            emails.add(email);
+        }
+        return true;
     }
 }

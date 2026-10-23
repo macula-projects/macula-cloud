@@ -17,9 +17,6 @@
 package dev.macula.cloud.iam.handler;
 
 import java.io.IOException;
-import java.util.EnumMap;
-import java.util.Map;
-
 import dev.macula.cloud.iam.authentication.thirdparty.PendingThirdPartyBindingRepository;
 import dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyIdentityResolutionService.BindingRequiredException;
 import jakarta.servlet.ServletException;
@@ -30,7 +27,6 @@ import org.springframework.security.oauth2.core.endpoint.OAuth2ParameterNames;
 import org.springframework.security.web.DefaultRedirectStrategy;
 import org.springframework.security.web.RedirectStrategy;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
-import org.springframework.security.web.authentication.SimpleUrlAuthenticationFailureHandler;
 
 /**
  * 统一处理浏览器认证失败：待绑定身份进入绑定页，其余失败只返回受控原因码。
@@ -48,15 +44,10 @@ public class BrowserAuthenticationFailureHandler implements AuthenticationFailur
     private final PendingThirdPartyBindingRepository pending;
     private final String issuer;
     private final RedirectStrategy redirectStrategy = new DefaultRedirectStrategy();
-    private final Map<AuthenticationFailureReason, AuthenticationFailureHandler> failureHandlers =
-        new EnumMap<>(AuthenticationFailureReason.class);
 
     public BrowserAuthenticationFailureHandler(PendingThirdPartyBindingRepository pending, String issuer) {
         this.pending = pending;
         this.issuer = issuer.endsWith("/") ? issuer.substring(0, issuer.length() - 1) : issuer;
-        for (AuthenticationFailureReason reason : AuthenticationFailureReason.values()) {
-            failureHandlers.put(reason, new SimpleUrlAuthenticationFailureHandler(failureUrl(reason)));
-        }
     }
 
     @Override
@@ -68,7 +59,7 @@ public class BrowserAuthenticationFailureHandler implements AuthenticationFailur
             return;
         }
         AuthenticationFailureReason reason = AuthenticationFailureReason.from(exception);
-        failureHandlers.get(reason).onAuthenticationFailure(request, response, exception);
+        redirectStrategy.sendRedirect(request, response, failureUrl(reason));
     }
 
     private String failureUrl(AuthenticationFailureReason reason) {

@@ -17,13 +17,6 @@
 
 package dev.macula.cloud.iam.protocol.oauth2;
 
-/**
- * {@code CustomOAuth2TokenCustomizer} Token增强
- *
- * @author rain
- * @since 2023/4/17 14:26
- */
-
 import dev.macula.boot.constants.SecurityConstants;
 import dev.macula.cloud.iam.service.userdetails.SysUserDetails;
 import org.springframework.security.core.GrantedAuthority;
@@ -52,8 +45,10 @@ public class CustomOAuth2TokenCustomizer implements OAuth2TokenCustomizer<OAuth2
     @Override
     public void customize(OAuth2TokenClaimsContext context) {
         if (OAuth2TokenType.ACCESS_TOKEN.equals(context.getTokenType())) {
-            context.getClaims().claims(claims -> claims.putAll(accessClaims(
-                context.getPrincipal(), context.getRegisteredClient().getClientId())));
+            context.getClaims().claims(claims -> {
+                claims.putAll(accessClaims(context.getPrincipal(), context.getRegisteredClient().getClientId()));
+                claims.put(OAuth2ParameterNames.GRANT_TYPE, context.getAuthorizationGrantType().getValue());
+            });
         }
     }
 
@@ -62,11 +57,17 @@ public class CustomOAuth2TokenCustomizer implements OAuth2TokenCustomizer<OAuth2
         String clientId) {
         java.util.Map<String, Object> claims = new java.util.HashMap<>();
         claims.put(OAuth2ParameterNames.CLIENT_ID, clientId);
-        if (principal == null) return claims;
+        if (principal == null) {
+            return claims;
+        }
         if (principal.getPrincipal() instanceof SysUserDetails user) {
-            if (user.getNickname() != null) claims.put(SecurityConstants.JWT_NICKNAME_KEY, user.getNickname());
+            if (user.getNickname() != null) {
+                claims.put(SecurityConstants.JWT_NICKNAME_KEY, user.getNickname());
+            }
             claims.put(SecurityConstants.JWT_DATASCOPE_KEY, user.getDataScope());
-            if (user.getDeptId() != null) claims.put(SecurityConstants.JWT_DEPTID_KEY, user.getDeptId());
+            if (user.getDeptId() != null) {
+                claims.put(SecurityConstants.JWT_DEPTID_KEY, user.getDeptId());
+            }
         }
         if (principal.getAuthorities() != null) {
             claims.put(SecurityConstants.AUTHORITIES_KEY, principal.getAuthorities().stream()

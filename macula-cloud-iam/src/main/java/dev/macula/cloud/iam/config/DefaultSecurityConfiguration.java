@@ -17,6 +17,11 @@
 
 package dev.macula.cloud.iam.config;
 
+import dev.macula.cloud.iam.authentication.challenge.LoginCaptchaProperties;
+import dev.macula.cloud.iam.authentication.dingtalk.DingtalkLoginFilterConfigurer;
+import dev.macula.cloud.iam.authentication.dingtalk.DingtalkLoginMode;
+import dev.macula.cloud.iam.authentication.feishu.FeishuLoginFilterConfigurer;
+import dev.macula.cloud.iam.authentication.feishu.FeishuLoginMode;
 import dev.macula.cloud.iam.authentication.github.GithubLoginFilterConfigurer;
 import dev.macula.cloud.iam.authentication.sms.SmsLoginFilterConfigurer;
 import dev.macula.cloud.iam.authentication.sms.SmsService;
@@ -24,9 +29,12 @@ import dev.macula.cloud.iam.authentication.sms.SmsUserDetailsService;
 import dev.macula.cloud.iam.authentication.thirdparty.PendingThirdPartyBindingRepository;
 import dev.macula.cloud.iam.authentication.wecom.WecomLoginFilterConfigurer;
 import dev.macula.cloud.iam.authentication.wecom.WecomLoginMode;
+import dev.macula.cloud.iam.authentication.wechat.WechatLoginFilterConfigurer;
+import dev.macula.cloud.iam.authentication.wechat.WechatLoginMode;
 import dev.macula.cloud.iam.controller.ThirdPartyBindingController;
 import dev.macula.cloud.iam.enums.ThirdPartyProviderType;
 import dev.macula.cloud.iam.handler.BrowserAuthenticationFailureHandler;
+import dev.macula.cloud.iam.message.EmailVerificationProperties;
 import dev.macula.cloud.iam.message.LoginSmsDispatcher;
 import dev.macula.cloud.iam.message.SmsVerificationCodeStore;
 import dev.macula.cloud.iam.message.SmsVerificationProperties;
@@ -34,10 +42,13 @@ import dev.macula.cloud.iam.service.support.SysOAuth2ClientService;
 import dev.macula.cloud.iam.service.support.SysUserService;
 import dev.macula.cloud.iam.service.support.UserAuthInfoService;
 import dev.macula.cloud.iam.service.support.impl.SmsServiceImpl;
+import dev.macula.cloud.iam.service.userdetails.ClientAwareAccountResolver;
 import dev.macula.cloud.iam.service.userdetails.SysUserDetailsServiceImpl;
+import dev.macula.cloud.system.security.UserIdentifierNormalizer;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -59,8 +70,15 @@ import org.springframework.security.web.authentication.SavedRequestAwareAuthenti
  */
 @EnableWebSecurity
 @Configuration(proxyBeanMethods = false)
-@EnableConfigurationProperties(SmsVerificationProperties.class)
+@EnableConfigurationProperties({SmsVerificationProperties.class, EmailVerificationProperties.class,
+    LoginCaptchaProperties.class})
 public class DefaultSecurityConfiguration {
+    @Bean
+    @ConditionalOnMissingBean(name = "identifierNormalizer")
+    public UserIdentifierNormalizer identifierNormalizer() {
+        return new UserIdentifierNormalizer();
+    }
+
     @Bean
     @Order(Ordered.HIGHEST_PRECEDENCE + 2)
     SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http,
@@ -83,7 +101,11 @@ public class DefaultSecurityConfiguration {
                 .requestMatchers("/iam/**").permitAll()
                 .requestMatchers("/login", ThirdPartyProviderType.GITHUB.loginPath(),
                     ThirdPartyProviderType.WECOM.loginPath(), WecomLoginMode.BROWSER.loginPath(),
-                    WecomLoginMode.WEBVIEW.loginPath(), ThirdPartyBindingController.BINDING_PATH,
+                    WecomLoginMode.WEBVIEW.loginPath(), ThirdPartyProviderType.FEISHU.loginPath(),
+                    FeishuLoginMode.BROWSER.loginPath(), ThirdPartyProviderType.DINGTALK.loginPath(),
+                    DingtalkLoginMode.BROWSER.loginPath(), ThirdPartyProviderType.WECHAT.loginPath(),
+                    WechatLoginMode.BROWSER.loginPath(), WechatLoginMode.WEBVIEW.loginPath(),
+                    ThirdPartyBindingController.BINDING_PATH,
                     ThirdPartyBindingController.BINDING_CANCEL_PATH).permitAll()
                 .requestMatchers("/api/v1/sms-code").permitAll()
                 .anyRequest().authenticated())
@@ -112,6 +134,18 @@ public class DefaultSecurityConfiguration {
             .successHandler(authenticationSuccessHandler)
             .failureHandler(authenticationFailureHandler)
             .permitAll());
+        http.with(new FeishuLoginFilterConfigurer<>(), feishu -> feishu
+            .successHandler(authenticationSuccessHandler)
+            .failureHandler(authenticationFailureHandler)
+            .permitAll());
+        http.with(new DingtalkLoginFilterConfigurer<>(), dingtalk -> dingtalk
+            .successHandler(authenticationSuccessHandler)
+            .failureHandler(authenticationFailureHandler)
+            .permitAll());
+        http.with(new WechatLoginFilterConfigurer<>(), wechat -> wechat
+            .successHandler(authenticationSuccessHandler)
+            .failureHandler(authenticationFailureHandler)
+            .permitAll());
         return http.build();
         // @formatter:on
     }
@@ -124,23 +158,45 @@ public class DefaultSecurityConfiguration {
 
     @Bean
     @Qualifier("sysUserDetailsService")
-    public SysUserDetailsServiceImpl sysUserDetailsService(SysUserService sysUserService, SysOAuth2ClientService clientService,
+    public SysUserDetailsServiceImpl sysUserDetailsService(SysUserService sysUserService,
+        SysOAuth2ClientService clientService, ClientAwareAccountResolver accountResolver,
         @Nullable UserAuthInfoService authInfoService) {
-        return new SysUserDetailsServiceImpl(sysUserService, clientService, authInfoService);
+        return new SysUserDetailsServiceImpl(sysUserService, clientService, accountResolver, authInfoService);
     }
 
     @Bean
     public SmsService smsService(ObjectProvider<SmsVerificationCodeStore> stores,
-        ObjectProvider<LoginSmsDispatcher> dispatchers) {
+        ObjectProvider<LoginSmsDispatcher> dispatchers, UserIdentifierNormalizer identifierNormalizer) {
         SmsVerificationCodeStore store = stores.getIfAvailable();
         LoginSmsDispatcher dispatcher = dispatchers.getIfAvailable();
         if (store != null && dispatcher != null) {
-            return new SmsServiceImpl(store, dispatcher);
+            return new SmsServiceImpl(store, dispatcher, identifierNormalizer);
         }
         return new SmsService() {
-            @Override public boolean verifyCode(String phone, String rawCode) { return false; }
-            @Override public void sendCode(String phone) { throw new IllegalStateException("短信服务未配置"); }
-            @Override public void sendCode(String phone, String remoteAddress) { sendCode(phone); }
+            @Override
+            public boolean verifyCode(String phone, String rawCode) {
+                return false;
+            }
+
+            @Override
+            public boolean verifyCode(String phone, String rawCode, String clientId) {
+                return false;
+            }
+
+            @Override
+            public void sendCode(String phone) {
+                throw new IllegalStateException("短信服务未配置");
+            }
+
+            @Override
+            public void sendCode(String phone, String remoteAddress) {
+                sendCode(phone);
+            }
+
+            @Override
+            public void sendCode(String phone, String remoteAddress, String clientId) {
+                sendCode(phone);
+            }
         };
     }
 }

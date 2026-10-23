@@ -95,6 +95,6 @@ class ThirdPartyBindingControllerTest {
 
     private void savePending() {
         pending.save(request, new ThirdPartyIdentityResolutionService.BindingRequiredException("GITHUB", "123",
-            new ThirdPartyLoginContext("GITHUB", "", Instant.now(), "/")));
+            new ThirdPartyLoginContext("GITHUB", "", "test-client", Instant.now(), "/")));
     }
 }

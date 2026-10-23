@@ -19,6 +19,7 @@ package dev.macula.cloud.iam.service.userdetails;
 import dev.macula.cloud.iam.message.LoginSmsDispatcher;
 import dev.macula.cloud.iam.message.SmsVerificationCodeStore;
 import dev.macula.cloud.iam.service.support.impl.SmsServiceImpl;
+import dev.macula.cloud.system.security.UserIdentifierNormalizer;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -38,7 +39,7 @@ import static org.mockito.Mockito.when;
 class SmsServiceImplTest {
     private final SmsVerificationCodeStore store = mock(SmsVerificationCodeStore.class);
     private final LoginSmsDispatcher dispatcher = mock(LoginSmsDispatcher.class);
-    private final SmsServiceImpl service = new SmsServiceImpl(store, dispatcher);
+    private final SmsServiceImpl service = new SmsServiceImpl(store, dispatcher, new UserIdentifierNormalizer());
 
     @Test
     void activatesCodeOnlyAfterSupplierAcceptance() {
@@ -67,5 +68,17 @@ class SmsServiceImplTest {
         assertThat(service.verifyCode("138-0000-0000", "123456")).isTrue();
         assertThat(service.verifyCode(null, "123456")).isFalse();
         verify(store).consume("13800000000", "123456");
+    }
+
+    @Test
+    void protocolCodeIsIssuedAndConsumedInsideClientContext() {
+        when(store.issue("13800000000", "127.0.0.1", "client-a")).thenReturn("123456");
+        when(store.consume("13800000000", "123456", "client-a")).thenReturn(true);
+
+        service.sendCode("13800000000", "127.0.0.1", "client-a");
+
+        verify(dispatcher).send("13800000000", "123456");
+        verify(store).activate("13800000000", "123456", "client-a");
+        assertThat(service.verifyCode("13800000000", "123456", "client-a")).isTrue();
     }
 }

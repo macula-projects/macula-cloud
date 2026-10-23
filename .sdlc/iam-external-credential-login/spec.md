@@ -18,11 +18,11 @@ Author: Rain.
 ## Requirements
 
 1. IAM 必须在现有 `/oauth2/token` 上提供业务名称为 `external_code`、协议值为 `urn:macula:params:oauth:grant-type:external_code` 的独立扩展 grant，接收第三方短期 code 并返回现有格式的 access token；首期不得为该 grant 签发 refresh token，也不得把该流程伪装成标准 OIDC 登录。
-2. 扩展 grant 首期只允许客户端认证方式为 `none` 且 `ClientSettings.requireProofKey=true` 的公共 OAuth Client。`requireProofKey` 继续强制该 Client 的标准 authorization_code 流程使用 S256 PKCE，但 `external_code` 没有 IAM authorization code，不能宣称自身受到 PKCE 保护；它是端侧已取得第三方一次性 code 后的一步登录例外。
+2. 扩展 grant 首期只允许客户端认证方式为 `none` 且 `ClientSettings.requireProofKey=true` 的公共 OAuth Client。`requireProofKey` 继续强制该 Client 的标准 authorization_code 流程使用 S256 PKCE，但 `external_code` 没有 IAM authorization code，不能宣称自身受到 PKCE 保护；它是端侧已取得第三方一次性 code 后的一步登录例外。同一个 APP 或微信小程序 Client 可以同时启用 `authorization_code` 与 `external_code`：前者进入 IAM 认证闭环并经精确 HTTPS redirect URI 返回，后者直接消费端侧已取得的第三方 code，两类 code 不得混用。
 3. 每个 OAuth Client 必须同时显式启用扩展 grant，并配置非空的允许外部 code type 集合；任一条件不满足均返回 `unauthorized_client`。旧 Client 的集合默认为空，因此升级后不会自动获得第三方登录能力。
 4. 外部 code 类型必须由 `ExternalCodeType` 枚举表达并映射到固定 provider、固定凭证语义和唯一服务端校验器；协议参数名固定为 `code_type`，code 值使用标准 `code` 参数并在代码中引用 `OAuth2ParameterNames.CODE`。请求不得提交第三方 URL、App ID、密钥、租户、组织、用户标识或换码模式覆盖配置。
-5. 首期必须分别覆盖原生 APP、微信小程序、协作客户端内嵌网页和普通浏览器网页四类来源。即使最终使用相同第三方接口，不同来源也使用独立 `ExternalCodeType`，以便 OAuth Client 精确授权、选择固定应用配置并独立审计；禁止按失败结果猜测来源或依次尝试多个端点。
-6. 飞书成功结果必须包含非空 `employee_no`；钉钉必须解析为配置组织内的成员 `userId`；企业微信必须解析为配置企业和应用内的成员 `userId`；微信普通登录和小程序登录必须得到 `unionid`，缺失时不得降级到 `openid`。
+5. 首期必须分别覆盖原生 APP、小程序、协作客户端内嵌网页和普通浏览器网页四类来源。即使最终使用相同第三方接口，不同来源也使用独立 `ExternalCodeType`，以便 OAuth Client 精确授权、选择固定应用配置并独立审计；禁止按失败结果猜测来源或依次尝试多个端点。
+6. 飞书成功结果必须包含非空 `employee_no`；钉钉必须解析为配置组织内的成员 `userId`；企业微信必须解析为配置企业和应用内的成员 `userid`（小写 `i`）；微信普通登录和小程序登录必须得到 `unionid`，缺失时不得降级到 `openid`。
 7. 微信小程序登录 code 与手机号 code 必须独立校验：前者只产生微信 `unionid` 身份，后者只产生服务端核验的手机号。两种凭证不得互相代替，也不得要求调用方同时提交。
 8. 阿里云号码认证 Token 必须由 IAM 服务端调用官方取号接口得到手机号；请求携带的手机号、掩码号或运营商信息不得参与账号认证。
 9. 已核验的 provider subject 必须先查找 `sys_user_identity_binding`。已绑定时仍须按当前 OAuth Client 的 `tenantId` 和 `userType` 重新加载并校验用户、状态和权限；不能仅凭全局 username 直接颁发 Token。
@@ -33,8 +33,9 @@ Author: Rain.
 14. binding ticket 必须随机、不可预测、服务端存储、最长五分钟有效、限制失败次数、与 `clientId`、`tenantId`、`userType`、绑定类型及已核验身份绑定，并以原子操作消费。Ticket 不得包含可由客户端解码的 subject 或手机号。
 15. IAM 必须对外部 code 执行并发安全的防重放控制。Redis 只能保存带服务端密钥的 code 摘要和短期状态，不得保存原始 code、Token、手机号或第三方响应。
 16. 本地 password grant 不增加 `identifier_type`，继续只接收现有 `username` 和 `password` 参数。IAM 必须在服务端将 `username` 输入同时作为用户名、规范化手机号和规范化邮箱候选进行解析：零命中统一认证失败，只命中一个不同用户时校验该用户密码，命中多个不同用户时失败关闭；不得用客户端参数或固定优先级选择其中一个账号。解析到唯一用户后再按 OAuth Client 用户路由加载用户。
+    端侧向用户提供账号密码登录时必须进入 `/oauth2/authorize` 浏览器认证闭环，并使用 authorization_code + S256 PKCE 返回端侧；不得把 password grant 作为新的端侧登录接入方式。现有 password grant 仅为兼容已有受支持调用方保留。
 17. 现有 SMS grant 必须修复为按手机号唯一解析并按 Client 路由用户；`OAuth2ResourceOwnerSmsAuthenticationProvider` 继续只负责协议参数到认证 Token 的适配，手机号解析、唯一性校验和 Client 用户路由不得散落在 grant Provider 中。新增邮件验证码 grant，按邮箱唯一解析用户。短信和邮件验证码均必须一次性消费、限时、限次、限流，并使用通用失败响应避免暴露账号是否存在。
-18. 短信和邮件验证码申请接口属于 IAM 内部认证能力。调用方必须提供已登记的公共 OAuth Client ID，Client 必须是 `none + requireProofKey=true` 并启用对应本地 grant；接口统一返回已接受结果，通过 CAPTCHA、Origin、IP/Client/目标限流控制滥用，不向调用方泄露手机号或邮箱是否存在、用户状态或发送供应商原始错误。
+18. 短信和邮件验证码申请接口属于 IAM 内部认证能力。调用方必须提供已登记的公共 OAuth Client ID，Client 必须是 `none + requireProofKey=true` 并启用对应本地 grant；接口统一返回已接受结果，通过 CAPTCHA、Origin、IP/Client/目标限流控制滥用，不向调用方泄露手机号或邮箱是否存在、用户状态或发送供应商原始错误。浏览器预检不包含自定义 header 的具体值，因此 OPTIONS 只验证 Origin 至少属于一个 Client 及必要 header 声明；实际 POST 必须严格核对 Origin、单值 `X-OAuth-Client-Id` 与 body `client_id` 属于同一 Client。
 19. `sys_user.username`、`mobile`、`email` 都是全局唯一登录标识：字段为 `NULL` 时可以存在多条，字段非空时必须由数据库唯一约束和服务层校验共同保证唯一；空字符串或仅空白内容必须在写入前规范化为 `NULL`。字段重复、格式无效、用户被删除或禁用、或不属于 Client 配置的租户/用户类型时均不得登录。身份比较必须使用服务端统一规范化规则，不能由调用方选择大小写或格式规则。
 20. 扩展 grant 只能签发 Client 已注册 scope 的子集，并沿用该 Client 的 access token 格式、TTL 和撤销策略。首期不为该 grant 签发 refresh token 或 OIDC ID Token；请求 `openid` 时返回 `invalid_scope`。
 21. 提供商禁用、配置缺失、code type 未允许、换码失败、超时、非成功 HTTP、3xx、畸形响应、身份字段缺失或绑定冲突都必须失败关闭；不得回退到其他 provider、其他换码模式、本地资料猜测或较弱身份字段。
@@ -79,18 +80,19 @@ scope=<空格分隔的scope>
 | 场景 | `ExternalCodeType` | 端侧来源及传入 `code` | IAM 服务端验证 | 可信身份键 | 本地处理 |
 |---|---|---|---|---|---|
 | 原生 APP | `FEISHU_APP_CODE` | 飞书授权登录 SDK 返回的 code；AppLink 仅在该接入方案中承担唤起或回跳时使用 | 使用该 Client 固定绑定的飞书移动应用配置换码并读取用户资料 | `FEISHU + employee_no` | 查外部身份绑定；未绑定返回 binding ticket |
-| 原生 APP | `WECOM_APP_CODE` | 企业微信 SDK 返回的 code | 使用固定企业及应用配置换取企业成员身份 | `WECOM + userId` | 查外部身份绑定；未绑定返回 binding ticket |
+| 原生 APP | `WECOM_APP_CODE` | 企业微信 SDK 返回的 code | 使用固定企业及应用配置换取企业成员身份 | `WECOM + userid` | 查外部身份绑定；未绑定返回 binding ticket |
 | 原生 APP | `DINGTALK_APP_CODE` | 钉钉授权登录 SDK 返回的 code | 使用固定钉钉应用及组织配置换码并解析组织成员 | `DINGTALK + userId` | 查外部身份绑定；未绑定返回 binding ticket |
 | 原生 APP | `WECHAT_OPEN_APP_CODE` | 微信开放平台移动应用 SDK 返回的 code | 使用固定移动应用 AppID/Secret 换码 | `WECHAT + unionid` | 缺少 `unionid` 失败；未绑定返回 binding ticket |
 | 原生 APP | `ALIYUN_MOBILE_TOKEN` | 阿里云号码认证 SDK 返回的取号 Token | IAM 调用阿里云服务端取号接口 | 规范化手机号 | 唯一匹配即登录；无匹配返回手机号 binding ticket，不创建第三方身份绑定 |
 | 微信小程序 | `WECHAT_MINIAPP_LOGIN_CODE` | `wx.login` 返回的 code | 使用固定小程序 AppID/Secret 调用服务端登录换码 | `WECHAT + unionid` | 缺少 `unionid` 失败；未绑定返回 binding ticket |
 | 微信小程序 | `WECHAT_MINIAPP_PHONE_CODE` | 手机号授权能力返回的独立 phone code | 使用固定小程序配置调用服务端手机号接口 | 规范化手机号 | 唯一匹配即登录；无匹配返回手机号 binding ticket；不要求也不补绑 `unionid` |
-| 内嵌网页 | `WECOM_WEBVIEW_CODE` | 企业微信内网页通过 JSSDK / OAuth 得到的 code | 使用固定企业及应用配置换取成员身份 | `WECOM + userId` | 查外部身份绑定；未绑定返回 binding ticket |
+| 企业微信小程序 | `WECOM_MINIAPP_CODE` | 关联到企业自建应用的小程序通过 `wx.qy.login()` 返回的 code | 使用 Client 固定的企业自建应用 `access_token` 调用 `miniprogram/jscode2session` | `WECOM + userid` | 只认小写 `userid`；未绑定返回 binding ticket；不返回或持久化 `session_key` |
+| 内嵌网页 | `WECOM_WEBVIEW_CODE` | 企业微信内网页通过 JSSDK / OAuth 得到的 code | 使用固定企业及应用配置换取成员身份 | `WECOM + userid` | 查外部身份绑定；未绑定返回 binding ticket |
 | 内嵌网页 | `FEISHU_WEBVIEW_CODE` | 飞书内网页通过 JSSDK 得到的 code | 使用固定飞书网页应用配置换码并读取用户资料 | `FEISHU + employee_no` | 查外部身份绑定；未绑定返回 binding ticket |
 | 内嵌网页 | `DINGTALK_WEBVIEW_CODE` | 钉钉内网页通过 JSSDK 得到的 authCode | 使用固定钉钉应用及组织配置换取成员身份 | `DINGTALK + userId` | 查外部身份绑定；未绑定返回 binding ticket |
 | 浏览器网页 | `FEISHU_BROWSER_CODE` | 飞书 OAuth / 扫码登录回调 code | 使用固定飞书网页应用配置和已登记回调地址换码 | `FEISHU + employee_no` | 查外部身份绑定；未绑定返回 binding ticket |
 | 浏览器网页 | `DINGTALK_BROWSER_CODE` | 钉钉 OAuth / 扫码登录回调 code | 换取用户身份后解析为目标组织成员 | `DINGTALK + userId` | 查外部身份绑定；未绑定返回 binding ticket |
-| 浏览器网页 | `WECOM_BROWSER_CODE` | 企业微信网页 / 扫码登录回调 code | 使用固定企业及应用配置换取成员身份 | `WECOM + userId` | 查外部身份绑定；未绑定返回 binding ticket |
+| 浏览器网页 | `WECOM_BROWSER_CODE` | 企业微信网页 / 扫码登录回调 code | 使用固定企业及应用配置换取成员身份 | `WECOM + userid` | 查外部身份绑定；未绑定返回 binding ticket |
 | 浏览器网页 | `WECHAT_OPEN_BROWSER_CODE` | 微信开放平台网站应用扫码登录回调 code | 使用固定网站应用 AppID/Secret 换码 | `WECHAT + unionid` | 缺少 `unionid` 失败；未绑定返回 binding ticket |
 
 每个平台继续在自身包内实现换码、响应校验和主体提取；公共 registry 只按 `ExternalCodeType` 查找唯一 verifier，不包含 provider 条件分支。不同 code type 可以在确认官方合同完全一致后共享底层 verifier，但不能合并 Client allowlist、应用配置选择或审计语义。
@@ -98,6 +100,8 @@ scope=<空格分隔的scope>
 微信公众号内网页不定义 `ExternalCodeType`：业务网页先进入 IAM `/oauth2/authorize`，IAM 在浏览器 Session 认证链中根据已验证的 OAuth Client 策略和微信容器提示自动发起公众号网页 OAuth，回调后恢复原始 authorization request 并签发受 PKCE 保护的 Macula authorization code。该自适应 `/authorize` 路由属于独立变更；本规格只确保企微、飞书、钉钉内嵌 WebView 的 JSSDK code 可以直接进入 `external_code` grant。
 
 所有 verifier 使用固定 HTTPS 端点、连接/读取超时、禁用自动跟随 3xx、最小响应 DTO 和白名单日志。身份源配置来自 System 管理的唯一启用配置；微信增加移动应用和小程序的公开 App ID/秘密字段，阿里云号码认证增加独立 provider 类型及服务端 AK/SK 等必要配置。真实字段以实现时复核的官方服务端合同为准，不能让请求提供。
+
+企业微信小程序首期只支持关联到企业自建应用的模式，复用该 registration 的 `corpId` 与 `appSecret`；服务商第三方小程序使用 `/cgi-bin/service/miniprogram/jscode2session` 和 `suite_access_token`，属于不同的应用注册、授权与租户模型，不得使用 `WECOM_MINIAPP_CODE` 猜测或回退调用。
 
 ### 3. Client 策略
 
@@ -142,7 +146,7 @@ Admin 使用分组多选框展示 provider 和 code 语义，不允许自由输�
 
 错误响应不得包含 provider subject、手机号、邮箱、原始凭证或第三方消息。Ticket 服务端记录：随机 ID 摘要、Client 快照、绑定类型、provider/subject 或规范化手机号、创建时间、过期时间和失败次数；原始第三方凭证在完成核验后不再保存。
 
-调用方随后使用同一个 Client，通过 password、SMS 或 email grant 取得本地用户 access token，再调用：
+调用方随后使用同一个 Client，通过 `/oauth2/authorize` 的本地账号认证取得 authorization_code + S256 PKCE access token，或通过已允许的 SMS/email 本地 grant 取得用户 access token，再调用：
 
 ```http
 POST /api/v1/external-identity-bindings
@@ -152,7 +156,7 @@ Content-Type: application/json
 {"bindingTicket":"..."}
 ```
 
-绑定接口必须从 `MaculaOAuth2AuthorizationService` 查回 access token 对应的授权，验证它由同一个 Client 的允许用户型本地 grant 产生，并验证 principal、tenantId、userType 和 ticket 快照一致。外部身份 ticket 插入 `sys_user_identity_binding`；手机号 ticket 在账号手机号为空或相同时绑定手机号。事务成功后原子消费 ticket 并返回 `204 No Content`。调用方已经持有本地 access token，无需让普通 REST Controller 额外签发 Token；后续外部登录使用新的第三方凭证即可直接成功。
+绑定接口必须从 `MaculaOAuth2AuthorizationService` 查回 access token 对应的授权，验证它来自同一个 Client 的 authorization_code 用户登录或允许的 SMS/email 用户型本地 grant，并验证 principal、tenantId、userType 和 ticket 快照一致。client_credentials、external_code、refresh_token 或不能证明本地账号交互认证的 Token 不得作为绑定依据。外部身份 ticket 插入 `sys_user_identity_binding`；手机号 ticket 在账号手机号为空或相同时绑定手机号。事务成功后原子消费 ticket 并返回 `204 No Content`。调用方已经持有本地 access token，无需让普通 REST Controller 额外签发 Token；后续外部登录使用新的第三方凭证即可直接成功。
 
 ### 6. 验证码登录
 
@@ -228,7 +232,7 @@ IAM 和 System 实体同步增加 Client 字段；System Form/VO 和 Admin 同�
 1. Converter 单元测试固定 grant URI、参数常量、单值和长度规则，覆盖缺失、重复、未知 code type、额外 provider 参数及 scope 解析。
 2. Token Provider 测试覆盖缺少 `client_id`、机密 Client、`requireProofKey=false`、grant 未启用、allowlist 为空/不包含、scope 越权、provider 禁用和用户类型无 resolver，并断言均不调用第三方；另覆盖 `none + requireProofKey=true` 公共 Client 的允许路径。
 3. 每个 provider verifier 使用本地 Mock HTTP Server 覆盖成功换码、固定 HTTPS 端点、禁用 3xx、超时、非成功状态、数值错误码、畸形响应和关键字段缺失；不得访问真实外网。
-4. 身份测试分别证明飞书 `employee_no`、钉钉组织成员 `userId`、企业微信成员 `userId`、微信普通/小程序 `unionid`、微信小程序手机号和阿里云手机号；微信缺少 `unionid` 必须失败且不查询 `openid` 绑定。
+4. 身份测试分别证明飞书 `employee_no`、钉钉组织成员 `userId`、企业微信成员 `userid`、微信普通/小程序 `unionid`、微信小程序手机号和阿里云手机号；微信缺少 `unionid` 必须失败且不查询 `openid` 绑定。
 5. 防重放测试并发提交相同凭证，断言最多一次进入 provider verifier；覆盖成功、binding required、无效凭证、基础设施瞬时失败和 TTL 后行为，Redis 中不得出现原始凭证。
 6. Client-aware 用户解析测试覆盖 username/mobile/email 的唯一、空、重复、大小写/格式规范化、删除、禁用、租户不符、用户类型不符和 Client 配置变化。
 7. password 兼容测试证明现有 `username + password` 请求不变，并覆盖输入只命中 username、mobile、email，同一用户跨字段重复命中，以及输入分别命中多个不同用户时失败关闭；SMS 和 email grant 覆盖验证码成功、过期、重放、错误次数、限流和账号枚举防护。

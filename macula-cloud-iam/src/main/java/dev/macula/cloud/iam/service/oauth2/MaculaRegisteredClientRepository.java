@@ -18,9 +18,14 @@
 package dev.macula.cloud.iam.service.oauth2;
 
 import cn.hutool.core.util.StrUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import dev.macula.boot.constants.CacheConstants;
+import dev.macula.cloud.iam.mapper.SysOAuth2ClientExternalProviderMapper;
 import dev.macula.cloud.iam.pojo.entity.SysOAuth2Client;
+import dev.macula.cloud.iam.pojo.entity.SysOAuth2ClientExternalProvider;
+import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeClientSettings;
 import dev.macula.cloud.iam.service.support.SysOAuth2ClientService;
+import dev.macula.cloud.system.enums.ExternalCodeType;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import org.springframework.cache.annotation.Cacheable;
@@ -39,7 +44,12 @@ import org.springframework.util.StringUtils;
 
 import java.time.Duration;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.stream.Collectors;
 
 /**
  * {@code MaculaRegisteredClientRepository} 查询客户端相关信息实现
@@ -66,6 +76,8 @@ public class MaculaRegisteredClientRepository implements RegisteredClientReposit
     private final static Duration authorizationCodeValiditySeconds = Duration.ofMinutes(5);
 
     private final SysOAuth2ClientService oauth2ClientService;
+
+    private final SysOAuth2ClientExternalProviderMapper externalProviderMapper;
 
     /**
      * Saves the registered client.
@@ -150,6 +162,18 @@ public class MaculaRegisteredClientRepository implements RegisteredClientReposit
             .requireProofKey(oauth2Client.isRequireProofKey() ||
                 StringUtils.commaDelimitedListToSet(oauth2Client.getClientAuthenticationMethods()).contains("none"))
             .requireAuthorizationConsent(oauth2Client.isRequireAuthorizationConsent());
+        Set<String> externalCodeTypes = parseExternalCodeTypes(oauth2Client.getExternalCodeTypes());
+        clientSettingsBuilder.setting(ExternalCodeClientSettings.CODE_TYPES, externalCodeTypes);
+        clientSettingsBuilder.setting(ExternalCodeClientSettings.ALLOWED_ORIGINS,
+            immutableCsv(oauth2Client.getAllowedOrigins()));
+        clientSettingsBuilder.setting(ExternalCodeClientSettings.PROVIDER_BINDINGS,
+            providerBindings(oauth2Client.getClientId(), externalCodeTypes));
+        if (oauth2Client.getTenantId() != null) {
+            clientSettingsBuilder.setting(ExternalCodeClientSettings.TENANT_ID, oauth2Client.getTenantId());
+        }
+        if (oauth2Client.getUserType() != null) {
+            clientSettingsBuilder.setting(ExternalCodeClientSettings.USER_TYPE, oauth2Client.getUserType().getType());
+        }
         SignatureAlgorithm signatureAlgorithm = SignatureAlgorithm.from(oauth2Client.getSigningAlgorithm());
         JwsAlgorithm jwsAlgorithm = signatureAlgorithm == null ? MacAlgorithm.from(oauth2Client.getSigningAlgorithm()) : signatureAlgorithm;
         if (jwsAlgorithm != null) {
@@ -181,5 +205,36 @@ public class MaculaRegisteredClientRepository implements RegisteredClientReposit
             .build();
 
         // @formatter:on
+    }
+
+    private Set<String> parseExternalCodeTypes(String value) {
+        Set<String> values = immutableCsv(value);
+        for (String codeType : values) {
+            ExternalCodeType.fromValue(codeType);
+        }
+        return values;
+    }
+
+    private Set<String> immutableCsv(String value) {
+        if (!StringUtils.hasText(value)) {
+            return Set.of();
+        }
+        return Arrays.stream(value.split(StrUtil.COMMA)).map(String::trim).filter(StringUtils::hasText)
+            .collect(Collectors.toUnmodifiableSet());
+    }
+
+    private Map<String, Long> providerBindings(String clientId, Set<String> allowedCodeTypes) {
+        Map<String, Long> mappings = externalProviderMapper.selectList(
+            new LambdaQueryWrapper<SysOAuth2ClientExternalProvider>()
+                .eq(SysOAuth2ClientExternalProvider::getClientId, clientId)
+                .orderByAsc(SysOAuth2ClientExternalProvider::getCodeType))
+            .stream().filter(mapping -> allowedCodeTypes.contains(mapping.getCodeType()))
+            .collect(Collectors.toMap(SysOAuth2ClientExternalProvider::getCodeType,
+                SysOAuth2ClientExternalProvider::getIdentityProviderId,
+                (left, right) -> left, LinkedHashMap::new));
+        if (!mappings.keySet().equals(new TreeSet<>(allowedCodeTypes))) {
+            return Map.of();
+        }
+        return Map.copyOf(mappings);
     }
 }
