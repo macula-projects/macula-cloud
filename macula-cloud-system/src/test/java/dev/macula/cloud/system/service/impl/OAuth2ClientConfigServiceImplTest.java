@@ -28,6 +28,7 @@ import dev.macula.cloud.system.pojo.entity.SysIdentityProvider;
 import dev.macula.cloud.system.pojo.entity.SysOAuth2ClientConfig;
 import dev.macula.cloud.system.pojo.entity.SysOAuth2ClientExternalProvider;
 import dev.macula.cloud.system.pojo.entity.SysTenantInfo;
+import dev.macula.cloud.system.security.OAuth2ClientCacheNames;
 import org.junit.jupiter.api.Test;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
@@ -69,6 +70,7 @@ class OAuth2ClientConfigServiceImplTest {
     private final PasswordEncoder encoder = mock(PasswordEncoder.class);
     private final CacheManager cacheManager = mock(CacheManager.class);
     private final Cache cache = mock(Cache.class);
+    private final Cache originCache = mock(Cache.class);
     private final OAuth2ClientConfigServiceImpl service =
         new OAuth2ClientConfigServiceImpl(mapper, externalProviderMapper, identityProviderMapper,
             tenantMapper, encoder, cacheManager);
@@ -108,17 +110,76 @@ class OAuth2ClientConfigServiceImplTest {
         when(tenantMapper.selectById(1L)).thenReturn(new SysTenantInfo());
         when(mapper.selectCount(any())).thenReturn(0L);
         when(encoder.encode("test-secret-123456")).thenReturn("{bcrypt}digest");
-        when(cacheManager.getCache(CacheConstants.OAUTH2_CLIENT_CACHE_KEY)).thenReturn(cache);
+        stubCaches();
         TransactionSynchronizationManager.initSynchronization();
         try {
             assertTrue(service.save(null, form).isSecretConfigured());
             verify(mapper).insert(argThat((SysOAuth2ClientConfig entity) ->
                 "{bcrypt}digest".equals(entity.getClientSecret()) && entity.getTenantId() == 1L));
-            verify(cache, never()).evict(any());
+            verify(cache, never()).clear();
+            verify(originCache, never()).clear();
             for (TransactionSynchronization synchronization : TransactionSynchronizationManager.getSynchronizations()) {
                 synchronization.afterCommit();
             }
-            verify(cache).evict("test-client");
+            verify(cache).clear();
+            verify(originCache).clear();
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+    }
+
+    @Test
+    void cacheClearFailureIsSurfacedAfterCommittedWrite() {
+        OAuth2ClientForm form = valid();
+        when(tenantMapper.selectById(1L)).thenReturn(new SysTenantInfo());
+        stubCaches();
+        doThrow(new IllegalStateException("fixture cache unavailable")).when(cache).clear();
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            assertDoesNotThrow(() -> service.save(null, form));
+            TransactionSynchronization synchronization =
+                TransactionSynchronizationManager.getSynchronizations().get(0);
+
+            assertThrows(IllegalStateException.class, synchronization::afterCommit);
+            verify(mapper).insert(any(SysOAuth2ClientConfig.class));
+            verify(originCache).clear();
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+    }
+
+    @Test
+    void originCacheClearFailureIsSurfacedAfterCommittedWrite() {
+        OAuth2ClientForm form = valid();
+        when(tenantMapper.selectById(1L)).thenReturn(new SysTenantInfo());
+        stubCaches();
+        doThrow(new IllegalStateException("fixture origin cache unavailable")).when(originCache).clear();
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            assertDoesNotThrow(() -> service.save(null, form));
+            TransactionSynchronization synchronization =
+                TransactionSynchronizationManager.getSynchronizations().get(0);
+
+            assertThrows(IllegalStateException.class, synchronization::afterCommit);
+            verify(mapper).insert(any(SysOAuth2ClientConfig.class));
+            verify(cache).clear();
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+    }
+
+    @Test
+    void missingCacheRegionFailsBeforeRegisteringCommitCallback() {
+        OAuth2ClientForm form = valid();
+        when(tenantMapper.selectById(1L)).thenReturn(new SysTenantInfo());
+        when(cacheManager.getCache(CacheConstants.OAUTH2_CLIENT_CACHE_KEY)).thenReturn(cache);
+        when(cacheManager.getCache(OAuth2ClientCacheNames.TOKEN_ORIGIN_INDEX)).thenReturn(null);
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            assertThrows(IllegalStateException.class, () -> service.save(null, form));
+            assertTrue(TransactionSynchronizationManager.getSynchronizations().isEmpty());
+            verify(cache, never()).clear();
+            verify(originCache, never()).clear();
         } finally {
             TransactionSynchronizationManager.clearSynchronization();
         }
@@ -135,7 +196,7 @@ class OAuth2ClientConfigServiceImplTest {
         form.setRequireProofKey(false);
         when(tenantMapper.selectById(1L)).thenReturn(new SysTenantInfo());
         when(encoder.encode("test-secret-123456")).thenReturn("{bcrypt}digest");
-        when(cacheManager.getCache(CacheConstants.OAUTH2_CLIENT_CACHE_KEY)).thenReturn(cache);
+        stubCaches();
         TransactionSynchronizationManager.initSynchronization();
         try {
             assertDoesNotThrow(() -> service.save(null, form));
@@ -146,25 +207,52 @@ class OAuth2ClientConfigServiceImplTest {
     }
 
     @Test
-    void protocolVerificationGrantRequiresPublicClientAndExactOrigins() {
+    void protocolOriginsAreIndependentFromGrantWhileVerificationRequiresPublicClient() {
         OAuth2ClientForm form = valid();
         form.setAuthorizationGrantTypes("sms");
         form.setRedirectUris(null);
         form.setScopes("profile");
         when(tenantMapper.selectById(1L)).thenReturn(new SysTenantInfo());
-
-        assertThrows(ResponseStatusException.class, () -> service.save(null, form));
-
-        form.setAllowedOrigins(Set.of("https://app.example.test"));
-        when(cacheManager.getCache(CacheConstants.OAUTH2_CLIENT_CACHE_KEY)).thenReturn(cache);
+        stubCaches();
         TransactionSynchronizationManager.initSynchronization();
         try {
             assertDoesNotThrow(() -> service.save(null, form));
+            verify(mapper).insert(argThat((SysOAuth2ClientConfig entity) ->
+                "".equals(entity.getAllowedOrigins())));
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+
+        OAuth2ClientForm confidentialSms = valid();
+        confidentialSms.setClientAuthenticationMethods("client_secret_post");
+        confidentialSms.setClientSecret("test-secret-123456");
+        confidentialSms.setAuthorizationGrantTypes("sms");
+        confidentialSms.setRedirectUris(null);
+        confidentialSms.setScopes("profile");
+        assertThrows(ResponseStatusException.class, () -> service.save(null, confidentialSms));
+
+        OAuth2ClientForm authorizationCode = valid();
+        authorizationCode.setAllowedOrigins(Set.of("https://app.example.test"));
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            assertDoesNotThrow(() -> service.save(null, authorizationCode));
             verify(mapper).insert(argThat((SysOAuth2ClientConfig entity) ->
                 "https://app.example.test".equals(entity.getAllowedOrigins())));
         } finally {
             TransactionSynchronizationManager.clearSynchronization();
         }
+    }
+
+    @Test
+    void rejectsBrowserOriginsBeyondDatabaseCapacity() {
+        OAuth2ClientForm form = valid();
+        form.setAllowedOrigins(java.util.stream.IntStream.range(0, 100)
+            .mapToObj(index -> "https://client-" + index + ".example.test")
+            .collect(java.util.stream.Collectors.toSet()));
+        when(tenantMapper.selectById(1L)).thenReturn(new SysTenantInfo());
+
+        assertThrows(ResponseStatusException.class, () -> service.save(null, form));
+        verify(mapper, never()).insert(any(SysOAuth2ClientConfig.class));
     }
 
     @Test
@@ -182,7 +270,7 @@ class OAuth2ClientConfigServiceImplTest {
         provider.setEnabled(true);
         when(tenantMapper.selectById(1L)).thenReturn(new SysTenantInfo());
         when(identityProviderMapper.selectById(7L)).thenReturn(provider);
-        when(cacheManager.getCache(CacheConstants.OAUTH2_CLIENT_CACHE_KEY)).thenReturn(cache);
+        stubCaches();
         TransactionSynchronizationManager.initSynchronization();
         try {
             assertDoesNotThrow(() -> service.save(null, form));
@@ -207,7 +295,7 @@ class OAuth2ClientConfigServiceImplTest {
         form.setDirectLoginProviderType(BrowserLoginProviderType.WECOM.name());
         when(tenantMapper.selectById(1L)).thenReturn(new SysTenantInfo());
         when(identityProviderMapper.selectCount(any())).thenReturn(1L);
-        when(cacheManager.getCache(CacheConstants.OAUTH2_CLIENT_CACHE_KEY)).thenReturn(cache);
+        stubCaches();
         TransactionSynchronizationManager.initSynchronization();
         try {
             var result = service.save(null, form);
@@ -263,21 +351,24 @@ class OAuth2ClientConfigServiceImplTest {
         form.setClientSecret("test-secret-123456");
         when(tenantMapper.selectById(1L)).thenReturn(new SysTenantInfo());
         when(encoder.encode("test-secret-123456")).thenReturn("{bcrypt}digest");
-        when(cacheManager.getCache(CacheConstants.OAUTH2_CLIENT_CACHE_KEY)).thenReturn(cache);
+        stubCaches();
         doThrow(new IllegalStateException("fixture database failure")).when(mapper)
             .insert(any(SysOAuth2ClientConfig.class));
         TransactionSynchronizationManager.initSynchronization();
         try {
             assertThrows(IllegalStateException.class, () -> service.save(null, form));
             assertTrue(TransactionSynchronizationManager.getSynchronizations().isEmpty());
-            verify(cache, never()).evict(any());
+            verify(cache, never()).clear();
+            verify(originCache, never()).clear();
             reset(mapper);
             service.save(null, form);
-            verify(cache, never()).evict(any());
+            verify(cache, never()).clear();
+            verify(originCache, never()).clear();
             for (TransactionSynchronization synchronization : TransactionSynchronizationManager.getSynchronizations()) {
                 synchronization.afterCompletion(TransactionSynchronization.STATUS_ROLLED_BACK);
             }
-            verify(cache, never()).evict(any());
+            verify(cache, never()).clear();
+            verify(originCache, never()).clear();
         } finally {
             TransactionSynchronizationManager.clearSynchronization();
         }
@@ -296,6 +387,11 @@ class OAuth2ClientConfigServiceImplTest {
         form.setAccessTokenTimeToLive(30L);
         assertThrows(ResponseStatusException.class, () -> service.save(null, form));
         verify(mapper, never()).insert(any(SysOAuth2ClientConfig.class));
+    }
+
+    private void stubCaches() {
+        when(cacheManager.getCache(CacheConstants.OAUTH2_CLIENT_CACHE_KEY)).thenReturn(cache);
+        when(cacheManager.getCache(OAuth2ClientCacheNames.TOKEN_ORIGIN_INDEX)).thenReturn(originCache);
     }
 
     private OAuth2ClientForm valid() {

@@ -96,10 +96,12 @@ npm run dev
 
 ## 环境模式
 
-浏览器通过同源路径 `/api` 访问 Gateway，通过 `/iam` 访问 IAM。开发服务器和容器 Nginx 分别代理这两个前缀，避免浏览器跨域并保持各环境访问方式一致：
+浏览器通过同源路径 `/api` 访问 Gateway；Token 请求可以直接访问统一 IAM，也可以由部署方选择通过 `/iam`
+反向代理。直接访问 IAM 时，管理员必须把 Admin 的精确 Origin 配置到对应 OAuth Client 的
+`allowedOrigins`；空列表会被 IAM 拒绝，不能使用全局通配来源：
 
 ```sh
-# local：Vite 开发服务器代理到本机 Gateway/IAM
+# local：Vite 开发服务器代理 Gateway，IAM 使用配置的直连地址
 npm run dev
 
 # Docker Compose、开发、预发、性能测试、生产构建
@@ -110,7 +112,10 @@ npm run build:pet
 npm run build:prd
 ```
 
-本地 Vite 默认把 `/api` 代理到 `127.0.0.1:9000`、把 `/iam` 代理到 `127.0.0.1:9010`，可分别通过 `VITE_APP_GATEWAY_PROXY_TARGET`、`VITE_APP_IAM_PROXY_TARGET` 覆盖。Docker 镜像内置 Nginx 将 `/api`、`/iam` 代理到 Compose 中的 Gateway、IAM 服务。共享环境的入口代理也应提供这两个同源前缀；如部署拓扑确实不同，可在构建产物的 `config.js` 中覆盖 `API_URL`、`IAM_URL`。
+本地 Vite 默认把 `/api` 代理到 `127.0.0.1:9000`，IAM 默认直连 `127.0.0.1:9010`。Docker 镜像仍内置
+`/api`、`/iam` 代理供部署方选择，但其他系统不需要复制该代理结构。共享环境可在构建产物的 `config.js` 中
+覆盖 `API_URL`、`IAM_URL`；直接访问 IAM 时必须先为当前 OAuth Client 登记浏览器页面的精确 Origin。
+Token 请求的 URL、form、query 和 Header 合同不因 Client 级 CORS 改变。
 
 ## 登录配置
 

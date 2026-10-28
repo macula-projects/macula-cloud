@@ -37,6 +37,7 @@ import dev.macula.cloud.iam.controller.LoginController;
 import dev.macula.cloud.iam.controller.ProtocolVerificationCodeController;
 import dev.macula.cloud.iam.controller.SmsCodeController;
 import dev.macula.cloud.iam.controller.ThirdPartyBindingController;
+import dev.macula.cloud.iam.enums.UserTypeEnum;
 import dev.macula.cloud.iam.handler.AuthenticationFailureReason;
 import dev.macula.cloud.iam.mapper.SysIdentityProviderMapper;
 import dev.macula.cloud.iam.mapper.SysOAuth2ClientExternalProviderMapper;
@@ -45,6 +46,7 @@ import dev.macula.cloud.iam.message.ProtocolLoginCodeDispatcher;
 import dev.macula.cloud.iam.pojo.dto.UserAuthInfo;
 import dev.macula.cloud.iam.pojo.entity.SysIdentityProvider;
 import dev.macula.cloud.iam.pojo.entity.SysOAuth2Client;
+import dev.macula.cloud.iam.pojo.entity.SysUser;
 import dev.macula.cloud.iam.protocol.oauth2.endpoint.AuthorizationConsentController;
 import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeAccountResolver;
 import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeClientSettings;
@@ -53,6 +55,7 @@ import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeVerif
 import dev.macula.cloud.iam.service.support.SysOAuth2ClientService;
 import dev.macula.cloud.iam.service.support.SysUserService;
 import dev.macula.cloud.iam.service.userdetails.ClientAwareAccountResolver;
+import dev.macula.cloud.system.enums.ExternalCodeType;
 import dev.macula.cloud.system.security.UserIdentifierNormalizer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -152,7 +155,6 @@ import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppC
 @ActiveProfiles("local")
 @TestPropertySource(properties = {
     "macula.cloud.iam.issuer-uri=https://iam.example",
-    "macula.cloud.iam.token-cors-allowed-origins=https://admin.example",
     "macula.cloud.iam.sms-verification.digest-key=fixture-digest-key",
     "macula.cloud.iam.email-verification.digest-key=fixture-digest-key",
     "macula.cloud.iam.login-captcha.digest-key=fixture-digest-key"
@@ -164,14 +166,17 @@ class IamProtocolTest {
     ObjectMapper json = tools.jackson.databind.json.JsonMapper.builder().build();
     final String verifier = "01234567890123456789012345678901234567890123456789";
 
-    @Test void tokenCorsAllowsOnlyConfiguredOriginAndEndpoint() throws Exception {
+    @Test void tokenCorsAllowsOnlyClientOriginAndEndpoint() throws Exception {
+        SysOAuth2ClientService clientService = context.getBean(SysOAuth2ClientService.class);
+        when(clientService.allowedOrigins()).thenReturn(Set.of("https://client.example"));
+
         mvc.perform(options("/oauth2/token")
-                .header(HttpHeaders.ORIGIN, "https://admin.example")
+                .header(HttpHeaders.ORIGIN, "https://client.example")
                 .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, HttpMethod.POST.name())
                 .header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS,
                     HttpHeaders.AUTHORIZATION + ", " + HttpHeaders.CONTENT_TYPE + ", tenantId"))
             .andExpect(status().isOk())
-            .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "https://admin.example"))
+            .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "https://client.example"))
             .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS,
                 org.hamcrest.Matchers.containsString(HttpMethod.POST.name())))
             .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS,
@@ -179,9 +184,9 @@ class IamProtocolTest {
             .andExpect(header().doesNotExist(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS));
 
         mvc.perform(post("/oauth2/token")
-                .header(HttpHeaders.ORIGIN, "https://admin.example")
+                .header(HttpHeaders.ORIGIN, "https://client.example")
                 .contentType(org.springframework.http.MediaType.APPLICATION_FORM_URLENCODED))
-            .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "https://admin.example"))
+            .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "https://client.example"))
             .andExpect(header().doesNotExist(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS));
 
         mvc.perform(options("/oauth2/token")
@@ -196,10 +201,98 @@ class IamProtocolTest {
             .andExpect(header().doesNotExist(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN));
     }
 
+    @Test void tokenOriginIsBoundToAuthenticatedClientBeforeGrantHandling() throws Exception {
+        SysOAuth2ClientService clientService = context.getBean(SysOAuth2ClientService.class);
+        when(clientService.allowedOrigins()).thenReturn(Set.of("https://client.example"));
+
+        for (String grant : List.of("password", "sms", "email",
+            "urn:macula:params:oauth:grant-type:external_code", "authorization_code", "refresh_token",
+            "client_credentials")) {
+            mvc.perform(post("/oauth2/token")
+                    .with(httpBasic("jwt", "fixture-secret"))
+                    .header(HttpHeaders.ORIGIN, "https://client.example")
+                    .contentType(org.springframework.http.MediaType.APPLICATION_FORM_URLENCODED)
+                    .param("grant_type", grant))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("invalid_request"))
+                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "https://client.example"));
+        }
+    }
+
+    @Test void tokenOriginOwnedByAuthenticatedClientReachesGrantProvider() throws Exception {
+        SysOAuth2ClientService clientService = context.getBean(SysOAuth2ClientService.class);
+        when(clientService.allowedOrigins()).thenReturn(Set.of("https://jwt.example"));
+        when(clientService.isAllowedOrigin("jwt", "https://jwt.example")).thenReturn(true);
+
+        mvc.perform(post("/oauth2/token")
+                .with(httpBasic("jwt", "fixture-secret"))
+                .header(HttpHeaders.ORIGIN, "https://jwt.example")
+                .contentType(org.springframework.http.MediaType.APPLICATION_FORM_URLENCODED)
+                .param("grant_type", "password")
+                .param("username", "fixture-user")
+                .param("password", "fixture-password")
+                .param("scope", "profile"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.access_token").isNotEmpty())
+            .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "https://jwt.example"));
+    }
+
+    @Test void publicTokenGrantsAuthenticateClientAndRefreshKeepsClientOwnership() throws Exception {
+        MvcResult password = mvc.perform(post("/oauth2/token")
+                .header(HttpHeaders.ORIGIN, "https://client.example")
+                .contentType(org.springframework.http.MediaType.APPLICATION_FORM_URLENCODED)
+                .param("grant_type", "password").param("client_id", "public")
+                .param("username", "fixture-user").param("password", "fixture-password")
+                .param("scope", "profile"))
+            .andExpect(status().isOk())
+            .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "https://client.example"))
+            .andReturn();
+        String refreshToken = json.readTree(password.getResponse().getContentAsString())
+            .get("refresh_token").asText();
+
+        mvc.perform(post("/oauth2/token")
+                .header(HttpHeaders.ORIGIN, "https://client.example")
+                .contentType(org.springframework.http.MediaType.APPLICATION_FORM_URLENCODED)
+                .param("grant_type", "refresh_token").param("client_id", "public")
+                .param("refresh_token", refreshToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.access_token").isNotEmpty());
+
+        mvc.perform(post("/oauth2/token")
+                .header(HttpHeaders.ORIGIN, "https://client.example")
+                .contentType(org.springframework.http.MediaType.APPLICATION_FORM_URLENCODED)
+                .param("grant_type", "refresh_token").param("client_id", "public-other")
+                .param("refresh_token", refreshToken))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.error").value("invalid_grant"));
+
+        for (MockHttpServletRequestBuilder request : List.of(
+            post("/oauth2/token").param("grant_type", "sms").param("client_id", "public")
+                .param("phone", "13800000000").param("code", "fixture-code").param("scope", "profile"),
+            post("/oauth2/token").param("grant_type", "email").param("client_id", "public")
+                .param("email", "fixture@example.test").param("code", "fixture-code").param("scope", "profile"),
+            post("/oauth2/token").param("grant_type", ExternalCodeType.GRANT_TYPE).param("client_id", "public")
+                .param("code", "fixture-code")
+                .param("code_type", ExternalCodeType.WECHAT_MINIAPP_LOGIN_CODE.name())
+                .param("scope", "profile"))) {
+            MvcResult result = mvc.perform(request.header(HttpHeaders.ORIGIN, "https://client.example")
+                    .contentType(org.springframework.http.MediaType.APPLICATION_FORM_URLENCODED))
+                .andExpect(status().isBadRequest()).andReturn();
+            assertThat(result.getResponse().getContentAsString()).doesNotContain("invalid_client");
+        }
+
+        mvc.perform(post("/oauth2/token")
+                .header(HttpHeaders.ORIGIN, "https://client.example")
+                .contentType(org.springframework.http.MediaType.APPLICATION_FORM_URLENCODED)
+                .param("grant_type", "client_credentials").param("client_id", "public"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.access_token").doesNotExist());
+    }
+
     @Test void protocolCaptchaPreflightUsesOriginAndPostBindsClientHeaderToBody() throws Exception {
         SysOAuth2ClientService clientService = context.getBean(SysOAuth2ClientService.class);
         LoginCaptchaService captchaService = context.getBean(LoginCaptchaService.class);
-        when(clientService.hasAllowedOrigin("https://client.example")).thenReturn(true);
+        when(clientService.allowedOrigins()).thenReturn(Set.of("https://client.example"));
 
         mvc.perform(options(ProtocolVerificationCodeController.CAPTCHA_PATH)
                 .header(HttpHeaders.ORIGIN, "https://client.example")
@@ -255,22 +348,35 @@ class IamProtocolTest {
     static class App implements WebMvcConfigurer {
         @Bean @Primary RegisteredClientRepository fixtureClients() {
             return new InMemoryRegisteredClientRepository(client("public", ClientAuthenticationMethod.NONE,
+                OAuth2TokenFormat.REFERENCE), client("public-other", ClientAuthenticationMethod.NONE,
                 OAuth2TokenFormat.REFERENCE), client("jwt", ClientAuthenticationMethod.CLIENT_SECRET_BASIC,
                 OAuth2TokenFormat.SELF_CONTAINED), client("compat", ClientAuthenticationMethod.CLIENT_SECRET_BASIC,
                 OAuth2TokenFormat.REFERENCE), client("reuse", ClientAuthenticationMethod.CLIENT_SECRET_BASIC,
                 OAuth2TokenFormat.REFERENCE));
         }
         static RegisteredClient client(String id, ClientAuthenticationMethod method, OAuth2TokenFormat format) {
-            return RegisteredClient.withId(id).clientId(id)
-                .clientSecret("{bcrypt}" + new BCryptPasswordEncoder().encode("fixture-secret"))
+            RegisteredClient.Builder builder = RegisteredClient.withId(id).clientId(id)
                 .clientAuthenticationMethod(method).authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
                 .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
                 .authorizationGrantType(new AuthorizationGrantType("password"))
                 .authorizationGrantType(new AuthorizationGrantType("sms"))
-                .redirectUri("https://client.example/callback").scope("openid").scope("profile").scope("email")
-                .clientSettings(ClientSettings.builder().requireProofKey(true).requireAuthorizationConsent(true)
+                .redirectUri("https://client.example/callback").scope("openid").scope("profile").scope("email");
+            if (ClientAuthenticationMethod.NONE.equals(method)) {
+                builder.authorizationGrantType(new AuthorizationGrantType("email"))
+                    .authorizationGrantType(new AuthorizationGrantType(ExternalCodeType.GRANT_TYPE));
+            } else {
+                builder.clientSecret("{bcrypt}" + new BCryptPasswordEncoder().encode("fixture-secret"));
+            }
+            return builder.clientSettings(ClientSettings.builder().requireProofKey(true).requireAuthorizationConsent(true)
                     .setting(ExternalCodeClientSettings.ALLOWED_ORIGINS,
-                        Set.of("https://client.example"))
+                        Set.of("jwt".equals(id) ? "https://jwt.example" : "https://client.example"))
+                    .setting(ExternalCodeClientSettings.CODE_TYPES,
+                        ClientAuthenticationMethod.NONE.equals(method)
+                            ? Set.of(ExternalCodeType.WECHAT_MINIAPP_LOGIN_CODE.name()) : Set.of())
+                    .setting(ExternalCodeClientSettings.PROVIDER_BINDINGS,
+                        ClientAuthenticationMethod.NONE.equals(method)
+                            ? java.util.Map.of(ExternalCodeType.WECHAT_MINIAPP_LOGIN_CODE.name(), 7L)
+                            : java.util.Map.of())
                     .setting(ExternalCodeClientSettings.USER_TYPE, "employee")
                     .setting(ExternalCodeClientSettings.TENANT_ID, 1L).build())
                 .tokenSettings(TokenSettings.builder().accessTokenFormat(format)
@@ -406,8 +512,19 @@ class IamProtocolTest {
         browserClient.setAuthorizationGrantTypes("authorization_code,refresh_token");
         browserClient.setRedirectUris("https://client.example/callback");
         browserClient.setBrowserLoginProviderTypes("DINGTALK,FEISHU,GITHUB,WECOM,WECHAT");
+        browserClient.setTenantId(1L);
+        browserClient.setUserType(UserTypeEnum.EMPLOYEE);
         when(context.getBean(SysOAuth2ClientService.class).getClientByClientId("public"))
             .thenReturn(browserClient);
+        SysUser resolvedUser = new SysUser();
+        resolvedUser.setUsername("fixture-user");
+        when(context.getBean(ClientAwareAccountResolver.class)
+            .resolveIdentifier(UserTypeEnum.EMPLOYEE, "fixture-user")).thenReturn(resolvedUser);
+        SysOAuth2ClientService clientService = context.getBean(SysOAuth2ClientService.class);
+        when(clientService.allowedOrigins()).thenReturn(Set.of("https://client.example", "https://jwt.example"));
+        when(clientService.isAllowedOrigin("public", "https://client.example")).thenReturn(true);
+        when(clientService.isAllowedOrigin("public-other", "https://client.example")).thenReturn(true);
+        when(clientService.isAllowedOrigin("jwt", "https://jwt.example")).thenReturn(true);
         mvc = webAppContextSetup(context).apply(springSecurity()).alwaysDo(result -> {
             if (result.getResponse().getStatus() >= 400) {
                 System.out.println("Rejected " + result.getRequest().getRequestURI() + ": "
@@ -1027,6 +1144,30 @@ class IamProtocolTest {
         mvc.perform(get("/userinfo").header("Authorization", "Bearer " + access)).andExpect(status().isUnauthorized());
         mvc.perform(post("/oauth2/introspect").with(httpBasic("jwt", "fixture-secret")).param("token", "absent"))
             .andExpect(status().isOk()).andExpect(jsonPath("$.active").value(false));
+    }
+
+    @Test void publicTokenClientAuthenticationIsLimitedToTokenEndpoint() throws Exception {
+        MvcResult issued = mvc.perform(post("/oauth2/token").with(httpBasic("jwt", "fixture-secret"))
+                .param("grant_type", "password").param("username", "fixture-user")
+                .param("password", "fixture-password").param("scope", "profile"))
+            .andExpect(status().isOk()).andReturn();
+        String accessToken = json.readTree(issued.getResponse().getContentAsString())
+            .get("access_token").asText();
+
+        mvc.perform(post("/oauth2/introspect").param("client_id", "public")
+                .param("grant_type", "password").param("token", accessToken))
+            .andExpect(status().is3xxRedirection())
+            .andExpect(header().string("Location", org.hamcrest.Matchers.endsWith("/login")))
+            .andExpect(content().string(""));
+        mvc.perform(post("/oauth2/revoke").param("client_id", "public")
+                .param("grant_type", "password").param("token", accessToken))
+            .andExpect(status().is3xxRedirection())
+            .andExpect(header().string("Location", org.hamcrest.Matchers.endsWith("/login")))
+            .andExpect(content().string(""));
+
+        mvc.perform(post("/oauth2/introspect").with(httpBasic("jwt", "fixture-secret"))
+                .param("token", accessToken))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.active").value(true));
     }
 
     @Test void exportsRenderedPagesForResponsiveReview() throws Exception {

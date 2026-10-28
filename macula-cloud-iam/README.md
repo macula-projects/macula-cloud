@@ -242,7 +242,6 @@ code。
 | 环境变量 | 说明 |
 | --- | --- |
 | `IAM_ISSUER_URI` | 外部应用和第三方平台可以访问的稳定 issuer；反向代理在 `/iam` 时应包含该前缀 |
-| `IAM_TOKEN_CORS_ALLOWED_ORIGINS` | 允许跨域调用 Token 端点的精确来源，多个值使用英文逗号分隔；留空表示禁用 |
 | `IAM_SIGNING_KEY_LOCATION` | 签名 keystore 的 Spring Resource 地址 |
 | `IAM_SIGNING_KEY_ALIAS` | 签名密钥 alias，默认 `jose` |
 | `IAM_SIGNING_KEY_PASSWORD` | keystore 密码，由部署环境注入 |
@@ -250,6 +249,20 @@ code。
 
 生产环境必须使用独立签名密钥和 HTTPS。反向代理应覆盖客户端提交的 `Forwarded`、`X-Forwarded-*`，并
 传递真实协议、主机和路径前缀。第三方平台后台登记的回调地址必须与公开 issuer 完全一致。
+
+浏览器可直接跨域调用 `/oauth2/token`，不要求接入系统部署 IAM 反向代理。允许来源由 OAuth Client 的
+`allowedOrigins` 精确配置；协议、主机和端口必须完全匹配，空列表表示拒绝该 Client 的全部浏览器跨域请求。
+预检及 CORS 传输许可只证明 Origin 至少被一个 Client 登记，实际 Token POST 会在 Client 认证完成后再次核对
+权威 Client 数据中的 Origin，并在任何 grant 或 Token 签发前拒绝跨 Client 借用。全局 Origin 索引使用固定
+缓存键且同步加载，只负责传输许可；即使缓存清理失败，陈旧索引也不能越过实际 POST 的权威校验。Token 预检
+允许浏览器只声明实际使用的 `Authorization`、`tenantId` 等非 safelisted Header，不强制声明 safelisted
+`Content-Type`。
+
+无密钥 public Client 的 password、sms、email、external_code、refresh_token 请求继续使用既有单值
+`client_id` form 参数；IAM 只在无 Basic、secret 或 assertion 凭据时建立 `none` Client Principal，各 grant
+仍独立校验密码、验证码、外部凭证或 refresh token 归属。authorization_code 仍走官方 PKCE 流程，public
+`client_credentials` 仍拒绝。服务端请求不带 `Origin` 时维持原有行为；Token URL、form、query 和 Header
+合同不变。`IAM_TOKEN_CORS_ALLOWED_ORIGINS` 已停止使用，不能作为 Client 空配置的回退。
 
 ## 开发验证
 

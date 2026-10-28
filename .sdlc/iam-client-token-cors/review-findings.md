@@ -25,3 +25,89 @@
 - Scope: 只审 Round 2 finding 的修订；不重复前两轮 finding。
 - Findings: `NO_FINDINGS`。
 - Disposition: Plan review 在第三轮结束；前两轮 Important 均已修订，最终轮无新增 finding。
+
+## Code review
+
+### Round 1 — Code — `d4e4fd99872272af9763b75cbbd270c6e115c039 + uncommitted workspace`
+
+- Reviewer: `sdlc-reviewer`；Depth: `Standard`（仓库 `REVIEW.md` 未显式声明 depth，按完整 Bugs、Security、Compliance passes 执行）。
+- Scope: 相对基线 `d4e4fd99872272af9763b75cbbd270c6e115c039` 的全部已跟踪 diff 和本变更新增文件。
+- Passes run: Bugs、Security、Compliance；Compliance 未发现适用的新增缺陷。
+- Earlier findings suppressed: 0。
+- Verifier rejected: 0；独立 verifier 确认以下 3 条均真实发生。
+- Findings:
+  - `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/protocol/oauth2/endpoint/OAuth2TokenOriginFilter.java:65 — Important — 过滤器要求 SecurityContext 中已有已认证 OAuth2ClientAuthenticationToken，但默认 public-client converter 只认证带 code_verifier 的 authorization_code 请求，仓库未为 sms、email、external_code 或 public refresh 注册 Client 认证转换器；这些受支持的 public Client 浏览器 grant 会在进入既有 grant Provider 前返回 invalid_request，当前真实过滤链测试只覆盖 confidential Client 的成功路径 — 为受支持的 public 自定义 grant 建立可可靠取得 RegisteredClient 的既有认证路径，并增加 sms、email、external_code、public authorization_code/refresh 的匹配 Origin 可达性测试 — Response: fixed and verified 2026-10-28`
+  - `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/config/ProtocolLoginCorsConfigurationSource.java:113 — Important — Token 预检强制要求 Access-Control-Request-Headers 声明 content-type，但 application/x-www-form-urlencoded 的 Content-Type 是 CORS safelisted；浏览器因 Authorization 或 tenantId 触发预检时通常不会声明它，合法请求会被 403 拒绝 — 不要求预检声明 safelisted Content-Type，只校验浏览器实际声明的 Header 均在 allowlist 中，并覆盖 authorization、tenantId 及二者组合 — Response: fixed and verified 2026-10-28`
+  - `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/config/ProtocolLoginCorsConfigurationSource.java:76 — Minor — 每个跨域 Token POST/OPTIONS 都在认证前调用 hasAllowedOrigin，其 FIND_IN_SET 条件无法利用现有 client_id 索引，匿名请求可持续触发 OAuth Client 表全表计数并放大数据库与连接池压力 — 使用随 OAuth Client 配置失效的规范化 Origin 缓存或可索引的独立 Origin 映射，补充更新和失效验证 — Response: fixed and verified 2026-10-28`
+
+### Round 2 — Code — `d4e4fd99872272af9763b75cbbd270c6e115c039 + uncommitted remediation workspace`
+
+- Reviewer: `sdlc-reviewer`；Depth: `Standard`；项目 `REVIEW.md` 的 Bugs、Security、Compliance 三个 pass 均执行。
+- Scope: 只审 Code Round 1 remediation 增量：public Token Client converter/provider、public refresh 签发与归属、Token 预检 Header 修正、固定键 Origin 传输缓存、权威 Client Origin 查询、提交后缓存清理及 Stage 4 随后修正。
+- Earlier findings suppressed: 7（Code Round 1 三项和 remediation plan review 四项均不重复报告）。
+- Verifier rejected: 0；全新上下文 verifier 确认以下 2 条均真实发生。
+- Compliance: 未发现适用于本轮增量的新增合规缺陷。
+- Findings:
+  - `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/protocol/oauth2/client/PublicTokenClientAuthenticationConverter.java:52 — Important / Security — converter 注册在 Spring Authorization Server 共享 Client 认证过滤器中，却未限制为 POST /oauth2/token；Spring Security 7.0.7 同一过滤器还覆盖 introspection、revocation、device authorization 和 PAR，攻击者可在这些端点提交 public client_id 与受支持 grant_type，仅凭公开标识建立已认证 Client，其中 introspection Provider 不校验请求 Client 是否拥有目标 Token，因而可探测任意有效 Token 的状态与 claims — 将 converter 显式绑定 AuthorizationServerSettings 的 POST Token endpoint matcher，并增加 introspection、revocation、device authorization、PAR 的负向测试 — Response: fixed and verified 2026-10-28`
+  - `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/service/support/impl/SysOAuth2ClientServiceImpl.java:52 — Minor / Bugs — 固定缓存键 __allowed_origins__ 与 MaculaRegisteredClientRepository 的任意 client_id 共用 OAuth Client cache region；System 允许合法 Client ID 取该值，因此两类缓存项会使用同一字符串键，先写入的一方可能让另一方收到 Set 或 RegisteredClient 的错误类型并中断 Client 认证/CORS — 为 Origin 索引使用独立 cache region 或不会与 Client ID 冲突的键类型，并覆盖该保留样式 Client ID — Response: fixed and verified 2026-10-28`
+
+### Round 3 — Code — `d4e4fd99872272af9763b75cbbd270c6e115c039 + uncommitted Code Round 2 remediation workspace`
+
+- Reviewer: `sdlc-reviewer`；Depth: `Standard`；项目 `REVIEW.md` 的 Bugs、Security、Compliance 三个 pass 均执行。
+- Scope: 只审 Code Round 2 remediation 增量：public converter 的严格 POST Token endpoint matcher、共享 System API cache region 常量、独立 Origin 索引 region、双 region 事务提交后失效、缺失/异常处理及对应单元、真实安全链、缓存碰撞和 Stage 4 证据。
+- Earlier findings suppressed: 9；不重复 Code Round 1/2 code finding 或 remediation plan finding。
+- Findings: `NO_FINDINGS`。
+- Verifier: 全新 verify-mode 上下文收到空候选列表，返回 `NO_CANDIDATES_TO_VERIFY`；rejected: 0。
+- Nits: 0。
+- Compliance: 未发现适用于本轮增量的新增合规要求违反。
+- Disposition: Code Round 3 无新增 finding；等待人工 PR 审批，不由 agent 自行批准、合并、推送或部署。
+- Human approval: Rain 于 2026-10-28 明确回复 `LGTM`；Stage 5 人工审批 gate 通过。该审批不扩大为 commit、push、PR 创建、merge 或生产部署授权。
+
+### Pre-existing
+
+无。
+
+### Recurring
+
+扫描 `.sdlc/*/review-findings.md` 后，未发现上述 finding class 已在两个或更多 change 中出现；当前无需要编码的 recurring class。
+
+### Code round summary
+
+| Round | Stage | Findings posted | Suppressed as duplicates | Verifier rejected |
+| --- | --- | ---: | ---: | ---: |
+| 1 | Code | 3 | 0 | 0 |
+| 2 | Code | 2 | 7 | 0 |
+| 3 | Code | 0 | 9 | 0 |
+
+## Code Round 1 remediation plan review
+
+### Round 1 — Plan — `uncommitted`
+
+- Reviewer: `sdlc-reviewer`；Passes run: Plan。
+- Scope: accepted spec revision 2026-10-28 and `plan.md` Code Round 1 remediation addendum only。
+- Earlier findings suppressed: 3。
+- Verifier rejected: 0；独立 verifier 确认以下 4 条均真实发生。
+- Findings:
+  - `.sdlc/iam-client-token-cors/plan.md:79 — Important — 仅在事务提交后清理缓存时，清理异常无法回滚数据库且可能让 IAM 继续使用已撤销 Origin — 最终 Origin 授权改为按已认证 client_id 查询权威数据库；缓存只提供传输许可，陈旧缓存不能签发 Token，并增加清理失败测试 — Response: fixed`
+  - `.sdlc/iam-client-token-cors/plan.md:89 — Important — public refresh proof 未固定跨 Client refresh token 归属拒绝 — 增加 Client B 使用 Client A refresh token 返回 invalid_grant 且 Token Generator 无调用的断言，并保留 confidential compatibility 回归 — Response: fixed`
+  - `.sdlc/iam-client-token-cors/plan.md:91 — Minor — 固定键缓存 proof 未覆盖并发 cache miss，匿名并发仍可能重复全表加载 — 规定同步 single-flight，并发测试断言一次加载、共享结果和异常全部失败关闭 — Response: fixed`
+  - `.sdlc/iam-client-token-cors/plan.md:80 — Important — remediation 要更新 verification.md 但 Additional files 未列该路径 — 已加入精确路径并限定只追加 Stage 4 重跑证据 — Response: fixed`
+
+### Round 2 — Plan — `uncommitted`
+
+- Reviewer: `sdlc-reviewer`；Passes run: Plan。
+- Scope: 只审 Round 1 四条 finding 对应的 remediation plan 修订。
+- Findings: `NO_FINDINGS`。
+- Earlier findings suppressed: 4。
+- Verifier rejected: 0（无候选 finding 需要二次验证）。
+- Disposition: 修复计划评审通过；等待工程师明确批准后进入实现。
+
+## Code Round 2 remediation plan review
+
+### Round 1 — Plan — `uncommitted`
+
+- Reviewer: `sdlc-reviewer`；Pass: Plan only。
+- Scope: `plan.md` 的 `## Code Round 2 remediation` 新增部分；检查 converter Token endpoint 限定、独立 Origin cache region、双 region 事务后失效、精确文件范围和重新验证证据。
+- Earlier findings suppressed: 9；不重复 Code Round 1/2 finding 或上轮 remediation plan finding。
+- Findings: `NO_FINDINGS`。
+- Disposition: Code Round 2 修复计划首轮评审通过，等待工程师明确批准后实施。

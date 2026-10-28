@@ -44,7 +44,7 @@ describe("Admin login", () => {
 
   it("uses runtime OAuth and demo account configuration", () => {
     cy.intercept("GET", "**/config.js*", {
-      headers: {"content-type": "application/javascript"},
+      headers: { "content-type": "application/javascript" },
       body: `const APP_CONFIG = {
         OAUTH_CLIENT_ID: "runtime-client",
         OAUTH_CLIENT_SECRET: "runtime-secret",
@@ -60,9 +60,10 @@ describe("Admin login", () => {
       expect(body.get("client_id")).to.eq("runtime-client");
       expect(body.get("client_secret")).to.eq("runtime-secret");
       expect(body.get("scope")).to.eq("runtime.scope");
+      expect(request.headers).not.to.have.property("x-oauth-client-id");
       request.reply({
         statusCode: 400,
-        body: {error_description: "Runtime credentials checked"},
+        body: { error_description: "Runtime credentials checked" },
       });
     }).as("runtimeTokenRequest");
 
@@ -72,6 +73,8 @@ describe("Admin login", () => {
     cy.contains("button", "登录").click();
 
     cy.wait("@runtimeTokenRequest");
-    cy.contains(".el-message", "Runtime credentials checked").should("be.visible");
+    cy.contains(".el-message", "Runtime credentials checked").should(
+      "be.visible"
+    );
   });
 });

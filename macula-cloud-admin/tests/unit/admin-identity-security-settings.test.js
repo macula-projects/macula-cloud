@@ -88,6 +88,8 @@ describe("平台身份、消息与接入应用管理", () => {
     expect(oauthPage).toContain("externalCodeTypes");
     expect(oauthPage).toContain("externalProviderBindings");
     expect(oauthPage).toContain("allowedOriginsText");
+    expect(oauthPage).toContain("浏览器协议允许 Origin");
+    expect(oauthPage).toContain("留空时拒绝该 Client 的全部浏览器跨域协议请求");
     expect(oauthPage).toContain("externalCodeCatalog");
     expect(oauthPage).toContain(
       "provider.capabilities?.includes(codeType.capability)"

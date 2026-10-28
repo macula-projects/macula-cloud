@@ -16,6 +16,7 @@
  */
 package dev.macula.cloud.iam.config;
 
+import dev.macula.boot.constants.GlobalConstants;
 import dev.macula.cloud.iam.controller.ProtocolVerificationCodeController;
 import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeClientSettings;
 import dev.macula.cloud.iam.service.support.SysOAuth2ClientService;
@@ -37,7 +38,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * 依据单值 Client 提示与 Client 的精确 Origin allowlist 生成验证码端点 CORS 策略。
+ * 为 Token 与验证码协议端点生成受控 CORS 策略。
  *
  * @author Rain
  * @since 6.1.0
@@ -52,22 +53,34 @@ public class ProtocolLoginCorsConfigurationSource implements CorsConfigurationSo
 
     private final RegisteredClientRepository clients;
     private final SysOAuth2ClientService clientService;
+    private final String tokenEndpoint;
 
     @Override
     public CorsConfiguration getCorsConfiguration(HttpServletRequest request) {
-        if (!PATHS.contains(applicationPath(request))) {
+        String path = applicationPath(request);
+        boolean tokenRequest = tokenEndpoint.equals(path);
+        if (!tokenRequest && !PATHS.contains(path)) {
             return null;
         }
         String origin = singleHeader(request, HttpHeaders.ORIGIN);
         if (HttpMethod.OPTIONS.matches(request.getMethod())) {
-            return preflightConfiguration(request, origin);
+            return preflightConfiguration(request, origin, tokenRequest);
+        }
+        if (!HttpMethod.POST.matches(request.getMethod())) {
+            return tokenRequest && hasOriginHeader(request) ? deniedConfiguration() : null;
+        }
+        if (tokenRequest) {
+            if (origin == null) {
+                return hasOriginHeader(request) ? deniedConfiguration() : null;
+            }
+            return clientService.allowedOrigins().contains(origin) ? tokenConfiguration(origin) : deniedConfiguration();
         }
         String clientId = singleHeader(request, ProtocolVerificationCodeController.CLIENT_ID_HEADER);
         RegisteredClient client = clientId == null ? null : clients.findByClientId(clientId);
-        if (client == null || origin == null || !allowedOrigins(client).contains(origin)) {
+        if (origin == null || client == null || !allowedOrigins(client).contains(origin)) {
             return null;
         }
-        return configuration(origin);
+        return verificationConfiguration(origin);
     }
 
     private String applicationPath(HttpServletRequest request) {
@@ -79,33 +92,63 @@ public class ProtocolLoginCorsConfigurationSource implements CorsConfigurationSo
         return path;
     }
 
-    private CorsConfiguration preflightConfiguration(HttpServletRequest request, String origin) {
-        if (origin == null || !declaresRequiredHeaders(request) || !clientService.hasAllowedOrigin(origin)) {
-            return null;
+    private CorsConfiguration preflightConfiguration(HttpServletRequest request, String origin,
+        boolean tokenRequest) {
+        if (origin == null) {
+            return tokenRequest && hasOriginHeader(request) ? deniedConfiguration() : null;
         }
-        return configuration(origin);
+        if (!declaresRequiredHeaders(request, tokenRequest) || !clientService.allowedOrigins().contains(origin)) {
+            return tokenRequest ? deniedConfiguration() : null;
+        }
+        return tokenRequest ? tokenConfiguration(origin) : verificationConfiguration(origin);
     }
 
-    private boolean declaresRequiredHeaders(HttpServletRequest request) {
+    private boolean declaresRequiredHeaders(HttpServletRequest request, boolean tokenRequest) {
         String requestedHeaders = request.getHeader(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS);
-        if (requestedHeaders == null) {
-            return false;
+        if (requestedHeaders == null || requestedHeaders.isBlank()) {
+            return tokenRequest;
         }
         Set<String> names = List.of(requestedHeaders.split(",")).stream()
             .map(String::trim).map(value -> value.toLowerCase(Locale.ROOT)).collect(Collectors.toSet());
-        return names.contains(HttpHeaders.CONTENT_TYPE.toLowerCase(Locale.ROOT))
+        Set<String> allowed = tokenRequest
+            ? Set.of(HttpHeaders.CONTENT_TYPE.toLowerCase(Locale.ROOT),
+                HttpHeaders.AUTHORIZATION.toLowerCase(Locale.ROOT),
+                GlobalConstants.TENANT_ID_NAME.toLowerCase(Locale.ROOT))
+            : Set.of(HttpHeaders.CONTENT_TYPE.toLowerCase(Locale.ROOT),
+                ProtocolVerificationCodeController.CLIENT_ID_HEADER.toLowerCase(Locale.ROOT));
+        if (names.stream().anyMatch(String::isBlank) || !allowed.containsAll(names)) {
+            return false;
+        }
+        return tokenRequest || names.contains(HttpHeaders.CONTENT_TYPE.toLowerCase(Locale.ROOT))
             && names.contains(ProtocolVerificationCodeController.CLIENT_ID_HEADER.toLowerCase(Locale.ROOT));
     }
 
-    private CorsConfiguration configuration(String origin) {
+    private CorsConfiguration tokenConfiguration(String origin) {
+        return configuration(origin, List.of(HttpHeaders.CONTENT_TYPE, HttpHeaders.AUTHORIZATION,
+            GlobalConstants.TENANT_ID_NAME));
+    }
+
+    private CorsConfiguration verificationConfiguration(String origin) {
+        return configuration(origin, List.of(HttpHeaders.CONTENT_TYPE,
+            ProtocolVerificationCodeController.CLIENT_ID_HEADER));
+    }
+
+    private CorsConfiguration configuration(String origin, List<String> allowedHeaders) {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(List.of(origin));
         configuration.setAllowedMethods(List.of(HttpMethod.POST.name(), HttpMethod.OPTIONS.name()));
-        configuration.setAllowedHeaders(List.of(HttpHeaders.CONTENT_TYPE,
-            ProtocolVerificationCodeController.CLIENT_ID_HEADER));
+        configuration.setAllowedHeaders(allowedHeaders);
         configuration.setAllowCredentials(false);
         configuration.setMaxAge(MAX_AGE);
         return configuration;
+    }
+
+    private CorsConfiguration deniedConfiguration() {
+        return new CorsConfiguration();
+    }
+
+    private boolean hasOriginHeader(HttpServletRequest request) {
+        return request.getHeader(HttpHeaders.ORIGIN) != null;
     }
 
     private String singleHeader(HttpServletRequest request, String name) {

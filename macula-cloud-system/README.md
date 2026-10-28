@@ -113,6 +113,13 @@ System 数据库同时供 IAM 使用，清理后相关账号、权限及认证�
   升级时应先停止或排空全部旧 IAM 实例，由 System 执行并验证 V10，再失效专用 OAuth Client 缓存，最后
   启动新 IAM；禁止新旧 IAM 跨 V10 混跑，也不要通过清空共享 Redis 代替精确缓存失效。
 
+- V11 只把 `sys_oauth2_client.allowed_origins` 的注释扩展为浏览器协议端点的统一精确 Origin，不修改或回填
+  任何 Client 数据。该字段可独立于 grant 配置；空列表表示 IAM 拒绝该 Client 的全部浏览器跨域协议请求。
+  短信和邮箱 grant 仍必须使用 public PKCE Client。升级前必须在旧 IAM 仍运行时盘点浏览器 Client 并配置
+  Origin；无法通过整表保存的历史 Client 按 `deploy/README.md` 的受控 DBA 步骤只更新该字段。Client 新增、
+  修改、改密或删除在事务提交后清理共享 OAuth Client 缓存区域，使 RegisteredClient 与全局 Origin 索引共同
+  失效；IAM 对实际 Token POST 仍按已认证 client_id 查询权威数据，缓存不作为最终 Origin 授权依据。
+
 - OAuth Client 的每个 `ExternalCodeType` 必须选择一个启用、provider 类型相符且具备对应配置能力的
   身份源 registration。微信移动应用、小程序和网站应用使用各自的 App ID/secret；飞书浏览器 code
   使用固定外部 redirect URI；阿里云号码认证使用独立 AccessKey。管理接口只回显非敏感目录和

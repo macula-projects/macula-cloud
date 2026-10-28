@@ -53,3 +53,91 @@
 - `admin-identity-security-settings.test.js` 和 `admin-identity-security-settings.cy.js` 证明 Origin 字段新语义可见，已有值保存和重开后不丢失，空值提示明确；`example.cy.js` 断言登录 Token URL、body 和 Header 保持原合同且不存在新增 Client 提示。
 - Stage 4 依次运行 IAM/System 最小 Maven 测试、根 `mvn test -Plocal`、隔离 MySQL migration IT、Admin `npm run test:unit`、`npm run build`、目标及完整 Cypress、`git diff --check`；分别报告静态、mock 浏览器、隔离数据库和代码测试证据。
 - 本地 Compose 运行时使用两个 Client 与不同 Origin 验证允许、跨 Client、未知 Origin、空配置和无 Origin 服务端请求，并做日志敏感信息检查；该证据不替代真实外部系统验收、生产迁移或 `bands.yaml` SLO 数据。
+
+## Implementation record
+- 2026-10-27：按批准顺序完成实现，没有计划外范围偏差。Token 请求合同保持不变；全局 Origin 配置已删除；实际浏览器 Token POST 在 Client 认证后、grant Provider 前按已认证 Client 精确校验 Origin；无 Origin 的服务端请求旁路该校验。
+- Build 阶段仅执行编译级与静态自检：目标模块 `compile`、`test-compile`、Admin 目标文件 ESLint、Compose 配置渲染和 `git diff --check` 均通过。首次 `compile` 发现一处重命名后的旧方法调用并已就地修正；未提前运行 Stage 4 的单元、集成、构建或运行时测试。
+- Test 阶段首次真实过滤链启动发现 Spring Security 7 不允许把动态加入的 `OAuth2ClientAuthenticationFilter` 作为外部 `addFilterAfter` 顺序锚点。依据当前 7.0.7 源码，将 Origin 过滤器显式放在已注册的 `UsernamePasswordAuthenticationFilter` 前；Authorization Server 自身把 Client 认证放在 `AbstractPreAuthenticatedProcessingFilter` 后、Token Endpoint 放在 `AuthorizationFilter` 后，因此仍严格位于 Client 认证与 grant 处理之间，不改变批准架构。
+- Test 阶段真实预检还证明 `CorsConfigurationSource` 对已识别 Token 端点返回 `null` 只会省略 CORS 响应头，不会稳定产生计划要求的 403。Token 请求带 Origin 但来源、方法或请求 Header 非法时改为返回空 CORS 策略，由 Spring 标准 CORS 处理器显式拒绝；无 Origin 请求、非协议端点及既有验证码端点的原失败语义保持不变。
+- Compose 日志泄漏检查发现 Nacos naming client 会在 IAM 启动时以 INFO 输出非空 `username/password` 初始化属性。IAM 将该第三方 logger 收紧为 WARN；不改变 Nacos 连接或认证配置，仅确保本次要求的密码日志检查可成立。
+- 最终全量 Cypress 复跑发现既有“延迟目录”用例依赖两次 hash 导航重新请求目录，应用复用当前页面状态时第二次请求并不稳定发生。测试改为第二段注册一次性延迟 intercept 后显式 reload，使“目录晚到”成为确定前提；页面行为与生产代码不变。
+
+## Code Round 1 remediation (from accepted spec revision 2026-10-28)
+
+### Additional files that change
+- `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/protocol/oauth2/client/PublicTokenClientAuthenticationConverter.java`：只为 password、sms、email、external_code、refresh_token 的 Token POST 解析单值 public `client_id`；遇到 Basic、secret 或 assertion 凭据时不接管框架认证。
+- `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/protocol/oauth2/client/PublicTokenClientAuthenticationProvider.java`：从 `RegisteredClientRepository` 建立受限的 `ClientAuthenticationMethod.NONE` Principal，要求 Client 仅配置 `none` 且登记当前 grant；不处理 authorization_code PKCE 或 client_credentials。
+- `macula-cloud-iam/src/test/java/dev/macula/cloud/iam/protocol/oauth2/client/PublicTokenClientAuthenticationConverterTest.java`、`PublicTokenClientAuthenticationProviderTest.java`：覆盖允许的 public grant、重复/缺失 client_id、混入 confidential 凭据、未知 Client、错误认证方式、未登记 grant 及明确拒绝 public client_credentials。
+- `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/service/support/SysOAuth2ClientService.java`、`impl/SysOAuth2ClientServiceImpl.java`：把逐 Origin `FIND_IN_SET` 查询替换为固定键缓存的规范化 Origin 集合；缓存 miss 一次读取非空 Origin 列，后续匿名请求只做集合包含判断。
+- `macula-cloud-iam/src/test/java/dev/macula/cloud/iam/service/support/impl/SysOAuth2ClientServiceImplTest.java`：证明固定键缓存命中不重复访问数据库，集合规范化，缓存加载失败关闭。
+- `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/protocol/oauth2/grant/CompatibilityRefreshTokenAuthenticationProvider.java`：public Client 交给框架标准 refresh Provider 校验 Token 归属，既有 confidential password/sms openid 兼容路径保持不变。
+- `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/protocol/oauth2/grant/base/OAuth2UserGrantTokenIssuer.java`：移除旧有的 public Client refresh 排除条件，使已认证 public 用户 grant 在 Client 已登记 `refresh_token` 时可签发 refresh token；归属仍由框架 refresh Provider 校验。
+- `.sdlc/iam-client-token-cors/verification.md`：只追加修复后的 Stage 4 重跑命令、结果、运行时证据和历史失败说明。
+
+### Remediation order
+1. 修正 Token 预检：只校验浏览器实际声明的 Header 均在 allowlist；不再强制声明 safelisted `Content-Type`，保留验证码端点必须声明 `Content-Type` 和 Client Header 的旧规则。
+2. 增加受限 public Token Client converter/provider，并通过 Spring Authorization Server `clientAuthentication` 扩展点注册；authorization_code 继续由官方 PKCE converter/provider 处理，confidential Client 继续走官方认证，public client_credentials 不进入扩展。
+3. 保持 `OAuth2TokenOriginFilter` 位于 Client 认证后、grant Provider 前，但不再把缓存中的 RegisteredClient Origin 当作最终授权依据：过滤器用已认证 Client 的 `client_id` 走现有唯一索引读取权威数据库行，再精确比较 Origin。为 public sms、email、external_code、password、refresh 增加真实过滤链可达性测试，并覆盖混入 secret/Authorization/assertion、跨 Client Origin 和 public client_credentials 拒绝。
+4. 将预检/传输层的全局 Origin 存在性改为共享 OAuth Client 缓存区域的固定索引键，并启用同步 single-flight 加载；System 的 Client 新增、修改、改密、删除在事务提交后清理该缓存区域。清理失败时旧索引最多暂时允许浏览器发送实际请求，不能通过第 3 步的权威 Client/Origin 校验；新增 Origin 在缓存刷新前保持失败关闭。
+5. 更新 IAM/System 单元测试、README 和验证记录，重新执行 Stage 4 的目标 Maven、根 Maven、隔离迁移、Admin 单测/构建/E2E 与 Compose 运行时矩阵；修复后回到 Stage 5 Code Round 2，只审本轮增量。
+
+### Remediation risks
+- public Client 无 secret：converter/provider 只能建立 `none` Client 身份，不能替代 grant 凭证校验；必须限制 endpoint、grant、参数形态和 RegisteredClient 配置，防止绕过官方 PKCE 或把 confidential Client 降级为 public。
+- public refresh：必须由框架 refresh Provider 校验 refresh token 与 RegisteredClient 归属；既有 compatibility wrapper 只保留 confidential password/sms openid 分支，不能自行放宽 Token 归属，且 Client B 使用 Client A refresh token 必须在 Token Generator 前拒绝。
+- 缓存失效：全局缓存只提供非授权性的 CORS 传输许可；撤销 Origin 的最终拒绝依赖已认证 Client ID 的权威数据库行而不是缓存。缓存读取、single-flight 加载或权威数据库查询异常必须拒绝请求；缓存清理失败不得成为继续签发 Token 的条件。
+- 预检 Header：Token 与验证码端点规则不同；只修 Token 的 safelisted Header 语义，不能让验证码端点丢失现有 Client Header 约束。
+
+### Remediation proof
+- public Client converter/provider 单元测试和 `IamProtocolTest` 真实链证明 sms、email、external_code、password、refresh 的匹配 Origin 能到达原 grant 校验，同时 authorization_code PKCE、confidential Client、public client_credentials 和恶意混合凭据保持原安全边界；public Client B 使用 Client A refresh token 必须返回 `invalid_grant` 且 Token Generator 无调用，既有 confidential compatibility refresh 继续通过。
+- `ProtocolLoginCorsConfigurationSourceTest` 分别覆盖无非 safelisted Header、仅 Authorization、仅 tenantId、二者组合、显式 Content-Type 和未知 Header；验证码预检旧规则继续通过。
+- IAM Origin 索引缓存并发测试证明任意 Origin 共用一个缓存项，多个并发 cache miss 只触发一次全表加载，其余请求复用同一结果；加载异常使全部等待请求失败关闭。System 测试证明新增/更新/改密/删除只在事务提交后清理 OAuth Client 缓存区域；额外测试模拟清理失败和陈旧预检索引，证明实际 POST 仍按已认证 Client ID 查询权威数据库并拒绝已撤销 Origin。
+- 修复后的完整 Stage 4 验证重新证明 Maven、Flyway、Admin、Cypress、Compose 双 Client、无 Origin server-to-server 和敏感日志边界。
+
+### Remediation implementation record
+- 2026-10-28：按获批修复顺序完成源码与测试实现。Token 预检不再要求 safelisted `Content-Type` 出现在 `Access-Control-Request-Headers`；验证码预检仍要求 `Content-Type` 与 Client Header。public Client 扩展只接管 password、sms、email、external_code、refresh_token 的单值 `client_id` 且无 confidential 凭据请求；authorization_code PKCE、confidential Client 和 public client_credentials 继续由框架原路径处理。
+- Origin 全局索引改为 `@Cacheable(sync=true)` 的固定缓存键。实际 Token POST 不信任该缓存或 RegisteredClient 缓存中的 Origin，而是用已认证 Client ID 读取权威数据库行并精确比较；System Client 写事务提交后清理 OAuth Client 缓存区域。public refresh 直接委托框架标准 Provider 校验归属，既有 confidential compatibility 分支不变。
+- 新增 converter/provider、固定索引并发、缓存异常、权威 Origin、public grant 真实过滤链和跨 Client refresh 测试。首次 `test-compile` 因测试使用了错误的 Spring Security 7 Client token 构造器失败，修正测试夹具后目标 IAM/System `test-compile` 成功；未运行测试用例。
+- Stage 4 首次定向执行证明旧签发器仍显式排除 `ClientAuthenticationMethod.NONE` 的 refresh token；为实现已接受的 public refresh 要求，补充修改 `OAuth2UserGrantTokenIssuer`，仅移除该排除条件，不改变 Client 必须登记 `refresh_token`、Client 已认证和框架 refresh 归属校验。该实际偏差已补入 Additional files 并由成功、跨 Client 拒绝及 confidential 回归测试覆盖。
+- 直接执行 Maven `checkstyle:check` 先触发插件默认 `sun_checks.xml`，随后使用仓库 `.config/checkstyle.xml` 时暴露 IAM/System API 的既有全量违规。改为用同一仓库规则和 header 精确检查本次修改的 IAM/System 主代码文件，均为 0 violation；同时修复了本次触及的 compatibility provider 中既有无花括号控制语句。`git diff --check` 通过。
+- Stage 4 修复后验证于 2026-10-28 全绿：目标 IAM 57 项与 System 13 项、根 11 模块、隔离 MySQL V11、Admin 51 项 Vitest、20 项目标及 30 项全量 Cypress、生产构建、变更文件 Checkstyle/ESLint、Compose 配置和运行时矩阵全部通过。Compose 还证明陈旧传输索引下已撤销 Origin 仍被权威数据库校验拒绝；两个临时 Client Origin 已恢复为空。完整命令和证据见 `verification.md`。
+
+## Code Round 2 remediation
+
+### Additional files that change
+- `macula-cloud-api/macula-cloud-system-api/src/main/java/dev/macula/cloud/system/security/OAuth2ClientCacheNames.java`：新增 IAM/System 共用的 Token Origin 索引缓存 region 名称，避免与任意 OAuth Client ID 共用键空间。
+- `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/protocol/oauth2/client/PublicTokenClientAuthenticationConverter.java`：构造时接收 Token endpoint matcher，并在解析任何参数前只接受匹配的 POST Token 请求。
+- `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/config/ProtocolOAuth2Configuration.java`：使用当前 `AuthorizationServerSettings` 的 Token endpoint 创建 matcher 后注册 public converter，不改变其他 Client 认证端点。
+- `macula-cloud-iam/src/test/java/dev/macula/cloud/iam/protocol/oauth2/client/PublicTokenClientAuthenticationConverterTest.java`：覆盖 Token POST 成功以及 introspection、revocation、device authorization、PAR、非 POST 和相似路径不接管。
+- `macula-cloud-iam/src/test/java/dev/macula/cloud/iam/config/IamProtocolTest.java`：在真实共享 Client 认证过滤链中证明 public Client 不能通过伪造 `grant_type` 认证 introspection/revocation；既有 confidential 端点与 public Token grant 保持通过。
+- `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/service/support/impl/SysOAuth2ClientServiceImpl.java`：把固定 Origin 索引移到共享契约定义的独立 cache region，固定 region 内仍只使用单一索引键并保持 `sync=true`。
+- `macula-cloud-iam/src/test/java/dev/macula/cloud/iam/service/support/impl/SysOAuth2ClientServiceImplTest.java`：同时装配 Client 与 Origin 两个 cache region，证明相同字符串键可在两个 region 分别保存不同类型且 Origin 并发 single-flight 不回退。
+- `macula-cloud-system/src/main/java/dev/macula/cloud/system/service/impl/OAuth2ClientConfigServiceImpl.java`：事务提交后分别清理 RegisteredClient region 与 Token Origin 索引 region；任一 region 缺失或清理异常都显式失败。
+- `macula-cloud-system/src/test/java/dev/macula/cloud/system/service/impl/OAuth2ClientConfigServiceImplTest.java`：覆盖提交后两个 region 都被清理、提交前/回滚不清理、region 缺失和任一清理异常显式失败。
+- `.sdlc/iam-client-token-cors/plan.md`、`.sdlc/iam-client-token-cors/review-findings.md`、`.sdlc/iam-client-token-cors/verification.md`：记录修复计划、Plan review、实施偏差和重新验证证据。
+
+### Remediation order
+1. 在 System API 定义独立的 Token Origin 索引 cache region 常量，IAM 和 System 都只引用该共享契约；不修改 Macula Boot，也不更改现有 RegisteredClient cache region。
+2. 将 `allowedOrigins()` 的固定索引键迁到新 region。System 的事务后清理同时覆盖旧 Client region 和新 Origin region，先解析并确认两个 region 都存在，再注册单个 `afterCommit` 回调，避免配置错误只清一半。
+3. 为 public Client converter 注入严格的 POST Token endpoint matcher，并在读取 form/query 参数前拒绝所有非匹配请求。matcher 使用 `AuthorizationServerSettings.getTokenEndpoint()`，不硬编码 `/oauth2/token`，不影响官方 confidential、PKCE、introspection、revocation、device authorization 或 PAR converter/provider。
+4. 增加 converter 单元、真实安全链和双 cache region 回归测试；保留 Code Round 1 的 public password/sms/email/external_code/refresh、跨 Client refresh、预检 Header、权威 Origin 与 single-flight 测试。
+5. 实施完成后返回 Stage 4，重新执行目标 Maven、根 Maven、隔离迁移、Admin Vitest/build/Cypress、变更文件 Checkstyle/ESLint、Compose 配置与运行时矩阵；验证全绿后再进入 Code Round 3。
+
+### Remediation risks
+- 端点 matcher 必须在 converter 的最前面执行；若先解析参数，非 Token 端点仍可能被异常或参数语义影响。Token endpoint 可配置，禁止在 converter 内写死默认路径。
+- Spring Authorization Server 的共享 Client 认证过滤器覆盖多个端点；负向测试必须经过真实过滤链，不能只依赖 converter 单测。
+- 分离 cache region 后，System 必须对两个 region 保持同一事务提交后的失效语义；只清旧 region 会让新增 Origin 暂时失败关闭，只清新 region 会保留陈旧 RegisteredClient。两者都不能在事务回滚时清理。
+- cache region 名称是 IAM/System 跨服务安全契约，应放在现有 System API 模块；不得在两个部署模块复制字符串，也不得为此把运行时实现引入 API 模块。
+- 当前工作区尚未提交，Code Round 3 仍需以 remediation 文件范围和记录的 finding 为界去重，不能把旧 finding 重报为新问题。
+
+### Remediation proof
+- `PublicTokenClientAuthenticationConverterTest` 证明只有配置 Token endpoint 的 POST 请求可建立受限 public Client 请求；introspection、revocation、device authorization、PAR、GET 和近似路径均返回 `null`，且非 Token 请求不会因伪造 grant/client 参数抛出 public converter 错误。
+- `IamProtocolTest` 先取得有效 Token，再证明 public Client 使用支持的伪造 `grant_type` 调用 introspection/revocation 不能建立 Client 身份或读取/撤销 Token；confidential introspection/revocation 和全部既有 public Token grant 回归保持。
+- `SysOAuth2ClientServiceImplTest` 证明 Origin 索引 cache region 与 RegisteredClient region 名称不同，同一 `__allowed_origins__` 键可分别保存 `Set<String>` 与 Client marker，不发生类型碰撞；8 路并发 miss 仍只加载一次。
+- `OAuth2ClientConfigServiceImplTest` 证明成功事务只在提交后清理两个 cache region，失败写入和回滚均不清理，region 缺失或清理异常可见；权威数据库 Origin 校验继续使陈旧传输索引失败关闭。
+- 修复后的 Stage 4 完整证据追加到 `verification.md`，并把 Code Round 2 两项 finding 仅在验证完成后标为 fixed。
+
+### Remediation implementation record
+- 2026-10-28：按获批顺序完成 Code Round 2 修复，没有计划外范围偏差。新增 System API 共享缓存 region 常量；IAM Origin 索引迁到独立 region；System 在事务提交后清理 RegisteredClient 与 Origin 索引两个 region，并在 region 缺失或任一清理失败时显式暴露错误。
+- public Client converter 现在使用基于当前 `AuthorizationServerSettings` Token endpoint 的严格 POST matcher，并在读取任何请求参数前拒绝 introspection、revocation、device authorization、PAR、非 POST 和近似路径。真实安全链回归覆盖 public Client 不能借伪造 `grant_type` 在 introspection/revocation 建立身份，且未授权 revocation 不会撤销目标 Token。
+- 补充双 cache region 类型隔离、8 路 single-flight 保持、两类清理异常、region 缺失、提交前和回滚不清理测试。仓库不存在 `CLAUDE.md`，因此按根 `AGENTS.md` 的按需规则读取并遵循 architecture、backend-development 与 testing 规则，没有绕过项目约束。
+- Build 阶段执行 IAM/System 及依赖模块 `test-compile`，5 个 reactor 模块成功；按仓库 Checkstyle 配置精确检查本轮变更的 System API、IAM、System 主代码文件，均为 0 violation；`git diff --check` 通过。尚未运行测试用例，正式验证留给 Stage 4。

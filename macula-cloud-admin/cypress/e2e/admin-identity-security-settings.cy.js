@@ -136,7 +136,8 @@ describe("平台身份、消息与接入应用管理", () => {
     path,
     externalCodeCatalog = { codeTypes: [], providerRegistrations: [] },
     externalCodeCatalogDelay = 0,
-    externalCodeCatalogAlias = "externalCodeCatalog"
+    externalCodeCatalogAlias = "externalCodeCatalog",
+    externalCodeCatalogTimes
   ) {
     cy.intercept(
       "GET",
@@ -144,8 +145,13 @@ describe("平台身份、消息与接入应用管理", () => {
       ok(providerCatalog)
     ).as("providerCatalog");
     cy.intercept(
-      "GET",
-      "**/system/api/v1/oauth2-clients/external-code-catalog*",
+      {
+        method: "GET",
+        url: "**/system/api/v1/oauth2-clients/external-code-catalog*",
+        ...(externalCodeCatalogTimes
+          ? { times: externalCodeCatalogTimes }
+          : {}),
+      },
       { ...ok(externalCodeCatalog), delay: externalCodeCatalogDelay }
     ).as(externalCodeCatalogAlias);
     cy.setCookie("TOKEN", "root-test-token");
@@ -752,6 +758,7 @@ describe("平台身份、消息与接入应用管理", () => {
       );
       expect(request.body.browserLoginProviderTypes).to.deep.equal(["WECOM"]);
       expect(request.body.directLoginProviderType).to.equal("WECOM");
+      expect(request.body.allowedOrigins).to.deep.equal([]);
     });
     cy.wait("@clients");
     cy.contains("tr", "旧多端应用")
@@ -821,7 +828,13 @@ describe("平台身份、消息与接入应用管理", () => {
       ok([{ value: 1, label: "平台租户" }])
     ).as("tenants");
 
-    open("/system/oauth2-client", catalog, 1000, "manualExternalCodeCatalog");
+    open(
+      "/system/oauth2-client",
+      catalog,
+      1000,
+      "manualExternalCodeCatalog",
+      1
+    );
     cy.wait("@clients");
     cy.contains("tr", "延迟目录应用").contains("button", "编辑").click();
     cy.wait("@manualExternalCodeCatalog");
@@ -833,8 +846,16 @@ describe("平台身份、消息与接入应用管理", () => {
       .should("contain", "企业微信");
 
     cy.get(".el-drawer__close-btn:visible").click();
-    cy.visit("/#/");
-    open("/system/oauth2-client", catalog, 1000);
+    cy.intercept(
+      {
+        method: "GET",
+        url: "**/system/api/v1/oauth2-clients/external-code-catalog*",
+        times: 1,
+      },
+      { ...ok(catalog), delay: 1000 }
+    ).as("externalCodeCatalog");
+    cy.reload();
+    cy.wait("@clients");
     cy.contains("tr", "延迟目录应用").contains("button", "编辑").click();
     cy.contains(".el-segmented__item", "微信小程序").click();
     cy.wait("@externalCodeCatalog");

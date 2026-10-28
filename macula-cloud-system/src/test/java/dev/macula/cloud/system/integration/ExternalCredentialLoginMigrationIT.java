@@ -35,7 +35,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * 在显式隔离 MySQL 中验证 V8 到 V10 的标识预检、Client 默认拒绝与过时配置清理。
+ * 在显式隔离 MySQL 中验证 V8 到 V11 的标识预检、Client 默认拒绝与过时配置清理。
  *
  * @author Rain
  * @since 6.1.0
@@ -93,6 +93,7 @@ class ExternalCredentialLoginMigrationIT {
 
         Flyway v10 = flyway(url, username, password, "10");
         v10.migrate();
+        String adminClientSnapshot;
         try (Connection connection = DriverManager.getConnection(url, username, password)) {
             assertEquals(2L, count(connection,
                 "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = ? "
@@ -112,9 +113,28 @@ class ExternalCredentialLoginMigrationIT {
             assertEquals(1L, count(connection,
                 "SELECT COUNT(*) FROM sys_oauth2_client_external_provider "
                     + "WHERE code_type = 'WECOM_MINIAPP_CODE'"));
+            adminClientSnapshot = clientSnapshot(connection,
+                "e4da4a32-592b-46f0-ae1d-784310e88423");
         }
 
-        v10.clean();
+        Flyway v11 = flyway(url, username, password, "11");
+        v11.migrate();
+        try (Connection connection = DriverManager.getConnection(url, username, password)) {
+            assertEquals("浏览器协议端点允许的精确 Origin，逗号分隔", columnComment(connection,
+                database, "sys_oauth2_client", "allowed_origins"));
+            assertEquals(0L, count(connection,
+                "SELECT COUNT(*) FROM sys_oauth2_client WHERE allowed_origins <> ''"));
+            assertEquals(1, updateHistoricalClientOrigin(connection,
+                "e4da4a32-592b-46f0-ae1d-784310e88423", "https://admin.example.test"));
+            assertEquals(adminClientSnapshot, clientSnapshot(connection,
+                "e4da4a32-592b-46f0-ae1d-784310e88423"));
+            assertEquals(1L, count(connection,
+                "SELECT COUNT(*) FROM sys_oauth2_client WHERE client_id = "
+                    + "'e4da4a32-592b-46f0-ae1d-784310e88423' "
+                    + "AND allowed_origins = 'https://admin.example.test'"));
+        }
+
+        v11.clean();
         Flyway nonCanonical = flyway(url, username, password, "8");
         nonCanonical.migrate();
         try (Connection connection = DriverManager.getConnection(url, username, password)) {
@@ -197,6 +217,47 @@ class ExternalCredentialLoginMigrationIT {
         try (PreparedStatement statement = connection.prepareStatement(
             "ALTER TABLE sys_user ADD UNIQUE KEY uk_sys_user_mobile (mobile)")) {
             statement.executeUpdate();
+        }
+    }
+
+    private static int updateHistoricalClientOrigin(Connection connection, String clientId, String origin)
+        throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+            "UPDATE sys_oauth2_client SET allowed_origins = ? WHERE client_id = ? AND allowed_origins = '' "
+                + "AND client_authentication_methods = 'client_secret_basic,client_secret_post' "
+                + "AND authorization_grant_types = 'authorization_code,client_credentials,refresh_token,password,sms'")) {
+            statement.setString(1, origin);
+            statement.setString(2, clientId);
+            return statement.executeUpdate();
+        }
+    }
+
+    private static String clientSnapshot(Connection connection, String clientId) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+            "SELECT CONCAT_WS('|', SHA2(client_secret, 256), client_authentication_methods, "
+                + "authorization_grant_types, "
+                + "redirect_uris, scopes, require_proof_key, require_authorization_consent, token_format, "
+                + "reuse_refresh_tokens, user_type, tenant_id) FROM sys_oauth2_client WHERE client_id = ?")) {
+            statement.setString(1, clientId);
+            try (ResultSet result = statement.executeQuery()) {
+                assertTrue(result.next());
+                return result.getString(1);
+            }
+        }
+    }
+
+    private static String columnComment(Connection connection, String database, String table, String column)
+        throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+            "SELECT column_comment FROM information_schema.columns WHERE table_schema = ? "
+                + "AND table_name = ? AND column_name = ?")) {
+            statement.setString(1, database);
+            statement.setString(2, table);
+            statement.setString(3, column);
+            try (ResultSet result = statement.executeQuery()) {
+                assertTrue(result.next());
+                return result.getString(1);
+            }
         }
     }
 

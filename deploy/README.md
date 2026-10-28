@@ -115,7 +115,40 @@ Admin 的 `development` mode 对应本地 `local` 环境：`/api` 由 Vite 代�
 
 第三方登录的 GitHub/企业微信回调按固定 `IAM_ISSUER_URI` 生成，不能从请求 Host 推导。默认本机直连入口 `http://127.0.0.1:${IAM_HOST_PORT}/login` 的回调会回到 IAM 端口；若要从 Admin 的 `/iam/login` 进入并回到 Admin 同源地址，请在 `deploy/.env` 中设置例如 `IAM_ISSUER_URI=http://127.0.0.1:5900/iam`（按实际公开域名、协议和端口替换），并在各身份提供商登记 `<issuer>/login/github`、`<issuer>/login/wecom`。一个部署只使用一个固定公开回调基址；改变该值后需同步更新提供商登记和已有 OIDC issuer 消费方。`/iam/` 代理会覆盖客户端转发头并传递 `X-Forwarded-Prefix`，不要将 IAM 容器端口直接暴露给不受信客户端。
 
-`IAM_TOKEN_CORS_ALLOWED_ORIGINS` 仅为需要直接访问 IAM `/oauth2/token` 的浏览器配置精确来源，多个来源以英文逗号分隔；禁止 `*`，留空表示禁用跨域。登录、绑定及授权页面不开放跨域，正常容器部署优先使用 Admin 同源 `/iam` 代理。
+浏览器可以直接访问 IAM `/oauth2/token`，不要求每个接入系统提供 `/iam` 代理。允许来源由各 OAuth Client 的
+`allowedOrigins` 精确配置；禁止 `*`，空列表表示拒绝该 Client 的全部浏览器跨域请求。部署级
+`IAM_TOKEN_CORS_ALLOWED_ORIGINS` 已停止使用，也不会作为空配置回退。登录、绑定及授权页面仍不开放跨域。
+
+切换新版 IAM 前，必须在旧 IAM 仍运行时盘点全部浏览器 Client 并配置 Origin。满足当前安全校验的 Client 使用
+System 管理 API；历史 `confidential + sms/email` Client 不能通过整表保存绕过 public PKCE 约束，只能由授权
+DBA 在备份后执行以下窄更新。先替换占位符，检查锁定行与预期原值，再执行 UPDATE；`affected_rows` 必须为 1，
+复查认证方式、grant、secret 摘要及其他字段未变后才能 `COMMIT`，否则执行 `ROLLBACK`：
+
+```sql
+START TRANSACTION;
+SELECT client_id, client_authentication_methods, authorization_grant_types,
+       allowed_origins, SHA2(client_secret, 256) AS client_secret_digest
+FROM sys_oauth2_client
+WHERE client_id = '<CLIENT_ID>'
+FOR UPDATE;
+
+UPDATE sys_oauth2_client
+SET allowed_origins = '<EXACT_ORIGINS_CSV>'
+WHERE client_id = '<CLIENT_ID>'
+  AND allowed_origins = '<EXPECTED_OLD_ORIGINS>'
+  AND client_authentication_methods = '<EXPECTED_AUTH_METHODS>'
+  AND authorization_grant_types = '<EXPECTED_GRANTS>';
+
+SELECT ROW_COUNT() AS affected_rows;
+SELECT client_id, client_authentication_methods, authorization_grant_types,
+       allowed_origins, SHA2(client_secret, 256) AS client_secret_digest
+FROM sys_oauth2_client
+WHERE client_id = '<CLIENT_ID>';
+-- 人工核对全部预期值后执行 COMMIT；任何不一致执行 ROLLBACK。
+```
+
+不要从 redirect URI、请求 Host 或旧全局白名单自动推导 Origin，也不要把本机示例值写入共享或生产数据库。
+回滚到旧 IAM 时恢复旧版本所需的部署级白名单；数据库中已审核的 Client Origin 可以保留。
 
 ## 常用命令
 

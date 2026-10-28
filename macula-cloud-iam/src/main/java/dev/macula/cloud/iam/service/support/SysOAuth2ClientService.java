@@ -19,6 +19,8 @@ package dev.macula.cloud.iam.service.support;
 
 import dev.macula.cloud.iam.pojo.entity.SysOAuth2Client;
 
+import java.util.Set;
+
 /**
  * {@code SysOauth2ClientService} 获取Oauth2Client
  *
@@ -29,10 +31,18 @@ public interface SysOAuth2ClientService {
     SysOAuth2Client getClientByClientId(String clientId);
 
     /**
-     * 判断精确 Origin 是否至少属于一个 OAuth Client。
+     * 返回全部 OAuth Client 登记的精确 Origin 索引。
      *
-     * @param origin 已规范化的 Origin
-     * @return 是否允许预检
+     * @return 不可变 Origin 集合
      */
-    boolean hasAllowedOrigin(String origin);
+    Set<String> allowedOrigins();
+
+    /**
+     * 使用权威 Client 数据校验精确 Origin。
+     *
+     * @param clientId 已认证 Client 标识
+     * @param origin   已规范化 Origin
+     * @return 是否属于该 Client
+     */
+    boolean isAllowedOrigin(String clientId, String origin);
 }

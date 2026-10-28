@@ -48,14 +48,14 @@ class ProtocolLoginCorsConfigurationSourceTest {
     private final RegisteredClientRepository clients = mock(RegisteredClientRepository.class);
     private final SysOAuth2ClientService clientService = mock(SysOAuth2ClientService.class);
     private final ProtocolLoginCorsConfigurationSource source =
-        new ProtocolLoginCorsConfigurationSource(clients, clientService);
+        new ProtocolLoginCorsConfigurationSource(clients, clientService, "/oauth2/token");
 
     @Test
     void preflightUsesOriginWithoutRequiringUnavailableClientHeaderValue() {
         MockHttpServletRequest request = request(HttpMethod.OPTIONS);
         request.addHeader(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS,
             "content-type, " + ProtocolVerificationCodeController.CLIENT_ID_HEADER);
-        when(clientService.hasAllowedOrigin(ORIGIN)).thenReturn(true);
+        when(clientService.allowedOrigins()).thenReturn(Set.of(ORIGIN));
 
         CorsConfiguration configuration = source.getCorsConfiguration(request);
 
@@ -86,9 +86,74 @@ class ProtocolLoginCorsConfigurationSourceTest {
         verifyNoInteractions(clientService, clients);
     }
 
+    @Test
+    void tokenCorsUsesGlobalOriginExistenceOnlyAsTransportPermission() {
+        MockHttpServletRequest preflight = tokenRequest(HttpMethod.OPTIONS);
+        preflight.addHeader(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS,
+            "authorization, content-type, tenantId");
+        when(clientService.allowedOrigins()).thenReturn(Set.of(ORIGIN));
+
+        CorsConfiguration preflightConfiguration = source.getCorsConfiguration(preflight);
+
+        assertThat(preflightConfiguration).isNotNull();
+        assertThat(preflightConfiguration.getAllowedHeaders())
+            .contains(HttpHeaders.AUTHORIZATION, HttpHeaders.CONTENT_TYPE, "tenantId")
+            .doesNotContain(ProtocolVerificationCodeController.CLIENT_ID_HEADER);
+        verifyNoInteractions(clients);
+
+        MockHttpServletRequest post = tokenRequest(HttpMethod.POST);
+        assertThat(source.getCorsConfiguration(post)).isNotNull();
+        verifyNoInteractions(clients);
+    }
+
+    @Test
+    void tokenCorsRejectsUnknownOriginAndNonPostMethod() {
+        MockHttpServletRequest post = tokenRequest(HttpMethod.POST);
+        when(clientService.allowedOrigins()).thenReturn(Set.of());
+        assertThat(source.getCorsConfiguration(post).getAllowedOrigins()).isNullOrEmpty();
+
+        assertThat(source.getCorsConfiguration(tokenRequest(HttpMethod.GET)).getAllowedOrigins()).isNullOrEmpty();
+    }
+
+    @Test
+    void tokenCorsRejectsDuplicateOriginHeaders() {
+        MockHttpServletRequest post = tokenRequest(HttpMethod.POST);
+        post.addHeader(HttpHeaders.ORIGIN, "https://other.example.test");
+
+        assertThat(source.getCorsConfiguration(post).getAllowedOrigins()).isNullOrEmpty();
+        verifyNoInteractions(clientService, clients);
+    }
+
+    @Test
+    void tokenPreflightAcceptsSafelistedAndOptionalHeaderCombinations() {
+        when(clientService.allowedOrigins()).thenReturn(Set.of(ORIGIN));
+
+        assertThat(source.getCorsConfiguration(tokenRequest(HttpMethod.OPTIONS))).isNotNull();
+        for (String headers : Set.of("authorization", "tenantId", "authorization, tenantId", "content-type")) {
+            MockHttpServletRequest request = tokenRequest(HttpMethod.OPTIONS);
+            request.addHeader(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, headers);
+            assertThat(source.getCorsConfiguration(request)).isNotNull();
+        }
+    }
+
+    @Test
+    void tokenPreflightRejectsUnknownRequestedHeader() {
+        MockHttpServletRequest request = tokenRequest(HttpMethod.OPTIONS);
+        request.addHeader(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, "x-unexpected");
+
+        assertThat(source.getCorsConfiguration(request).getAllowedOrigins()).isNullOrEmpty();
+        verifyNoInteractions(clientService, clients);
+    }
+
     private MockHttpServletRequest request(HttpMethod method) {
         MockHttpServletRequest request = new MockHttpServletRequest(method.name(),
             ProtocolVerificationCodeController.CAPTCHA_PATH);
+        request.addHeader(HttpHeaders.ORIGIN, ORIGIN);
+        return request;
+    }
+
+    private MockHttpServletRequest tokenRequest(HttpMethod method) {
+        MockHttpServletRequest request = new MockHttpServletRequest(method.name(), "/oauth2/token");
         request.addHeader(HttpHeaders.ORIGIN, ORIGIN);
         return request;
     }

@@ -30,6 +30,7 @@ import dev.macula.cloud.system.pojo.entity.SysOAuth2ClientConfig;
 import dev.macula.cloud.system.pojo.entity.SysOAuth2ClientExternalProvider;
 import dev.macula.cloud.system.service.OAuth2ClientConfigService;
 import dev.macula.cloud.system.security.OAuth2LoginGrantTypes;
+import dev.macula.cloud.system.security.OAuth2ClientCacheNames;
 import dev.macula.cloud.system.enums.BrowserLoginProviderType;
 import dev.macula.cloud.system.enums.ExternalCodeType;
 import dev.macula.cloud.system.vo.OAuth2ClientVO;
@@ -82,6 +83,7 @@ public class OAuth2ClientConfigServiceImpl implements OAuth2ClientConfigService 
     private static final String MOBILE_APP_SECRET = "mobileAppSecret";
     private static final String MINI_APP_ID = "miniAppId";
     private static final String MINI_APP_SECRET = "miniAppSecret";
+    private static final int ALLOWED_ORIGINS_MAX_LENGTH = 2048;
     private final JsonMapper json = JsonMapper.builder().build();
     private final SysOAuth2ClientConfigMapper mapper;
     private final SysOAuth2ClientExternalProviderMapper externalProviderMapper;
@@ -196,7 +198,7 @@ public class OAuth2ClientConfigServiceImpl implements OAuth2ClientConfigService 
             mapper.updateById(entity);
         }
         replaceExternalProviders(entity.getClientId(), form.getExternalProviderBindings());
-        evictAfterCommit(entity.getClientId());
+        evictAfterCommit();
         return toVO(entity);
     }
 
@@ -209,7 +211,7 @@ public class OAuth2ClientConfigServiceImpl implements OAuth2ClientConfigService 
         }
         entity.setClientSecret(encodeSecret(secret));
         mapper.updateById(entity);
-        evictAfterCommit(entity.getClientId());
+        evictAfterCommit();
     }
 
     @Override
@@ -219,7 +221,7 @@ public class OAuth2ClientConfigServiceImpl implements OAuth2ClientConfigService 
         externalProviderMapper.delete(new LambdaQueryWrapper<SysOAuth2ClientExternalProvider>()
             .eq(SysOAuth2ClientExternalProvider::getClientId, entity.getClientId()));
         mapper.deleteById(id);
-        evictAfterCommit(entity.getClientId());
+        evictAfterCommit();
     }
 
     private void validate(OAuth2ClientForm form) {
@@ -259,11 +261,11 @@ public class OAuth2ClientConfigServiceImpl implements OAuth2ClientConfigService 
         }
         Set<String> allowedOrigins = normalizeOrigins(form.getAllowedOrigins());
         boolean verificationCodeGrant = grants.contains(SMS_GRANT) || grants.contains(OAuth2LoginGrantTypes.EMAIL);
-        if (verificationCodeGrant && (!publicClient || allowedOrigins.isEmpty())) {
-            bad("短信或邮箱验证码 grant 必须由公共客户端配置非空精确 Origin");
+        if (verificationCodeGrant && !publicClient) {
+            bad("短信或邮箱验证码 grant 必须由公共客户端使用");
         }
-        if (!verificationCodeGrant && !allowedOrigins.isEmpty()) {
-            bad("未启用短信或邮箱验证码 grant 时不得配置验证码 Origin");
+        if (csvValue(allowedOrigins).length() > ALLOWED_ORIGINS_MAX_LENGTH) {
+            bad("浏览器协议允许 Origin 超出长度限制");
         }
         validateExternalProviderBindings(externalCodeTypes, externalProviderBindings);
         validateBrowserLoginProviders(browserProviders);
@@ -519,17 +521,41 @@ public class OAuth2ClientConfigServiceImpl implements OAuth2ClientConfigService 
             StringUtils.hasText(e.getClientSecret()));
     }
 
-    private void evictAfterCommit(String clientId) {
-        Cache cache = cacheManager.getCache(CacheConstants.OAUTH2_CLIENT_CACHE_KEY);
-        if (cache == null) {
-            throw new IllegalStateException("IAM 客户端缓存不可用");
-        }
+    private void evictAfterCommit() {
+        Cache clientCache = requireCache(CacheConstants.OAUTH2_CLIENT_CACHE_KEY);
+        Cache originCache = requireCache(OAuth2ClientCacheNames.TOKEN_ORIGIN_INDEX);
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                cache.evict(clientId);
+                clearCaches(clientCache, originCache);
             }
         });
+    }
+
+    private Cache requireCache(String name) {
+        Cache cache = cacheManager.getCache(name);
+        if (cache == null) {
+            throw new IllegalStateException("IAM 客户端缓存不可用");
+        }
+        return cache;
+    }
+
+    private void clearCaches(Cache... caches) {
+        RuntimeException failure = null;
+        for (Cache cache : caches) {
+            try {
+                cache.clear();
+            } catch (RuntimeException ex) {
+                if (failure == null) {
+                    failure = ex;
+                } else {
+                    failure.addSuppressed(ex);
+                }
+            }
+        }
+        if (failure != null) {
+            throw failure;
+        }
     }
 
     private static void bad(String reason) {

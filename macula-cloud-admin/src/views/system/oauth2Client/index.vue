@@ -279,13 +279,16 @@
                 />
               </el-select>
             </el-form-item>
-            <el-form-item label="验证码允许 Origin">
+            <el-form-item label="浏览器协议允许 Origin">
               <el-input
                 v-model="form.allowedOriginsText"
                 type="textarea"
                 :rows="3"
-                placeholder="每行一个精确 origin，例如 https://app.example.com"
+                placeholder="每行一个精确 Origin，例如 https://app.example.com"
               />
+              <span class="hint"
+                >留空时拒绝该 Client 的全部浏览器跨域协议请求</span
+              >
             </el-form-item>
             <el-form-item label="强制 PKCE"
               ><el-switch
