@@ -1,0 +1,43 @@
+# Plan: 租户隔离的菜单路由缓存 (from spec.md 2026-10-29)
+
+Accepted by Rain on 2026-10-29.
+
+## Files that change
+- `.sdlc/tenant-aware-menu-route-cache/plan.md`、`review-findings.md`：记录实施合同、Plan 评审和实际偏差。
+- `macula-cloud-system/src/main/java/dev/macula/cloud/system/service/MenuRouteTenantContext.java`：从 JWT claim、请求租户上下文、ROOT 权限和用户租户成员关系解析并校验菜单查询的可信租户，返回只能由该组件创建的 `TrustedTenant` 捕获值。
+- `macula-cloud-system/src/main/java/dev/macula/cloud/system/service/MenuRouteCacheService.java`：根据 `TrustedTenant` 生成版本化租户缓存 key，并在事务提交后精确淘汰已校验租户的路由缓存。
+- `macula-cloud-system/src/main/java/dev/macula/cloud/system/service/SysMenuService.java`：明确 `cleanCache()` 只清理当前可信租户的路由缓存。
+- `macula-cloud-system/src/main/java/dev/macula/cloud/system/service/impl/SysMenuServiceImpl.java`：按可信租户 key 缓存路由，并让菜单新增、修改、删除、可见性变更在成功提交后精确失效。
+- `macula-cloud-system/src/main/java/dev/macula/cloud/system/service/impl/SysRoleServiceImpl.java`：角色保存、删除和菜单关系变更成功提交后精确失效当前租户路由缓存。
+- `macula-cloud-system/src/main/java/dev/macula/cloud/system/controller/SysMenuController.java`：移除固定 `'routes'` 的 Controller 级缓存淘汰，交由事务服务统一处理。
+- `macula-cloud-system/src/test/java/dev/macula/cloud/system/service/MenuRouteTenantContextTest.java`：覆盖 AK/SK claim、用户切租户、ROOT、默认租户、越权和缺失租户拒绝。
+- `macula-cloud-system/src/test/java/dev/macula/cloud/system/service/MenuRouteCacheServiceTest.java`：覆盖版本化 key、当前租户精确淘汰、事务提交后淘汰和回滚不淘汰。
+- `macula-cloud-system/src/test/java/dev/macula/cloud/system/service/impl/SysMenuServiceImplTest.java`：覆盖不同租户缓存隔离、全部菜单写路径的缓存失效，以及越权租户在任何 Mapper 写入前被拒绝。
+- `macula-cloud-system/src/test/java/dev/macula/cloud/system/service/impl/SysRoleServiceImplTest.java`：覆盖角色保存、删除和菜单更新成功后失效、失败回滚不提前淘汰，以及越权租户零写入。
+- `macula-cloud-system/README.md`：说明菜单租户解析、版本化缓存键、旧共享键退役和禁止混合版本部署。
+
+## Order of work
+1. 实现 `MenuRouteTenantContext`。优先使用 JWT `tenantId` claim；请求上下文与 claim 相同时直接接受。二者不同时，只有带用户角色的主体可进入租户切换校验：ROOT 校验目标租户存在，非 ROOT 校验当前用户名对应用户的 `sys_tenant_user` 关系；无显式关系时只兼容默认租户 1。无租户、应用主体覆盖 claim、未知用户或越权租户统一返回 403。成功时返回内部 `TrustedTenant` 捕获值，解析过程不记录主体或凭据。
+2. 实现 `MenuRouteCacheService`，只接受 `TrustedTenant` 并产生 `routes:v2:{tenantId}` key，从 Spring `CacheManager` 获取 `system` cache。事务活跃时注册 `afterCommit` 精确淘汰；无事务时仅在数据库操作成功返回后立即淘汰。缓存缺失属于服务配置错误，明确失败而非静默跳过。
+3. 将 `SysMenuServiceImpl.listRoutes()` 的 `@Cacheable` key 改为可信租户版本化 key。每个菜单写 Service 入口都必须在首个 Mapper 调用前解析并捕获 `TrustedTenant`；菜单保存、权限更新、删除和可见性更新成功后把同一捕获值交给缓存服务，保证 SQL 租户与失效租户一致；`cleanCache()` 同样先解析当前可信租户。
+4. 移除 `SysMenuController` 的三个固定 `@CacheEvict`，避免事务外误清共享 key。在 `SysRoleServiceImpl.saveRole()`、`deleteRoles()` 和 `updateRoleMenus()` 的首个 Mapper 调用前解析 `TrustedTenant`，全部写入成功后使用同一捕获值注册精确淘汰。`updateRoleStatus()` 当前不参与 `listRoutes()` SQL 结果，不扩大本次范围。
+5. 添加租户解析、缓存事务语义和菜单/角色写路径测试。Spring Cache 代理用内存 CacheManager 依次执行租户 1、12、1 和反向顺序，证明每个租户只装载一次自己的路由且缓存 key 不交叉；越权请求必须在零 Mapper 写入、零缓存操作的状态下失败。
+6. 更新 System README，记录新旧 key、24 小时旧键 TTL、排空旧 System 实例以及可选精确删除旧 `macula:cache:system::routes` 的发布步骤。
+7. Build 阶段运行新增目标单测和 `git diff --check`；完整 System reactor、Docker 双租户验证和旧键清理验证交给 Stage 4。
+
+## Risks
+- 当前请求租户上下文可由 header 建立，不能直接作为可信 key。计划要求在任何缓存读取前完成 claim/ROOT/成员关系校验；应用主体没有用户角色时不得覆盖 JWT claim。
+- 非 ROOT 无显式 `sys_tenant_user` 关系时，现有租户选项逻辑会回退默认租户 1；本实现保持该兼容行为，不能扩展为任意租户。
+- `MenuRouteTenantContext` 不能依赖会反向依赖 `SysMenuService` 的高层 Service，否则会形成循环依赖；成员校验使用现有 Mapper 的只读查询，并保留 Service 层业务编排边界。
+- Spring Cache 切面在方法执行前求值 key；key 解析本身必须完成授权校验，并确保该租户与 MyBatis 实际使用的 `TenantContextHolder`/JWT claim 一致。
+- 固定 key 的 Controller 淘汰移除后，所有菜单和角色菜单写路径必须显式覆盖；漏掉可见性或角色关系会导致最长 24 小时陈旧菜单。
+- 事务内提前淘汰可能让并发请求把旧数据库结果重新写回缓存；因此所有事务写路径必须在 `afterCommit` 淘汰，回滚不得淘汰。
+- 新旧 System 混跑时旧实例仍会返回共享缓存，属于已接受的阻塞发布关注点；代码不会尝试通过清空 Redis 掩盖混跑。
+- 当前工作区有大量其他 OAuth/IAM 未提交改动；实现只触碰计划列出的文件，不格式化、回滚或提交其他改动。
+
+## Proof
+- `MenuRouteTenantContextTest` 证明：claim-only 的 AK/SK 租户成功；应用请求头覆盖 claim 被拒；用户选择 token 租户成功；ROOT 只能切换到存在租户；非 ROOT 只能切换到成员租户；无成员用户只允许默认租户 1；未知用户、越权和无租户均返回 403。
+- `MenuRouteCacheServiceTest` 证明 key 精确为 `routes:v2:1`、`routes:v2:12`；服务只接受解析器返回的 `TrustedTenant`；事务提交前不淘汰、提交后只淘汰当前租户、回滚不淘汰；没有 `system` cache 时明确失败。
+- `SysMenuServiceImplTest` 在 Spring Cache 代理下按 1→12→1 与 12→1→12 调用 `listRoutes()`，断言 Mapper 对每租户只执行一次且结果不串租户；同时覆盖新增、修改、删除、可见性和显式 clean 的当前租户淘汰，并断言越权 header 在零 Mapper 写入、零缓存操作时被拒绝。
+- `SysRoleServiceImplTest` 证明角色保存（含 code 变更）、删除、菜单与权限更新成功后注册淘汰，任一写步骤抛错时事务不会产生提交后淘汰；越权 header 在首个 Mapper 调用前被拒绝。
+- Build 最小验证执行新增测试类和 `git diff --check`。Stage 4 执行 `mvn -pl macula-cloud-api,macula-cloud-api/macula-cloud-system-api,macula-cloud-system -am test -Plocal`，并在 Docker 中使用 Cloud 租户 1、Samples AK/SK 租户 12、再租户 1 进行真实菜单与 Redis key 冒烟；报告只记录租户、菜单归属和 key，不记录 token、AK/SK 或用户名。
