@@ -164,6 +164,47 @@ function grantTypes(value) {
   );
 }
 
+export function normalizeTerminalLoginConfiguration(client) {
+  const supported = new Set(COMMON_EXTERNAL_CODE_TYPES);
+  const externalCodeTypes = [
+    ...new Set(
+      (client.externalCodeTypes || []).filter((codeType) =>
+        supported.has(codeType)
+      )
+    ),
+  ];
+  const externalProviderBindings = Object.fromEntries(
+    externalCodeTypes
+      .filter((codeType) => client.externalProviderBindings?.[codeType] != null)
+      .map((codeType) => [codeType, client.externalProviderBindings[codeType]])
+  );
+  const grants = grantTypes(client.authorizationGrantTypes);
+  if (externalCodeTypes.length) grants.add(EXTERNAL_CODE_GRANT);
+  else grants.delete(EXTERNAL_CODE_GRANT);
+  return {
+    ...client,
+    authorizationGrantTypes: [...grants].join(","),
+    externalCodeTypes,
+    externalProviderBindings,
+  };
+}
+
+export function isLegacyConfidentialVerificationClient(client) {
+  const authenticationMethods = grantTypes(client?.clientAuthenticationMethods);
+  const grants = grantTypes(client?.authorizationGrantTypes);
+  return (
+    authenticationMethods.size > 0 &&
+    !authenticationMethods.has("none") &&
+    (grants.has("sms") || grants.has("email"))
+  );
+}
+
+export function oauthClientErrorMessage(response, fallback = "操作失败") {
+  const cause = typeof response?.cause === "string" ? response.cause : "";
+  const businessCause = cause.match(/^4\d{2} [A-Z_]+ "([^"\r\n]+)"$/);
+  return businessCause?.[1] || response?.msg || fallback;
+}
+
 export function providerCandidatesForCodeType(codeTypeValue, catalog) {
   const definition = (catalog.codeTypes || []).find(
     (item) => item.value === codeTypeValue
@@ -320,13 +361,6 @@ export function loginCapabilitySummary(client) {
     .filter(Boolean)
     .map((method) => method.label);
   if (commonMethods.length) labels.push(commonMethods.join("、"));
-  if (
-    (client.externalCodeTypes || []).some(
-      (value) => !methodByExternalCodeType.has(value)
-    )
-  ) {
-    labels.push("高级兼容配置");
-  }
   return labels.length ? labels.join("；") : "仅本地认证";
 }
 

@@ -17,16 +17,15 @@
 
 package dev.macula.cloud.iam.protocol.oauth2;
 
+import dev.macula.boot.constants.GlobalConstants;
 import dev.macula.boot.constants.SecurityConstants;
 import dev.macula.cloud.iam.service.userdetails.SysUserDetails;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.oauth2.core.endpoint.OAuth2ParameterNames;
 import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenClaimsContext;
-import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenClaimsSet;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenCustomizer;
 
-import java.util.List;
 import java.util.stream.Collectors;
 
 /**
@@ -61,6 +60,9 @@ public class CustomOAuth2TokenCustomizer implements OAuth2TokenCustomizer<OAuth2
             return claims;
         }
         if (principal.getPrincipal() instanceof SysUserDetails user) {
+            if (user.getTenantId() != null) {
+                claims.put(GlobalConstants.TENANT_ID_NAME, user.getTenantId());
+            }
             if (user.getNickname() != null) {
                 claims.put(SecurityConstants.JWT_NICKNAME_KEY, user.getNickname());
             }

@@ -1,9 +1,10 @@
 # Spec: IAM Client 按终端配置登录方式 (from intent.md 2026-10-22)
-Status: accepted.
+Status: accepted (single-terminal revision approved by Rain 2026-10-29).
 
 ## Requirements
-1. OAuth Client 表单以终端类型选择器作为登录能力配置入口，稳定选项为浏览器、APP、微信小程序、企业微信
-   小程序和端内网页；切换终端只改变当前展示内容，不清除其他终端已经选择的配置。
+1. 每个 OAuth Client 必须且只能选择一个终端类型，稳定值为 `BROWSER`、`APP`、`WECHAT_MINIAPP`、
+   `WECOM_MINIAPP` 和 `WEBVIEW`。切换终端必须清除前一终端已选择的登录方式、身份源绑定、direct provider，
+   以及由登录方式派生的 `authorization_code` / `external_code` grant；不同终端不能同时保留勾选状态。
 2. 每个终端只展示面向使用者的中文登录方式，不在常用区域展示 `ExternalCodeType` 枚举名、result type、
    capability 或身份源主键。
 3. 浏览器提供本地认证说明及 GitHub、企业微信、飞书、钉钉、微信网页登录，第三方方式写入
@@ -20,28 +21,31 @@ Status: accepted.
    只有对应 provider 恰好存在一个启用身份源时才可选择，零个或多个时均禁用并提示整改全局身份源配置。
 8. “进入登录页后”只在当前 Client 已选择网页登录提供商时显示，候选仅来自允许集合；清除提供商时同步清除
    已失效的 direct provider。
-9. 企业微信和微信的普通浏览器与端内网页入口共享同一个 `browserLoginProviderTypes` 权限，两处必须展示为同一
-   “网页认证能力”的镜像开关，任一处修改同步生效；摘要显示“网页（浏览器/端内）”，不得伪造可独立授权的终端
-   边界。
-10. OAuth2 客户端认证、原始 grant、scope、Origin、Token TTL、Token 格式、签名算法及仍受服务端支持的历史
-    browser external code 配置移入折叠的高级配置。默认折叠不得造成保存时丢值；真正不受当前枚举支持的历史值
-    必须阻止保存并提示先迁移，不能承诺服务端无法接受的透传。
+9. 企业微信和微信的浏览器与端内网页仍复用 `browserLoginProviderTypes` 协议字段，但由持久化的终端类型明确
+   归属；页面只在当前终端显示选中状态，不再把两处渲染成镜像开关。System 必须拒绝与终端不匹配的 provider
+   或 external code type，不能只依赖前端清理。
+10. OAuth2 客户端认证、原始 grant、scope、Origin、Token TTL、Token 格式和签名算法保留在折叠的高级配置。
+    不再提供历史 browser external code 配置；默认折叠不得造成当前终端合法值丢失。
 11. 选择 IAM 统一登录或网页闭环方式时，常用区域必须展示并校验重定向 URI；空回调不能只依赖保存后的服务端
     报错。已有回调 URI 必须无损回显。
-12. 列表页使用中文摘要展示已配置的终端登录能力，不直接拼接原始 code type；仍受支持但未进入常用配置的值以
-    “高级兼容配置”标记，不伪装成已识别业务方式。
-13. 不修改 System/IAM 服务端安全校验、数据库迁移、公开 API 或第三方换码逻辑；前端自动映射不是新的授权
-    边界，服务端仍按现有字段拒绝非法组合。
+12. 列表页按持久化终端类型展示中文终端名称和该终端登录能力，不直接拼接原始 code type；终端为空或字段组合
+    跨终端的旧试验记录显示“待选择终端”，编辑保存时必须收敛为单终端配置。
+13. System REST Form/VO 和 `sys_oauth2_client` 新增 `terminalType` / `terminal_type`。该字段只管理 Client 配置，
+    不加入 Token 请求；IAM 第三方换码协议不变。System 保存时按终端 allowlist 校验 provider、code type 和派生
+    grant，防止绕过 Admin 写入跨终端组合。
 
 ## Non-goals
 - 不删除 `code_type` 协议参数，也不修改 `/oauth2/token` 请求格式。
 - 不自动创建、启用或修改身份源，不猜测多个同类身份源应使用哪一个。
 - 不在 Admin 中集成第三方 SDK、JSSDK 或真实第三方授权流程。
-- 不把同一个 OAuth Client 限制为只能服务一个终端。
+- 不允许同一个 OAuth Client 同时服务多个终端；需要多终端时创建多个 OAuth Client。
 
 ## Verification strategy
-- Vitest 覆盖终端切换、业务方式与底层字段双向映射、grant 联动、external code 唯一身份源自动绑定/多身份源
-  选择、网页登录身份源唯一性、共享网页能力同步、direct provider 联动、回调 URI 校验以及高级配置无损回显。
-- Cypress 覆盖管理员编辑 Client、跨多个终端选择登录方式、保存请求字段和重新打开后的业务摘要。
+- System 单元测试覆盖五种终端 allowlist、缺失/非法终端、跨终端 provider/code type 拒绝，以及合法组合保存；
+  Flyway 隔离测试证明新增 nullable 列不改写现有 Client 登录字段。
+- Vitest 覆盖终端切换时清除其他终端方式、绑定、direct provider 和派生 grant，业务方式与底层字段映射、身份源
+  选择、网页登录唯一性、回调 URI校验，以及持久化终端的回显。
+- Cypress 覆盖管理员只能保留一个终端，切换后旧终端无勾选、保存请求包含唯一 `terminalType`，重新打开仍定位
+  到该终端并只回显其登录方式。
 - Admin 生产构建验证 Vue 模板、Element Plus 组件和打包路径。
-- `git diff --check` 验证补丁格式；后端未变更，不以本轮 UI 测试替代既有服务端安全测试。
+- `git diff --check` 验证补丁格式；执行 System 目标测试、根 Maven、Admin 完整单测/构建/E2E 和隔离迁移测试。

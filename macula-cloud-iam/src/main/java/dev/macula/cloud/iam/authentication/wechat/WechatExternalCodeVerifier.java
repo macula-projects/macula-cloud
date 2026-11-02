@@ -37,8 +37,7 @@ import java.util.Set;
 public class WechatExternalCodeVerifier implements ExternalCodeVerifier {
     private static final String PROVIDER_TYPE = "WECHAT";
     private static final Set<ExternalCodeType> TYPES = Set.of(ExternalCodeType.WECHAT_OPEN_APP_CODE,
-        ExternalCodeType.WECHAT_MINIAPP_LOGIN_CODE, ExternalCodeType.WECHAT_MINIAPP_PHONE_CODE,
-        ExternalCodeType.WECHAT_OPEN_BROWSER_CODE);
+        ExternalCodeType.WECHAT_MINIAPP_LOGIN_CODE, ExternalCodeType.WECHAT_MINIAPP_PHONE_CODE);
 
     private final IdentityProviderConfigService configs;
     private final WechatClient client;
@@ -58,8 +57,6 @@ public class WechatExternalCodeVerifier implements ExternalCodeVerifier {
                 client.fetchMiniappUnionId(config, code));
             case WECHAT_MINIAPP_PHONE_CODE -> ExternalCodeVerification.mobile(
                 client.fetchMiniappMobile(config, code));
-            case WECHAT_OPEN_BROWSER_CODE -> ExternalCodeVerification.identity(PROVIDER_TYPE,
-                client.fetchUnionId(config, code, WechatLoginMode.BROWSER));
             default -> throw new IllegalArgumentException("Unsupported WeChat external code type");
         };
     }

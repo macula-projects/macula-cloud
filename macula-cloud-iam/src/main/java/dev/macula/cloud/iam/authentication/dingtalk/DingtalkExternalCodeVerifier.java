@@ -37,7 +37,7 @@ import java.util.Set;
 public class DingtalkExternalCodeVerifier implements ExternalCodeVerifier {
     private static final String PROVIDER_TYPE = "DINGTALK";
     private static final Set<ExternalCodeType> TYPES = Set.of(ExternalCodeType.DINGTALK_APP_CODE,
-        ExternalCodeType.DINGTALK_WEBVIEW_CODE, ExternalCodeType.DINGTALK_BROWSER_CODE);
+        ExternalCodeType.DINGTALK_WEBVIEW_CODE);
 
     private final IdentityProviderConfigService configs;
     private final DingtalkClient client;
@@ -52,7 +52,6 @@ public class DingtalkExternalCodeVerifier implements ExternalCodeVerifier {
         ProviderConfig config = configs.requireEnabledById(identityProviderId, PROVIDER_TYPE);
         DingtalkLoginMode mode = switch (codeType) {
             case DINGTALK_APP_CODE -> DingtalkLoginMode.APP;
-            case DINGTALK_BROWSER_CODE -> DingtalkLoginMode.BROWSER;
             case DINGTALK_WEBVIEW_CODE -> DingtalkLoginMode.WEBVIEW;
             default -> throw new IllegalArgumentException("Unsupported DingTalk external code type");
         };

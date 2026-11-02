@@ -71,3 +71,89 @@
 - 本地 Compose 证据不代表外部系统、生产迁移或 `bands.yaml` SLO 证据。
 - 正式切换前仍须按发布清单为每个浏览器 OAuth Client 配置精确 Origin；空值按设计失败关闭。
 - Stage 4 已完成；下一步是 Stage 5 Code Round 3，只审 Code Round 2 修复增量。
+
+## 2026-10-29 历史 OAuth Client 保存补救验证
+
+**Verification is green**。历史 `client_secret_basic,client_secret_post + password,sms`
+Client 现在可在认证方式和 grant 语义集合不变时维护 Origin 等管理字段；新建、扩权或改变成另一
+非法组合仍被拒绝。Admin 对可识别的业务校验错误显示精确原因，未知异常不展示任意内部 `cause`。
+`.env`、Token 请求参数、Client secret 契约及既有 Client 协议字段均未改变。
+
+### 实际命令与结果
+
+| 实际命令/检查 | 退出码 | 实际结果 |
+| --- | --- | --- |
+| `mvn test -Plocal` | 0 | 11 个 Reactor 模块全部 `SUCCESS`；`BUILD SUCCESS`，37.483s。System 的 `OAuth2ClientConfigServiceImplTest` 20 项和 IAM `IamProtocolTest` 29 项通过；System 仅保留 1 项显式环境门禁跳过 |
+| `SYSTEM_EXTERNAL_LOGIN_MIGRATION_IT=true SPRING_DATASOURCE_* ... mvn -pl macula-cloud-system -am -Dtest=ExternalCredentialLoginMigrationIT ... test -Plocal` | 0 | 全新临时 MySQL 8.4 隔离库验证 V1/V8 至 V11；1 项通过，4 个 Reactor 模块成功；`BUILD SUCCESS`，6.720s；临时容器已删除 |
+| 管理端 `npm run test:unit -- --run` | 0 | 9 个文件、52/52 通过，1.44s |
+| 管理端 `npm run build` | 0 | 2467 个模块构建成功，5.92s；仅有既有 Sass `@import` 弃用和大 chunk 警告 |
+| 管理端 `npm run test:e2e:ci` | 0 | 4 个 spec、31/31 通过；目标 OAuth Client spec 为 21/21 |
+| 管理端变更文件 `npx eslint ... --no-fix` | 0 | 无输出、未修改文件 |
+| System 变更 Java 的仓库 Checkstyle | 0 | `You have 0 Checkstyle violations`，`BUILD SUCCESS` |
+| `docker compose ... config --quiet` 和 `build macula-cloud-system` | 0 | Compose 解析成功；System 镜像构建成功 |
+| `docker compose ... up -d --no-deps --no-build --force-recreate --wait macula-cloud-system` | 0 | 只替换 System；最终 `healthy`，容器镜像 ID 与新构建镜像一致；未重建其他服务或删除卷 |
+
+保护配置 eval 不适用：未修改 `AGENTS.md`、`CLAUDE.md`、skill、hook、`REVIEW.md`、
+`bands.yaml` 或 reviewer 定义。新增的 `application.yml` 变化只把
+`SysOAuth2ClientConfigMapper` 日志固定为 INFO，避免 MyBatis DEBUG 参数日志输出 BCrypt 密钥哈希。
+
+### 真实 Compose 证据
+
+验证使用本地 Admin 密码登录和 Client 2 的真实 GET/PUT，不记录 Token、密码、secret 或密钥哈希：
+
+| 场景 | 实际结果 |
+| --- | --- |
+| Admin password Token | HTTP 200 |
+| GET OAuth Client 2 | HTTP 200 |
+| 只增加临时 Origin 并保存 | HTTP 200，响应确认 Origin 已写入；认证方式和 grant 未改变 |
+| 在历史 confidential Client 上非法增加 `email` grant | 统一异常封装 HTTP 500，但安全提取出的业务原因精确为“短信或邮箱验证码 grant 必须由公共客户端使用” |
+| 恢复原 Origin | HTTP 200，响应与测试前 Origin 集合完全一致 |
+| Admin 实际 UserInfo `/system/api/v1/users/me` | HTTP 200，返回非空 username |
+| 新 System 容器日志 | access token、refresh token、client secret 值、Bearer Header、password grant 参数、BCrypt 值和 `client_secret` 字段命中均为 0 |
+
+单独检查 OIDC `/userinfo` 返回 403，是因为历史 Admin Client 没有 `openid` scope；Admin 实际调用的
+`/system/api/v1/users/me` 为 200，因此该结果不属于本次保存补救回归失败，也未修改 OIDC 契约。
+
+### 失败回路与修正
+
+- 全量 Cypress 首轮复用 Element Plus loading 后的 DOM alias，Cypress 自身读取旧 alias `selector`
+  失败；改为断言当前可见保存按钮处于 loading/disabled，并继续断言只发出一次请求，目标与全量
+  Cypress 随后均通过。
+- 隔离 MySQL 首轮使用 `mysqladmin ping` 过早判定就绪而收到 1045；改为实际执行 `SELECT 1`。
+  本轮第一次重跑又误传 `SYSTEM_MIGRATION_IT_*`，安全门禁因缺少 `SPRING_DATASOURCE_*` 明确失败；
+  使用测试声明的变量后通过，两次失败均未接触现有数据库。
+- Stage 4 首轮日志扫描发现两条 MyBatis `Parameters` 日志包含 BCrypt Client secret 哈希。虽然不是
+  明文，仍按敏感日志失败处理；精确关闭 OAuth Client Mapper DEBUG 参数日志、重建 System 并重新
+  执行根测试、前端测试、迁移、Compose 和真实保存后，全部敏感模式计数为 0。
+- Checkstyle 首次手工命令漏传仓库规则路径，误用 `sun_checks.xml` 报出 205 条无关旧规则；使用
+  `.config/checkstyle.xml` 与 `.config/checkstyle-header.txt` 重跑后为 0 violation。
+
+### 边界与交接
+
+- 以上是单元/浏览器 mock、隔离数据库和本地 Compose 证据，不代表生产、真实外部身份提供商或
+  `bands.yaml` SLO 证据。
+- 未提交、推送、创建 PR、发布或操作远端环境。
+- Stage 4 验证完成；下一步进入 `sdlc-deploy` 的人工 PR 评审准备，不能由代理自批门禁。
+
+## 2026-10-29 验证后 UI 布局反馈
+
+在人工验收指出 OAuth Client 编辑抽屉贴边和联动区拥挤后，追加了纯布局调整，未改变字段、API、
+联动映射或保存逻辑。目标 Vitest 10/10、OAuth 页面 Cypress 21/21、变更文件 ESLint/Prettier、
+Admin production build 和本地 Docker 健康检查均通过，并已在真实本地页面确认正文留白、分组卡片、
+登录方式双列及固定 footer 正常。该目标证据不替代完整 Stage 4；进入下一门禁前必须重新执行完整
+前端与项目回归，因此上方 2026-10-29 的 green 结论只覆盖追加布局调整之前的代码快照。
+
+后续同轮文案验收把“浏览器兼容凭证”改为“历史兼容 Code”，并将长 code type 与身份源绑定改为
+纵向响应式布局；目标 Vitest 10/10、OAuth 页面 Cypress 21/21、ESLint/Prettier 和 production
+build 通过。该结果同样属于目标反馈证据，不改变完整 Stage 4 仍需重跑的结论。
+
+人工随后确认该功能为全新开发，不接受历史浏览器 code 兼容。实现已删除 Admin 的兼容入口与摘要、
+System API 的四个 `*_BROWSER_CODE` 枚举值，以及 IAM 对应 verifier 分支；浏览器第三方登录只保留
+`/oauth2/authorize` 路径。编辑包含旧试验值的表单时，Admin 会在提交前只保留终端模型支持的标准
+code type 和绑定，不再回传旧值。目标 Vitest 11/11、OAuth 页面 Cypress 21/21、Admin production
+build、前端 ESLint、相关 API/IAM/System 测试 25 项和变更 Java 精确 Checkstyle 均通过。首次直接
+执行聚合 Checkstyle 命中了仓库既有文件，且默认还误用了 `sun_checks.xml`；改用仓库规则并限定本轮
+变更 Java 文件后均为 0 violation。Admin、System、IAM 本地镜像已重建并仅重建这三个容器，最终均为
+Docker healthy，Admin HTTP 为 200；两个 Java 服务的 Docker 健康检查是 TCP 端口检查，匿名请求其
+受保护的 `/actuator/health` 会由现有安全/异常链返回 500，不能作为本轮业务健康端点证据。完整 Stage 4
+仍需在进入下一门禁前重跑。

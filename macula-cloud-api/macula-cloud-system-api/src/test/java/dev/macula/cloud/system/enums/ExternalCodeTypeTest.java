@@ -40,11 +40,7 @@ class ExternalCodeTypeTest {
             ExternalCodeType.WECHAT_MINIAPP_PHONE_CODE,
             ExternalCodeType.WECOM_MINIAPP_CODE,
             ExternalCodeType.FEISHU_WEBVIEW_CODE,
-            ExternalCodeType.DINGTALK_WEBVIEW_CODE,
-            ExternalCodeType.FEISHU_BROWSER_CODE,
-            ExternalCodeType.DINGTALK_BROWSER_CODE,
-            ExternalCodeType.WECOM_BROWSER_CODE,
-            ExternalCodeType.WECHAT_OPEN_BROWSER_CODE
+            ExternalCodeType.DINGTALK_WEBVIEW_CODE
         }, ExternalCodeType.values());
         assertEquals("WECOM", ExternalCodeType.WECOM_APP_CODE.providerType());
         assertEquals(ExternalCodeType.Scene.APP, ExternalCodeType.WECOM_APP_CODE.scene());

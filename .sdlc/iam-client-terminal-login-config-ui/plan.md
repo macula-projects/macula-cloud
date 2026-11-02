@@ -3,66 +3,86 @@
 ## Files that change
 - `.sdlc/iam-client-terminal-login-config-ui/intent.md`、`spec.md`、`plan.md`、`review-findings.md`：记录用户已确认的
   终端优先交互、实现顺序、风险和 Plan 评审。
+- `macula-cloud-system/src/main/resources/db/migration/V12__oauth_client_terminal_type.sql`：为 OAuth Client 新增 nullable
+  `terminal_type`，不猜测、不回填已有 Client 的终端归属。
+- `macula-cloud-system/src/main/java/dev/macula/cloud/system/enums/OAuth2ClientTerminalType.java`：定义五种稳定终端值及
+  provider/code type allowlist。
+- `macula-cloud-system/src/main/java/dev/macula/cloud/system/form/OAuth2ClientForm.java`、`vo/OAuth2ClientVO.java`、
+  `pojo/entity/SysOAuth2ClientConfig.java`：在写入、展示和持久化模型中增加 `terminalType`。
+- `macula-cloud-system/src/main/java/dev/macula/cloud/system/service/impl/OAuth2ClientConfigServiceImpl.java`：保存时拒绝
+  缺失终端、跨终端 provider/code type 和与登录能力不一致的派生 grant。
+- `macula-cloud-system/src/test/java/dev/macula/cloud/system/service/impl/OAuth2ClientConfigServiceImplTest.java`、
+  `integration/ExternalCredentialLoginMigrationIT.java`：覆盖单终端校验和 V12 不回填升级。
 - `macula-cloud-admin/src/api/model/system/oauth2Client.js`：集中定义终端与中文登录方式目录，以及业务方式到现有
-  网页 provider/external code type 的稳定映射；不新增 API。
+  网页 provider/external code type 的稳定映射；REST 端点不变，但请求/响应合同新增必填 `terminalType`。
 - `macula-cloud-admin/src/views/system/oauth2Client/index.vue`：把当前平铺的网页登录和 code type 配置重构为终端
-  选择器、当前终端登录方式卡片、按需身份源选择和折叠高级配置；保留现有表单字段及提交合同。
+  选择器、当前终端登录方式卡片、按需身份源选择和折叠高级配置；提交和回显同步读写 `terminalType`。
 - `macula-cloud-admin/tests/unit/admin-identity-security-settings.test.js`：覆盖目录、双向映射、自动 grant、身份源状态、
   direct 联动、高级值保留和中文摘要。
-- `macula-cloud-admin/cypress/e2e/admin-identity-security-settings.cy.js`：覆盖跨终端选择、自动身份源绑定、保存请求和
-  编辑回显的管理员关键流程。
-- `macula-cloud-iam/README.md`：把管理员配置说明改为“先选终端、再选登录方式”，说明 `code_type` 由系统映射但
-  Token 协议仍携带该参数。
+- `macula-cloud-admin/cypress/e2e/admin-identity-security-settings.cy.js`：覆盖单终端切换清理、自动身份源绑定、
+  `terminalType` 保存请求和编辑回显；同步更新所有 OAuth Client API mock/fixture。
+- `macula-cloud-system/README.md`、`macula-cloud-iam/README.md`：说明一个 Client 只归属一个终端，多终端需拆分
+  Client；`terminalType` 不进入 Token 请求。
 
 ## Order of work
-1. 在 API 模型中建立 UI 专用的终端和登录方式目录。每个业务方式明确映射 `browserProviderType`、
-   `externalCodeType` 或 authorization-code 能力；标签使用中文，底层稳定值不改变。
-2. 在 OAuth Client 页面增加当前终端状态与派生选择逻辑。从服务端现有字段反向识别业务方式；切换终端不修改
-   表单，只有勾选或取消登录方式时才更新底层字段。
-3. 将登录能力区改为终端选择器和方式卡片。external code 唯一身份源自动绑定、零个时禁用、多个时显示该
-   方式自己的身份源选择；网页登录只在 provider 恰好有一个全局启用身份源时可选。企微/微信的浏览器与端内
-   网页显示为同步生效的共享网页能力。网页登录 direct 选择只在存在候选时出现。
-4. 将原始协议参数和仍受支持的兼容 code type 放入高级配置折叠区。IAM 统一登录或网页闭环方式选中时在常用
+1. 增加 V12 `terminal_type` nullable 列和 System 终端枚举，扩展 Form/VO/Entity。迁移只加列，不从现有字段
+   猜测终端；新建和更新保存必须提交合法终端。
+2. 在 System Service 按终端校验 `browserLoginProviderTypes`、`externalCodeTypes` 及其绑定：浏览器只允许网页
+   provider，APP/小程序/端内网页只允许各自目录；`authorization_code` / `external_code` 必须与当前终端所选
+   登录方式一致。非法组合在写库前明确拒绝。
+3. 在 Admin API 模型增加单终端归一化函数。切换终端先清除所有终端派生的 provider、code type、绑定、direct
+   provider 和两种派生 grant，再由用户勾选当前终端方式；保留 refresh、scope、Origin、TTL 等非终端字段。
+4. 将登录能力区维持为单选终端选择器和方式卡片。external code 唯一身份源自动绑定、零个时禁用、多个时显示该
+   方式自己的身份源选择；网页登录只在 provider 恰好有一个全局启用身份源时可选。企微/微信虽复用底层
+   provider 字段，但只在持久化 `terminalType` 对应的浏览器或端内网页中显示和生效，不镜像另一终端状态。
+   网页登录 direct 选择只在当前终端存在候选时出现。
+5. 将原始协议参数保留在高级配置折叠区。IAM 统一登录或网页闭环方式选中时在常用
    区域展示并校验重定向 URI；保存前继续执行现有 PKCE、身份源绑定和 Origin 规范化检查，并确保折叠状态不
    影响数据提交。遇到服务端已不支持的未知值时阻止保存并提示迁移。
-5. 将列表中的原始枚举串替换为终端化中文摘要；不能映射的历史值单独标记为高级兼容配置。
-6. 更新 Vitest、Cypress 和 IAM README。实现阶段只运行相关 Vitest 与静态差异检查；完整构建和 Cypress 留给
-   Stage 4，不提交、推送或更新 Docker。
+6. 列表摘要以持久化终端为主；旧记录没有终端时显示待选择，不把跨终端字段自动解释成合法配置。
+7. 更新 System/IAM README、System 单元/迁移测试、Admin Vitest/Cypress。Build 阶段运行目标测试和静态检查，
+   完整根 Maven、Admin 构建/E2E、隔离迁移及 Docker 验证留给 Stage 4。
 
 ## Risks
-- 同一 provider 在浏览器和端内网页可能共用 `browserLoginProviderTypes`；UI 必须把终端当作配置导航而非新的
-  服务端权限维度，企微/微信两处必须同步更新，不能宣称现有模型能分别禁止这两个容器。
-- APP 的 IAM 统一登录和普通浏览器都使用 authorization code；终端选择不持久化，编辑时只能从已选业务能力
-  派生建议入口，不能作为运行时事实。
-- 现有 Client 可能包含 `FEISHU_BROWSER_CODE` 等仍受支持的高级 browser external code；默认界面可以隐藏，
-  但保存必须原样保留，且列表要提示存在兼容配置。真正不受当前枚举支持的值必须阻止保存并提示迁移。
+- 新增终端字段会改变 System 保存契约。数据库列保持 nullable 以允许旧服务先运行，但新 System 对写入强制非空；
+  发布必须先升级数据库/System/Admin，旧记录在管理员选择终端前只能读取，不能无损保存跨终端组合。
+- `/system/api/v1/oauth2-clients` 路径和 HTTP 方法不变，但请求/响应 JSON 新增 `terminalType`；除当前 Admin 外未发现
+  其他仓库内写调用方，仍须同步全部 Admin mock/fixture，并在发布说明中提示外部管理 API 调用方升级。
+- 企业微信/微信在浏览器和端内网页复用 provider 字段；必须依赖持久化终端区分归属。若只清前端状态而不保存
+  终端，重开后会再次产生镜像勾选。
+- 切换终端会主动删除原终端登录能力，属于用户明确选择后的可见破坏性变更；界面应立即反映清除结果，保存前
+  不自动恢复。
 - 自动绑定只适用于 external code 且候选恰好为一个；网页登录必须继续满足全局唯一启用身份源，任何场景在零个
   或多个候选时静默选取都会造成错误凭据或跨应用身份风险。
-- 取消某个方式时必须只删除该方式映射的底层值和绑定，不能清除同平台其他终端或网页登录配置。
+- 切换终端必须清除全部旧终端派生字段；同终端内取消单个方式时仍只删除该方式及绑定。
 - 页面当前包含大量协议字段，重排 DOM 可能破坏既有测试选择器和表单校验；测试应以稳定文本、角色和请求体
   断言用户可观察行为。
 
 ## Proof
-- `admin-identity-security-settings.test.js` 证明五类终端只显示各自方式，选择与取消精确映射现有字段，微信小程序
-  两种 code 不混淆，端内企微/公众号走 browser provider，企微/微信网页能力跨终端同步，external code grant
-  随选择联动。
+- `OAuth2ClientConfigServiceImplTest` 证明五类终端合法组合允许，缺失终端、跨终端 provider/code type、错误绑定
+  和不一致派生 grant 在写库前拒绝；`ExternalCredentialLoginMigrationIT` 证明 V12 只加列且不改原登录字段。
+- `admin-identity-security-settings.test.js` 证明五类终端只显示各自方式，切换后旧终端 provider/code type/绑定/
+  direct/grant 全部清除，微信小程序两种 code 不混淆，端内企微/公众号由 `terminalType` 区分归属。
 - 同一测试证明 external code 一个身份源自动绑定、多个身份源要求显式选择、无身份源不可选，网页登录要求
   全局唯一身份源，以及 direct provider 只来自已选网页方式。
-- 兼容性用例载入包含受支持 browser external code 和高级 OAuth2 参数的旧 Client，关闭高级区直接保存，断言
-  请求体完整保留原值；不受支持的未知值阻止保存并给出迁移提示。
+- 旧记录用例载入缺少终端或跨终端试验值的 Client，列表显示待选择；选择终端后只保留该终端合法值并提交唯一
+  `terminalType`，不保留历史 browser code。
 - 授权码方式用例覆盖空重定向 URI 的前端拒绝和已有 URI 无损回显。
-- Cypress 从编辑 Client 开始，依次配置浏览器、APP 和微信小程序方式，断言页面中文摘要与保存请求，再重新打开
-  验证回显。
-- Stage 4 执行相关 Vitest、`npm run build`、目标 Cypress 和 `git diff --check`，分别报告自动化结果；不声称完成
-  真实第三方平台联调，因为本次不改变认证运行链。
+- Cypress 从编辑 Client 开始，从浏览器切到 APP 再切到微信小程序，每次断言前一终端无勾选；保存请求只包含
+  最终终端字段及其登录能力，重新打开定位到同一终端。
+- Stage 4 执行 System 目标测试、根 Maven、隔离迁移、完整 Vitest/build/Cypress、Docker System/Admin 更新和
+  `git diff --check`；不声称完成真实第三方平台联调，因为 Token 请求协议未改变。
 
 ## Implementation notes and deviations
-- 已复用 System 现有 external-code catalog，未新增后端 API、数据库字段或依赖；终端类型是 Admin 配置导航，
-  最终仍提交 `browserLoginProviderTypes`、`externalCodeTypes`、grant 和身份源绑定。
-- 浏览器的本地账号方式与 APP 的 IAM 统一登录共同映射 `authorization_code`；当已选择网页登录提供商时，界面
-  禁止关闭其依赖的 IAM 授权能力。企业微信、微信在浏览器和端内网页之间通过同一个 provider 值自然同步。
-- 仍受支持的 browser external code 只在高级协议配置中显示并保留原绑定；服务端目录不存在的历史类型会阻止
-  保存并提示迁移，不会静默清理。
+- 2026-10-29，Rain 以“之前那个也OK”明确接受 single-terminal revision 的 spec 与本计划，Stage 3 进入实现阶段。
+- 本节及其后的旧 Verification/Code review 记录属于“终端仅作导航”的历史实现证据，已被 2026-10-29
+  single-terminal revision 取代，不再描述当前实现目标。新修订将新增 System 字段和数据库列，并在实现后追加
+  新的实施及验证记录。
+- 历史实现复用了 System external-code catalog，未新增后端 API、数据库字段或依赖；该决策因无法持久化唯一终端
+  归属而废止。
+- 浏览器的本地账号方式与 APP 的 IAM 统一登录共同映射 `authorization_code`；新修订通过 `terminalType` 区分
+  归属，不再让企业微信、微信在浏览器和端内网页之间镜像同步。
+- browser external code 已在后续人工反馈中删除；新修订不恢复该兼容能力。
 - 唯一 external code 身份源已自动绑定；多个候选显示选择器；网页登录继续要求同 provider 恰好一个启用身份源。
 - 项目根目录不存在 `CLAUDE.md`，因此实现继续遵循根 `AGENTS.md` 及按需加载的前端、测试规则，没有替代或生成
   项目记忆文件。

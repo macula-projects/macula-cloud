@@ -82,3 +82,20 @@
 
 - Round 3 再次扫描 `.sdlc/*/review-findings.md`，未发现上述 finding class 已在两个或更多 change 中重复，因此暂无需要
   编码到 `AGENTS.md`、lint 或 `REVIEW.md` 的 recurring class。
+
+## Plan revision review — single-terminal model (2026-10-29)
+
+### Round 1 — Plan pass
+
+- Important — `plan.md:35`：计划仍要求企微/微信在浏览器与端内网页同步生效，和修订后的单终端归属冲突。已改为
+  两个终端仅复用底层 provider 字段，界面和配置只在持久化 `terminalType` 对应终端显示/生效，不再镜像。
+- Important — `plan.md:16`：文件说明仍称“不新增 API”并保留旧提交合同，可能漏改 `terminalType` 请求/响应和测试
+  fixture。已明确端点不变但 JSON 合同新增必填 `terminalType`，并把全部 Admin mock/fixture、外部管理 API 升级
+  提示纳入文件范围、风险和证明。
+- Security：无新发现；System 服务端终端 allowlist 计划提供持久化授权配置边界，Token 请求协议不变。
+- Compliance：未发现适用的数据分类、同意、保留、审计或监管要求。
+
+### Round 2 — Plan pass
+
+- No findings。Round 1 两项 Important 均已闭环：REST 端点保持不变但请求/响应 JSON 明确新增必填
+  `terminalType`；企微/微信共享底层 provider 只在持久化终端对应的当前界面显示和生效，不再跨终端镜像。

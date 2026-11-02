@@ -35,12 +35,7 @@ public enum ExternalCodeType {
     WECHAT_MINIAPP_PHONE_CODE("WECHAT", Scene.MINIAPP, ResultType.MOBILE, Capability.WECHAT_MINIAPP),
     WECOM_MINIAPP_CODE("WECOM", Scene.MINIAPP, ResultType.EXTERNAL_IDENTITY, Capability.DEFAULT),
     FEISHU_WEBVIEW_CODE("FEISHU", Scene.WEBVIEW, ResultType.EXTERNAL_IDENTITY, Capability.DEFAULT),
-    DINGTALK_WEBVIEW_CODE("DINGTALK", Scene.WEBVIEW, ResultType.EXTERNAL_IDENTITY, Capability.DEFAULT),
-    FEISHU_BROWSER_CODE("FEISHU", Scene.BROWSER, ResultType.EXTERNAL_IDENTITY,
-        Capability.FEISHU_EXTERNAL_REDIRECT),
-    DINGTALK_BROWSER_CODE("DINGTALK", Scene.BROWSER, ResultType.EXTERNAL_IDENTITY, Capability.DEFAULT),
-    WECOM_BROWSER_CODE("WECOM", Scene.BROWSER, ResultType.EXTERNAL_IDENTITY, Capability.DEFAULT),
-    WECHAT_OPEN_BROWSER_CODE("WECHAT", Scene.BROWSER, ResultType.EXTERNAL_IDENTITY, Capability.DEFAULT);
+    DINGTALK_WEBVIEW_CODE("DINGTALK", Scene.WEBVIEW, ResultType.EXTERNAL_IDENTITY, Capability.DEFAULT);
 
     /** external_code 扩展 grant 的协议值。 */
     public static final String GRANT_TYPE = "urn:macula:params:oauth:grant-type:external_code";
@@ -86,8 +81,7 @@ public enum ExternalCodeType {
     public enum Scene {
         APP,
         MINIAPP,
-        WEBVIEW,
-        BROWSER
+        WEBVIEW
     }
 
     /**
@@ -107,7 +101,6 @@ public enum ExternalCodeType {
      */
     public enum Capability {
         DEFAULT,
-        FEISHU_EXTERNAL_REDIRECT,
         WECHAT_MOBILE_APP,
         WECHAT_MINIAPP
     }

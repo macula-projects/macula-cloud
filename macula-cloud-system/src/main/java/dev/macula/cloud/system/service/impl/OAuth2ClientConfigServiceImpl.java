@@ -17,6 +17,7 @@
 package dev.macula.cloud.system.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import dev.macula.boot.constants.CacheConstants;
@@ -78,7 +79,6 @@ public class OAuth2ClientConfigServiceImpl implements OAuth2ClientConfigService 
     private static final Set<String> GRANTS = Set.of(AUTHORIZATION_CODE_GRANT, "refresh_token",
         CLIENT_CREDENTIALS_GRANT, "password", SMS_GRANT, OAuth2LoginGrantTypes.EMAIL, ExternalCodeType.GRANT_TYPE);
     private static final Set<String> USERS = Set.of("member", "employee", "odc", "supplier");
-    private static final String EXTERNAL_REDIRECT_URI = "externalRedirectUri";
     private static final String MOBILE_APP_ID = "mobileAppId";
     private static final String MOBILE_APP_SECRET = "mobileAppSecret";
     private static final String MINI_APP_ID = "miniAppId";
@@ -122,9 +122,6 @@ public class OAuth2ClientConfigServiceImpl implements OAuth2ClientConfigService 
         capabilities.add(ExternalCodeType.Capability.DEFAULT.name());
         Map<String, String> config = jsonObject(provider.getConfigJson());
         Map<String, String> secrets = jsonObject(provider.getSecretConfigJson());
-        if (StringUtils.hasText(config.get(EXTERNAL_REDIRECT_URI))) {
-            capabilities.add(ExternalCodeType.Capability.FEISHU_EXTERNAL_REDIRECT.name());
-        }
         if (StringUtils.hasText(config.get(MOBILE_APP_ID)) && StringUtils.hasText(secrets.get(MOBILE_APP_SECRET))) {
             capabilities.add(ExternalCodeType.Capability.WECHAT_MOBILE_APP.name());
         }
@@ -142,8 +139,8 @@ public class OAuth2ClientConfigServiceImpl implements OAuth2ClientConfigService 
     @Override
     @Transactional
     public OAuth2ClientVO save(Long id, OAuth2ClientForm form) {
-        validate(form);
         SysOAuth2ClientConfig entity = id == null ? new SysOAuth2ClientConfig() : require(id);
+        validate(form, entity);
         if (id != null && !entity.getClientId().equals(form.getClientId())) {
             bad("clientId 创建后不可修改");
         }
@@ -154,6 +151,10 @@ public class OAuth2ClientConfigServiceImpl implements OAuth2ClientConfigService 
         boolean publicClient = csv(form.getClientAuthenticationMethods()).contains("none");
         boolean secretRequired = csv(form.getClientAuthenticationMethods()).stream()
             .anyMatch(method -> method.startsWith("client_secret_"));
+        String originalAuthenticationMethods = entity.getClientAuthenticationMethods();
+        String originalGrantTypes = entity.getAuthorizationGrantTypes();
+        boolean legacyVerificationClient = isUnchangedLegacyVerificationClient(entity,
+            csv(form.getClientAuthenticationMethods()), csv(form.getAuthorizationGrantTypes()));
         if (id == null) {
             entity.setClientId(form.getClientId());
             entity.setClientIdIssuedAt(Instant.now());
@@ -194,6 +195,8 @@ public class OAuth2ClientConfigServiceImpl implements OAuth2ClientConfigService 
         entity.setTenantId(form.getTenantId());
         if (id == null) {
             mapper.insert(entity);
+        } else if (legacyVerificationClient) {
+            updateLegacyVerificationClient(entity, originalAuthenticationMethods, originalGrantTypes);
         } else {
             mapper.updateById(entity);
         }
@@ -224,7 +227,7 @@ public class OAuth2ClientConfigServiceImpl implements OAuth2ClientConfigService 
         evictAfterCommit();
     }
 
-    private void validate(OAuth2ClientForm form) {
+    private void validate(OAuth2ClientForm form, SysOAuth2ClientConfig existing) {
         if (tenantMapper.selectById(form.getTenantId()) == null) {
             bad("租户不存在");
         }
@@ -239,8 +242,9 @@ public class OAuth2ClientConfigServiceImpl implements OAuth2ClientConfigService 
         Set<BrowserLoginProviderType> browserProviders = browserLoginProviderTypes(
             form.getBrowserLoginProviderTypes());
         normalizeDirectLoginProviderType(form.getDirectLoginProviderType(), browserProviders);
-        if (auth.isEmpty() || !AUTH.containsAll(auth) || grants.isEmpty() || !GRANTS.containsAll(grants) ||
-            scopes.isEmpty()) {
+        if (hasInvalidCsvStructure(form.getClientAuthenticationMethods())
+            || hasInvalidCsvStructure(form.getAuthorizationGrantTypes()) || auth.isEmpty()
+            || !AUTH.containsAll(auth) || grants.isEmpty() || !GRANTS.containsAll(grants) || scopes.isEmpty()) {
             bad("认证方式、授权方式或 scope 无效");
         }
         if (grants.contains(AUTHORIZATION_CODE_GRANT) && csv(form.getRedirectUris()).isEmpty()) {
@@ -260,8 +264,9 @@ public class OAuth2ClientConfigServiceImpl implements OAuth2ClientConfigService 
             bad("外部凭证登录必须由公共客户端同时配置 grant 和非空 code type");
         }
         Set<String> allowedOrigins = normalizeOrigins(form.getAllowedOrigins());
-        boolean verificationCodeGrant = grants.contains(SMS_GRANT) || grants.contains(OAuth2LoginGrantTypes.EMAIL);
-        if (verificationCodeGrant && !publicClient) {
+        boolean verificationCodeGrant = hasVerificationCodeGrant(grants);
+        if (verificationCodeGrant && !publicClient
+            && !isUnchangedLegacyVerificationClient(existing, auth, grants)) {
             bad("短信或邮箱验证码 grant 必须由公共客户端使用");
         }
         if (csvValue(allowedOrigins).length() > ALLOWED_ORIGINS_MAX_LENGTH) {
@@ -325,6 +330,40 @@ public class OAuth2ClientConfigServiceImpl implements OAuth2ClientConfigService 
             if (!"https".equalsIgnoreCase(uri.getScheme()) || uri.getHost() == null) {
                 bad("JWK URL 必须使用 HTTPS");
             }
+        }
+    }
+
+    private boolean hasVerificationCodeGrant(Set<String> grants) {
+        return grants.contains(SMS_GRANT) || grants.contains(OAuth2LoginGrantTypes.EMAIL);
+    }
+
+    private boolean hasInvalidCsvStructure(String value) {
+        if (!StringUtils.hasText(value)) {
+            return true;
+        }
+        List<String> tokens = Arrays.stream(value.split(",", -1)).map(String::trim).toList();
+        return tokens.stream().anyMatch(String::isEmpty) || Set.copyOf(tokens).size() != tokens.size();
+    }
+
+    private boolean isUnchangedLegacyVerificationClient(SysOAuth2ClientConfig existing, Set<String> auth,
+        Set<String> grants) {
+        if (existing == null) {
+            return false;
+        }
+        Set<String> existingAuth = csv(existing.getClientAuthenticationMethods());
+        Set<String> existingGrants = csv(existing.getAuthorizationGrantTypes());
+        return !existingAuth.contains("none") && hasVerificationCodeGrant(existingGrants)
+            && existingAuth.equals(auth) && existingGrants.equals(grants);
+    }
+
+    private void updateLegacyVerificationClient(SysOAuth2ClientConfig entity,
+        String originalAuthenticationMethods, String originalGrantTypes) {
+        int updated = mapper.update(entity, new LambdaUpdateWrapper<SysOAuth2ClientConfig>()
+            .eq(SysOAuth2ClientConfig::getId, entity.getId())
+            .eq(SysOAuth2ClientConfig::getClientAuthenticationMethods, originalAuthenticationMethods)
+            .eq(SysOAuth2ClientConfig::getAuthorizationGrantTypes, originalGrantTypes));
+        if (updated != 1) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "客户端配置已被其他请求修改，请刷新后重试");
         }
     }
 
@@ -408,7 +447,6 @@ public class OAuth2ClientConfigServiceImpl implements OAuth2ClientConfigService 
         Map<String, String> config = jsonObject(provider.getConfigJson());
         Map<String, String> secrets = jsonObject(provider.getSecretConfigJson());
         boolean capable = switch (codeType.capability()) {
-            case FEISHU_EXTERNAL_REDIRECT -> StringUtils.hasText(config.get(EXTERNAL_REDIRECT_URI));
             case WECHAT_MOBILE_APP -> StringUtils.hasText(config.get(MOBILE_APP_ID))
                 && StringUtils.hasText(secrets.get(MOBILE_APP_SECRET));
             case WECHAT_MINIAPP ->

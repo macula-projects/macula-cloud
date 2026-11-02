@@ -18,7 +18,10 @@ import oauth, {
   EXTERNAL_CODE_GRANT,
   TERMINAL_LOGIN_METHODS,
   invalidSelectedBrowserProviders,
+  isLegacyConfidentialVerificationClient,
   loginCapabilitySummary,
+  normalizeTerminalLoginConfiguration,
+  oauthClientErrorMessage,
   reconcileExternalProviderBindings,
   terminalForClient,
   unsupportedExternalCodeTypes,
@@ -45,6 +48,40 @@ describe("平台身份、消息与接入应用管理", () => {
     const result = await oauth.get(42);
     expect(result.url).toContain("/oauth2-clients/42");
     expect(result.data).toBeUndefined();
+  });
+
+  it("recognizes legacy verification clients and exposes only safe business errors", () => {
+    expect(
+      isLegacyConfidentialVerificationClient({
+        clientAuthenticationMethods: "client_secret_basic,client_secret_post",
+        authorizationGrantTypes:
+          "authorization_code,client_credentials,refresh_token,password,sms",
+      })
+    ).toBe(true);
+    expect(
+      isLegacyConfidentialVerificationClient({
+        clientAuthenticationMethods: "none",
+        authorizationGrantTypes: "authorization_code,sms",
+      })
+    ).toBe(false);
+    expect(
+      isLegacyConfidentialVerificationClient({
+        clientAuthenticationMethods: "",
+        authorizationGrantTypes: "sms",
+      })
+    ).toBe(false);
+    expect(
+      oauthClientErrorMessage({
+        cause: '400 BAD_REQUEST "短信或邮箱验证码 grant 必须由公共客户端使用"',
+        msg: "系统异常",
+      })
+    ).toBe("短信或邮箱验证码 grant 必须由公共客户端使用");
+    expect(
+      oauthClientErrorMessage({
+        cause: "java.lang.IllegalStateException: internal detail",
+        msg: "系统异常",
+      })
+    ).toBe("系统异常");
   });
 
   it("marks pending runtime settings and avoids credential echo", () => {
@@ -80,6 +117,11 @@ describe("平台身份、消息与接入应用管理", () => {
     expect(messagePage).not.toContain('value:"CUSTOM",label:"自定义短信"');
     expect(oauthPage).toContain("<el-drawer");
     expect(oauthPage).not.toContain("<el-dialog");
+    expect(oauthPage).toContain('size="min(920px, 100vw)"');
+    expect(oauthPage).toContain('class="form-section basic-fields"');
+    expect(oauthPage).toContain('class="form-section capability-section"');
+    expect(oauthPage).toContain("padding: 0 28px 32px");
+    expect(oauthPage).toContain("grid-template-columns: 1fr");
     expect(oauthPage).toMatch(/clientSecret:\s*["']{2}/);
     expect(oauthPage).toContain("所属租户");
     expect(oauthPage).toContain("先选择终端，再选择该终端允许的登录方式");
@@ -90,10 +132,12 @@ describe("平台身份、消息与接入应用管理", () => {
     expect(oauthPage).toContain("allowedOriginsText");
     expect(oauthPage).toContain("浏览器协议允许 Origin");
     expect(oauthPage).toContain("留空时拒绝该 Client 的全部浏览器跨域协议请求");
+    expect(oauthPage).not.toContain("历史兼容 Code");
+    expect(oauthPage).not.toContain("浏览器兼容凭证");
+    expect(oauthPage).not.toContain("legacy-code-config");
+    expect(oauthPage).toContain("历史验证码客户端兼容模式");
+    expect(oauthPage).toContain("legacyCompatibility");
     expect(oauthPage).toContain("externalCodeCatalog");
-    expect(oauthPage).toContain(
-      "provider.capabilities?.includes(codeType.capability)"
-    );
     expect(oauthPage).toContain("activeTerminal");
     expect(oauthPage).toContain("activeLoginMethods");
     expect(oauthPage).toContain("toggleLoginMethod");
@@ -135,6 +179,37 @@ describe("平台身份、消息与接入应用管理", () => {
       ])
     );
     expect(COMMON_EXTERNAL_CODE_TYPES).not.toContain("FEISHU_BROWSER_CODE");
+  });
+
+  it("drops unsupported browser code types and bindings from edited clients", () => {
+    expect(
+      normalizeTerminalLoginConfiguration({
+        authorizationGrantTypes: `authorization_code,${EXTERNAL_CODE_GRANT}`,
+        externalCodeTypes: ["FEISHU_BROWSER_CODE", "WECOM_APP_CODE"],
+        externalProviderBindings: {
+          FEISHU_BROWSER_CODE: 10,
+          WECOM_APP_CODE: 20,
+        },
+      })
+    ).toEqual(
+      expect.objectContaining({
+        externalCodeTypes: ["WECOM_APP_CODE"],
+        externalProviderBindings: { WECOM_APP_CODE: 20 },
+      })
+    );
+    expect(
+      normalizeTerminalLoginConfiguration({
+        authorizationGrantTypes: `authorization_code,${EXTERNAL_CODE_GRANT}`,
+        externalCodeTypes: ["FEISHU_BROWSER_CODE"],
+        externalProviderBindings: { FEISHU_BROWSER_CODE: 10 },
+      })
+    ).toEqual(
+      expect.objectContaining({
+        authorizationGrantTypes: "authorization_code",
+        externalCodeTypes: [],
+        externalProviderBindings: {},
+      })
+    );
   });
 
   it("reconciles edited client bindings against the current provider catalog", () => {
@@ -245,9 +320,7 @@ describe("平台身份、消息与接入应用管理", () => {
         browserLoginProviderTypes: ["GITHUB", "WECOM", "WECHAT"],
         externalCodeTypes: ["WECOM_APP_CODE", "REMOVED_CODE"],
       })
-    ).toBe(
-      "浏览器：GitHub；网页（浏览器/端内）：企业微信、微信；企业微信 SDK；高级兼容配置"
-    );
+    ).toBe("浏览器：GitHub；网页（浏览器/端内）：企业微信、微信；企业微信 SDK");
     expect(
       unsupportedExternalCodeTypes(
         { externalCodeTypes: ["WECOM_APP_CODE", "REMOVED_CODE"] },

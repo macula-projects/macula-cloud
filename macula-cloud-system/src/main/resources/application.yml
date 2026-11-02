@@ -110,6 +110,11 @@ logging:
   level:
     root: info
     dev.macula.cloud: debug
+    # OAuth Client 参数包含单向哈希后的密钥，禁止由 MyBatis DEBUG 参数日志输出。
+    dev.macula.cloud.system.mapper.SysOAuth2ClientConfigMapper: info
+    # 租户菜单授权查询包含认证用户名与成员参数，禁止由 MyBatis DEBUG 参数日志输出。
+    dev.macula.cloud.system.mapper.SysUserMapper: info
+    dev.macula.cloud.system.mapper.SysTenantUserMapper: info
   file:
     name: ${user.home}/logs/${spring.application.name}/${spring.application.name}.log
 

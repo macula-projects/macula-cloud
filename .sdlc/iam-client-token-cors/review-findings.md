@@ -111,3 +111,23 @@
 - Earlier findings suppressed: 9；不重复 Code Round 1/2 finding 或上轮 remediation plan finding。
 - Findings: `NO_FINDINGS`。
 - Disposition: Code Round 2 修复计划首轮评审通过，等待工程师明确批准后实施。
+
+## Runtime remediation plan review
+
+### Round 1 — Plan — `e9f41e6 + uncommitted runtime remediation plan`
+
+- Reviewer: `sdlc-reviewer` fallback；Pass: Plan only。
+- Scope: `plan.md` 的 `## Runtime remediation: 历史 confidential 验证码 Client 可维护性` 新增部分；检查历史豁免安全边界、并发、错误信息泄露、精确文件范围和证明。
+- Earlier findings suppressed: 9；不重复既有 Plan/Code finding。
+- Findings:
+  - `.sdlc/iam-client-token-cors/plan.md:159 — Important — 历史豁免依赖先读旧 auth/grant 再无条件 updateById，但计划未处理并发；若另一请求已把 Client 整改为合法 public 配置，基于旧快照的保存仍可把 confidential+sms 历史组合写回，绕过“目标状态变化重新严格校验”的边界 — 在同一事务内对 Client 行加锁，或用旧 auth/grant 作为条件更新并在不匹配时冲突失败；补充可证明并发整改不会被旧表单回写覆盖的测试 — Response: fixed in plan with conditional auth/grant update, conflict failure and concurrency proof`
+  - `.sdlc/iam-client-token-cors/plan.md:167 — Minor — 风险段写成“不得把 confidential 浏览器 Client 转成 public”，与第 160 行及 Proof 中“管理员显式整改为完整 public PKCE 配置允许”矛盾，实施者可能据此错误阻止安全整改 — 改成“不得自动转换；仅管理员显式提交且完整满足 public PKCE 约束时允许整改”，并保持对应成功测试 — Response: fixed`
+- Disposition: 两项接受并修订；Round 2 只复审对应变化。
+
+### Round 2 — Plan — `e9f41e6 + uncommitted runtime remediation plan revision`
+
+- Reviewer: `sdlc-reviewer` fallback；Pass: Plan only。
+- Scope: 只复审 Round 1 两项 finding 对应的条件更新并发保护、显式 public PKCE 整改边界及证明变化。
+- Earlier findings suppressed: 11。
+- Findings: `NO_FINDINGS`。
+- Disposition: Runtime remediation 计划评审通过；等待工程师明确批准后实施。

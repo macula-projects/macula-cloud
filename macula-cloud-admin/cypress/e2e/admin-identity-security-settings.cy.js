@@ -502,6 +502,114 @@ describe("平台身份、消息与接入应用管理", () => {
     cy.contains(".el-drawer", "强制 PKCE").should("be.visible");
   });
 
+  it("maintains legacy verification client origins without hiding business errors", () => {
+    let updateRequests = 0;
+    let client = {
+      id: 2,
+      clientId: "e4da4a32-592b-46f0-ae1d-784310e88423",
+      clientName: "macula-cloud-gateway",
+      tenantId: 1,
+      userType: "employee",
+      clientAuthenticationMethods: "client_secret_basic,client_secret_post",
+      authorizationGrantTypes:
+        "authorization_code,client_credentials,refresh_token,password,sms",
+      redirectUris: "http://127.0.0.1:8083/login/oauth2/code/felord",
+      scopes: "message.read,message.write,userinfo",
+      externalCodeTypes: [],
+      externalProviderBindings: {},
+      allowedOrigins: ["http://127.0.0.1:5900"],
+      browserLoginProviderTypes: [],
+      directLoginProviderType: "",
+      requireProofKey: false,
+      requireAuthorizationConsent: true,
+      authorizationCodeTimeToLive: 300,
+      accessTokenTimeToLive: 43200,
+      refreshTokenTimeToLive: 2592000,
+      tokenFormat: "reference",
+      reuseRefreshTokens: true,
+      idTokenSignatureAlgorithm: "RS256",
+    };
+    cy.intercept("GET", "**/system/api/v1/oauth2-clients*", (req) => {
+      req.reply(ok({ records: [client], total: 1 }));
+    }).as("clients");
+    cy.intercept(
+      "GET",
+      "**/system/api/v1/tenants/options*",
+      ok([{ value: 1, label: "平台租户" }])
+    ).as("tenants");
+    cy.intercept("PUT", "**/system/api/v1/oauth2-clients/2", (req) => {
+      updateRequests += 1;
+      if (req.body.authorizationGrantTypes.includes("email")) {
+        req.reply({
+          statusCode: 500,
+          body: {
+            success: false,
+            code: "B0002",
+            msg: "系统异常",
+            cause:
+              '400 BAD_REQUEST "短信或邮箱验证码 grant 必须由公共客户端使用"',
+          },
+        });
+        return;
+      }
+      expect(req.body.clientAuthenticationMethods).to.equal(
+        "client_secret_basic,client_secret_post"
+      );
+      expect(req.body.authorizationGrantTypes).to.equal(
+        "authorization_code,client_credentials,refresh_token,password,sms"
+      );
+      expect(req.body.allowedOrigins).to.deep.equal([
+        "http://127.0.0.1:5900",
+        "http://127.0.0.1:5800",
+      ]);
+      client = { ...client, ...req.body };
+      req.reply({ ...ok(client), delay: 300 });
+    }).as("updateLegacyClient");
+
+    open("/system/oauth2-client");
+    cy.wait("@clients");
+    cy.wait("@tenants");
+    cy.contains("tr", "macula-cloud-gateway")
+      .contains("button", "编辑")
+      .click();
+    cy.get(".el-drawer:visible").within(() => {
+      cy.contains("历史验证码客户端兼容模式").should("be.visible");
+      cy.contains("高级协议配置").click();
+      cy.contains(".el-form-item", "浏览器协议允许 Origin")
+        .find("textarea")
+        .type("{end}{enter}http://127.0.0.1:5800");
+      cy.contains("button", "保存").click();
+      cy.contains("button", "保存")
+        .should("have.class", "is-loading")
+        .and("be.disabled");
+    });
+    cy.wait("@updateLegacyClient");
+    cy.then(() => expect(updateRequests).to.equal(1));
+    cy.wait("@clients");
+
+    cy.contains("tr", "macula-cloud-gateway")
+      .contains("button", "编辑")
+      .click();
+    cy.get(".el-drawer:visible").within(() => {
+      cy.contains("高级协议配置").click();
+      cy.contains(".el-form-item", "浏览器协议允许 Origin")
+        .find("textarea")
+        .should("have.value", "http://127.0.0.1:5900\nhttp://127.0.0.1:5800");
+      cy.contains(".el-form-item", "授权方式")
+        .find("input")
+        .clear()
+        .type(
+          "authorization_code,client_credentials,refresh_token,password,sms,email"
+        );
+      cy.contains("button", "保存").click();
+    });
+    cy.wait("@updateLegacyClient");
+    cy.contains("短信或邮箱验证码 grant 必须由公共客户端使用").should(
+      "be.visible"
+    );
+    cy.contains("系统异常").should("not.exist");
+  });
+
   it("configures login methods by terminal without exposing code types", () => {
     const catalog = {
       codeTypes: [
@@ -516,12 +624,6 @@ describe("平台身份、消息与接入应用管理", () => {
           providerType: "WECHAT",
           scene: "MINIAPP",
           capability: "WECHAT_MINIAPP",
-        },
-        {
-          value: "FEISHU_BROWSER_CODE",
-          providerType: "FEISHU",
-          scene: "BROWSER",
-          capability: "FEISHU_EXTERNAL_REDIRECT",
         },
       ],
       providerRegistrations: [
@@ -604,7 +706,7 @@ describe("平台身份、消息与接入应用管理", () => {
     cy.contains("允许的 code type").should("not.exist");
   });
 
-  it("reconciles edited bindings and keeps shared and compatible login settings", () => {
+  it("reconciles edited bindings and removes unsupported browser code settings", () => {
     const catalog = {
       codeTypes: [
         {
@@ -625,12 +727,6 @@ describe("平台身份、消息与接入应用管理", () => {
           scene: "APP",
           capability: "DEFAULT",
         },
-        {
-          value: "FEISHU_BROWSER_CODE",
-          providerType: "FEISHU",
-          scene: "BROWSER",
-          capability: "FEISHU_EXTERNAL_REDIRECT",
-        },
       ],
       providerRegistrations: [
         {
@@ -643,7 +739,7 @@ describe("平台身份、消息与接入应用管理", () => {
           id: 30,
           name: "飞书主应用",
           providerType: "FEISHU",
-          capabilities: ["DEFAULT", "FEISHU_EXTERNAL_REDIRECT"],
+          capabilities: ["DEFAULT"],
         },
         {
           id: 31,
@@ -706,7 +802,7 @@ describe("平台身份、消息与接入应用管理", () => {
     cy.wait("@tenants");
     cy.contains("tr", "旧多端应用")
       .should("contain", "网页（浏览器/端内）：企业微信")
-      .and("contain", "高级兼容配置")
+      .and("not.contain", "高级兼容配置")
       .contains("button", "编辑")
       .click();
     cy.contains(".el-drawer .el-form-item__label", /^企业微信 SDK身份源$/)
@@ -747,12 +843,16 @@ describe("平台身份、消息与接入应用管理", () => {
       expect(request.body.externalCodeTypes).not.to.include(
         "DINGTALK_APP_CODE"
       );
-      expect(request.body.externalCodeTypes).to.include("FEISHU_BROWSER_CODE");
+      expect(request.body.externalCodeTypes).not.to.include(
+        "FEISHU_BROWSER_CODE"
+      );
       expect(request.body.externalProviderBindings).to.deep.include({
         WECOM_APP_CODE: 20,
         FEISHU_APP_CODE: 30,
-        FEISHU_BROWSER_CODE: 30,
       });
+      expect(request.body.externalProviderBindings).not.to.have.property(
+        "FEISHU_BROWSER_CODE"
+      );
       expect(request.body.externalProviderBindings).not.to.have.property(
         "DINGTALK_APP_CODE"
       );
@@ -763,17 +863,14 @@ describe("平台身份、消息与接入应用管理", () => {
     cy.wait("@clients");
     cy.contains("tr", "旧多端应用")
       .should("contain", "网页（浏览器/端内）：企业微信")
-      .and("contain", "高级兼容配置")
+      .and("not.contain", "高级兼容配置")
       .contains("button", "编辑")
       .click();
     cy.contains(".el-drawer .el-form-item__label", /^企业微信 SDK身份源$/)
       .parents(".el-form-item")
       .should("contain", "新企业微信");
     cy.contains(".el-drawer", "高级协议配置").click();
-    cy.contains(".el-checkbox", "FEISHU_BROWSER_CODE").should(
-      "have.class",
-      "is-checked"
-    );
+    cy.contains(".el-checkbox", "FEISHU_BROWSER_CODE").should("not.exist");
   });
 
   it("re-infers the edited terminal after a delayed external catalog", () => {
@@ -949,7 +1046,7 @@ describe("平台身份、消息与接入应用管理", () => {
     cy.then(() => expect(writes).to.equal(2));
   });
 
-  it("rejects missing redirects and unsupported historical code types", () => {
+  it("rejects missing redirects and removes unsupported code types", () => {
     const unsupportedClient = {
       id: 8,
       clientId: "unsupported-client",
@@ -985,7 +1082,7 @@ describe("平台身份、消息与接入应用管理", () => {
     cy.intercept("PUT", "**/system/api/v1/oauth2-clients/8", (req) => {
       writes += 1;
       req.reply(ok({ id: 8 }));
-    });
+    }).as("updateClient");
 
     open("/system/oauth2-client");
     cy.wait("@clients");
@@ -1008,10 +1105,15 @@ describe("平台身份、消息与接入应用管理", () => {
 
     cy.contains("tr", "待迁移应用").contains("button", "编辑").click();
     cy.contains(".el-drawer", "保存").contains("button", "保存").click();
-    cy.contains("存在不受支持的历史凭证类型：REMOVED_CODE").should(
-      "be.visible"
-    );
-    cy.then(() => expect(writes).to.equal(0));
+    cy.wait("@updateClient").then(({ request }) => {
+      expect(request.body.externalCodeTypes).to.deep.equal([]);
+      expect(request.body.externalProviderBindings).to.deep.equal({});
+      expect(request.body.authorizationGrantTypes).to.equal(
+        "authorization_code"
+      );
+    });
+    cy.wait("@clients");
+    cy.then(() => expect(writes).to.equal(1));
   });
 
   it("manages the fixed mail and SMS provider/template scope", () => {
@@ -1361,7 +1463,7 @@ describe("平台身份、消息与接入应用管理", () => {
     cy.contains(".el-drawer .el-form-item", "Client ID")
       .find("input")
       .type("pkce-app");
-    cy.contains(".el-drawer .el-form-item", "重定向 URI")
+    cy.contains(".el-drawer:visible .el-form-item:visible", "重定向 URI")
       .find("textarea")
       .type("https://example.test/callback");
     cy.contains(".el-drawer", "保存").contains("button", "保存").click();

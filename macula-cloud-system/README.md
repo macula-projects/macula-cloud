@@ -76,7 +76,9 @@ System 数据库同时供 IAM 使用，清理后相关账号、权限及认证�
   机密客户端密钥由 System `PasswordEncoder` 单向哈希保存；公共客户端使用 `none` 且无密钥，
   强制启用 PKCE。表单支持 OIDC `openid` 和 ID Token 签名设置。客户端变更在事务提交后清理
   IAM 共享缓存，但不会撤销已签发的授权或令牌。仅 `client_credentials` 的应用无需回调 URI；
-  `client_secret_jwt` 不开放新配置，因为现有单向哈希密钥不能用于 HMAC 验签。上线前应针对已有客户端做兼容回归。
+  `client_secret_jwt` 不开放新配置，因为现有单向哈希密钥不能用于 HMAC 验签。System 会将
+  `SysOAuth2ClientConfigMapper` 的日志固定在 INFO 以上，避免 MyBatis DEBUG 参数日志输出密钥哈希。
+  上线前应针对已有客户端做兼容回归。
 - V6 新增 `sys_user_identity_binding`，只维护第三方 provider subject 到 username 的全局绑定，不含
   tenant ID、user ID、user type 或 token。`(provider_type, provider_subject)` 与
   `(provider_type, username)` 均唯一；当前仅由受控运维流程预置。V6 还通过生成列唯一键约束每种
@@ -116,9 +118,11 @@ System 数据库同时供 IAM 使用，清理后相关账号、权限及认证�
 - V11 只把 `sys_oauth2_client.allowed_origins` 的注释扩展为浏览器协议端点的统一精确 Origin，不修改或回填
   任何 Client 数据。该字段可独立于 grant 配置；空列表表示 IAM 拒绝该 Client 的全部浏览器跨域协议请求。
   短信和邮箱 grant 仍必须使用 public PKCE Client。升级前必须在旧 IAM 仍运行时盘点浏览器 Client 并配置
-  Origin；无法通过整表保存的历史 Client 按 `deploy/README.md` 的受控 DBA 步骤只更新该字段。Client 新增、
-  修改、改密或删除在事务提交后清理共享 OAuth Client 缓存区域，使 RegisteredClient 与全局 Origin 索引共同
-  失效；IAM 对实际 Token POST 仍按已认证 client_id 查询权威数据，缓存不作为最终 Origin 授权依据。
+  Origin；旧 System 无法整表保存的历史 Client 按 `deploy/README.md` 的受控 DBA 步骤只更新该字段。新版
+  System 允许已存在的 `confidential + sms/email` Client 在认证方式和 grant 集合均不变时维护 Origin 等字段，
+  但新建、扩权或改成另一非法组合仍拒绝；并发安全整改会让旧表单条件更新冲突失败。Client 新增、修改、改密或
+  删除在事务提交后清理共享 OAuth Client 缓存区域，使 RegisteredClient 与全局 Origin 索引共同失效；IAM 对
+  实际 Token POST 仍按已认证 client_id 查询权威数据，缓存不作为最终 Origin 授权依据。
 
 - OAuth Client 的每个 `ExternalCodeType` 必须选择一个启用、provider 类型相符且具备对应配置能力的
   身份源 registration。微信移动应用、小程序和网站应用使用各自的 App ID/secret；飞书浏览器 code
@@ -154,6 +158,19 @@ Flyway 增量验证 `IdentityProviderMigrationIT` 默认禁用；仅将 `SYSTEM_
 或其他配置值。这些配置当前仅保存，尚未接入 IAM/Gateway 运行时。
 
 详细字段、默认值、单位和升级说明见 `../docs/security-policy.md`。
+
+## 菜单路由租户缓存
+
+`GET /api/v1/menus/routes` 在读取缓存前校验 JWT 租户与请求租户上下文。AK/SK 主体只能使用
+Gateway 写入 JWT 的 `tenantId`；用户切换租户时，ROOT 只能切换到已存在租户，普通用户只能切换到
+`sys_tenant_user` 明确关联的租户，无关联用户仅兼容默认租户 1。无法确定可信租户或越权时返回 403，
+不会回退到共享缓存。
+
+路由缓存键从旧的 `macula:cache:system::routes` 升级为
+`macula:cache:system::routes:v2:{tenantId}`。菜单新增、修改、删除、可见性变化以及角色菜单关系变化，
+只在事务提交后精确失效当前可信租户的键；回滚不会提前清理缓存。旧共享键默认可等待 24 小时 TTL
+自然到期，也可在确认全部旧 System 实例已经停止或排空后精确删除。禁止新旧 System 实例混合运行，
+也禁止通过清空整个 Redis 代替旧键迁移。
 
 ## 关于DTO的说明
 

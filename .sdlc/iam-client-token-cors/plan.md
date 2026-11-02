@@ -1,6 +1,19 @@
 # Plan: IAM Client 级 Token CORS (from spec.md 2026-10-27)
 
 ## Files that change
+- `macula-cloud-api/macula-cloud-system-api/src/main/java/dev/macula/cloud/system/enums/ExternalCodeType.java`
+- `macula-cloud-api/macula-cloud-system-api/src/test/java/dev/macula/cloud/system/enums/ExternalCodeTypeTest.java`
+- `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/authentication/feishu/FeishuExternalCodeVerifier.java`
+- `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/authentication/dingtalk/DingtalkExternalCodeVerifier.java`
+- `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/authentication/wecom/WecomExternalCodeVerifier.java`
+- `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/authentication/wechat/WechatExternalCodeVerifier.java`
+- `macula-cloud-iam/src/test/java/dev/macula/cloud/iam/authentication/feishu/FeishuExternalCodeVerifierTest.java`
+- `macula-cloud-iam/README.md`
+- `macula-cloud-system/src/main/java/dev/macula/cloud/system/service/impl/OAuth2ClientConfigServiceImpl.java`
+- `macula-cloud-system/src/main/resources/application.yml`
+- `macula-cloud-admin/src/api/model/system/oauth2Client.js`
+- `macula-cloud-admin/src/views/system/oauth2Client/index.vue`
+- `macula-cloud-admin/cypress/e2e/admin-identity-security-settings.cy.js`
 - `.sdlc/iam-client-token-cors/plan.md`、`.sdlc/iam-client-token-cors/review-findings.md`：记录获批实施顺序、Plan review 结果和后续实际偏差。
 - `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/config/ProtocolOAuth2Configuration.java`：移除部署级 Token Origin 列表，把 Client 级协议 CORS source 和认证后 Token Origin 过滤器装入 Authorization Server 安全链。
 - `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/config/ProtocolLoginCorsConfigurationSource.java`：在现有验证码 CORS 基础上覆盖 Token 端点；Token 预检和实际请求的传输层只按 Origin 全局存在性返回 CORS 许可，不把该结果当作 Client 授权。
@@ -141,3 +154,47 @@
 - public Client converter 现在使用基于当前 `AuthorizationServerSettings` Token endpoint 的严格 POST matcher，并在读取任何请求参数前拒绝 introspection、revocation、device authorization、PAR、非 POST 和近似路径。真实安全链回归覆盖 public Client 不能借伪造 `grant_type` 在 introspection/revocation 建立身份，且未授权 revocation 不会撤销目标 Token。
 - 补充双 cache region 类型隔离、8 路 single-flight 保持、两类清理异常、region 缺失、提交前和回滚不清理测试。仓库不存在 `CLAUDE.md`，因此按根 `AGENTS.md` 的按需规则读取并遵循 architecture、backend-development 与 testing 规则，没有绕过项目约束。
 - Build 阶段执行 IAM/System 及依赖模块 `test-compile`，5 个 reactor 模块成功；按仓库 Checkstyle 配置精确检查本轮变更的 System API、IAM、System 主代码文件，均为 0 violation；`git diff --check` 通过。尚未运行测试用例，正式验证留给 Stage 4。
+
+## Runtime remediation: 历史 confidential 验证码 Client 可维护性
+
+### Additional files that change
+- `macula-cloud-system/src/main/java/dev/macula/cloud/system/service/impl/OAuth2ClientConfigServiceImpl.java`：更新时先读取现有 Client，再执行带历史状态的校验；只对“数据库中已存在且认证方式、grant 集合均未改变”的 confidential + sms/email 组合保留维护通道，新建或新增该非法组合仍拒绝。
+- `macula-cloud-system/src/test/java/dev/macula/cloud/system/service/impl/OAuth2ClientConfigServiceImplTest.java`：复现内置 Client 原样保存失败，覆盖历史组合更新 Origin 成功、认证方式/grant 扩权拒绝、新建拒绝及整改为合法组合成功。
+- `macula-cloud-system/src/main/resources/application.yml`：将 OAuth Client Mapper 日志固定为 INFO，避免 MyBatis DEBUG 参数日志输出单向哈希后的 Client secret。
+- `macula-cloud-admin/src/api/model/system/oauth2Client.js`：提供 OAuth Client 页面专用的安全错误摘要函数，只从服务端 `cause` 中提取明确的 `ResponseStatusException` 业务原因，其他异常继续使用公开 `msg`/兜底文案。
+- `macula-cloud-admin/src/views/system/oauth2Client/index.vue`：保存失败时显示可执行的业务校验原因；历史 confidential 验证码 Client 显示兼容提示，但不自动修改认证方式、grant、secret 或 PKCE。
+- `macula-cloud-admin/tests/unit/admin-identity-security-settings.test.js`：覆盖历史 Client 无损回显/保存、错误摘要和兼容提示。
+- `macula-cloud-admin/cypress/e2e/admin-identity-security-settings.cy.js`：覆盖管理员为历史内置 Client 修改 Origin 并保存成功，以及非法改变认证方式/grant 时展示明确原因。
+- `macula-cloud-system/README.md`、`macula-cloud-admin/README.md`、`deploy/README.md`：把“历史 Client 只能 DBA 窄更新”修订为切换前可用 DBA 路径、升级后可由管理 API 在不改变历史认证方式/grant 的条件下维护；继续禁止自动迁移和静默放宽。
+- `.sdlc/iam-client-token-cors/plan.md`、`.sdlc/iam-client-token-cors/review-findings.md`、`.sdlc/iam-client-token-cors/verification.md`：记录运行时复现、补救计划评审、实施偏差与重新验证证据。
+
+### Remediation order
+1. 以本地 Compose 的同一份 GET/PUT 数据固定回归：内置 Client `client_secret_basic,client_secret_post + password,sms` 原样保存当前返回系统异常，后端实际原因为 public Client 约束。
+2. 将 System 保存流程调整为更新时先读取现有行，再校验请求。新建 Client 继续严格执行 sms/email 必须 public PKCE；更新只有在现有行已经是 confidential 验证码组合，且请求的认证方式集合与 grant 集合都与数据库完全相同时，才允许修改 Origin、显示信息、回调、scope、TTL 等既有管理字段。增加 sms/email、认证方式和 grant 集合顺序差异的规范化比较，不能用 CSV 字符串顺序误判变更。历史豁免写入必须以读取时数据库中的原始认证方式和 grant 字符串作为条件更新；条件不匹配返回冲突并要求刷新，不能让旧表单覆盖并发完成的安全整改。
+3. 对历史 Client 的任何认证方式或 grant 变化重新执行完整目标状态校验：删除 sms/email、完整迁移为 public PKCE 等整改后的合法状态允许；增加 sms/email、在 confidential 方法间切换、增加 grant 或留下新的非法组合均拒绝。不得自动删除 secret、改为 public、启用 PKCE 或重写已有数据；只有管理员显式提交且目标状态完整满足 public PKCE 约束时才允许整改。
+4. Admin 保持完整表单契约和无损回显，增加历史兼容警示；保存错误只显示可识别的业务原因，不把任意内部异常 `cause` 暴露给用户。`.env`、Token 请求参数和 Client secret 契约不变。
+5. 更新单元、Cypress 和 README 后进入 Stage 4：执行目标 System 测试、根 Maven、Admin Vitest/build/Cypress、变更 Java Checkstyle、前端 ESLint、Compose 配置及本地真实 GET/PUT/Token/UserInfo 回归。
+
+### Remediation risks
+- 历史豁免若只检查“目标仍含 sms/email”，会允许管理员把其他 Client 改造成非法 confidential 验证码 Client；必须同时证明数据库旧状态已非法且认证方式、grant 两个集合都完全未变。
+- CSV 顺序不是授权语义；比较必须使用规范化集合，否则仅由 Admin 重排字段就会误拒绝，或重复值/空值被错误视为等价。
+- 允许维护不等于认可历史安全模型。不得自动把 confidential 浏览器 Client 转成 public、清空 secret 或改变 grant；管理员显式提交且目标状态完整满足 public PKCE 约束时允许安全整改，其他安全演进仍是独立变更。
+- 历史豁免基于读取快照时，普通 `updateById` 会让旧请求覆盖并发整改；豁免路径必须对原始 auth/grant 做条件更新，影响行数不是 1 时以冲突失败且不得清缓存。
+- 直接展示统一异常响应的任意 `cause` 可能泄露内部实现。前端只识别固定的 HTTP 状态原因格式并提取引号内业务文本，未知格式回退公开 `msg`。
+- 事务与缓存语义不得改变：成功更新仍只在事务提交后清理 RegisteredClient 与 Origin 索引两个 region，失败校验不写库、不清缓存。
+
+### Remediation proof
+- `OAuth2ClientConfigServiceImplTest` 使用与 V1 内置记录一致的历史实体，证明不改变 auth/grant 时可新增、删除或清空精确 Origin；新建 confidential sms/email、向合法 confidential Client 新增 sms/email、改变历史 Client auth/grant 为另一非法组合均拒绝；删除验证码 grant 或显式迁移到完整 public PKCE 配置允许。并发测试模拟读取后另一请求已整改 auth/grant，断言旧历史表单的条件更新影响 0 行、返回冲突、不清缓存且不能把非法组合写回。
+- Admin Vitest 证明历史字段回显不丢失、兼容提示可见、明确的 `400 BAD_REQUEST "..."` 只提取业务原因，未知 `cause` 不展示；Cypress 证明 Origin 保存请求保持完整字段且成功后重新打开可回显，并覆盖非法变更错误态与重复提交保护。
+- 目标 System 和根 Maven 回归证明现有严格新建规则、Origin 规范化、事务后双缓存失效及其他模块不回退；Admin build/lint 和完整 E2E 证明页面契约不破坏。
+- 本地 Compose 使用管理员真实 Token 执行 GET Client、PUT 仅改 Origin、再次 GET、Token CORS 预检/签发和 UserInfo；记录 HTTP 状态与非敏感字段，不输出 secret 或 Token，并恢复测试前 Origin 值。
+
+### Runtime remediation implementation record
+- 2026-10-29：按获批补救顺序完成实现。System 只对数据库中已存在且 auth/grant 语义集合未改变的 confidential 验证码 Client 使用带原始 auth/grant 条件的更新；并发条件不匹配返回 409。新建、扩展或变成另一非法组合继续拒绝；删除验证码 grant 或管理员显式提交完整 public PKCE 目标状态仍允许，未自动改写 secret、PKCE 或协议字段。
+- Admin 增加历史兼容提示，并只从固定 `4xx STATUS "业务原因"` 格式提取可展示原因；未知 `cause` 回退公开 `msg`。Origin 保存保持完整表单字段，保存中的重复触发由既有 `saving` 门闩拒绝。`.env`、Token 请求及 Client secret 合同未改变。
+- 为满足 artifact gate 的精确路径匹配，在既有 `Files that change` 顶部重复列出四个已有目标路径；这只是计划工具兼容记录，不改变批准范围或实现语义。Cypress 首次新增用例命中隐藏 Drawer，改为限定当前可见 Drawer；重复提交覆盖首次把 `ok()` 静态响应再次包入 `body`，修正为在原静态响应上增加延迟。两项均为测试夹具修正，生产代码不变。
+- Build 阶段反馈：System 目标测试 20 项、Admin 目标 Vitest 10 项、目标 Cypress 21 项、Admin production build、变更前端文件 ESLint 和两份变更 Java 的仓库规则 Checkstyle 均通过；`git diff --check` 无空白错误。首次扩展三种 Origin 维护场景时 Mockito 精确实体断言匹配两次，改为验证三次均走条件更新并直接断言返回协议字段不变。以上不替代 Stage 4 的根 Maven、完整前端、Compose 及真实 GET/PUT/Token/UserInfo 验证。
+- Stage 4 首轮 Compose 日志检查发现 `SysOAuth2ClientConfigMapper` 的 MyBatis DEBUG `Parameters` 两次输出 BCrypt 密钥哈希；虽然不是明文，仍不满足敏感日志边界。按失败回路补充精确 logger 覆盖为 INFO，不影响其他 `dev.macula.cloud` DEBUG 日志，并要求重建 System 后重新执行完整验证。
+- 2026-10-29 人工界面反馈指出 OAuth Client 编辑抽屉正文贴边、标签列过宽且登录联动区域层级拥挤。保持字段、联动和保存契约不变，将抽屉扩为最大 920px，增加 28px 正文留白，把基础信息和登录能力放入独立分组容器，标签列收窄为 150px，并为 720px 以下视口切换单列标签布局；目标 Vitest、Cypress、ESLint、Prettier 和生产构建通过，Admin 本地镜像已替换，完整 Stage 4 需在进入下一门禁前重跑。
+- 同轮人工反馈确认“浏览器兼容凭证”会被误解为上方终端登录方式的重复配置。保留历史协议能力但改名为“历史兼容 Code”，明确上方已自动派生标准 code type、这里只服务旧调用方直接使用浏览器 Code 调用 `external_code` grant；身份源绑定改为纵向行，长 code 名不再作为 150px 表单标签，说明、提示和登录卡片补充行高与间距。`macula-samples-admin-bff/application.yml` 只配置资源服务器 JWT 与 app-key/secret，不构成这些历史浏览器 code type 的使用证据。
+- 2026-10-29 人工进一步确认该能力属于全新开发，不需要任何历史浏览器 `external_code` 兼容。上一条“保留并改名”的决定作废：删除 Admin 兼容入口和未知类型摘要，编辑时只保留终端登录模型支持的标准 code type/绑定；同时删除 System API 枚举及 IAM 四个 verifier 中的 `*_BROWSER_CODE` 协议分支与文档说明。浏览器第三方登录统一从 `/oauth2/authorize` 进入，既有 APP、小程序和 WEBVIEW code type 保持不变；这属于人工需求纠正，不承诺旧试验数据兼容。

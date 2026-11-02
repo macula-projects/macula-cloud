@@ -120,9 +120,9 @@ Admin 的 `development` mode 对应本地 `local` 环境：`/api` 由 Vite 代�
 `IAM_TOKEN_CORS_ALLOWED_ORIGINS` 已停止使用，也不会作为空配置回退。登录、绑定及授权页面仍不开放跨域。
 
 切换新版 IAM 前，必须在旧 IAM 仍运行时盘点全部浏览器 Client 并配置 Origin。满足当前安全校验的 Client 使用
-System 管理 API；历史 `confidential + sms/email` Client 不能通过整表保存绕过 public PKCE 约束，只能由授权
-DBA 在备份后执行以下窄更新。先替换占位符，检查锁定行与预期原值，再执行 UPDATE；`affected_rows` 必须为 1，
-复查认证方式、grant、secret 摘要及其他字段未变后才能 `COMMIT`，否则执行 `ROLLBACK`：
+System 管理 API；旧 System 对历史 `confidential + sms/email` Client 仍会拒绝整表保存，因此切换前由授权 DBA
+在备份后执行以下窄更新。先替换占位符，检查锁定行与预期原值，再执行 UPDATE；`affected_rows` 必须为 1，复查
+认证方式、grant、secret 摘要及其他字段未变后才能 `COMMIT`，否则执行 `ROLLBACK`：
 
 ```sql
 START TRANSACTION;
@@ -149,6 +149,8 @@ WHERE client_id = '<CLIENT_ID>';
 
 不要从 redirect URI、请求 Host 或旧全局白名单自动推导 Origin，也不要把本机示例值写入共享或生产数据库。
 回滚到旧 IAM 时恢复旧版本所需的部署级白名单；数据库中已审核的 Client Origin 可以保留。
+新版 System 部署后，管理 API/Admin 可在历史 Client 的认证方式和 grant 集合均不变时维护 Origin 等字段；该兼容
+通道不允许新建或扩大非法组合，并用条件更新防止旧表单覆盖并发完成的 public PKCE 整改。
 
 ## 常用命令
 

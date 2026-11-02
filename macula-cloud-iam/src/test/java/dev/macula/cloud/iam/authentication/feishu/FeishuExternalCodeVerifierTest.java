@@ -55,22 +55,4 @@ class FeishuExternalCodeVerifierTest {
         verify(client).fetchEmployeeNo(config, "app-code", null, FeishuLoginMode.APP);
     }
 
-    @Test
-    void browserCodeUsesConfiguredRedirectUri() {
-        IdentityProviderConfigService configs = mock(IdentityProviderConfigService.class);
-        FeishuClient client = mock(FeishuClient.class);
-        ProviderConfig config = new ProviderConfig("FEISHU", "app", "secret",
-            Map.of("appId", "app", "externalRedirectUri", "https://app.example/callback"));
-        when(configs.requireEnabledById(8L, "FEISHU")).thenReturn(config);
-        when(client.fetchEmployeeNo(config, "browser-code", "https://app.example/callback",
-            FeishuLoginMode.BROWSER)).thenReturn("E1002");
-        FeishuExternalCodeVerifier verifier = new FeishuExternalCodeVerifier(configs, client);
-
-        ExternalCodeVerification verification = verifier.verify(
-            ExternalCodeType.FEISHU_BROWSER_CODE, 8L, "browser-code");
-
-        assertEquals("E1002", verification.subject());
-        verify(client).fetchEmployeeNo(config, "browser-code", "https://app.example/callback",
-            FeishuLoginMode.BROWSER);
-    }
 }

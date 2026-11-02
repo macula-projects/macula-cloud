@@ -68,133 +68,155 @@
     />
     <el-drawer
       v-model="drawer"
+      class="oauth-client-drawer"
       :title="form.id ? '编辑接入应用' : '新增接入应用'"
-      size="min(800px, 100vw)"
+      size="min(920px, 100vw)"
       direction="rtl"
       @closed="reset"
     >
-      <el-form ref="formRef" :model="form" label-width="180px" :rules="rules">
-        <el-form-item label="应用名称" prop="clientName"
-          ><el-input v-model="form.clientName"
-        /></el-form-item>
-        <el-form-item label="Client ID" prop="clientId"
-          ><el-input v-model="form.clientId" :disabled="!!form.id"
-        /></el-form-item>
-        <el-form-item label="所属租户" prop="tenantId"
-          ><el-select v-model="form.tenantId" filterable style="width: 100%"
-            ><el-option
-              v-for="item in tenants"
-              :key="item.value"
-              :label="item.label"
-              :value="item.value" /></el-select
-        ></el-form-item>
-        <el-form-item label="用户类型" prop="userType"
-          ><el-select v-model="form.userType"
-            ><el-option
-              v-for="item in userTypes"
-              :key="item.value"
-              :label="item.label"
-              :value="item.value" /></el-select
-        ></el-form-item>
-        <el-divider content-position="left">登录能力</el-divider>
-        <el-alert
-          title="先选择终端，再选择该终端允许的登录方式。底层协议参数由系统自动配置。"
-          type="info"
-          :closable="false"
-          show-icon
-        />
-        <el-form-item label="终端类型">
-          <el-segmented
-            v-model="activeTerminal"
-            :options="terminalOptions"
-            @change="terminalChanged"
-          />
-        </el-form-item>
-        <div class="terminal-description">
-          {{ activeTerminalDefinition.description }}
+      <el-alert
+        v-if="legacyCompatibility"
+        class="legacy-client-warning"
+        title="历史验证码客户端兼容模式"
+        description="可以维护 Origin 等现有配置；认证方式或授权方式只有在完整整改为合法配置时才能修改。"
+        type="warning"
+        :closable="false"
+        show-icon
+      />
+      <el-form
+        ref="formRef"
+        class="client-form"
+        :model="form"
+        label-width="150px"
+        :rules="rules"
+      >
+        <div class="form-section basic-fields">
+          <el-form-item label="应用名称" prop="clientName"
+            ><el-input v-model="form.clientName"
+          /></el-form-item>
+          <el-form-item label="Client ID" prop="clientId"
+            ><el-input v-model="form.clientId" :disabled="!!form.id"
+          /></el-form-item>
+          <el-form-item label="所属租户" prop="tenantId"
+            ><el-select v-model="form.tenantId" filterable style="width: 100%"
+              ><el-option
+                v-for="item in tenants"
+                :key="item.value"
+                :label="item.label"
+                :value="item.value" /></el-select
+          ></el-form-item>
+          <el-form-item label="用户类型" prop="userType"
+            ><el-select v-model="form.userType"
+              ><el-option
+                v-for="item in userTypes"
+                :key="item.value"
+                :label="item.label"
+                :value="item.value" /></el-select
+          ></el-form-item>
         </div>
-        <el-form-item label="允许的登录方式">
-          <div class="login-method-grid">
-            <el-checkbox
-              v-for="method in activeLoginMethods"
-              :key="method.value"
-              :model-value="isLoginMethodSelected(method)"
-              :disabled="loginMethodState(method).disabled"
-              :data-login-method="method.value"
-              border
-              @change="(selected) => toggleLoginMethod(method, selected)"
-            >
-              <span class="login-method-label">{{ method.label }}</span>
-              <small>{{ loginMethodState(method).hint }}</small>
-            </el-checkbox>
-          </div>
-        </el-form-item>
-        <template
-          v-for="method in selectedExternalMethodsForActiveTerminal"
-          :key="method.value"
+        <el-divider class="section-divider" content-position="left"
+          >登录能力</el-divider
         >
-          <el-form-item
-            v-if="providerCandidates(method).length > 1"
-            :label="`${method.label}身份源`"
-          >
-            <el-select
-              v-model="form.externalProviderBindings[method.externalCodeType]"
-              placeholder="请选择身份源"
-              style="width: 100%"
-            >
-              <el-option
-                v-for="provider in providerCandidates(method)"
-                :key="provider.id"
-                :label="provider.name"
-                :value="provider.id"
-              />
-            </el-select>
-          </el-form-item>
-          <el-form-item
-            v-else-if="providerCandidates(method).length === 1"
-            :label="`${method.label}身份源`"
-          >
-            <span class="auto-binding"
-              >{{ providerCandidates(method)[0]?.name }}（自动绑定）</span
-            >
-          </el-form-item>
+        <div class="form-section capability-section">
           <el-alert
-            v-else
-            :title="`${method.label}缺少可用身份源，请先完成身份源配置`"
-            type="error"
+            title="先选择终端，再选择该终端允许的登录方式。底层协议参数由系统自动配置。"
+            type="info"
             :closable="false"
             show-icon
           />
-        </template>
-        <el-form-item
-          v-if="requiresAuthorizationCode"
-          label="重定向 URI"
-          prop="redirectUris"
-        >
-          <el-input
-            v-model="form.redirectUris"
-            type="textarea"
-            placeholder="多个地址用逗号分隔"
-          />
-        </el-form-item>
-        <el-form-item
-          v-if="selectedBrowserLoginProviders.length"
-          label="进入登录页后"
-        >
-          <el-select
-            v-model="form.directLoginProviderType"
-            clearable
-            placeholder="展示可选登录方式"
-            style="width: 100%"
-          >
-            <el-option
-              v-for="provider in selectedBrowserLoginProviders"
-              :key="provider.value"
-              :label="`直接进入${provider.label}认证`"
-              :value="provider.value"
+          <el-form-item label="终端类型">
+            <el-segmented
+              v-model="activeTerminal"
+              :options="terminalOptions"
+              @change="terminalChanged"
             />
-          </el-select>
-        </el-form-item>
+          </el-form-item>
+          <div class="terminal-description">
+            {{ activeTerminalDefinition.description }}
+          </div>
+          <el-form-item label="允许的登录方式">
+            <div class="login-method-grid">
+              <el-checkbox
+                v-for="method in activeLoginMethods"
+                :key="method.value"
+                :model-value="isLoginMethodSelected(method)"
+                :disabled="loginMethodState(method).disabled"
+                :data-login-method="method.value"
+                border
+                @change="(selected) => toggleLoginMethod(method, selected)"
+              >
+                <span class="login-method-label">{{ method.label }}</span>
+                <small>{{ loginMethodState(method).hint }}</small>
+              </el-checkbox>
+            </div>
+          </el-form-item>
+          <template
+            v-for="method in selectedExternalMethodsForActiveTerminal"
+            :key="method.value"
+          >
+            <el-form-item
+              v-if="providerCandidates(method).length > 1"
+              :label="`${method.label}身份源`"
+            >
+              <el-select
+                v-model="form.externalProviderBindings[method.externalCodeType]"
+                placeholder="请选择身份源"
+                style="width: 100%"
+              >
+                <el-option
+                  v-for="provider in providerCandidates(method)"
+                  :key="provider.id"
+                  :label="provider.name"
+                  :value="provider.id"
+                />
+              </el-select>
+            </el-form-item>
+            <el-form-item
+              v-else-if="providerCandidates(method).length === 1"
+              :label="`${method.label}身份源`"
+            >
+              <span class="auto-binding"
+                >{{ providerCandidates(method)[0]?.name }}（自动绑定）</span
+              >
+            </el-form-item>
+            <el-alert
+              v-else
+              :title="`${method.label}缺少可用身份源，请先完成身份源配置`"
+              type="error"
+              :closable="false"
+              show-icon
+            />
+          </template>
+          <el-form-item
+            v-if="requiresAuthorizationCode"
+            label="重定向 URI"
+            prop="redirectUris"
+          >
+            <el-input
+              v-model="form.redirectUris"
+              type="textarea"
+              placeholder="多个地址用逗号分隔"
+            />
+          </el-form-item>
+          <el-form-item
+            v-if="selectedBrowserLoginProviders.length"
+            label="进入登录页后"
+          >
+            <el-select
+              v-model="form.directLoginProviderType"
+              clearable
+              placeholder="展示可选登录方式"
+              style="width: 100%"
+            >
+              <el-option
+                v-for="provider in selectedBrowserLoginProviders"
+                :key="provider.value"
+                :label="`直接进入${provider.label}认证`"
+                :value="provider.value"
+              />
+            </el-select>
+          </el-form-item>
+        </div>
         <el-collapse class="advanced-settings">
           <el-collapse-item title="高级协议配置" name="protocol">
             <el-alert
@@ -245,40 +267,6 @@
             <el-form-item label="Scopes"
               ><el-input v-model="form.scopes" placeholder="openid,profile"
             /></el-form-item>
-            <el-form-item
-              v-if="compatibleBrowserCodeTypes.length"
-              label="浏览器兼容凭证"
-            >
-              <el-checkbox-group
-                v-model="form.externalCodeTypes"
-                @change="externalTypesChanged"
-              >
-                <el-checkbox
-                  v-for="item in compatibleBrowserCodeTypes"
-                  :key="item.value"
-                  :value="item.value"
-                  >{{ item.value }}</el-checkbox
-                >
-              </el-checkbox-group>
-            </el-form-item>
-            <el-form-item
-              v-for="codeType in selectedCompatibleBrowserCodeTypes"
-              :key="codeType.value"
-              :label="`${codeType.value} 身份源`"
-            >
-              <el-select
-                v-model="form.externalProviderBindings[codeType.value]"
-                placeholder="请选择身份源"
-                style="width: 100%"
-              >
-                <el-option
-                  v-for="provider in providersFor(codeType)"
-                  :key="provider.id"
-                  :label="provider.name"
-                  :value="provider.id"
-                />
-              </el-select>
-            </el-form-item>
             <el-form-item label="浏览器协议允许 Origin">
               <el-input
                 v-model="form.allowedOriginsText"
@@ -367,11 +355,12 @@ import api, {
   AUTHORIZATION_CODE_GRANT,
   BROWSER_LOGIN_PROVIDERS,
   CLIENT_TERMINALS,
-  COMMON_EXTERNAL_CODE_TYPES,
-  EXTERNAL_CODE_GRANT,
   TERMINAL_LOGIN_METHODS,
   invalidSelectedBrowserProviders,
+  isLegacyConfidentialVerificationClient,
   loginCapabilitySummary,
+  normalizeTerminalLoginConfiguration,
+  oauthClientErrorMessage,
   providerCandidatesForCodeType,
   reconcileExternalProviderBindings,
   terminalForClient,
@@ -425,7 +414,8 @@ const rows = ref([]),
   formRef = ref(),
   activeTerminal = ref("BROWSER"),
   terminalAutoSelected = ref(true),
-  catalogLoaded = ref(false);
+  catalogLoaded = ref(false),
+  legacyCompatibility = ref(false);
 const externalCatalog = ref({ codeTypes: [], providerRegistrations: [] });
 const browserLoginProviders = BROWSER_LOGIN_PROVIDERS;
 const terminalOptions = CLIENT_TERMINALS.map((terminal) => ({
@@ -449,18 +439,6 @@ const requiresAuthorizationCode = computed(() =>
 const selectedExternalMethodsForActiveTerminal = computed(() =>
   activeLoginMethods.value.filter(
     (method) => method.externalCodeType && isLoginMethodSelected(method)
-  )
-);
-const compatibleBrowserCodeTypes = computed(() =>
-  (externalCatalog.value.codeTypes || []).filter(
-    (item) =>
-      item.scene === "BROWSER" &&
-      !COMMON_EXTERNAL_CODE_TYPES.includes(item.value)
-  )
-);
-const selectedCompatibleBrowserCodeTypes = computed(() =>
-  compatibleBrowserCodeTypes.value.filter((item) =>
-    form.externalCodeTypes.includes(item.value)
   )
 );
 const unsupportedExternalCodeTypes = computed(() => {
@@ -493,7 +471,7 @@ const rules = {
   ],
 };
 const unwrap = (res) => {
-  if (!res?.success) throw new Error(res?.msg || res?.cause || "操作失败");
+  if (!res?.success) throw new Error(oauthClientErrorMessage(res));
   return res.data;
 };
 async function load() {
@@ -537,6 +515,7 @@ function reset() {
   Object.assign(form, blank());
   activeTerminal.value = "BROWSER";
   terminalAutoSelected.value = true;
+  legacyCompatibility.value = false;
   formRef.value?.clearValidate();
 }
 function authChanged(value) {
@@ -544,11 +523,15 @@ function authChanged(value) {
   if (!value.startsWith("client_secret_")) form.clientSecret = "";
 }
 function open(row) {
-  const value = row || {};
-  Object.assign(form, blank(), value, {
+  const value = row || blank();
+  const normalizedValue = normalizeTerminalLoginConfiguration(value);
+  legacyCompatibility.value = isLegacyConfidentialVerificationClient(value);
+  Object.assign(form, blank(), normalizedValue, {
     clientSecret: "",
-    externalCodeTypes: [...(value.externalCodeTypes || [])],
-    externalProviderBindings: { ...(value.externalProviderBindings || {}) },
+    externalCodeTypes: [...normalizedValue.externalCodeTypes],
+    externalProviderBindings: {
+      ...normalizedValue.externalProviderBindings,
+    },
     allowedOrigins: [...(value.allowedOrigins || [])],
     allowedOriginsText: (value.allowedOrigins || []).join("\n"),
     browserLoginProviderTypes: [...(value.browserLoginProviderTypes || [])],
@@ -556,27 +539,14 @@ function open(row) {
   });
   reconcileBindings();
   terminalAutoSelected.value = true;
-  activeTerminal.value = terminalForClient(value, externalCatalog.value);
+  activeTerminal.value = terminalForClient(
+    normalizedValue,
+    externalCatalog.value
+  );
   drawer.value = true;
 }
 function terminalChanged() {
   terminalAutoSelected.value = false;
-}
-function externalTypesChanged(values) {
-  const selected = new Set(values);
-  for (const codeType of Object.keys(form.externalProviderBindings)) {
-    if (!selected.has(codeType)) delete form.externalProviderBindings[codeType];
-  }
-  const grants = new Set(
-    form.authorizationGrantTypes
-      .split(",")
-      .map((item) => item.trim())
-      .filter(Boolean)
-  );
-  if (values.length) grants.add(EXTERNAL_CODE_GRANT);
-  else grants.delete(EXTERNAL_CODE_GRANT);
-  form.authorizationGrantTypes = [...grants].join(",");
-  reconcileBindings();
 }
 function grantTypes() {
   return new Set(
@@ -584,14 +554,6 @@ function grantTypes() {
       .split(",")
       .map((item) => item.trim())
       .filter(Boolean)
-  );
-}
-function providersFor(codeType) {
-  return (externalCatalog.value.providerRegistrations || []).filter(
-    (provider) =>
-      provider.providerType === codeType.providerType &&
-      (codeType.capability === "DEFAULT" ||
-        provider.capabilities?.includes(codeType.capability))
   );
 }
 function providerCandidates(method) {
@@ -687,9 +649,9 @@ async function save() {
     }
     if (unsupportedExternalCodeTypes.value.length)
       return ElMessage.error(
-        `存在不受支持的历史凭证类型：${unsupportedExternalCodeTypes.value.join(
+        `存在不受支持的凭证类型：${unsupportedExternalCodeTypes.value.join(
           "、"
-        )}，请先迁移`
+        )}，请重新选择登录方式`
       );
     if (form.externalCodeTypes.length && !catalogLoaded.value)
       return ElMessage.error("外部凭证目录加载失败，请刷新后重试");
@@ -711,7 +673,9 @@ async function save() {
     drawer.value = false;
     await load();
   } catch (error) {
-    ElMessage.error(error.message);
+    ElMessage.error(
+      oauthClientErrorMessage(error?.data, error?.message || "保存失败")
+    );
   } finally {
     saving.value = false;
   }
@@ -761,13 +725,37 @@ onMounted(() => {
 .toolbar .el-input {
   width: 270px;
 }
+.legacy-client-warning {
+  margin-bottom: 20px;
+}
+.form-section {
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 10px;
+}
+.basic-fields {
+  padding: 22px 22px 2px;
+}
+.capability-section {
+  padding: 20px 22px 4px;
+  background: var(--el-fill-color-extra-light);
+}
+.capability-section > .el-alert {
+  margin-bottom: 20px;
+}
+.section-divider {
+  margin: 30px 0 22px;
+}
 .hint {
-  margin-left: 12px;
+  display: block;
+  width: 100%;
+  margin: 6px 0 0;
   color: #999;
+  line-height: 1.5;
 }
 .terminal-description {
-  margin: -8px 0 16px 180px;
+  margin: -8px 0 18px 150px;
   color: var(--el-text-color-secondary);
+  line-height: 1.6;
 }
 .login-method-grid {
   display: grid;
@@ -797,15 +785,78 @@ onMounted(() => {
 .auto-binding {
   color: var(--el-text-color-secondary);
 }
+.login-method-grid small {
+  margin-top: 3px;
+  line-height: 1.45;
+}
 .advanced-settings {
-  margin-top: 20px;
+  margin-top: 28px;
+  overflow: hidden;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 10px;
+}
+.advanced-settings :deep(.el-collapse-item__header) {
+  height: 52px;
+  padding: 0 20px;
+  border-bottom: 0;
+  font-weight: 600;
+}
+.advanced-settings :deep(.el-collapse-item__wrap) {
+  border-top: 1px solid var(--el-border-color-lighter);
+  border-bottom: 0;
+}
+.advanced-settings :deep(.el-collapse-item__content) {
+  padding: 20px 22px 8px;
+}
+.advanced-settings .el-alert {
+  margin-bottom: 20px;
+}
+:deep(.oauth-client-drawer .el-drawer__body) {
+  padding: 0 28px 32px;
+}
+:deep(.oauth-client-drawer .el-drawer__footer) {
+  padding: 16px 28px;
+  border-top: 1px solid var(--el-border-color-lighter);
+}
+:deep(.oauth-client-drawer .el-drawer__header) {
+  margin-bottom: 20px;
+  padding: 24px 28px 0;
 }
 @media (max-width: 720px) {
+  .basic-fields,
+  .capability-section,
+  .advanced-settings :deep(.el-collapse-item__content) {
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+  .client-form :deep(.el-form-item) {
+    display: block;
+  }
+  .client-form :deep(.el-form-item__label) {
+    width: 100% !important;
+    height: auto;
+    margin-bottom: 8px;
+    justify-content: flex-start;
+  }
+  .client-form :deep(.el-form-item__content) {
+    margin-left: 0 !important;
+  }
   .login-method-grid {
     grid-template-columns: 1fr;
   }
   .terminal-description {
     margin-left: 0;
+  }
+  :deep(.oauth-client-drawer .el-drawer__header) {
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+  :deep(.oauth-client-drawer .el-drawer__footer) {
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+  :deep(.oauth-client-drawer .el-drawer__body) {
+    padding: 0 16px 24px;
   }
 }
 .el-pagination {

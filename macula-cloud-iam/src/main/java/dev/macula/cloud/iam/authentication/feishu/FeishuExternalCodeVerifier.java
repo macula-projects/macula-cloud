@@ -36,9 +36,8 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class FeishuExternalCodeVerifier implements ExternalCodeVerifier {
     private static final String PROVIDER_TYPE = "FEISHU";
-    private static final String EXTERNAL_REDIRECT_URI = "externalRedirectUri";
     private static final Set<ExternalCodeType> TYPES = Set.of(ExternalCodeType.FEISHU_APP_CODE,
-        ExternalCodeType.FEISHU_WEBVIEW_CODE, ExternalCodeType.FEISHU_BROWSER_CODE);
+        ExternalCodeType.FEISHU_WEBVIEW_CODE);
 
     private final IdentityProviderConfigService configs;
     private final FeishuClient client;
@@ -54,11 +53,8 @@ public class FeishuExternalCodeVerifier implements ExternalCodeVerifier {
         FeishuLoginMode mode = switch (codeType) {
             case FEISHU_APP_CODE -> FeishuLoginMode.APP;
             case FEISHU_WEBVIEW_CODE -> FeishuLoginMode.WEBVIEW;
-            case FEISHU_BROWSER_CODE -> FeishuLoginMode.BROWSER;
             default -> throw new IllegalArgumentException("Unsupported Feishu external code type");
         };
-        String redirectUri = mode == FeishuLoginMode.BROWSER ? config.require(EXTERNAL_REDIRECT_URI) : null;
-        return ExternalCodeVerification.identity(PROVIDER_TYPE,
-            client.fetchEmployeeNo(config, code, redirectUri, mode));
+        return ExternalCodeVerification.identity(PROVIDER_TYPE, client.fetchEmployeeNo(config, code, null, mode));
     }
 }

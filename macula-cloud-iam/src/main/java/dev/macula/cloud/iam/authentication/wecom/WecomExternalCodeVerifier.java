@@ -37,7 +37,7 @@ import java.util.Set;
 public class WecomExternalCodeVerifier implements ExternalCodeVerifier {
     private static final String PROVIDER_TYPE = "WECOM";
     private static final Set<ExternalCodeType> TYPES = Set.of(ExternalCodeType.WECOM_APP_CODE,
-        ExternalCodeType.WECOM_MINIAPP_CODE, ExternalCodeType.WECOM_BROWSER_CODE);
+        ExternalCodeType.WECOM_MINIAPP_CODE);
 
     private final IdentityProviderConfigService configs;
     private final WecomClient client;
@@ -53,7 +53,6 @@ public class WecomExternalCodeVerifier implements ExternalCodeVerifier {
         String userId = switch (codeType) {
             case WECOM_APP_CODE -> client.fetchAppUserId(config, code);
             case WECOM_MINIAPP_CODE -> client.fetchMiniAppUserId(config, code);
-            case WECOM_BROWSER_CODE -> client.fetchUserId(config, code);
             default -> throw new IllegalArgumentException("Unsupported WeCom external code type");
         };
         return ExternalCodeVerification.identity(PROVIDER_TYPE, userId);

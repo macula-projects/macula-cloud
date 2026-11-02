@@ -16,6 +16,7 @@
  */
 package dev.macula.cloud.system.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import dev.macula.boot.constants.CacheConstants;
 import dev.macula.cloud.system.enums.BrowserLoginProviderType;
 import dev.macula.cloud.system.enums.ExternalCodeType;
@@ -51,6 +52,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -244,6 +246,139 @@ class OAuth2ClientConfigServiceImplTest {
     }
 
     @Test
+    void legacyConfidentialVerificationClientCanUpdateOriginsWithoutChangingProtocol() {
+        OAuth2ClientForm addOrigin = legacyVerificationForm();
+        addOrigin.setAllowedOrigins(Set.of("https://admin.example.test"));
+        OAuth2ClientForm removeOrigin = legacyVerificationForm();
+        removeOrigin.setAllowedOrigins(Set.of("https://admin.example.test"));
+        OAuth2ClientForm clearOrigins = legacyVerificationForm();
+        clearOrigins.setAllowedOrigins(Set.of());
+        SysOAuth2ClientConfig existingWithoutOrigins = legacyVerificationClient();
+        SysOAuth2ClientConfig existingWithTwoOrigins = legacyVerificationClient();
+        existingWithTwoOrigins.setAllowedOrigins("https://admin.example.test,https://other.example.test");
+        SysOAuth2ClientConfig existingWithOrigins = legacyVerificationClient();
+        existingWithOrigins.setAllowedOrigins("https://admin.example.test");
+        when(mapper.selectById(2L)).thenReturn(existingWithoutOrigins, existingWithTwoOrigins, existingWithOrigins);
+        when(tenantMapper.selectById(1L)).thenReturn(new SysTenantInfo());
+        when(mapper.update(any(SysOAuth2ClientConfig.class),
+            org.mockito.ArgumentMatchers.<LambdaUpdateWrapper<SysOAuth2ClientConfig>>any())).thenReturn(1);
+        when(externalProviderMapper.selectList(any())).thenReturn(List.of());
+        stubCaches();
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            var addResult = service.save(2L, addOrigin);
+            var removeResult = service.save(2L, removeOrigin);
+            var clearResult = service.save(2L, clearOrigins);
+
+            assertEquals(Set.of("https://admin.example.test"), addResult.getAllowedOrigins());
+            assertEquals(Set.of("https://admin.example.test"), removeResult.getAllowedOrigins());
+            assertEquals(Set.of(), clearResult.getAllowedOrigins());
+            assertEquals("client_secret_basic,client_secret_post", addResult.getClientAuthenticationMethods());
+            assertEquals("authorization_code,client_credentials,refresh_token,password,sms",
+                addResult.getAuthorizationGrantTypes());
+            verify(mapper, times(3)).update(any(SysOAuth2ClientConfig.class),
+                org.mockito.ArgumentMatchers.<LambdaUpdateWrapper<SysOAuth2ClientConfig>>any());
+            verify(mapper, never()).updateById(any(SysOAuth2ClientConfig.class));
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+    }
+
+    @Test
+    void legacyVerificationMaintenanceRejectsProtocolChangesAndNewInvalidTargets() {
+        SysOAuth2ClientConfig existing = legacyVerificationClient();
+        when(mapper.selectById(2L)).thenReturn(existing);
+        when(tenantMapper.selectById(1L)).thenReturn(new SysTenantInfo());
+
+        OAuth2ClientForm changedAuthentication = legacyVerificationForm();
+        changedAuthentication.setClientAuthenticationMethods("client_secret_post");
+        assertThrows(ResponseStatusException.class, () -> service.save(2L, changedAuthentication));
+
+        OAuth2ClientForm changedGrants = legacyVerificationForm();
+        changedGrants.setAuthorizationGrantTypes(
+            "authorization_code,client_credentials,refresh_token,password,sms,email");
+        assertThrows(ResponseStatusException.class, () -> service.save(2L, changedGrants));
+
+        OAuth2ClientForm duplicateAuthentication = legacyVerificationForm();
+        duplicateAuthentication.setClientAuthenticationMethods(
+            "client_secret_basic,client_secret_post,client_secret_basic");
+        assertThrows(ResponseStatusException.class, () -> service.save(2L, duplicateAuthentication));
+
+        OAuth2ClientForm emptyGrantToken = legacyVerificationForm();
+        emptyGrantToken.setAuthorizationGrantTypes(
+            "authorization_code,client_credentials,,refresh_token,password,sms");
+        assertThrows(ResponseStatusException.class, () -> service.save(2L, emptyGrantToken));
+
+        SysOAuth2ClientConfig legalConfidential = legacyVerificationClient();
+        legalConfidential.setAuthorizationGrantTypes("client_credentials");
+        when(mapper.selectById(3L)).thenReturn(legalConfidential);
+        OAuth2ClientForm addsSms = legacyVerificationForm();
+        addsSms.setClientId(legalConfidential.getClientId());
+        assertThrows(ResponseStatusException.class, () -> service.save(3L, addsSms));
+
+        verify(mapper, never()).update(any(SysOAuth2ClientConfig.class),
+            org.mockito.ArgumentMatchers.<LambdaUpdateWrapper<SysOAuth2ClientConfig>>any());
+        verify(mapper, never()).updateById(any(SysOAuth2ClientConfig.class));
+    }
+
+    @Test
+    void legacyVerificationClientCanBeExplicitlyRemediatedToPublicPkce() {
+        SysOAuth2ClientConfig existing = legacyVerificationClient();
+        OAuth2ClientForm form = valid();
+        when(mapper.selectById(2L)).thenReturn(existing);
+        when(tenantMapper.selectById(1L)).thenReturn(new SysTenantInfo());
+        when(externalProviderMapper.selectList(any())).thenReturn(List.of());
+        stubCaches();
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            assertDoesNotThrow(() -> service.save(2L, form));
+            verify(mapper).updateById(argThat((SysOAuth2ClientConfig entity) ->
+                entity.getClientSecret() == null && "none".equals(entity.getClientAuthenticationMethods()) &&
+                    "authorization_code,refresh_token".equals(entity.getAuthorizationGrantTypes()) &&
+                    Boolean.TRUE.equals(entity.getRequireProofKey())));
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+    }
+
+    @Test
+    void legacyVerificationClientCanRemoveVerificationGrant() {
+        SysOAuth2ClientConfig existing = legacyVerificationClient();
+        OAuth2ClientForm form = legacyVerificationForm();
+        form.setAuthorizationGrantTypes("authorization_code,client_credentials,refresh_token,password");
+        when(mapper.selectById(2L)).thenReturn(existing);
+        when(tenantMapper.selectById(1L)).thenReturn(new SysTenantInfo());
+        when(externalProviderMapper.selectList(any())).thenReturn(List.of());
+        stubCaches();
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            assertDoesNotThrow(() -> service.save(2L, form));
+            verify(mapper).updateById(argThat((SysOAuth2ClientConfig entity) ->
+                "{bcrypt}digest".equals(entity.getClientSecret())
+                    && "authorization_code,client_credentials,refresh_token,password"
+                        .equals(entity.getAuthorizationGrantTypes())));
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+    }
+
+    @Test
+    void concurrentProtocolRemediationRejectsStaleLegacyMaintenance() {
+        OAuth2ClientForm form = legacyVerificationForm();
+        form.setAllowedOrigins(Set.of("https://admin.example.test"));
+        when(mapper.selectById(2L)).thenReturn(legacyVerificationClient());
+        when(tenantMapper.selectById(1L)).thenReturn(new SysTenantInfo());
+        when(mapper.update(any(SysOAuth2ClientConfig.class),
+            org.mockito.ArgumentMatchers.<LambdaUpdateWrapper<SysOAuth2ClientConfig>>any())).thenReturn(0);
+
+        ResponseStatusException error = assertThrows(ResponseStatusException.class, () -> service.save(2L, form));
+
+        assertEquals(409, error.getStatusCode().value());
+        verify(externalProviderMapper, never()).delete(any());
+        verify(cacheManager, never()).getCache(any());
+    }
+
+    @Test
     void rejectsBrowserOriginsBeyondDatabaseCapacity() {
         OAuth2ClientForm form = valid();
         form.setAllowedOrigins(java.util.stream.IntStream.range(0, 100)
@@ -408,5 +543,34 @@ class OAuth2ClientConfigServiceImplTest {
         form.setUserType("employee");
         form.setTenantId(1L);
         return form;
+    }
+
+    private OAuth2ClientForm legacyVerificationForm() {
+        OAuth2ClientForm form = valid();
+        form.setClientAuthenticationMethods("client_secret_basic,client_secret_post");
+        form.setAuthorizationGrantTypes("authorization_code,client_credentials,refresh_token,password,sms");
+        form.setRequireProofKey(false);
+        return form;
+    }
+
+    private SysOAuth2ClientConfig legacyVerificationClient() {
+        SysOAuth2ClientConfig entity = new SysOAuth2ClientConfig();
+        entity.setId(2L);
+        entity.setClientId("test-client");
+        entity.setClientSecret("{bcrypt}digest");
+        entity.setClientName("Test Client");
+        entity.setClientAuthenticationMethods("client_secret_basic,client_secret_post");
+        entity.setAuthorizationGrantTypes("authorization_code,client_credentials,refresh_token,password,sms");
+        entity.setRedirectUris("https://example.test/callback");
+        entity.setScopes("openid,profile");
+        entity.setAllowedOrigins("");
+        entity.setExternalCodeTypes("");
+        entity.setBrowserLoginProviderTypes("");
+        entity.setRequireProofKey(false);
+        entity.setRequireAuthorizationConsent(false);
+        entity.setReuseRefreshTokens(true);
+        entity.setUserType("employee");
+        entity.setTenantId(1L);
+        return entity;
     }
 }

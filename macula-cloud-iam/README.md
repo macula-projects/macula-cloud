@@ -160,12 +160,9 @@ GitHub、企业微信和微信公众号等由 IAM 管理浏览器认证闭环的
 SDK code 使用企业微信终端 SDK 专用的用户信息接口核验；该接口响应字段虽然写作 `UserId`，IAM 对外仍
 统一表达为成员 `userid`。钉钉原生 SDK code 先换取登录用户访问凭证，再将用户映射为所配置组织内的
 `userId`。飞书 AppLink code、其他 APP SDK code 与端内 JSSDK code 必须使用各自的 `code_type`，不能混用。
-`FEISHU_BROWSER_CODE`、`DINGTALK_BROWSER_CODE`、`WECOM_BROWSER_CODE`、`WECHAT_OPEN_BROWSER_CODE` 仅用于
-由业务前端自行取得第三方浏览器 code 后直接兑换 IAM Token 的高级兼容接入；普通浏览器的默认方案仍是从
-`/oauth2/authorize` 进入，由 IAM 完成第三方跳转、回调和应用页面恢复。
-
-GitHub 登录由 IAM 的浏览器认证闭环处理，从 `/login/github` 发起；它不使用 `external_code`，也没有
-`GITHUB_BROWSER_CODE`。
+浏览器第三方登录统一从 `/oauth2/authorize` 进入，由 IAM 完成第三方跳转、回调和应用页面恢复；浏览器
+场景不提供 `external_code` 的 `code_type`。GitHub 登录同样由 IAM 的浏览器认证闭环处理，从
+`/login/github` 发起。
 
 ## 本地账号与验证码登录
 
