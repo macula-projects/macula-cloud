@@ -57,6 +57,14 @@ public class SysOAuth2Client extends BaseEntity {
     private String redirectUris;
     /** 授权范围，逗号分隔 */
     private String scopes;
+    /** 允许的外部凭证类型，逗号分隔 */
+    private String externalCodeTypes;
+    /** 协议验证码端点允许的精确 Origin，逗号分隔 */
+    private String allowedOrigins;
+    /** 允许的浏览器第三方登录提供商，逗号分隔 */
+    private String browserLoginProviderTypes;
+    /** 进入登录页时直接发起的第三方登录提供商 */
+    private String directLoginProviderType;
 
     /** 是否需要proofKe */
     private boolean requireProofKey;

@@ -18,15 +18,23 @@
 package dev.macula.cloud.iam.controller;
 
 import cn.hutool.core.util.StrUtil;
+import dev.macula.cloud.iam.authentication.dingtalk.DingtalkLoginMode;
+import dev.macula.cloud.iam.authentication.feishu.FeishuLoginMode;
+import dev.macula.cloud.iam.authentication.thirdparty.BrowserLoginClientPolicyService;
+import dev.macula.cloud.iam.authentication.thirdparty.BrowserLoginClientPolicyService.ClientPolicy;
 import dev.macula.cloud.iam.authentication.thirdparty.IdentityProviderConfigService;
-import dev.macula.cloud.iam.enums.ThirdPartyProviderType;
 import dev.macula.cloud.iam.authentication.wecom.WecomLoginMode;
+import dev.macula.cloud.iam.authentication.wechat.WechatLoginMode;
+import dev.macula.cloud.iam.enums.ThirdPartyProviderType;
 import dev.macula.cloud.iam.handler.AuthenticationFailureReason;
-import dev.macula.cloud.iam.service.support.SysOAuth2ClientService;
+import dev.macula.cloud.system.enums.BrowserLoginProviderType;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
+import org.springframework.security.authentication.AuthenticationServiceException;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.CurrentSecurityContext;
@@ -39,6 +47,8 @@ import org.springframework.web.bind.annotation.RequestAttribute;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.Arrays;
+import java.util.Locale;
+import java.util.Optional;
 
 /**
  * The type LoginController.
@@ -49,8 +59,10 @@ import java.util.Arrays;
 @Controller
 @RequiredArgsConstructor
 public class LoginController {
-    private final SysOAuth2ClientService clientService;
+    private static final String WECOM_USER_AGENT_MARKER = "wxwork";
+    private static final String WECHAT_USER_AGENT_MARKER = "micromessenger";
     private final IdentityProviderConfigService providerConfigService;
+    private final BrowserLoginClientPolicyService clientPolicyService;
 
     /**
      * login page.
@@ -69,6 +81,7 @@ public class LoginController {
         @RequestParam(name = OAuth2ParameterNames.CLIENT_ID, required = false) String clientId,
         @RequestParam(name = OAuth2ParameterNames.ERROR, required = false) String authenticationError,
         HttpServletRequest request,
+        HttpServletResponse response,
         @RequestAttribute(name = "org.springframework.security.web.csrf.CsrfToken",
             required = false) CsrfToken csrfToken) {
 
@@ -83,20 +96,77 @@ public class LoginController {
         if (StrUtil.isNotBlank(resolvedClientId)) {
             model.addAttribute(OAuth2ParameterNames.CLIENT_ID, resolvedClientId);
         }
-        model.addAttribute("githubLoginEnabled",
-            providerConfigService.isVisible(ThirdPartyProviderType.GITHUB.providerType()));
-        model.addAttribute("wecomLoginEnabled",
-            providerConfigService.isVisible(ThirdPartyProviderType.WECOM.providerType()));
+        Optional<ClientPolicy> policy = resolvePolicy(request, response, model);
+        model.addAttribute("githubLoginEnabled", isVisible(policy, BrowserLoginProviderType.GITHUB));
+        model.addAttribute("wecomLoginEnabled", isVisible(policy, BrowserLoginProviderType.WECOM));
+        model.addAttribute("feishuLoginEnabled", isVisible(policy, BrowserLoginProviderType.FEISHU));
+        model.addAttribute("dingtalkLoginEnabled", isVisible(policy, BrowserLoginProviderType.DINGTALK));
+        model.addAttribute("wechatLoginEnabled", isVisible(policy, BrowserLoginProviderType.WECHAT));
         model.addAttribute("githubLoginPath", ThirdPartyProviderType.GITHUB.loginPath());
         model.addAttribute("wecomLoginPath", ThirdPartyProviderType.WECOM.loginPath());
         model.addAttribute("wecomBrowserPath", WecomLoginMode.BROWSER.loginPath());
         model.addAttribute("wecomWebviewPath", WecomLoginMode.WEBVIEW.loginPath());
+        model.addAttribute("feishuLoginPath", ThirdPartyProviderType.FEISHU.loginPath());
+        model.addAttribute("feishuBrowserPath", FeishuLoginMode.BROWSER.loginPath());
+        model.addAttribute("dingtalkLoginPath", ThirdPartyProviderType.DINGTALK.loginPath());
+        model.addAttribute("dingtalkBrowserPath", DingtalkLoginMode.BROWSER.loginPath());
+        model.addAttribute("wechatLoginPath", ThirdPartyProviderType.WECHAT.loginPath());
+        model.addAttribute("wechatBrowserPath", WechatLoginMode.BROWSER.loginPath());
+        model.addAttribute("wechatWebviewPath", WechatLoginMode.WEBVIEW.loginPath());
         if (StrUtil.isNotBlank(authenticationError)) {
             model.addAttribute("authenticationError",
                 AuthenticationFailureReason.fromCode(authenticationError).message());
+        } else if (policy.isPresent()) {
+            String automaticLoginPath = automaticLoginPath(request, policy.get());
+            if (automaticLoginPath != null) {
+                return "redirect:" + automaticLoginPath;
+            }
         }
         model.addAttribute("enableSmsLogin", enableSmsLogin);
         return "login";
+    }
+
+    private Optional<ClientPolicy> resolvePolicy(HttpServletRequest request, HttpServletResponse response,
+        Model model) {
+        try {
+            return clientPolicyService.resolve(request, response);
+        } catch (AuthenticationServiceException ex) {
+            model.addAttribute("authenticationError", "当前应用登录配置无效，请联系管理员。");
+            return Optional.empty();
+        }
+    }
+
+    private boolean isVisible(Optional<ClientPolicy> policy, BrowserLoginProviderType providerType) {
+        return policy.filter(value -> value.allowed(providerType)).isPresent()
+            && providerConfigService.isVisible(providerType.name());
+    }
+
+    private String automaticLoginPath(HttpServletRequest request, ClientPolicy policy) {
+        String userAgent = Optional.ofNullable(request.getHeader(HttpHeaders.USER_AGENT)).orElse("")
+            .toLowerCase(Locale.ROOT);
+        if (userAgent.contains(WECOM_USER_AGENT_MARKER) && canStart(policy, BrowserLoginProviderType.WECOM)) {
+            return WecomLoginMode.WEBVIEW.loginPath();
+        }
+        if (!userAgent.contains(WECOM_USER_AGENT_MARKER) && userAgent.contains(WECHAT_USER_AGENT_MARKER)
+            && canStart(policy, BrowserLoginProviderType.WECHAT)) {
+            return WechatLoginMode.WEBVIEW.loginPath();
+        }
+        BrowserLoginProviderType direct = policy.directProvider();
+        return direct != null && canStart(policy, direct) ? loginPath(direct) : null;
+    }
+
+    private boolean canStart(ClientPolicy policy, BrowserLoginProviderType providerType) {
+        return policy.allowed(providerType) && providerConfigService.isEnabled(providerType.name());
+    }
+
+    private String loginPath(BrowserLoginProviderType providerType) {
+        return switch (providerType) {
+            case GITHUB -> ThirdPartyProviderType.GITHUB.loginPath();
+            case WECOM -> ThirdPartyProviderType.WECOM.loginPath();
+            case FEISHU -> ThirdPartyProviderType.FEISHU.loginPath();
+            case DINGTALK -> ThirdPartyProviderType.DINGTALK.loginPath();
+            case WECHAT -> ThirdPartyProviderType.WECHAT.loginPath();
+        };
     }
 
     private String resolveClientId(String parameter, HttpServletRequest request) {

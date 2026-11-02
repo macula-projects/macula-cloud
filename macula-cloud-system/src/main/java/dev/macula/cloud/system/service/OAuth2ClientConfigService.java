@@ -19,6 +19,7 @@ package dev.macula.cloud.system.service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import dev.macula.cloud.system.form.OAuth2ClientForm;
 import dev.macula.cloud.system.vo.OAuth2ClientVO;
+import dev.macula.cloud.system.vo.OAuth2ExternalCodeCatalogVO;
 
 /**
  * IAM 接入应用配置管理服务。
@@ -28,6 +29,7 @@ import dev.macula.cloud.system.vo.OAuth2ClientVO;
  */
 public interface OAuth2ClientConfigService {
     IPage<OAuth2ClientVO> page(int pageNum, int pageSize, String keyword);
+    OAuth2ExternalCodeCatalogVO externalCodeCatalog();
     OAuth2ClientVO get(Long id);
     OAuth2ClientVO save(Long id, OAuth2ClientForm form);
     void resetSecret(Long id, String secret);

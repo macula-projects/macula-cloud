@@ -39,7 +39,8 @@ class ThirdPartyIdentityResolutionServiceTest {
     private final SysUserService users = mock(SysUserService.class);
     private final ThirdPartyUserDetailsService details = mock(ThirdPartyUserDetailsService.class);
     private final ThirdPartyIdentityResolutionService service = new ThirdPartyIdentityResolutionService(configs, users, details);
-    private final ThirdPartyLoginContext context = new ThirdPartyLoginContext("WECOM", "BROWSER", Instant.now(), "/");
+    private final ThirdPartyLoginContext context = new ThirdPartyLoginContext("WECOM", "BROWSER", "test-client",
+        Instant.now(), "/");
 
     @Test
     void wecomUserIdMatchesGlobalUsernameBeforeBinding() {

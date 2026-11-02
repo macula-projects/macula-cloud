@@ -68,6 +68,9 @@ public final class CompatibilityRefreshTokenAuthenticationProvider implements Au
             || !client.isAuthenticated() || client.getRegisteredClient() == null) {
             throw new OAuth2AuthenticationException(OAuth2ErrorCodes.INVALID_CLIENT);
         }
+        if (ClientAuthenticationMethod.NONE.equals(client.getClientAuthenticationMethod())) {
+            return delegate.authenticate(authentication);
+        }
         OAuth2Authorization authorization = authorizations.findByToken(request.getRefreshToken(), OAuth2TokenType.REFRESH_TOKEN);
         if (authorization == null || !Set.of("password", "sms").contains(authorization.getAuthorizationGrantType().getValue())
             || !authorization.getAuthorizedScopes().contains(OidcScopes.OPENID)
@@ -82,9 +85,6 @@ public final class CompatibilityRefreshTokenAuthenticationProvider implements Au
             throw new OAuth2AuthenticationException(OAuth2ErrorCodes.UNAUTHORIZED_CLIENT);
         }
         // The existing compatibility grants issue refresh tokens only to authenticated confidential clients.
-        if (ClientAuthenticationMethod.NONE.equals(client.getClientAuthenticationMethod())) {
-            throw new OAuth2AuthenticationException(OAuth2ErrorCodes.INVALID_CLIENT);
-        }
         var storedRefresh = authorization.getRefreshToken();
         Authentication principal = authorization.getAttribute(Principal.class.getName());
         if (storedRefresh == null || !storedRefresh.isActive() || principal == null) {
@@ -99,14 +99,18 @@ public final class CompatibilityRefreshTokenAuthenticationProvider implements Au
         if (!authorization.getAuthorizedScopes().containsAll(scopes)) {
             throw new OAuth2AuthenticationException(OAuth2ErrorCodes.INVALID_SCOPE);
         }
-        if (scopes.isEmpty()) scopes = authorization.getAuthorizedScopes();
+        if (scopes.isEmpty()) {
+            scopes = authorization.getAuthorizedScopes();
+        }
         var context = DefaultOAuth2TokenContext.builder().registeredClient(registeredClient)
             .principal(principal).authorizationServerContext(AuthorizationServerContextHolder.getContext())
             .authorization(authorization).authorizedScopes(scopes)
             .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN).authorizationGrant(request);
         var updated = OAuth2Authorization.from(authorization);
         OAuth2Token generated = generator.generate(context.tokenType(OAuth2TokenType.ACCESS_TOKEN).build());
-        if (generated == null) throw new OAuth2AuthenticationException(OAuth2ErrorCodes.SERVER_ERROR);
+        if (generated == null) {
+            throw new OAuth2AuthenticationException(OAuth2ErrorCodes.SERVER_ERROR);
+        }
         OAuth2AccessToken access = new OAuth2AccessToken(OAuth2AccessToken.TokenType.BEARER,
             generated.getTokenValue(), generated.getIssuedAt(), generated.getExpiresAt(), scopes);
         updated.token(access, metadata -> {
@@ -119,7 +123,9 @@ public final class CompatibilityRefreshTokenAuthenticationProvider implements Au
         if (!registeredClient.getTokenSettings().isReuseRefreshTokens()) {
             OAuth2Token next = generator.generate(context.tokenType(OAuth2TokenType.REFRESH_TOKEN)
                 .authorization(updated.build()).build());
-            if (!(next instanceof OAuth2RefreshToken)) throw new OAuth2AuthenticationException(OAuth2ErrorCodes.SERVER_ERROR);
+            if (!(next instanceof OAuth2RefreshToken)) {
+                throw new OAuth2AuthenticationException(OAuth2ErrorCodes.SERVER_ERROR);
+            }
             refresh = (OAuth2RefreshToken) next;
             updated.refreshToken(refresh);
         }

@@ -21,6 +21,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.Instant;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * IAM 接入应用脱敏展示，不包含密钥摘要。
@@ -40,6 +42,11 @@ public class OAuth2ClientVO {
     private String authorizationGrantTypes;
     private String redirectUris;
     private String scopes;
+    private Set<String> externalCodeTypes;
+    private Set<String> allowedOrigins;
+    private Map<String, Long> externalProviderBindings;
+    private Set<String> browserLoginProviderTypes;
+    private String directLoginProviderType;
     private boolean requireProofKey;
     private boolean requireAuthorizationConsent;
     private String jwkSetUrl;

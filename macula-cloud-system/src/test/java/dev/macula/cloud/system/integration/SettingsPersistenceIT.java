@@ -50,7 +50,12 @@ import java.sql.Connection;
 import java.util.Map;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * 仅在显式指定的隔离数据库上验证加密字段和提交后共享缓存失效。
@@ -99,7 +104,9 @@ class SettingsPersistenceIT {
             assertNotEquals("fixture-secret-not-real", stored);
             assertEquals("fixture-secret-not-real", identityMapper.selectById(entity.getId()).getAppSecret());
         } finally {
-            if (entity.getId() != null) identityMapper.deleteById(entity.getId());
+            if (entity.getId() != null) {
+                identityMapper.deleteById(entity.getId());
+            }
         }
     }
 
@@ -142,8 +149,12 @@ class SettingsPersistenceIT {
             assertNotEquals("fixture-smtp-secret", jdbc.queryForObject(
                 "SELECT credential FROM sys_message_provider WHERE id = ?", String.class, mailId));
         } finally {
-            if (mailId != null) jdbc.update("DELETE FROM sys_message_provider WHERE id = ?", mailId);
-            if (identityId != null) identityService.delete(identityId);
+            if (mailId != null) {
+                jdbc.update("DELETE FROM sys_message_provider WHERE id = ?", mailId);
+            }
+            if (identityId != null) {
+                identityService.delete(identityId);
+            }
         }
     }
 
@@ -169,7 +180,41 @@ class SettingsPersistenceIT {
             assertFalse(publicJson.contains(privateKey));
             assertEquals(privateKey, identityMapper.selectById(id).getAppSecret());
         } finally {
-            if (id != null) identityService.delete(id);
+            if (id != null) {
+                identityService.delete(id);
+            }
+        }
+    }
+
+    @Test
+    void additionalIdentitySecretIsEncryptedAndNeverReturned() {
+        IdentityProviderForm form = new IdentityProviderForm();
+        form.setName("settings-it-" + UUID.randomUUID());
+        form.setProviderType("WECHAT");
+        form.setCategory("social");
+        form.setConfig(Map.of("appId", "fixture-site-app", "appSecret", "fixture-site-secret",
+            "officialAccountAppId", "fixture-official-app",
+            "officialAccountAppSecret", "fixture-official-secret"));
+        Long id = null;
+        try {
+            var saved = identityService.save(null, form);
+            id = saved.getId();
+            String ciphertext = jdbc.queryForObject(
+                "SELECT secret_config_json FROM sys_identity_provider WHERE id = ?", String.class, id);
+            String publicJson = jdbc.queryForObject(
+                "SELECT config_json FROM sys_identity_provider WHERE id = ?", String.class, id);
+            assertNotNull(ciphertext);
+            assertFalse(ciphertext.contains("fixture-official-secret"));
+            assertFalse(publicJson.contains("fixture-site-secret"));
+            assertFalse(publicJson.contains("fixture-official-secret"));
+            assertEquals(Boolean.TRUE, saved.getConfiguredSecrets().get("appSecret"));
+            assertEquals(Boolean.TRUE, saved.getConfiguredSecrets().get("officialAccountAppSecret"));
+            assertFalse(saved.getConfig().containsKey("officialAccountAppSecret"));
+            assertTrue(identityMapper.selectById(id).getSecretConfigJson().contains("fixture-official-secret"));
+        } finally {
+            if (id != null) {
+                identityService.delete(id);
+            }
         }
     }
 
@@ -236,7 +281,9 @@ class SettingsPersistenceIT {
             assertEquals(2L, jdbc.queryForObject("SELECT COUNT(*) FROM sys_oauth2_client WHERE id IN (1, 2)",
                 Long.class));
         } finally {
-            if (id != null) clientService.delete(id);
+            if (id != null) {
+                clientService.delete(id);
+            }
             cache.evict(clientId);
             remoteListener.stop();
         }

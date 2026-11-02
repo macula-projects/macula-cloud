@@ -57,7 +57,7 @@ class GithubAuthenticationProviderTest {
         ThirdPartyIdentityResolutionService identities = mock(ThirdPartyIdentityResolutionService.class);
         var config = new IdentityProviderConfigService.ProviderConfig("GITHUB", "id", "secret",
             Map.of("clientId", "id"));
-        var context = new ThirdPartyLoginContext("GITHUB", "", Instant.now(), "/");
+        var context = new ThirdPartyLoginContext("GITHUB", "", "test-client", Instant.now(), "/");
         when(configs.requireEnabled("GITHUB")).thenReturn(config);
         when(github.fetchSubject(config, "code", "https://iam.example/login/github")).thenReturn("12345");
         when(identities.resolve("GITHUB", "12345", context))
@@ -77,7 +77,7 @@ class GithubAuthenticationProviderTest {
         GithubClient github = mock(GithubClient.class);
         IdentityProviderConfigService configs = mock(IdentityProviderConfigService.class);
         ThirdPartyIdentityResolutionService identities = mock(ThirdPartyIdentityResolutionService.class);
-        var context = new ThirdPartyLoginContext("WECOM", "BROWSER", Instant.now(), "/");
+        var context = new ThirdPartyLoginContext("WECOM", "BROWSER", "test-client", Instant.now(), "/");
 
         var result = new GithubAuthenticationProvider(github, configs, identities).authenticate(
             ThirdPartyAuthenticationToken.unauthenticated("WECOM", "code", context,

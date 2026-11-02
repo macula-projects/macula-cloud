@@ -76,10 +76,10 @@ public class OAuth2ResourceOwnerSmsAuthenticationProvider
     }
 
     @Override
-    public AbstractAuthenticationToken buildToken(Map<String, Object> reqParameters) {
+    public AbstractAuthenticationToken buildToken(Map<String, Object> reqParameters, RegisteredClient registeredClient) {
         String phone = (String)reqParameters.get(SmsAuthenticationFilter.SPRING_SECURITY_FORM_PHONE_KEY);
         String code = (String)reqParameters.get(SmsAuthenticationFilter.SPRING_SECURITY_FORM_CODE_KEY);
-        return new SmsAuthenticationToken(phone, code);
+        return new SmsAuthenticationToken(phone, code, registeredClient.getClientId());
     }
 
 }

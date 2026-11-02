@@ -33,16 +33,31 @@ import dev.macula.boot.starter.security.utils.SecurityUtils;
 import dev.macula.cloud.system.converter.RoleConverter;
 import dev.macula.cloud.system.form.RoleForm;
 import dev.macula.cloud.system.mapper.SysRoleMapper;
-import dev.macula.cloud.system.pojo.entity.*;
+import dev.macula.cloud.system.pojo.entity.SysPermission;
+import dev.macula.cloud.system.pojo.entity.SysRole;
+import dev.macula.cloud.system.pojo.entity.SysRoleMenu;
+import dev.macula.cloud.system.pojo.entity.SysRolePermission;
+import dev.macula.cloud.system.pojo.entity.SysUserRole;
 import dev.macula.cloud.system.query.RolePageQuery;
-import dev.macula.cloud.system.service.*;
+import dev.macula.cloud.system.service.MenuRouteCacheService;
+import dev.macula.cloud.system.service.MenuRouteTenantContext;
+import dev.macula.cloud.system.service.MenuRouteTenantContext.TrustedTenant;
+import dev.macula.cloud.system.service.SysPermissionService;
+import dev.macula.cloud.system.service.SysRoleMenuService;
+import dev.macula.cloud.system.service.SysRolePermissionService;
+import dev.macula.cloud.system.service.SysRoleService;
+import dev.macula.cloud.system.service.SysUserRoleService;
 import dev.macula.cloud.system.vo.role.RolePageVO;
 import lombok.RequiredArgsConstructor;
-import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -61,6 +76,8 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
     private final SysRolePermissionService sysRolePermissionService;
     private final SysPermissionService sysPermissionService;
     private final RoleConverter roleConverter;
+    private final MenuRouteTenantContext menuRouteTenantContext;
+    private final MenuRouteCacheService menuRouteCacheService;
 
     @Override
     public Page<RolePageVO> listRolePages(RolePageQuery queryParams) {
@@ -102,6 +119,7 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
     @Override
     @Transactional
     public boolean saveRole(RoleForm roleForm) {
+        TrustedTenant tenant = menuRouteTenantContext.resolve();
 
         Long roleId = roleForm.getId();
         String roleCode = roleForm.getCode();
@@ -113,7 +131,11 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
         // 实体转换
         SysRole role = roleConverter.form2Entity(roleForm);
 
-        return this.saveOrUpdate(role);
+        boolean saved = this.saveOrUpdate(role);
+        if (saved) {
+            menuRouteCacheService.evictAfterCommit(tenant);
+        }
+        return saved;
     }
 
     @Override
@@ -125,6 +147,7 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
     @Override
     @Transactional
     public boolean deleteRoles(String ids) {
+        TrustedTenant tenant = menuRouteTenantContext.resolve();
         List<Long> roleIds = Arrays.stream(ids.split(",")).map(Long::parseLong).collect(Collectors.toList());
         Optional.of(roleIds).orElse(new ArrayList<>()).forEach(id -> {
             long count = sysUserRoleService.count(new LambdaQueryWrapper<SysUserRole>().eq(SysUserRole::getRoleId, id));
@@ -136,7 +159,11 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
                 new LambdaQueryWrapper<SysRolePermission>().eq(SysRolePermission::getRoleId, id));
         });
 
-        return this.removeByIds(roleIds);
+        boolean removed = this.removeByIds(roleIds);
+        if (removed) {
+            menuRouteCacheService.evictAfterCommit(tenant);
+        }
+        return removed;
     }
 
     @Override
@@ -147,8 +174,8 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
 
     @Override
     @Transactional
-    @CacheEvict(cacheNames = "system", key = "'routes'")
     public boolean updateRoleMenus(Long roleId, List<Long> menuIds) {
+        TrustedTenant tenant = menuRouteTenantContext.resolve();
 
         // 删除角色菜单
         sysRoleMenuService.remove(new LambdaQueryWrapper<SysRoleMenu>().eq(SysRoleMenu::getRoleId, roleId));
@@ -176,6 +203,7 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
             }
         }
 
+        menuRouteCacheService.evictAfterCommit(tenant);
         return true;
     }
 

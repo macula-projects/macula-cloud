@@ -37,6 +37,7 @@ import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.LockedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.web.WebAttributes;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -58,7 +59,8 @@ class BrowserAuthenticationFailureHandlerTest {
         BrowserAuthenticationFailureHandler handler = new BrowserAuthenticationFailureHandler(pending, TRUSTED_ISSUER);
         MockHttpServletRequest request = new MockHttpServletRequest();
         MockHttpServletResponse response = new MockHttpServletResponse();
-        var context = new ThirdPartyLoginContext(ThirdPartyProviderType.GITHUB.providerType(), "", Instant.now(), "/");
+        var context = new ThirdPartyLoginContext(ThirdPartyProviderType.GITHUB.providerType(), "", "test-client",
+            Instant.now(), "/");
         var required = new ThirdPartyIdentityResolutionService.BindingRequiredException(
             ThirdPartyProviderType.GITHUB.providerType(), "external-subject", context);
 
@@ -89,21 +91,29 @@ class BrowserAuthenticationFailureHandlerTest {
 
     @Test
     void unexpectedFailureUsesUnavailableReasonWithoutLeakingDetails(CapturedOutput output) throws Exception {
-        MockHttpServletResponse response = handle(
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        MockHttpServletResponse response = handle(request,
             new AuthenticationServiceException("provider-secret-response-marker"));
 
         assertThat(response.getRedirectedUrl())
             .isEqualTo(TRUSTED_ISSUER + "/login?error=authentication_unavailable");
         assertThat(output).doesNotContain("provider-secret-response-marker");
+        assertThat(request.getSession(false)).isNull();
+        assertThat(request.getAttribute(WebAttributes.AUTHENTICATION_EXCEPTION)).isNull();
         assertThat(AuthenticationFailureReason.fromCode("forged-error"))
             .isEqualTo(AuthenticationFailureReason.AUTHENTICATION_UNAVAILABLE);
     }
 
     private MockHttpServletResponse handle(AuthenticationException failure) throws Exception {
+        return handle(new MockHttpServletRequest(), failure);
+    }
+
+    private MockHttpServletResponse handle(MockHttpServletRequest request, AuthenticationException failure)
+        throws Exception {
         BrowserAuthenticationFailureHandler handler =
             new BrowserAuthenticationFailureHandler(mock(PendingThirdPartyBindingRepository.class), TRUSTED_ISSUER);
         MockHttpServletResponse response = new MockHttpServletResponse();
-        handler.onAuthenticationFailure(new MockHttpServletRequest(), response, failure);
+        handler.onAuthenticationFailure(request, response, failure);
         return response;
     }
 }

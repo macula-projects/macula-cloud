@@ -21,7 +21,7 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
 /**
- * 共享 System 表的 IAM 只读登录短信模板映射。
+ * 共享 System 表的 IAM 只读登录消息模板映射。
  *
  * @author Rain
  * @since 2026-10-17
@@ -35,6 +35,9 @@ public class SysMessageTemplate {
     private String templateKey;
     private String providerType;
     private String languageCode;
+    private String senderName;
+    private String title;
+    private String content;
     private String providerTemplateCode;
     private Boolean enabled;
 }

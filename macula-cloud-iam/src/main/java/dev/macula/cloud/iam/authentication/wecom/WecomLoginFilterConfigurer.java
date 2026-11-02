@@ -17,6 +17,7 @@
 package dev.macula.cloud.iam.authentication.wecom;
 
 import dev.macula.cloud.iam.authentication.thirdparty.IdentityProviderConfigService;
+import dev.macula.cloud.iam.authentication.thirdparty.BrowserLoginClientPolicyService;
 import dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyIdentityResolutionService;
 import dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyLoginStateRepository;
 import dev.macula.cloud.iam.enums.ThirdPartyProviderType;
@@ -55,6 +56,7 @@ public class WecomLoginFilterConfigurer<H extends HttpSecurityBuilder<H>>
         ThirdPartyIdentityResolutionService identities = context.getBean(ThirdPartyIdentityResolutionService.class);
         getAuthenticationFilter().wecomClient(client);
         getAuthenticationFilter().configure(configs,
+            context.getBean(BrowserLoginClientPolicyService.class),
             context.getBean(ThirdPartyLoginStateRepository.class),
             context.getBean(AuthorizationServerSettings.class).getIssuer());
         http.authenticationProvider(postProcess(new WecomAuthenticationProvider(client, configs, identities)));

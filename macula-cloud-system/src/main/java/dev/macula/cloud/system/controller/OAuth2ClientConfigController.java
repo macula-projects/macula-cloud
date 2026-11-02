@@ -20,11 +20,20 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import dev.macula.cloud.system.form.OAuth2ClientForm;
 import dev.macula.cloud.system.service.OAuth2ClientConfigService;
 import dev.macula.cloud.system.vo.OAuth2ClientVO;
+import dev.macula.cloud.system.vo.OAuth2ExternalCodeCatalogVO;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 /**
  * IAM 接入应用管理 API，访问权限由平台 URL 权限配置控制。
@@ -42,6 +51,11 @@ public class OAuth2ClientConfigController {
     public IPage<OAuth2ClientVO> page(@RequestParam(defaultValue = "1") int pageNum,
         @RequestParam(defaultValue = "20") int pageSize, @RequestParam(required = false) String keyword) {
         return service.page(pageNum, pageSize, keyword);
+    }
+
+    @GetMapping("/external-code-catalog")
+    public OAuth2ExternalCodeCatalogVO externalCodeCatalog() {
+        return service.externalCodeCatalog();
     }
 
     @GetMapping("/{id}")
@@ -69,7 +83,11 @@ public class OAuth2ClientConfigController {
         service.delete(id);
     }
 
-    /** 管理员临时输入的密钥不通过读接口回显。 */
+    /**
+     * 管理员临时输入的密钥不通过读接口回显。
+     *
+     * @since 6.1.0
+     */
     @Data
     public static class SecretResetForm {
         @NotBlank

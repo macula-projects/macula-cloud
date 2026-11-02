@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2026 Macula
  *   macula.dev, China
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -16,21 +17,27 @@
 package dev.macula.cloud.iam.authentication.thirdparty;
 
 import dev.macula.cloud.iam.enums.UserTypeEnum;
-import dev.macula.cloud.iam.pojo.entity.SysOAuth2Client;
 import dev.macula.cloud.iam.pojo.dto.UserAuthInfo;
+import dev.macula.cloud.iam.pojo.entity.SysOAuth2Client;
+import dev.macula.cloud.iam.pojo.entity.SysUser;
 import dev.macula.cloud.iam.service.support.SysOAuth2ClientService;
 import dev.macula.cloud.iam.service.support.SysUserService;
 import dev.macula.cloud.iam.service.support.UserAuthInfoService;
-import dev.macula.cloud.iam.pojo.entity.SysUser;
+import dev.macula.cloud.iam.service.userdetails.ClientAwareAccountResolver;
 import dev.macula.cloud.iam.service.userdetails.SysUserDetailsServiceImpl;
 import org.junit.jupiter.api.Test;
-import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 /**
  * 验证第三方回调按全局系统账号登录，不依赖 OAuth client。
@@ -73,7 +80,8 @@ class ThirdPartyUserDetailsServiceTest {
         user.setDataScope(1);
         user.setRoles(java.util.Set.of("USER"));
         when(routedUsers.getUserAuthInfo(any(), eq(99L), eq("same-name"))).thenReturn(user);
-        SysUserDetailsServiceImpl service = new SysUserDetailsServiceImpl(systemUsers, clients, routedUsers);
+        SysUserDetailsServiceImpl service = new SysUserDetailsServiceImpl(systemUsers, clients,
+            mock(ClientAwareAccountResolver.class), routedUsers);
 
         for (UserTypeEnum type : UserTypeEnum.values()) {
             SysOAuth2Client client = new SysOAuth2Client();
@@ -97,7 +105,8 @@ class ThirdPartyUserDetailsServiceTest {
         client.setUserType(UserTypeEnum.MEMBER);
         when(clients.getClientByClientId("member-client")).thenReturn(client);
 
-        SysUserDetailsServiceImpl service = new SysUserDetailsServiceImpl(systemUsers, clients, routedUsers);
+        SysUserDetailsServiceImpl service = new SysUserDetailsServiceImpl(systemUsers, clients,
+            mock(ClientAwareAccountResolver.class), routedUsers);
 
         assertThrows(UsernameNotFoundException.class,
             () -> service.loadUserByClient("member-client", 99L, UserTypeEnum.MEMBER, "same-name"));
@@ -121,7 +130,8 @@ class ThirdPartyUserDetailsServiceTest {
         user.setRoles(java.util.Set.of("USER"));
         when(systemUsers.getUserAuthInfo(99L, "employee", null)).thenReturn(user);
 
-        SysUserDetailsServiceImpl service = new SysUserDetailsServiceImpl(systemUsers, clients, null);
+        SysUserDetailsServiceImpl service = new SysUserDetailsServiceImpl(systemUsers, clients,
+            mock(ClientAwareAccountResolver.class), null);
 
         assertEquals("employee",
             service.loadUserByClient("employee-client", 99L, UserTypeEnum.EMPLOYEE, "employee").getUsername());

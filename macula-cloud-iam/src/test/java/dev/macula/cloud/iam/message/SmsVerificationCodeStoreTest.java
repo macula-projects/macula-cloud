@@ -23,6 +23,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 
 import java.time.Duration;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -51,6 +52,7 @@ class SmsVerificationCodeStoreTest {
         properties.setDigestKey("fixture-digest-key");
         properties.setTtl(Duration.ofMinutes(5));
         properties.setSendInterval(Duration.ofSeconds(60));
+        properties.setMaxClientSendsPerInterval(200);
         properties.setMaxIpSendsPerInterval(20);
         properties.setMaxAttempts(5);
         when(redis.opsForValue()).thenReturn(values);
@@ -64,11 +66,20 @@ class SmsVerificationCodeStoreTest {
     void issuesSixDigitCodeAfterPhoneAndIpLimitsPass() {
         String code = store.issue("13800000000", "127.0.0.1");
 
+        ArgumentCaptor<String> phoneRateKey = ArgumentCaptor.forClass(String.class);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<String>> ipRateKeys = ArgumentCaptor.forClass(List.class);
         assertThat(code).matches("[0-9]{6}");
-        verify(values).setIfAbsent(org.mockito.ArgumentMatchers.startsWith("iam:sms:send:"),
-            eq("1"), eq(Duration.ofSeconds(60)));
-        verify(redis).execute(any(org.springframework.data.redis.core.script.RedisScript.class),
-            any(java.util.List.class), eq("60000"));
+        verify(values).setIfAbsent(phoneRateKey.capture(), eq("1"), eq(Duration.ofSeconds(60)));
+        verify(redis, org.mockito.Mockito.times(2)).execute(
+            any(org.springframework.data.redis.core.script.RedisScript.class),
+            ipRateKeys.capture(), eq("60000"));
+        assertThat(phoneRateKey.getValue()).startsWith("iam:sms:send:")
+            .doesNotContain("13800000000");
+        assertThat(ipRateKeys.getAllValues()).flatExtracting(value -> value)
+            .anyMatch(value -> value.startsWith("iam:sms:client:"))
+            .anyMatch(value -> value.startsWith("iam:sms:ip:"))
+            .allMatch(value -> !value.contains("13800000000") && !value.contains("127.0.0.1"));
     }
 
     @Test
@@ -91,11 +102,34 @@ class SmsVerificationCodeStoreTest {
     }
 
     @Test
+    void separatesTheSamePhoneAndCodeByClient() {
+        store.activate("13800000000", "123456", "client-a");
+        store.activate("13800000000", "123456", "client-b");
+
+        ArgumentCaptor<String> keys = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<String> valuesCaptor = ArgumentCaptor.forClass(String.class);
+        verify(values, org.mockito.Mockito.times(2)).set(keys.capture(), valuesCaptor.capture(),
+            eq(Duration.ofMinutes(5)));
+        assertThat(keys.getAllValues()).doesNotHaveDuplicates();
+        assertThat(valuesCaptor.getAllValues()).doesNotHaveDuplicates();
+    }
+
+    @Test
     void rejectsWhenIpWindowExceedsItsSharedNatAllowance() {
         when(redis.execute(any(org.springframework.data.redis.core.script.RedisScript.class),
-            any(java.util.List.class), anyString())).thenReturn(21L);
+            any(java.util.List.class), anyString())).thenReturn(1L, 21L);
 
         assertThatThrownBy(() -> store.issue("13800000000", "127.0.0.1"))
+            .isInstanceOf(IllegalStateException.class).hasMessage("发送过于频繁");
+        verify(redis).delete(org.mockito.ArgumentMatchers.startsWith("iam:sms:send:"));
+    }
+
+    @Test
+    void rejectsWhenClientWindowExceedsItsAllowance() {
+        when(redis.execute(any(org.springframework.data.redis.core.script.RedisScript.class),
+            any(java.util.List.class), anyString())).thenReturn(201L);
+
+        assertThatThrownBy(() -> store.issue("13800000000", "127.0.0.1", "client-a"))
             .isInstanceOf(IllegalStateException.class).hasMessage("发送过于频繁");
         verify(redis).delete(org.mockito.ArgumentMatchers.startsWith("iam:sms:send:"));
     }

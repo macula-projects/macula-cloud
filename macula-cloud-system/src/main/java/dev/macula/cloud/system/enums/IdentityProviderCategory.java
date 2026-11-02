@@ -26,7 +26,8 @@ import java.util.Arrays;
  */
 public enum IdentityProviderCategory {
     SOCIAL("social", "社交身份提供商"),
-    ENTERPRISE("enterprise", "企业身份提供商");
+    ENTERPRISE("enterprise", "企业身份提供商"),
+    MOBILE("mobile", "移动号码认证");
 
     private final String code;
     private final String label;

@@ -18,6 +18,7 @@ package dev.macula.cloud.iam.authentication.thirdparty;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import dev.macula.cloud.system.enums.BrowserLoginProviderType;
 import org.springframework.security.authentication.AuthenticationServiceException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
@@ -49,6 +50,7 @@ public abstract class AbstractThirdPartyAuthenticationFilter extends AbstractAut
     private final String providerType;
     private final String loginPath;
     private IdentityProviderConfigService configService;
+    private BrowserLoginClientPolicyService clientPolicyService;
     private ThirdPartyLoginStateRepository stateRepository;
     private String issuer;
     private URI issuerUri;
@@ -61,8 +63,10 @@ public abstract class AbstractThirdPartyAuthenticationFilter extends AbstractAut
     }
 
     public void configure(IdentityProviderConfigService configService,
+        BrowserLoginClientPolicyService clientPolicyService,
         ThirdPartyLoginStateRepository stateRepository, String issuer) {
         this.configService = configService;
+        this.clientPolicyService = clientPolicyService;
         this.stateRepository = stateRepository;
         this.issuer = issuer.endsWith("/") ? issuer.substring(0, issuer.length() - 1) : issuer;
         this.issuerUri = URI.create(this.issuer);
@@ -83,18 +87,22 @@ public abstract class AbstractThirdPartyAuthenticationFilter extends AbstractAut
                 throw new AuthenticationServiceException("第三方授权失败");
             }
             validateSavedRequestTarget(request, response, context);
+            clientPolicyService.requireAllowed(request, response, context.clientId(), provider());
             configService.requireEnabled(providerType);
             return getAuthenticationManager().authenticate(ThirdPartyAuthenticationToken.unauthenticated(
                 providerType, code, context, callbackUri()));
         }
 
         IdentityProviderConfigService.ProviderConfig config = configService.requireEnabled(providerType);
+        BrowserLoginClientPolicyService.ClientPolicy clientPolicy =
+            clientPolicyService.requireAllowed(request, response, provider());
         String mode = loginMode(request);
         if (mode == null) {
-            response.sendRedirect(request.getContextPath() + "/login?wecom_choice=1");
+            response.sendRedirect(request.getContextPath() + "/login");
             return null;
         }
-        ThirdPartyLoginContext context = new ThirdPartyLoginContext(providerType, mode, Instant.now(),
+        ThirdPartyLoginContext context = new ThirdPartyLoginContext(providerType, mode, clientPolicy.clientId(),
+            Instant.now(),
             resolveSavedRequestTarget(request, response));
         String generatedState = stateRepository.create(request, context);
         response.sendRedirect(authorizationUri(config, generatedState, callbackUri(), context));
@@ -106,6 +114,10 @@ public abstract class AbstractThirdPartyAuthenticationFilter extends AbstractAut
 
     protected String loginMode(HttpServletRequest request) {
         return "";
+    }
+
+    private BrowserLoginProviderType provider() {
+        return BrowserLoginProviderType.fromValue(providerType);
     }
 
     private void validateSavedRequestTarget(HttpServletRequest request, HttpServletResponse response,

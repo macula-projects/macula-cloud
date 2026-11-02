@@ -47,4 +47,7 @@ public interface SysUserService extends IService<SysUser> {
     /** Returns the only active record for a phone, or {@code null} when absent. */
     SysUser findUniqueByMobile(String mobile);
 
+    /** Returns the only active record for a normalized email, or {@code null} when absent. */
+    SysUser findUniqueByEmail(String email);
+
 }

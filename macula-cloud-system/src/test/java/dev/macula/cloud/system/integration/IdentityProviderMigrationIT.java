@@ -29,7 +29,10 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * 在指定的全新隔离库上验证 Flyway 历史升级及旧身份源行保留。
@@ -136,7 +139,22 @@ class IdentityProviderMigrationIT {
                     "VALUES ('second-enabled-github', 'GITHUB', 'other', '{}', 1, 1)"));
         }
 
-        toV6.clean();
+        Flyway toV8 = Flyway.configure().dataSource(url, username, password)
+            .locations("classpath:db/migration").target(MigrationVersion.fromVersion("8"))
+            .cleanDisabled(false).load();
+        toV8.migrate();
+        try (Connection connection = DriverManager.getConnection(url, username, password)) {
+            assertEquals(8L, count(connection,
+                "SELECT COUNT(*) FROM flyway_schema_history WHERE success = 1"));
+            assertEquals("text", string(connection,
+                "SELECT DATA_TYPE FROM information_schema.columns WHERE table_schema = ? " +
+                    "AND table_name = 'sys_identity_provider' AND column_name = 'secret_config_json'", database));
+            assertEquals(1L, count(connection,
+                "SELECT COUNT(*) FROM sys_identity_provider WHERE name = 'migration-legacy-fixture' " +
+                    "AND app_id = 'legacy-client' AND config_json = '{}' AND secret_config_json IS NULL"));
+        }
+
+        toV8.clean();
         Flyway toV5 = Flyway.configure().dataSource(url, username, password)
             .locations("classpath:db/migration").target(MigrationVersion.fromVersion("5")).load();
         toV5.migrate();
@@ -171,7 +189,9 @@ class IdentityProviderMigrationIT {
 
     private static long count(Connection connection, String sql, Object... arguments) throws Exception {
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
-            for (int i = 0; i < arguments.length; i++) statement.setObject(i + 1, arguments[i]);
+            for (int i = 0; i < arguments.length; i++) {
+                statement.setObject(i + 1, arguments[i]);
+            }
             try (ResultSet result = statement.executeQuery()) {
                 assertTrue(result.next());
                 return result.getLong(1);
@@ -181,7 +201,9 @@ class IdentityProviderMigrationIT {
 
     private static String string(Connection connection, String sql, Object... arguments) throws Exception {
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
-            for (int i = 0; i < arguments.length; i++) statement.setObject(i + 1, arguments[i]);
+            for (int i = 0; i < arguments.length; i++) {
+                statement.setObject(i + 1, arguments[i]);
+            }
             try (ResultSet result = statement.executeQuery()) {
                 assertTrue(result.next());
                 return result.getString(1);

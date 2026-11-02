@@ -31,11 +31,12 @@ System 数据库同时供 IAM 使用，清理后相关账号、权限及认证�
   角色检查；访问授权由现有网关 URL 权限配置控制。V2 只为 `ROOT` 角色建立默认关联，后续可在
   系统权限管理中调整。直接访问 System 服务虽仍需资源服务器认证，但不会经过网关的 URL 权限检查；
   应以容器网络、防火墙或入口代理限制 System 直连，不能将其端口暴露给不可信客户端。
-- 身份提供商只管理 GitHub、支付宝、微信、企业微信、飞书、钉钉配置；本轮不改变 IAM 的第三方登录行为。
+- 身份提供商管理 GitHub、支付宝、微信、企业微信、飞书、钉钉及阿里云号码认证配置；IAM 不接入支付宝登录。
 - 身份源列表可用 `category=social|enterprise` 筛选。创建/更新请求中的 `config` 必须是 JSON 对象：
-  GitHub 使用 `clientId/clientSecret`，支付宝使用 `appId/appPrivateKey/alipayPublicKey`，微信使用
-  `appId/appSecret`，企业微信使用 `corpId/agentId/appSecret`，飞书使用 `appId/appSecret`，钉钉使用
-  `appKey/appSecret`（可选 `corpId`）。请求另带 `providerType`、相符的 `category`、名称、备注、
+  GitHub 使用 `clientId/clientSecret`，支付宝使用 `appId/appPrivateKey/alipayPublicKey`，微信使用网站
+  应用 `appId/appSecret` 及公众号 `officialAccountAppId/officialAccountAppSecret`，企业微信使用
+  `corpId/agentId/appSecret`，飞书使用 `appId/appSecret`，钉钉使用
+  `appKey/appSecret/corpId`。请求另带 `providerType`、相符的 `category`、名称、备注、
   启用/显示开关。服务端拒绝未知或跨类型字段；响应 `config` 只含非敏感字段，
   `configuredSecrets` 只标明凭据是否已配置。更新时省略或留空凭据表示保留原值，不能通过本接口清空凭据。
   `config_json` 存规范非敏感 JSON，`app_secret` 由 `@CryptoField` 保存密文；旧 `app_id` 继续同步以兼容已有行。
@@ -47,8 +48,7 @@ System 数据库同时供 IAM 使用，清理后相关账号、权限及认证�
   已保存的 `provider_type` 大写 code 和列表 `category` 小写 code 保持不变。
   身份源不提供可配置的回调地址；目录及列表/详情 VO 的只读 `callbackUrl` 为
   `/login/{providerType 小写}`（Admin 展示为 `IAM_URL` + 该路径），与现有 `/login/sms`
-  命名约定一致，由未来 IAM `authentication` 包中各提供商的 LoginFilter
-  按相同路径处理。当前 Filter 尚未接入，此地址不能用于实际登录。Admin 使用其 `IAM_URL`
+  命名约定一致，由 IAM `authentication` 包中各提供商的 LoginFilter 按相同路径处理。Admin 使用其 `IAM_URL`
   配置的对外基址显示完整 URL，部署时须核对该基址。历史 `callback_url` 列和值保留，但
   `SysIdentityProvider` 不再映射该列，管理 API 不读取或写入旧值。接入应用的 OAuth
   `redirectUris` 是另一项配置，不受此变更影响。
@@ -76,7 +76,9 @@ System 数据库同时供 IAM 使用，清理后相关账号、权限及认证�
   机密客户端密钥由 System `PasswordEncoder` 单向哈希保存；公共客户端使用 `none` 且无密钥，
   强制启用 PKCE。表单支持 OIDC `openid` 和 ID Token 签名设置。客户端变更在事务提交后清理
   IAM 共享缓存，但不会撤销已签发的授权或令牌。仅 `client_credentials` 的应用无需回调 URI；
-  `client_secret_jwt` 不开放新配置，因为现有单向哈希密钥不能用于 HMAC 验签。上线前应针对已有客户端做兼容回归。
+  `client_secret_jwt` 不开放新配置，因为现有单向哈希密钥不能用于 HMAC 验签。System 会将
+  `SysOAuth2ClientConfigMapper` 的日志固定在 INFO 以上，避免 MyBatis DEBUG 参数日志输出密钥哈希。
+  上线前应针对已有客户端做兼容回归。
 - V6 新增 `sys_user_identity_binding`，只维护第三方 provider subject 到 username 的全局绑定，不含
   tenant ID、user ID、user type 或 token。`(provider_type, provider_subject)` 与
   `(provider_type, username)` 均唯一；当前仅由受控运维流程预置。V6 还通过生成列唯一键约束每种
@@ -94,8 +96,41 @@ System 数据库同时供 IAM 使用，清理后相关账号、权限及认证�
   不得修改已执行的 V7 文件。回滚需停写 IAM/System，恢复迁移前备份和匹配的应用版本，不能只删除
   唯一索引或 Flyway 历史。
 
+- V8 为 `sys_identity_provider` 增加可空 `secret_config_json`，用于保存微信等身份源的附加密钥。
+  `app_secret` 继续保存目录的主密钥；附加密钥 JSON 整体使用 `@CryptoField` 加密，公开 `config_json`
+  不得包含任何密钥，查询接口只在 `configuredSecrets` 返回每个密钥是否已配置。升级保留既有行并将新列
+  置空；回滚需恢复 V8 前数据库备份并同步回退 IAM/System，不能只删除列或 Flyway 历史。
+
+- V9 增加 OAuth Client 的 `external_code_types`、`allowed_origins` 以及
+  `sys_oauth2_client_external_provider` 固定映射。未配置的旧 Client 默认禁止所有第三方 code。
+  V9 只把 mobile/email 的语义空白改为 NULL；任何非空重复或非规范历史值都会使迁移明确停止，
+  不自动改写、合并或挑选账号。确认数据后才会为非空 mobile/email 建立全局唯一索引。
+  System 用户新增、修改和导入统一执行手机号规范化、邮箱 trim+小写、空白转 NULL 和服务层冲突预检。
+  部署前必须在隔离 MySQL 分别验证历史 V8→V9 升级与干净库初始化，不能用干净库成功代替升级证据。
+
+- V10 为 OAuth Client 增加 `browser_login_provider_types` 和 `direct_login_provider_type`。允许列表为空时
+  IAM 只提供本地认证；直接登录提供商必须属于允许列表。配置网页登录提供商的 Client 必须启用
+  `authorization_code` 并登记回调 URI，每个平台还必须恰好存在一个启用的身份源。V10 同时精确删除已经
+  废弃的 `WECOM_WEBVIEW_CODE` 映射和 Client CSV token，保留企微 APP、小程序及普通浏览器类型。
+  升级时应先停止或排空全部旧 IAM 实例，由 System 执行并验证 V10，再失效专用 OAuth Client 缓存，最后
+  启动新 IAM；禁止新旧 IAM 跨 V10 混跑，也不要通过清空共享 Redis 代替精确缓存失效。
+
+- V11 只把 `sys_oauth2_client.allowed_origins` 的注释扩展为浏览器协议端点的统一精确 Origin，不修改或回填
+  任何 Client 数据。该字段可独立于 grant 配置；空列表表示 IAM 拒绝该 Client 的全部浏览器跨域协议请求。
+  短信和邮箱 grant 仍必须使用 public PKCE Client。升级前必须在旧 IAM 仍运行时盘点浏览器 Client 并配置
+  Origin；旧 System 无法整表保存的历史 Client 按 `deploy/README.md` 的受控 DBA 步骤只更新该字段。新版
+  System 允许已存在的 `confidential + sms/email` Client 在认证方式和 grant 集合均不变时维护 Origin 等字段，
+  但新建、扩权或改成另一非法组合仍拒绝；并发安全整改会让旧表单条件更新冲突失败。Client 新增、修改、改密或
+  删除在事务提交后清理共享 OAuth Client 缓存区域，使 RegisteredClient 与全局 Origin 索引共同失效；IAM 对
+  实际 Token POST 仍按已认证 client_id 查询权威数据，缓存不作为最终 Origin 授权依据。
+
+- OAuth Client 的每个 `ExternalCodeType` 必须选择一个启用、provider 类型相符且具备对应配置能力的
+  身份源 registration。微信移动应用、小程序和网站应用使用各自的 App ID/secret；飞书浏览器 code
+  使用固定外部 redirect URI；阿里云号码认证使用独立 AccessKey。管理接口只回显非敏感目录和
+  `configuredSecrets`，不返回秘密值。sms/email grant 只允许公共 Client，并要求非空精确 Origin。
+
 隔离数据库集成测试 `SettingsPersistenceIT` 默认不运行；显式设置 `SYSTEM_SETTINGS_IT=true` 后，
-须将 `SPRING_DATASOURCE_URL` 指向名称以 `macula_settings_it_` 开头、已升级至 V5 的隔离测试库，
+须将 `SPRING_DATASOURCE_URL` 指向名称以 `macula_settings_it_` 开头、已升级至 V8 的隔离测试库，
 并提供测试用 `MACULA_CRYPTO_PASSWORD`、MySQL 凭据与独立 Redis database。此测试禁用自动
 Flyway，不会自行执行迁移。测试会核对库名，
 只清理自己创建的行与缓存项，不可指向业务数据库。
@@ -123,6 +158,19 @@ Flyway 增量验证 `IdentityProviderMigrationIT` 默认禁用；仅将 `SYSTEM_
 或其他配置值。这些配置当前仅保存，尚未接入 IAM/Gateway 运行时。
 
 详细字段、默认值、单位和升级说明见 `../docs/security-policy.md`。
+
+## 菜单路由租户缓存
+
+`GET /api/v1/menus/routes` 在读取缓存前校验 JWT 租户与请求租户上下文。AK/SK 主体只能使用
+Gateway 写入 JWT 的 `tenantId`；用户切换租户时，ROOT 只能切换到已存在租户，普通用户只能切换到
+`sys_tenant_user` 明确关联的租户，无关联用户仅兼容默认租户 1。无法确定可信租户或越权时返回 403，
+不会回退到共享缓存。
+
+路由缓存键从旧的 `macula:cache:system::routes` 升级为
+`macula:cache:system::routes:v2:{tenantId}`。菜单新增、修改、删除、可见性变化以及角色菜单关系变化，
+只在事务提交后精确失效当前可信租户的键；回滚不会提前清理缓存。旧共享键默认可等待 24 小时 TTL
+自然到期，也可在确认全部旧 System 实例已经停止或排空后精确删除。禁止新旧 System 实例混合运行，
+也禁止通过清空整个 Redis 代替旧键迁移。
 
 ## 关于DTO的说明
 

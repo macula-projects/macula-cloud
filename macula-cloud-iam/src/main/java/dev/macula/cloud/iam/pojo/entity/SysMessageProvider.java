@@ -34,6 +34,7 @@ public class SysMessageProvider {
     private Long id;
     private String channel;
     private String providerType;
+    private String endpoint;
     private String account;
     @CryptoField
     private String credential;

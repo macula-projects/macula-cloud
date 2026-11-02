@@ -17,12 +17,17 @@
 
 package dev.macula.cloud.iam.service.oauth2;
 
+import dev.macula.cloud.iam.mapper.SysOAuth2ClientExternalProviderMapper;
 import dev.macula.cloud.iam.pojo.entity.SysOAuth2Client;
 import dev.macula.cloud.iam.service.support.SysOAuth2ClientService;
 import org.junit.jupiter.api.Test;
+
 import java.time.Duration;
-import static org.assertj.core.api.Assertions.*;
-import static org.mockito.Mockito.*;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * 客户端注册模型默认值与 PKCE 兼容策略回归。
@@ -30,25 +35,28 @@ import static org.mockito.Mockito.*;
  * @since 6.1.0
  */
 class MaculaRegisteredClientRepositoryTest {
-    @Test void unknownClientReturnsNull() {
-        assertThat(new MaculaRegisteredClientRepository(mock(SysOAuth2ClientService.class)).findByClientId("absent")).isNull();
+    @Test
+    void unknownClientReturnsNull() {
+        assertThat(repository(mock(SysOAuth2ClientService.class)).findByClientId("absent")).isNull();
     }
 
-    @Test void publicClientRequiresPkceAndDefaultsToFiveMinuteCode() {
+    @Test
+    void publicClientRequiresPkceAndDefaultsToFiveMinuteCode() {
         var client = entity("none");
         var service = mock(SysOAuth2ClientService.class);
         when(service.getClientByClientId("fixture")).thenReturn(client);
-        var result = new MaculaRegisteredClientRepository(service).findByClientId("fixture");
+        var result = repository(service).findByClientId("fixture");
         assertThat(result.getClientSettings().isRequireProofKey()).isTrue();
         assertThat(result.getTokenSettings().getAuthorizationCodeTimeToLive()).isEqualTo(Duration.ofMinutes(5));
     }
 
-    @Test void confidentialClientKeepsExplicitPkcePolicyAndPasswordExtension() {
+    @Test
+    void confidentialClientKeepsExplicitPkcePolicyAndPasswordExtension() {
         var client = entity("client_secret_basic");
         client.setRequireProofKey(false);
         var service = mock(SysOAuth2ClientService.class);
         when(service.getClientByClientId("fixture")).thenReturn(client);
-        var repository = new MaculaRegisteredClientRepository(service);
+        var repository = repository(service);
         assertThat(repository.findByClientId("fixture").getClientSettings().isRequireProofKey()).isFalse();
         client.setRequireProofKey(true);
         assertThat(repository.findByClientId("fixture").getClientSettings().isRequireProofKey()).isTrue();
@@ -58,10 +66,18 @@ class MaculaRegisteredClientRepositoryTest {
 
     private SysOAuth2Client entity(String method) {
         SysOAuth2Client client = new SysOAuth2Client();
-        client.setClientId("fixture"); client.setClientName("测试应用");
+        client.setClientId("fixture");
+        client.setClientName("测试应用");
         client.setClientAuthenticationMethods(method);
         client.setAuthorizationGrantTypes("authorization_code,password,refresh_token");
-        client.setRedirectUris("https://client.example/callback"); client.setScopes("openid,profile");
+        client.setRedirectUris("https://client.example/callback");
+        client.setScopes("openid,profile");
         return client;
+    }
+
+    private MaculaRegisteredClientRepository repository(SysOAuth2ClientService service) {
+        SysOAuth2ClientExternalProviderMapper mapper = mock(SysOAuth2ClientExternalProviderMapper.class);
+        when(mapper.selectList(any())).thenReturn(java.util.List.of());
+        return new MaculaRegisteredClientRepository(service, mapper);
     }
 }

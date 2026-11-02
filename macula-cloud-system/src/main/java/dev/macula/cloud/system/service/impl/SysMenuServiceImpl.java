@@ -36,6 +36,9 @@ import dev.macula.cloud.system.pojo.entity.SysMenu;
 import dev.macula.cloud.system.pojo.entity.SysPermission;
 import dev.macula.cloud.system.pojo.entity.SysRoleMenu;
 import dev.macula.cloud.system.query.MenuQuery;
+import dev.macula.cloud.system.service.MenuRouteCacheService;
+import dev.macula.cloud.system.service.MenuRouteTenantContext;
+import dev.macula.cloud.system.service.MenuRouteTenantContext.TrustedTenant;
 import dev.macula.cloud.system.service.SysMenuService;
 import dev.macula.cloud.system.service.SysPermissionService;
 import dev.macula.cloud.system.service.SysRoleMenuService;
@@ -43,13 +46,18 @@ import dev.macula.cloud.system.vo.menu.MenuVO;
 import dev.macula.cloud.system.vo.menu.ResourceVO;
 import dev.macula.cloud.system.vo.menu.RouteVO;
 import lombok.RequiredArgsConstructor;
-import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.RequestMethod;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -67,9 +75,22 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
 
     private final SysRoleMenuService roleMenuService;
 
+    private final MenuRouteTenantContext menuRouteTenantContext;
+
+    private final MenuRouteCacheService menuRouteCacheService;
+
     @Override
     @Transactional
     public boolean saveMenu(SysMenu menu) {
+        TrustedTenant tenant = menuRouteTenantContext.resolve();
+        boolean saved = saveMenuInternal(menu);
+        if (saved) {
+            menuRouteCacheService.evictAfterCommit(tenant);
+        }
+        return saved;
+    }
+
+    private boolean saveMenuInternal(SysMenu menu) {
         String path = menu.getPath();
 
         MenuTypeEnum menuType = menu.getType();  // 菜单类型
@@ -112,7 +133,7 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
     }
 
     @Override
-    @Cacheable(cacheNames = "system", key = "'routes'")
+    @Cacheable(cacheNames = "system", key = "@menuRouteCacheService.key(@menuRouteTenantContext.resolve())")
     public List<RouteVO> listRoutes() {
         List<RouteBO> menuList = this.baseMapper.listRoutes();
         return recurRoutes(SecurityConstants.ROOT_NODE_ID, menuList);
@@ -126,8 +147,13 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
 
     @Override
     public boolean updateMenuVisible(Long menuId, Integer visible) {
-        return this.update(
+        TrustedTenant tenant = menuRouteTenantContext.resolve();
+        boolean updated = this.update(
             new LambdaUpdateWrapper<SysMenu>().eq(SysMenu::getId, menuId).set(SysMenu::getVisible, visible));
+        if (updated) {
+            menuRouteCacheService.evictAfterCommit(tenant);
+        }
+        return updated;
     }
 
     @Override
@@ -169,16 +195,20 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
     @Override
     @Transactional
     public boolean updateMenuPermission(MenuForm menuForm) {
+        TrustedTenant tenant = menuRouteTenantContext.resolve();
         SysMenu sysMenu = menuConverter.form2Entity(menuForm);
-        boolean result = saveMenu(sysMenu);
+        boolean result = saveMenuInternal(sysMenu);
         if (result) {
-            return permissionService.saveOrUpdatePerms(sysMenu.getId(), menuForm.getApiList());
+            boolean permissionsSaved = permissionService.saveOrUpdatePerms(sysMenu.getId(), menuForm.getApiList());
+            menuRouteCacheService.evictAfterCommit(tenant);
+            return permissionsSaved;
         }
         return false;
     }
 
     @Transactional
     public boolean deleteMenus(String ids) {
+        TrustedTenant tenant = menuRouteTenantContext.resolve();
         List<Long> menuIds = Arrays.stream(ids.split(",")).map(Long::parseLong).collect(Collectors.toList());
         // 如果有关联URL权限不能删除，删除菜单时同时会删除与角色表的关系
         Optional.of(menuIds).orElse(new ArrayList<>()).forEach(id -> {
@@ -187,12 +217,16 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
             Assert.isTrue(count <= 0, "该菜单下有URL权限，无法删除");
             roleMenuService.remove(new LambdaQueryWrapper<SysRoleMenu>().eq(SysRoleMenu::getMenuId, id));
         });
-        return this.removeByIds(menuIds);
+        boolean removed = this.removeByIds(menuIds);
+        if (removed) {
+            menuRouteCacheService.evictAfterCommit(tenant);
+        }
+        return removed;
     }
 
     @Override
-    @CacheEvict(cacheNames = "system", key = "'routes'")
     public void cleanCache() {
+        menuRouteCacheService.evictAfterCommit(menuRouteTenantContext.resolve());
     }
 
     /**

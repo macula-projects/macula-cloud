@@ -17,6 +17,7 @@
 package dev.macula.cloud.iam.authentication.thirdparty;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import dev.macula.cloud.iam.enums.ThirdPartyProviderType;
 import dev.macula.cloud.iam.mapper.SysIdentityProviderMapper;
 import dev.macula.cloud.iam.mapper.SysUserIdentityBindingMapper;
 import dev.macula.cloud.iam.pojo.entity.SysIdentityProvider;
@@ -45,6 +46,15 @@ public class IdentityProviderConfigService {
     private final SysUserIdentityBindingMapper bindingMapper;
     private final JsonMapper json = JsonMapper.builder().build();
 
+    public boolean isEnabled(String providerType) {
+        try {
+            requireEnabled(providerType);
+            return true;
+        } catch (AuthenticationServiceException ex) {
+            return false;
+        }
+    }
+
     public boolean isVisible(String providerType) {
         try {
             return providerMapper.selectCount(new LambdaQueryWrapper<SysIdentityProvider>()
@@ -65,13 +75,32 @@ public class IdentityProviderConfigService {
             if (providers.size() != 1) {
                 throw unavailable();
             }
-            SysIdentityProvider provider = providers.get(0);
-            if (!StringUtils.hasText(provider.getAppSecret())) {
+            return toConfig(providers.get(0), providerType);
+        } catch (AuthenticationServiceException ex) {
+            throw ex;
+        } catch (RuntimeException ex) {
+            throw unavailable();
+        }
+    }
+
+    /**
+     * 按 OAuth Client 固定绑定的 registration ID 读取启用配置，并核对 provider 类型。
+     *
+     * @param registrationId 身份源 registration 主键
+     * @param expectedProviderType code type 固定的 provider 类型
+     * @return 受控运行时配置
+     */
+    public ProviderConfig requireEnabledById(Long registrationId, String expectedProviderType) {
+        try {
+            if (registrationId == null || !StringUtils.hasText(expectedProviderType)) {
                 throw unavailable();
             }
-            Map<String, String> config = StringUtils.hasText(provider.getConfigJson())
-                ? json.readValue(provider.getConfigJson(), new TypeReference<>() { }) : Map.of();
-            return new ProviderConfig(providerType, provider.getAppId(), provider.getAppSecret(), config);
+            SysIdentityProvider provider = providerMapper.selectById(registrationId);
+            if (provider == null || !Boolean.TRUE.equals(provider.getEnabled())
+                || !expectedProviderType.equals(provider.getProviderType())) {
+                throw unavailable();
+            }
+            return toConfig(provider, expectedProviderType);
         } catch (AuthenticationServiceException ex) {
             throw ex;
         } catch (RuntimeException ex) {
@@ -99,15 +128,45 @@ public class IdentityProviderConfigService {
         return new AuthenticationServiceException("第三方登录暂不可用");
     }
 
+    private ProviderConfig toConfig(SysIdentityProvider provider, String providerType) {
+        if (!StringUtils.hasText(provider.getAppSecret())) {
+            throw unavailable();
+        }
+        Map<String, String> config = StringUtils.hasText(provider.getConfigJson())
+            ? json.readValue(provider.getConfigJson(), new TypeReference<>() { }) : Map.of();
+        Map<String, String> secrets = StringUtils.hasText(provider.getSecretConfigJson())
+            ? json.readValue(provider.getSecretConfigJson(), new TypeReference<>() { }) : Map.of();
+        ThirdPartyProviderType type = ThirdPartyProviderType.fromProviderType(providerType);
+        if (!type.additionalSecretFields().containsAll(secrets.keySet())
+            || type.requiredPublicFields().stream().anyMatch(key -> !StringUtils.hasText(config.get(key)))
+            || type.requiredAdditionalSecretFields().stream().anyMatch(
+                key -> !StringUtils.hasText(secrets.get(key)))) {
+            throw unavailable();
+        }
+        return new ProviderConfig(providerType, provider.getAppId(), provider.getAppSecret(), config, secrets);
+    }
+
     /**
      * 身份提供商的受控运行时配置。
      *
      * @since 6.1.0
      */
     public record ProviderConfig(String providerType, String appId, String appSecret,
-                                 Map<String, String> values) {
+                                 Map<String, String> values, Map<String, String> secrets) {
+        public ProviderConfig(String providerType, String appId, String appSecret, Map<String, String> values) {
+            this(providerType, appId, appSecret, values, Map.of());
+        }
+
         public String require(String key) {
             String value = values.get(key);
+            if (!StringUtils.hasText(value)) {
+                throw new AuthenticationServiceException("第三方登录暂不可用");
+            }
+            return value;
+        }
+
+        public String requireSecret(String key) {
+            String value = secrets.get(key);
             if (!StringUtils.hasText(value)) {
                 throw new AuthenticationServiceException("第三方登录暂不可用");
             }

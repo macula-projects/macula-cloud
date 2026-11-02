@@ -59,7 +59,7 @@ public interface SysMenuService extends IService<SysMenu> {
     boolean saveMenu(SysMenu menu);
 
     /**
-     * 清理路由缓存
+     * 清理当前可信租户的路由缓存。
      */
     void cleanCache();
 

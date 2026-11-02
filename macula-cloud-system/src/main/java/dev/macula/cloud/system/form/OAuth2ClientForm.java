@@ -21,6 +21,9 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
+import java.util.Map;
+import java.util.Set;
+
 /**
  * IAM 接入应用创建和修改表单，密钥仅在创建及重置时使用。
  *
@@ -41,6 +44,11 @@ public class OAuth2ClientForm {
     private String redirectUris;
     @NotBlank
     private String scopes;
+    private Set<String> externalCodeTypes = Set.of();
+    private Set<String> allowedOrigins = Set.of();
+    private Map<String, Long> externalProviderBindings = Map.of();
+    private Set<String> browserLoginProviderTypes = Set.of();
+    private String directLoginProviderType;
     @NotNull
     private Boolean requireProofKey;
     @NotNull

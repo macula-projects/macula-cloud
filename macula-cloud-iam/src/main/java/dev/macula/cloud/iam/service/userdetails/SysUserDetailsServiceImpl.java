@@ -40,6 +40,7 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.oauth2.core.endpoint.OAuth2ParameterNames;
 import org.springframework.util.Assert;
+import org.springframework.util.StringUtils;
 
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
@@ -61,6 +62,7 @@ public class SysUserDetailsServiceImpl implements UserDetailsService, UserDetail
 
     private final SysUserService sysUserService;
     private final SysOAuth2ClientService sysOAuth2ClientService;
+    private final ClientAwareAccountResolver accountResolver;
     @Nullable
     private final UserAuthInfoService userAuthInfoService;
 
@@ -72,16 +74,21 @@ public class SysUserDetailsServiceImpl implements UserDetailsService, UserDetail
         // 根据客户端配置获取不同的用户类型，访问不同的身份提供源
         if (StrUtil.isNotBlank(clientId)) {
             SysOAuth2Client oauth2Client = sysOAuth2ClientService.getClientByClientId(clientId);
-            if (oauth2Client != null) {
-                tenantId = oauth2Client.getTenantId();
-                if (userAuthInfoService != null) {
-                    userAuthInfo = userAuthInfoService.getUserAuthInfo(oauth2Client.getUserType(), tenantId, username);
-                }
+            if (oauth2Client == null || oauth2Client.getTenantId() == null || oauth2Client.getUserType() == null) {
+                throw new UsernameNotFoundException("OAuth client 不存在或用户路由未配置");
             }
-        }
-
-        // 默认使用系统用户
-        if (userAuthInfo == null) {
+            tenantId = oauth2Client.getTenantId();
+            if (oauth2Client.getUserType() == UserTypeEnum.EMPLOYEE) {
+                SysUser account = accountResolver.resolveIdentifier(oauth2Client.getUserType(), username);
+                userAuthInfo = sysUserService.getUserAuthInfo(tenantId, account.getUsername(), null);
+            } else if (userAuthInfoService != null) {
+                userAuthInfo = userAuthInfoService.getUserAuthInfo(oauth2Client.getUserType(), tenantId, username);
+            }
+            if (userAuthInfo == null) {
+                throw new UsernameNotFoundException("用户不存在");
+            }
+        } else {
+            // 没有 OAuth Client 上下文时保持既有系统用户登录行为。
             // TODO 如果要支持人群包，这里需要获取该用户的groupIds
             userAuthInfo = sysUserService.getUserAuthInfo(tenantId, username, null);
         }
@@ -115,7 +122,9 @@ public class SysUserDetailsServiceImpl implements UserDetailsService, UserDetail
         if (userAuthInfo == null && UserTypeEnum.EMPLOYEE == oauth2Client.getUserType()) {
             userAuthInfo = sysUserService.getUserAuthInfo(tenantId, username, null);
         }
-        if (userAuthInfo == null) throw new UsernameNotFoundException("用户不存在");
+        if (userAuthInfo == null) {
+            throw new UsernameNotFoundException("用户不存在");
+        }
         if (!StatusEnum.ENABLE.getValue().equals(userAuthInfo.getStatus())) {
             throw new DisabledException("该账户已被禁用!");
         }
@@ -126,11 +135,20 @@ public class SysUserDetailsServiceImpl implements UserDetailsService, UserDetail
 
     @Override
     public UserDetails loadUserByPhone(String phone) throws UsernameNotFoundException {
-        // TODO 应该从统一的用户与第三方身份绑定表获取用户名【username:手机号、微信OpenId、微信UnionId等】
-        String username = "";
-        UserDetails userDetails = this.loadUserByUsername(username);
-        if (userDetails instanceof SysUserDetails) {
-            ((SysUserDetails)userDetails).setMobile(phone);
+        String clientId = getClientId();
+        if (!StringUtils.hasText(clientId)) {
+            throw new UsernameNotFoundException("OAuth client 不存在或用户路由未配置");
+        }
+        SysOAuth2Client oauth2Client = sysOAuth2ClientService.getClientByClientId(clientId);
+        if (oauth2Client == null || oauth2Client.getTenantId() == null || oauth2Client.getUserType() == null) {
+            throw new UsernameNotFoundException("OAuth client 不存在或用户路由未配置");
+        }
+        SysUser account = accountResolver.findByMobile(oauth2Client.getUserType(), phone)
+            .orElseThrow(() -> new UsernameNotFoundException("用户不存在"));
+        UserDetails userDetails = loadUserByClient(clientId, oauth2Client.getTenantId(), oauth2Client.getUserType(),
+            account.getUsername());
+        if (userDetails instanceof SysUserDetails details) {
+            details.setMobile(account.getMobile());
         }
         return userDetails;
     }

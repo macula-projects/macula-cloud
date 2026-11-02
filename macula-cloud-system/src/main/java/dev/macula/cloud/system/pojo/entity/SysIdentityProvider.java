@@ -40,6 +40,8 @@ public class SysIdentityProvider {
     @CryptoField
     private String appSecret;
     private String configJson;
+    @CryptoField
+    private String secretConfigJson;
     private Boolean enabled;
     private Boolean visible;
 }

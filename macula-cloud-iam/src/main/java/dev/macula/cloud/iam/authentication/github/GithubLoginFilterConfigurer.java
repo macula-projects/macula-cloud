@@ -17,6 +17,7 @@
 package dev.macula.cloud.iam.authentication.github;
 
 import dev.macula.cloud.iam.authentication.thirdparty.IdentityProviderConfigService;
+import dev.macula.cloud.iam.authentication.thirdparty.BrowserLoginClientPolicyService;
 import dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyIdentityResolutionService;
 import dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyLoginStateRepository;
 import dev.macula.cloud.iam.enums.ThirdPartyProviderType;
@@ -54,6 +55,7 @@ public class GithubLoginFilterConfigurer<H extends HttpSecurityBuilder<H>>
         ThirdPartyIdentityResolutionService identities = context.getBean(ThirdPartyIdentityResolutionService.class);
         getAuthenticationFilter().githubClient(client);
         getAuthenticationFilter().configure(configs,
+            context.getBean(BrowserLoginClientPolicyService.class),
             context.getBean(ThirdPartyLoginStateRepository.class),
             context.getBean(AuthorizationServerSettings.class).getIssuer());
         http.authenticationProvider(postProcess(new GithubAuthenticationProvider(client, configs, identities)));

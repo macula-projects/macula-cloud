@@ -31,11 +31,21 @@ class ThirdPartyProviderTypeTest {
     @Test
     void keepsExistingProviderTypesAndLoginPaths() {
         assertArrayEquals(new ThirdPartyProviderType[] {
-            ThirdPartyProviderType.GITHUB, ThirdPartyProviderType.WECOM
+            ThirdPartyProviderType.GITHUB, ThirdPartyProviderType.WECOM, ThirdPartyProviderType.FEISHU,
+            ThirdPartyProviderType.DINGTALK, ThirdPartyProviderType.WECHAT,
+            ThirdPartyProviderType.ALIYUN_MOBILE
         }, ThirdPartyProviderType.values());
         assertEquals("GITHUB", ThirdPartyProviderType.GITHUB.providerType());
         assertEquals("/login/github", ThirdPartyProviderType.GITHUB.loginPath());
         assertEquals("WECOM", ThirdPartyProviderType.WECOM.providerType());
         assertEquals("/login/wecom", ThirdPartyProviderType.WECOM.loginPath());
+        assertEquals("FEISHU", ThirdPartyProviderType.FEISHU.providerType());
+        assertEquals("/login/feishu", ThirdPartyProviderType.FEISHU.loginPath());
+        assertEquals("DINGTALK", ThirdPartyProviderType.DINGTALK.providerType());
+        assertEquals("/login/dingtalk", ThirdPartyProviderType.DINGTALK.loginPath());
+        assertEquals("WECHAT", ThirdPartyProviderType.WECHAT.providerType());
+        assertEquals("/login/wechat", ThirdPartyProviderType.WECHAT.loginPath());
+        assertEquals("ALIYUN_MOBILE", ThirdPartyProviderType.ALIYUN_MOBILE.providerType());
+        assertEquals("", ThirdPartyProviderType.ALIYUN_MOBILE.loginPath());
     }
 }
