@@ -1,181 +1,36 @@
-# Macula Cloud ID ID中心
+# Macula Cloud TinyID
 
-统一的ID生成服务
+## 作用
 
-## 简介
+`macula-cloud-tinyid` 是基于数据库号段的分布式 ID 服务，为不同业务类型提供高吞吐、趋势递增的唯一 ID。
 
-macula-cloud-tinyid是基于滴滴[Tinyid](https://github.com/didi/tinyid)
-开发的一款分布式id生成系统，基于数据库号段算法实现，关于这个算法可以参考美团leaf或者tinyid原理介绍。Tinyid扩展了leaf-segment算法，支持了多db(
-master)
-，同时提供了starter使id生成本地化，获得了更好的性能与可用性。
+## 核心功能
 
-## 性能与可用性
+- 按 `bizType` 分配单个或批量 ID。
+- 向客户端分配号段，支持客户端本地缓存后发号。
+- 管理发号业务及其步长、余数等规则。
+- 查询数据源状态和发号审计记录。
 
-### 性能
+## 使用
 
-http方式访问，性能取决于http server的能力，网络传输速度
-java-client方式，id为本地生成，号段长度(step)越长，qps越大，如果将号段设置足够大，则qps可达1000w+
+先在管理端创建发号业务并设置唯一的 `bizType`，再通过 Gateway 调用发号接口：
 
-### 可用性
+```http
+GET /tinyid/api/v1/id/nextId?bizType=order&batchSize=10
+Authorization: Bearer <access_token>
+```
 
-依赖db，当db不可用时，因为server有缓存，所以还可以使用一段时间，如果配置了多个db，则只要有1个db存活，则服务可用
-使用tiny-client，只要server有一台存活，则理论上可用，server全挂，因为client有缓存，也可以继续使用一段时间
+常用接口：
 
-### Tinyid的特性
+| 路径 | 用途 |
+| --- | --- |
+| `/tinyid/api/v1/id/nextId` | 批量获取 ID |
+| `/tinyid/api/v1/id/nextIdSimple` | 以逗号分隔文本返回 ID |
+| `/tinyid/api/v1/id/nextSegmentId` | 获取完整号段对象 |
+| `/tinyid/api/v1/id/nextSegmentIdSimple` | 获取文本格式号段 |
+| `/tinyid/api/v1/admin/businesses` | 管理发号业务 |
+| `/tinyid/api/v1/admin/audit-logs` | 查询审计记录 |
 
-1. 全局唯一的long型id
-2. 趋势递增的id，即不保证下一个id一定比上一个大
-3. 非连续性
-4. 提供http和java client方式接入
-5. 支持批量获取id
-6. 支持生成1,3,5,7,9...序列的id
-7. 支持多个db的配置，无单点
+本地开发先按[根 README](../README.md)启动 MySQL、Nacos 和 Gateway，再在 IDE 中运行 `MaculaTinyIdApplication`。服务默认端口为 `9082`；经 Gateway 访问时使用 `9000` 端口。
 
-- 适用场景:只关心id是数字，趋势递增的系统，可以容忍id不连续，有浪费的场景
-- 不适用场景:类似订单id的业务(因为生成的id大部分是连续的，容易被扫库、或者测算出订单量)
-
-## 依赖
-
-JDK 17、Maven、MySQL。
-
-## 管理端
-
-TinyID 管理端 API 仅通过网关 `/tinyid/api/v1/admin/**` 访问，管理页为 `/tinyid/management`，动态菜单显示为“ID管理”并挂载在“系统管理”下，仅授权给 `ROOT`
-超级管理员。管理功能包括：
-
-- 发号业务：`biz_type` 表示独立业务，发号访问由网关统一认证。
-  `begin_id` 和 `max_id` 固定从 `0` 初始化，`step` 是每次获取 ID 的步长。只有该业务在全部数据源
-  都存在且每个数据源的 `max_id` 都为 `0` 时才允许删除。
-- 多数据库：创建业务时系统一次写入当前全部物理数据源，不需要切换数据源。`delta` 是该业务预留的
-  数据库实例容量，默认 `10`、创建时可以修改；`remainder` 按物理数据源列表下标从 `0` 开始自动
-  分配，页面只读展示。
-- 审计：管理 Controller 统一使用 `macula-boot-starter-auditlog` 发布标准事件，并由异步监听器写入
-  `tiny_id_audit_log`；不保存请求/响应正文、原始异常、SQL 或原始 Token。审计是异步尽力写入，
-  鉴权或方法调用前被拒绝的请求可能不会产生 Controller 审计事件，审计失败也不会回滚已完成的管理操作。
-
-四个发号接口均使用统一网关认证，不再校验 TinyID Token 或应用—bizType 绑定。
-不再提供接入应用或业务授权管理。`step`、`delta`、`remainder` 创建后不提供修改入口。
-未使用业务的删除跨全部数据源执行并记录审计；历史审计记录仍可查询。
-
-### 数据源与迁移
-
-多数据库继续沿用原有定义：每个物理库注册为 Spring `DruidDataSource`，`master` 只是其中之一；发号使用
-`@Primary DynamicDataSource` 随机选择物理库。Service 直接使用 `macula-boot-starter-mybatis-plus` Mapper；
-管理服务在同一个路由数据源上按列表下标显式固定目标库后循环读写，普通发号没有显式上下文时仍随机选库。
-
-管理列表完全保持 Spring 注入顺序，不按名称单独提取或重排 `master`。列表下标也是创建业务时的
-`remainder`；管理审计仅写入并读取列表中的第一个数据源（sequence=0），避免在各业务库复制审计记录。因此数据源顺序是部署硬约束：已有数据源
-不得重排、删除或在中间插入，扩容只能追加到列表末尾，并且新增下标必须小于业务 `delta`。服务不再
-持久化数据源顺序，也不会在启动时自动补齐新库。
-
-Flyway 通过 `@FlywayDataSource` 使用同一个 `DynamicDataSource`，不单独配置 URL、用户名或密码。
-Flyway 配置位于 `local` profile，`docker` 通过 profile 分组继承；共享环境由配置中心提供配置。
-迁移策略按列表序号固定路由后逐库执行，确保迁移 SQL 与历史表处于同一个库；任一库失败会终止启动。
-Nacos 等外部配置也应移除旧的 Flyway 连接配置及 `db/master` 位置。
-迁移已合并为唯一的 `db/migration/V1__baseline.sql`，仅包含业务表和审计表，
-不再创建 Token 表、管理请求表与数据源顺序表。
-直接清理 V1 会改变已执行版本的校验和，不能直接覆盖升级旧库。已有环境需由运维在备份后安排基线处理；
-本次不自动执行 repair、重置数据库或删除旧表，也不新增 V2。必须保留历史发号进度。
-`baseline-on-migrate=false` 防止将未迁移的非空库静默标记为 V1。
-新增库仍需在加入发号池前复制既有业务配置，并设置正确的 remainder；迁移不会自动补齐业务数据。
-数据库连接信息只用于服务端建池，不会通过管理 API 返回。
-
-V1 中的 `test`、`test_odd` 是历史示例。服务不再在启动迁移阶段自动删除或补齐数据，已有
-数据库及历史发号进度保持不变；全新环境是否保留示例由部署初始化流程决定。
-管理页面在请求提交期间禁用按钮，服务端依靠业务唯一约束避免重复业务；不保存通用管理请求状态。
-TinyID 内部 REST 模型统一位于 `pojo.form`、`pojo.query`、`pojo.vo`，不会发布到 `macula-cloud-api`。
-
-跨数据库写入不使用分布式事务：系统会先全量预检，再按管理列表顺序写入；失败时反向补偿。若补偿仍
-失败，会留下脱敏审计并要求人工修复；不得重排既有 `remainder`。
-
-## 示例
-
-请参考getting start
-
-## 推荐使用方式
-
-- macula-cloud-tinyid推荐部署到多个机房的多台机器
-    - 多机房部署可用性更高，http方式访问需使用方考虑延迟问题
-- 推荐使用tinyid-client来获取id，好处如下:
-    - id为本地生成(调用AtomicLong.addAndGet方法)，性能大大增加
-    - client对server访问变的低频，减轻了server的压力
-    - 因为低频，即便client使用方和server不在一个机房，也无须担心延迟
-    - 即便所有server挂掉，因为client预加载了号段，依然可以继续使用一段时间 注:
-      使用tinyid-client方式，如果client机器较多频繁重启，可能会浪费较多的id，这时可以考虑使用http方式
-- 推荐 db 配置两个或更多：管理端创建业务时会自动写入全部当前数据库；运行期发号仍可在某个数据库
-  暂时不可用时依赖其他实例和既有缓存继续服务。
-
-## tinyid的原理
-
-- tinyid是基于数据库发号算法实现的，简单来说是数据库中保存了可用的id号段，tinyid会将可用号段加载到内存中，之后生成id会直接内存中产生。
-- 可用号段在第一次获取id时加载，如当前号段使用达到一定量时，会异步加载下一可用号段，保证内存中始终有可用号段。
-- (如可用号段1~1000被加载到内存，则获取id时，会从1开始递增获取，当使用到一定百分比时，如20%(默认)
-  ，即200时，会异步加载下一可用号段到内存，假设新加载的号段是1001~2000,则此时内存中可用号段为200~
-  1000,1001~2000)，当id递增到1000时，当前号段使用完毕，下一号段会替换为当前号段。依次类推。
-
-## tinyid系统架构图
-
-![](https://github.com/didi/tinyid/raw/master/doc/tinyid.png)
-
-下面是一些关于这个架构图的说明:
-
-- nextId和getNextSegmentId是macula-cloud-tinyid对外提供的两个http接口
-- nextId是获取下一个id，当调用nextId时，会传入bizType，每个bizType的id数据是隔离的，生成id会使用该bizType类型生成的IdGenerator。
-- getNextSegmentId是获取下一个可用号段，tinyid-client会通过此接口来获取可用号段
-- IdGenerator是id生成的接口
-- IdGeneratorFactory是生产具体IdGenerator的工厂，每个biz_type生成一个IdGenerator实例。通过工厂，我们可以随时在db中新增biz_type，而不用重启服务
--
-
-CachedIdGenerator则是具体的id生成器对象，持有currentSegmentId和nextSegmentId对象，负责nextId的核心流程。nextId最终通过AtomicLong.andAndGet(
-delta)
-方法产生。
-
-- SegmentIdService是生成SegmentId对象的服务，在服务端通过Db生成，在client端通过Http访问服务端生成
-
-## 多数据库的配置
-
-[多数据库配置](https://github.com/didi/tinyid/wiki/Tinyid-server-config)
-
-## 其他说明
-
-其他id生成项目推荐
-
-- twitter snowflake
-- 百度uid-generator: 这是基于snowflake方案实现的开源组件，借用未来时间、缓存等手段，qps可达600w+
-- 美团leaf: 该篇文章详细的介绍了db号段和snowflake方案，近期也进行了Leaf开源
-
-## 部署说明
-
-TinyID 是独立应用；Gateway 通过 `/tinyid/**` 统一代理，包括管理接口及下列发号接口：
-`nextId`、`nextIdSimple`、`nextSegmentId`、`nextSegmentIdSimple` 四个发号接口。
-发号只需 `bizType`，批量取号可传 `batchSize`；Starter 使用 `POST nextSegmentIdSimple`。
-Server 不设置 `/tinyid` 上下文，
-Gateway 对 TinyID 路由使用 `StripPrefix=1`，先移除前缀再验签及转发，与 system 一致。
-管理接口的网关地址保持不变；直接访问 Server 时，管理和旧发号接口地址均去掉 `/tinyid`。
-Starter 使用 `macula.cloud.endpoint/app-key/secret-key` 签名访问网关，不传 TinyID 专用 token，
-不单独设置超时；缓存与预加载、本地发号保持不变。
-
-Gateway 验证 HMAC 后转发 JWT，Server 对全部发号接口执行 JWT 认证。
-网关沿用共享认证授权逻辑，本模块不额外区分 HMAC 应用与个人 Token，后续由统一策略处理。
-Server 仍信任有效 JWT，不独立校验 JWT 的 HMAC 来源，不能将其直连端口作为不受控的公开入口。
-发号接口不再加入匿名白名单。必须同步删除 Nacos 或环境中的 `/api/v1/id/**`
-及其单接口白名单，不能由外部配置重新放开匿名访问。
-网关与 Server 应使用匹配的 JWT 签发/验证配置；具备接口访问权的应用可申请任意已存在的 bizType。
-
-升级时删除客户端旧 `macula.cloud.tinyid.server/token/connect-timeout/read-timeout` 配置，
-并协调更新客户端、Server、网关路由与认证配置。旧 token-only 调用不再支持，全部发号调用需迁移到统一网关认证；
-配置中心或环境变量若覆盖 `server.servlet.context-path`，也必须移除旧值；
-网关应用 URL 授权按改写后的路径配置，例如 `POST:/api/v1/id/nextSegmentIdSimple`。
-回滚需同步恢复这些版本与配置，V1 基线差异需人工处理，不重置号段进度。
-Server 自定义 `SegmentIdService` 会使 Starter 远程客户端退让，无需配置客户端网关凭据。
-
-### 号段错误响应
-
-与 system 一样引入 `macula-boot-starter-web`，`TinyIdSysException` 由统一 BizException 处理器处理。
-新号段接口成功仍返回五字段 `text/plain`；失败改为 HTTP 500 + Result JSON，不再返回 HTTP 200 空串。
-`ID503` 表示业务不存在，`ID504` 表示号段更新冲突，`ID502` 表示内部申请失败；底层异常保留在 cause 链中供日志诊断。
-调用方需接受文本和 JSON 两种媒体类型，新版 Starter 会保留远程错误码。
-其他发号接口的业务失败同样返回 HTTP 500 + Result JSON，不再返回空串或 HTTP 200 错误响应。
-Controller 直接返回业务数据，由 Advice 包装普通 JSON 请求；Feign 标记请求按统一约定返回原始数据，Simple 接口成功仍为文本。
-管理接口同样使用统一 Result，前端与 system 一致先检查 `success` 再读取 `data`；请协调升级前后端。
-`macula.jackson.long-to-string=false` 保留原 JSON 数值类型；不再提供专属异常 Advice，参数及 MVC 异常遵循共享 ControllerExceptionAdvice 的状态与 Result 约定，不单独保留 400/405 状态。
+完整 Docker Compose 启动方式见 [`deploy/README.md`](../deploy/README.md)。

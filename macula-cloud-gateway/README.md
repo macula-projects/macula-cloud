@@ -1,23 +1,31 @@
-# Macula Cloud Gateway 网关中心
+# Macula Cloud Gateway
 
-平台对外统一入口，提供统一认证、鉴权、接口加解密等服务
+## 作用
 
-## TinyID 号段接口
+`macula-cloud-gateway` 是平台统一访问入口，负责将外部请求路由到后端服务，并在入口层处理认证、权限和接口保护。
 
-路由统一使用 `/tinyid/**`，认证授权继续沿用共享安全链。
-通过 `StripPrefix=1` 移除 `/tinyid` 前缀后转发至 `macula-cloud-tinyid`，Server 不设置上下文前缀。
-管理接口外部地址不变；通配路由不等于匿名开放，新增路径也需核对访问权限。
-新号段请求为 POST，业务参数只有 bizType；Starter 使用统一应用 AK/SK 进行 HMAC 签名，
-网关沿用应用 URL 访问策略校验后向下游传递 JWT。不得将此路径加入匿名白名单。
-沿用共享网关认证授权策略，TinyID 不额外区分 HMAC 应用与个人 Token；身份边界由后续统一策略处理。
-与 system 一致，StripPrefix 先于 HMAC 验签执行；验签和应用 URL 授权使用改写后的路径，
-号段接口授权表达式为 `POST:/api/v1/id/nextSegmentIdSimple`，不包含 `/tinyid`。
+## 核心功能
 
-同步核对配置中心中的路由、应用密钥与 URL 授权，以及 TinyID Server 的 JWT 验证配置。
-能访问新接口的应用可以申请已存在的任意 bizType；旧 TinyID Token 授权不再约束任何发号接口。
-客户端、Server 和网关配置需协调升级与回滚。
-Server 仍信任有效 JWT，不额外识别其原始认证方式。
+- 通过 Nacos 发现后端服务并进行负载均衡路由。
+- 校验 access token，并执行 URL 级访问控制。
+- 支持接口签名和请求、响应加解密。
+- 当前提供 System 的 `/system/**` 和 TinyID 的 `/tinyid/**` 路由。
 
-## 加解密服务
+## 使用
 
-CryptoLocaleServiceImpl是本地加解密实现，如果要接入密钥服务器需要修改
+先按[根 README](../README.md)启动基础设施以及 IAM、System 等目标服务，再在 IDE 中运行 `MaculaGatewayApplication`。本地默认端口为 `9000`。
+
+通过 Gateway 访问后端服务：
+
+```text
+http://127.0.0.1:9000/system/api/v1/menus/routes
+http://127.0.0.1:9000/tinyid/api/v1/id/nextId
+```
+
+除公开端点外，请求需要携带 IAM 签发的 access token：
+
+```http
+Authorization: Bearer <access_token>
+```
+
+完整 Docker Compose 启动方式见 [`deploy/README.md`](../deploy/README.md)。
