@@ -3,18 +3,22 @@
 Accepted by Rain on 2026-10-29.
 
 ## Files that change
-- `.sdlc/tenant-aware-menu-route-cache/plan.md`、`review-findings.md`：记录实施合同、Plan 评审和实际偏差。
-- `macula-cloud-system/src/main/java/dev/macula/cloud/system/service/MenuRouteTenantContext.java`：从 JWT claim、请求租户上下文、ROOT 权限和用户租户成员关系解析并校验菜单查询的可信租户，返回只能由该组件创建的 `TrustedTenant` 捕获值。
-- `macula-cloud-system/src/main/java/dev/macula/cloud/system/service/MenuRouteCacheService.java`：根据 `TrustedTenant` 生成版本化租户缓存 key，并在事务提交后精确淘汰已校验租户的路由缓存。
-- `macula-cloud-system/src/main/java/dev/macula/cloud/system/service/SysMenuService.java`：明确 `cleanCache()` 只清理当前可信租户的路由缓存。
-- `macula-cloud-system/src/main/java/dev/macula/cloud/system/service/impl/SysMenuServiceImpl.java`：按可信租户 key 缓存路由，并让菜单新增、修改、删除、可见性变更在成功提交后精确失效。
-- `macula-cloud-system/src/main/java/dev/macula/cloud/system/service/impl/SysRoleServiceImpl.java`：角色保存、删除和菜单关系变更成功提交后精确失效当前租户路由缓存。
-- `macula-cloud-system/src/main/java/dev/macula/cloud/system/controller/SysMenuController.java`：移除固定 `'routes'` 的 Controller 级缓存淘汰，交由事务服务统一处理。
-- `macula-cloud-system/src/test/java/dev/macula/cloud/system/service/MenuRouteTenantContextTest.java`：覆盖 AK/SK claim、用户切租户、ROOT、默认租户、越权和缺失租户拒绝。
-- `macula-cloud-system/src/test/java/dev/macula/cloud/system/service/MenuRouteCacheServiceTest.java`：覆盖版本化 key、当前租户精确淘汰、事务提交后淘汰和回滚不淘汰。
-- `macula-cloud-system/src/test/java/dev/macula/cloud/system/service/impl/SysMenuServiceImplTest.java`：覆盖不同租户缓存隔离、全部菜单写路径的缓存失效，以及越权租户在任何 Mapper 写入前被拒绝。
-- `macula-cloud-system/src/test/java/dev/macula/cloud/system/service/impl/SysRoleServiceImplTest.java`：覆盖角色保存、删除和菜单更新成功后失效、失败回滚不提前淘汰，以及越权租户零写入。
-- `macula-cloud-system/README.md`：说明菜单租户解析、版本化缓存键、旧共享键退役和禁止混合版本部署。
+- `.sdlc/tenant-aware-menu-route-cache/plan.md`
+- `.sdlc/tenant-aware-menu-route-cache/review-findings.md`
+- `macula-cloud-system/src/main/java/dev/macula/cloud/system/service/MenuRouteTenantContext.java`
+- `macula-cloud-system/src/main/java/dev/macula/cloud/system/service/MenuRouteCacheService.java`
+- `macula-cloud-system/src/main/java/dev/macula/cloud/system/service/SysMenuService.java`
+- `macula-cloud-system/src/main/java/dev/macula/cloud/system/service/impl/SysMenuServiceImpl.java`
+- `macula-cloud-system/src/main/java/dev/macula/cloud/system/service/impl/SysRoleServiceImpl.java`
+- `macula-cloud-system/src/main/java/dev/macula/cloud/system/controller/SysMenuController.java`
+- `macula-cloud-system/src/test/java/dev/macula/cloud/system/service/MenuRouteTenantContextTest.java`
+- `macula-cloud-system/src/test/java/dev/macula/cloud/system/service/MenuRouteCacheServiceTest.java`
+- `macula-cloud-system/src/test/java/dev/macula/cloud/system/service/impl/SysMenuServiceImplTest.java`
+- `macula-cloud-system/src/test/java/dev/macula/cloud/system/service/impl/SysRoleServiceImplTest.java`
+- `macula-cloud-system/README.md`
+
+上述文件分别承载可信租户解析、版本化缓存键、菜单与角色写路径的提交后精确失效、Controller
+固定键移除、对应测试、发布说明，以及实施合同和实际偏差记录。
 
 ## Order of work
 1. 实现 `MenuRouteTenantContext`。优先使用 JWT `tenantId` claim；请求上下文与 claim 相同时直接接受。二者不同时，只有带用户角色的主体可进入租户切换校验：ROOT 校验目标租户存在，非 ROOT 校验当前用户名对应用户的 `sys_tenant_user` 关系；无显式关系时只兼容默认租户 1。无租户、应用主体覆盖 claim、未知用户或越权租户统一返回 403。成功时返回内部 `TrustedTenant` 捕获值，解析过程不记录主体或凭据。
