@@ -19,16 +19,25 @@ package dev.macula.cloud.system.pojo.bo;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Data;
+import tools.jackson.databind.annotation.JsonSerialize;
+import tools.jackson.databind.ser.std.ToStringSerializer;
 
 import java.util.Date;
 
 /**
  * 应用业务对象
+ *
+ * @author Rain
+ * @since 6.1.0
  */
 @Data
 public class ApplicationBO {
 
     private Long id;
+
+    /** 认证后的业务租户，空值表示回退到归属租户。 */
+    @JsonSerialize(using = ToStringSerializer.class)
+    private Long authTenantId;
 
     /**
      * 应用名

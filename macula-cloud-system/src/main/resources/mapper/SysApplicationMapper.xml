@@ -8,6 +8,7 @@
         SELECT
         id,
         application_name,
+        auth_tenant_id,
         code,
         sk,
         homepage,
@@ -29,6 +30,7 @@
     <select id="listAllApplication" resultType="dev.macula.cloud.system.pojo.bo.ApplicationBO">
         SELECT id,
                application_name,
+               auth_tenant_id,
                code,
                sk,
                homepage,

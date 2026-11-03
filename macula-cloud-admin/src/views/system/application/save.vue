@@ -15,6 +15,14 @@
 					</template>
 				</el-input>
 			</el-form-item>
+			<el-form-item label="认证租户" prop="authTenantId">
+                <el-select v-model="form.authTenantId" filterable clearable :loading="tenantOptionsLoading"
+                    placeholder="留空使用应用归属租户" style="width: 100%">
+                    <el-option v-for="tenant in tenantOptions" :key="tenant.value"
+                        :label="tenant.label" :value="tenant.value"></el-option>
+                </el-select>
+                <div class="el-form-item-msg">决定认证后的业务数据租户；仅 ROOT 可设置其他租户。</div>
+            </el-form-item>
 			<el-form-item label="主页" prop="homepage">
 				<el-input v-model="form.homepage" clearable></el-input>
 			</el-form-item>
@@ -74,6 +82,9 @@ export default {
 			},
 			visible: false,
 			isSaveing: false,
+            originalAuthTenantId: null,
+            tenantOptions: [],
+            tenantOptionsLoading: false,
 			apiObj: this.$API.system_user.user.list,
 			props: {
 				label: 'username',
@@ -84,6 +95,7 @@ export default {
 			form: {
 				id: "",
 				applicationName: "",
+                authTenantId: "",
 				sk: "",
 				homepage: "",
 				code: "",
@@ -116,23 +128,54 @@ export default {
 		open(mode = 'add') {
 			this.mode = mode;
 			this.visible = true;
+            this.loadTenantOptions();
 			if (this.mode == 'add') {
 				this.form.sk = this.generateAkSK()
 			}
 			return this
 		},
+        async loadTenantOptions() {
+            this.tenantOptionsLoading = true;
+            this.tenantOptions = [];
+            try {
+                const res = await this.$API.system_tenant.tenant.options.get({ filterMe: 1 });
+                if (!res.success) {
+                    throw new Error(res.msg || '加载认证租户失败');
+                }
+                if (this.visible) {
+                    this.tenantOptions = (res.data || []).map(tenant => ({
+                        ...tenant,
+                        value: String(tenant.value)
+                    }));
+                }
+            } catch (error) {
+                if (this.visible) {
+                    ElMessage.error(error.message || '加载认证租户失败');
+                }
+            } finally {
+                this.tenantOptionsLoading = false;
+            }
+        },
 		//表单提交方法
 		submit() {
 			this.$refs.dialogForm.validate(async (valid) => {
 				if (valid) {
 					this.isSaveing = true;
 					this.form.manager = this.form.manager.map(item => item.username).join(',')
+                    const payload = {
+                        ...this.form,
+                        authTenantId: this.form.authTenantId == null || this.form.authTenantId === ''
+                            ? null : String(this.form.authTenantId)
+                    };
+                    if (this.mode !== 'add' && payload.authTenantId === this.originalAuthTenantId) {
+                        delete payload.authTenantId;
+                    }
 					let res;
 					if (this.mode == 'add') {
 						// 调用相关接口
-						res = await this.$API.system_application.application.add.post(this.form);
+						res = await this.$API.system_application.application.add.post(payload);
 					} else {
-						res = await this.$API.system_application.application.edit.put(this.form, this.form.id);
+						res = await this.$API.system_application.application.edit.put(payload, this.form.id);
 					}
 					this.isSaveing = false;
 					if (res.success) {
@@ -164,6 +207,8 @@ export default {
 		setData(data) {
 			this.form.id = data.id
 			this.form.applicationName = data.applicationName
+            this.form.authTenantId = data.authTenantId == null ? "" : String(data.authTenantId)
+            this.originalAuthTenantId = this.form.authTenantId === '' ? null : this.form.authTenantId
 			this.form.homepage = data.homepage
 			this.form.code = data.code
 			this.getUsersByUsernames(data.manager)

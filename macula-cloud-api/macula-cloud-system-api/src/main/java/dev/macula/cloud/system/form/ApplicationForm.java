@@ -19,13 +19,53 @@ package dev.macula.cloud.system.form;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.Setter;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonSetter;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 
+/**
+ * 第三方应用表单，区分认证租户的缺省更新与显式清空。
+ *
+ * @author Rain
+ * @since 6.1.0
+ */
 @Schema(description = "应用表单对象")
 @Data
 public class ApplicationForm {
+
+    @Schema(description = "认证租户，null 表示使用归属租户；修改时省略表示保留原值")
+    private Long authTenantId;
+
+    @JsonIgnore
+    @Getter(AccessLevel.NONE)
+    @Setter(AccessLevel.NONE)
+    private boolean authTenantIdProvided;
+
+    /**
+     * 标记认证租户被显式提交，包括 null 清空。
+     *
+     * @param authTenantId 认证租户
+     */
+    @JsonSetter("authTenantId")
+    public void setAuthTenantId(Long authTenantId) {
+        this.authTenantId = authTenantId;
+        this.authTenantIdProvided = true;
+    }
+
+    /**
+     * 是否显式提交认证租户。
+     *
+     * @return true 表示更新或清空，false 表示保留原值
+     */
+    @JsonIgnore
+    public boolean isAuthTenantIdProvided() {
+        return authTenantIdProvided;
+    }
 
     @Schema(description = "应用ID")
     private Long id;

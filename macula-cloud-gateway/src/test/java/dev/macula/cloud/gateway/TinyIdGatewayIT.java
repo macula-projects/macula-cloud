@@ -31,21 +31,33 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
 import org.springframework.mock.web.server.MockServerWebExchange;
-import org.springframework.security.oauth2.jwt.*;
+import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.test.util.ReflectionTestUtils;
 import reactor.core.publisher.Mono;
 
 import java.nio.charset.StandardCharsets;
-import java.security.*;
-import java.security.interfaces.*;
-import java.time.*;
+import java.security.KeyPairGenerator;
+import java.security.KeyPair;
+import java.security.MessageDigest;
+import java.security.interfaces.RSAPublicKey;
+import java.security.interfaces.RSAPrivateKey;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Base64;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
-import static org.assertj.core.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
+import static org.mockito.ArgumentMatchers.anyString;
 
 /**
  * 使用真实路由谓词和签名/JWT 过滤器，隔离 Redis 与下游服务验证号段链路。
@@ -100,7 +112,7 @@ class TinyIdGatewayIT {
         var encoder = new NimbusJwtEncoder(new ImmutableJWKSet<>(new JWKSet(key)));
         var jwtFilter = new AddJwtGlobalFilter(encoder, claims -> { }, redis);
         ReflectionTestUtils.setField(jwtFilter, "issuerUri", "https://test.invalid");
-        var signatureFilter = new KongApiGlobalFilter(redis);
+        var signatureFilter = signatureFilter(redis);
         AtomicReference<String> forwarded = new AtomicReference<>();
         var exchange = signed(SECRET, Instant.now());
         signatureFilter.filter(exchange, verified -> jwtFilter.filter(verified, downstream -> {
@@ -110,13 +122,15 @@ class TinyIdGatewayIT {
         })).block();
         assertThat(forwarded.get()).startsWith("Bearer ");
         var decoder = NimbusJwtDecoder.withPublicKey((RSAPublicKey) pair.getPublic()).build();
-        assertThat(decoder.decode(forwarded.get().substring(7)).getSubject()).isEqualTo("test-app");
+        var decoded = decoder.decode(forwarded.get().substring(7));
+        assertThat(decoded.getSubject()).isEqualTo("test-app");
+        assertThat(decoded.getClaimAsString("tenantId")).isEqualTo("12");
     }
 
     @Test
     void rejectsInvalidExpiredAndForbiddenRequests() throws Exception {
         RedisTemplate<String, Object> redis = redis();
-        var filter = new KongApiGlobalFilter(redis);
+        var filter = signatureFilter(redis);
         for (var exchange : List.of(signed("wrong-secret", Instant.now()),
             signed(SECRET, Instant.now().minusSeconds(600)))) {
             filter.filter(exchange, next -> {
@@ -126,7 +140,8 @@ class TinyIdGatewayIT {
         }
         when(redis.<String, String>opsForHash().entries(CacheConstants.SECURITY_SYSTEM_APPS + "test-app"))
             .thenReturn(Map.of(CacheConstants.SECURITY_SYSTEM_APPS_SECRIT_KEY, SECRET,
-                CacheConstants.SECURITY_SYSTEM_APPS_PERMIT_URLS, "POST:/other/**"));
+                CacheConstants.SECURITY_SYSTEM_APPS_PERMIT_URLS, "POST:/other/**",
+                "tenantId", "1", CacheConstants.SECURITY_SYSTEM_APPS_AUTH_TENANT_ID, "12"));
         var forbidden = signed(SECRET, Instant.now());
         filter.filter(forbidden, next -> { throw new AssertionError("Forbidden URL reached downstream"); }).block();
         assertThat(forbidden.getResponse().getStatusCode().value()).isEqualTo(403);
@@ -134,11 +149,30 @@ class TinyIdGatewayIT {
 
     @Test
     void propagatesDownstreamFailure() throws Exception {
-        var filter = new KongApiGlobalFilter(redis());
+        var filter = signatureFilter(redis());
         var exchange = signed(SECRET, Instant.now());
         IllegalStateException unavailable = new IllegalStateException("downstream unavailable");
         assertThatThrownBy(() -> filter.filter(exchange, next -> Mono.error(unavailable)).block())
             .isSameAs(unavailable);
+    }
+
+    @Test
+    void rejectsApplicationsFromOtherOrUnknownGatewayTenants() throws Exception {
+        var filter = signatureFilter(redis());
+        for (String applicationName : List.of("macula-samples-gateway", "unknown-gateway")) {
+            ReflectionTestUtils.setField(filter, "applicationName", applicationName);
+            var exchange = signed(SECRET, Instant.now());
+            filter.filter(exchange, next -> {
+                throw new AssertionError("Tenant-rejected request reached downstream");
+            }).block();
+            assertThat(exchange.getResponse().getStatusCode().value()).isEqualTo(403);
+        }
+    }
+
+    private static KongApiGlobalFilter signatureFilter(RedisTemplate<String, Object> redis) {
+        var filter = new KongApiGlobalFilter(redis);
+        ReflectionTestUtils.setField(filter, "applicationName", "macula-cloud-gateway");
+        return filter;
     }
 
     @SuppressWarnings("unchecked")
@@ -146,7 +180,10 @@ class TinyIdGatewayIT {
         RedisTemplate<String, Object> redis = mock(RedisTemplate.class, RETURNS_DEEP_STUBS);
         when(redis.<String, String>opsForHash().entries(CacheConstants.SECURITY_SYSTEM_APPS + "test-app"))
             .thenReturn(Map.of(CacheConstants.SECURITY_SYSTEM_APPS_SECRIT_KEY, SECRET,
-                CacheConstants.SECURITY_SYSTEM_APPS_PERMIT_URLS, "POST:" + SERVICE_PATH));
+                CacheConstants.SECURITY_SYSTEM_APPS_PERMIT_URLS, "POST:" + SERVICE_PATH,
+                "tenantId", "1", CacheConstants.SECURITY_SYSTEM_APPS_AUTH_TENANT_ID, "12"));
+        when(redis.<String, String>opsForHash().entries(CacheConstants.SECURITY_SYSTEM_TENANTS))
+            .thenReturn(Map.of("macula-cloud", "1", "macula-samples", "12"));
         when(redis.opsForValue().get(anyString())).thenReturn(null);
         return redis;
     }

@@ -20,11 +20,16 @@ package dev.macula.cloud.system.vo.app;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
+import tools.jackson.databind.annotation.JsonSerialize;
+import tools.jackson.databind.ser.std.ToStringSerializer;
 
 import java.time.LocalDateTime;
 
 /**
  * 应用分页视图对象
+ *
+ * @author Rain
+ * @since 6.1.0
  */
 @Schema(description = "应用分页视图对象")
 @Data
@@ -32,6 +37,10 @@ public class ApplicationVO {
 
     @Schema(description = "应用ID")
     private Long id;
+
+    /** 认证后的业务租户，空值表示回退到归属租户。 */
+    @JsonSerialize(using = ToStringSerializer.class)
+    private Long authTenantId;
 
     @Schema(description = "应用名")
     private String applicationName;

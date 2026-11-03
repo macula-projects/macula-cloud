@@ -25,7 +25,10 @@ import dev.macula.cloud.system.vo.app.ApplicationVO;
 import org.mapstruct.Mapper;
 
 /**
- * 应用对象转换器
+ * 应用对象转换器，按同名字段传递认证租户。
+ *
+ * @author Rain
+ * @since 6.1.0
  */
 @Mapper
 public interface ApplicationConverter {
