@@ -17,15 +17,19 @@
 
 package dev.macula.cloud.system.vo.menu;
 
-import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import dev.macula.boot.enums.MenuTypeEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
-import java.time.LocalDateTime;
+import java.util.Date;
 import java.util.List;
 
+/**
+ * 菜单列表接口对象，审计时间统一使用Date时间点。
+ * @author Rain
+ * @since 6.1.0
+ */
 @Schema(description = " 菜单视图对象")
 @Data
 public class MenuVO {
@@ -58,11 +62,7 @@ public class MenuVO {
 
     @Schema(description = "按钮权限标识")
     private String perm;
-
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    private LocalDateTime createTime;
-
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    private LocalDateTime updateTime;
+    private Date createTime;
+    private Date updateTime;
 
 }

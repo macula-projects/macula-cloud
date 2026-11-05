@@ -20,6 +20,7 @@ package dev.macula.cloud.system.converter;
 import dev.macula.cloud.system.form.DeptForm;
 import dev.macula.cloud.system.pojo.entity.SysDept;
 import dev.macula.cloud.system.vo.dept.DeptVO;
+import dev.macula.boot.mapstruct.GlobalMapperConfig;
 import org.mapstruct.Mapper;
 
 /**
@@ -28,13 +29,13 @@ import org.mapstruct.Mapper;
  * @author haoxr
  * @since 2022/7/29
  */
-@Mapper
+@Mapper(config = GlobalMapperConfig.class)
 public interface DeptConverter {
-
+    /** 将部门实体转换为编辑表单。 */
     DeptForm entity2Form(SysDept entity);
-
+    /** 将部门实体转换为Date接口模型。 */
     DeptVO entity2Vo(SysDept entity);
-
+    /** 将部门表单转换为数据库实体。 */
     SysDept form2Entity(DeptForm deptForm);
 
 }

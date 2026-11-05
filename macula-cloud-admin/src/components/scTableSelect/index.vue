@@ -25,7 +25,7 @@
 -->
 
 <template>
-	<el-select ref="select" v-model="defaultValue" :size="size" :clearable="clearable" :multiple="multiple" :collapse-tags="collapseTags" :collapse-tags-tooltip="collapseTagsTooltip" :filterable="filterable" :placeholder="placeholder" :disabled="disabled" :filter-method="filterMethod" @remove-tag="removeTag" @visible-change="visibleChange" @clear="clear">
+	<el-select ref="select" v-model="defaultValue" :value-key="defaultProps.value" :size="size" :clearable="clearable" :multiple="multiple" :collapse-tags="collapseTags" :collapse-tags-tooltip="collapseTagsTooltip" :filterable="filterable" :placeholder="placeholder" :disabled="disabled" :filter-method="filterMethod" @remove-tag="removeTag" @visible-change="visibleChange" @clear="clear">
 		<template #empty>
 			<div class="sc-table-select__table" :style="{width: tableWidth+'px'}" v-loading="loading">
 				<div class="sc-table-select__header">
@@ -155,18 +155,23 @@
 			reload(){
 				this.getData()
 			},
-			//自动模拟options赋值
-			autoCurrentLabel(){
-				this.$nextTick(() => {
-					if(this.multiple){
-						this.$refs.select.selected.forEach(item => {
-							item.currentLabel = item.value[this.defaultProps.label]
-						})
-					}else{
-						this.$refs.select.selectedLabel = this.defaultValue[this.defaultProps.label]
-					}
-				})
-			},
+            /** 表格选择使用对象值，按当前 Element Plus 选中项同步显示名称。 */
+            autoCurrentLabel(){
+                this.$nextTick(() => {
+                    // 新版 ElSelect 将选中项放入 states，旧版直接暴露 selected。
+                    // 同时覆盖单选与多选；卸载后不再访问失效的组件引用。
+                    const select = this.$refs.select
+                    const selected = select?.states?.selected ?? select?.selected ?? []
+                    selected.forEach(item => {
+                        item.currentLabel = item.value?.[this.defaultProps.label] ?? ''
+                    })
+                    if (select && !this.multiple) {
+                        const label = this.defaultValue?.[this.defaultProps.label] ?? ''
+                        if (select.states) select.states.selectedLabel = label
+                        else select.selectedLabel = label
+                    }
+                })
+            },
 			//表格勾选事件
 			select(rows, row){
 				var isSelect = rows.length && rows.indexOf(row) !== -1

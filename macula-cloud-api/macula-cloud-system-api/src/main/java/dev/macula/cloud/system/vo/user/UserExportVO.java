@@ -22,7 +22,7 @@ import com.alibaba.excel.annotation.format.DateTimeFormat;
 import com.alibaba.excel.annotation.write.style.ColumnWidth;
 import lombok.Data;
 
-import java.time.LocalDateTime;
+import java.util.Date;
 
 /**
  * 用户导出视图对象
@@ -54,6 +54,6 @@ public class UserExportVO {
 
     @ExcelProperty(value = "创建时间")
     @DateTimeFormat("yyyy/MM/dd HH:mm:ss")
-    private LocalDateTime createTime;
+    private Date createTime;
 
 }

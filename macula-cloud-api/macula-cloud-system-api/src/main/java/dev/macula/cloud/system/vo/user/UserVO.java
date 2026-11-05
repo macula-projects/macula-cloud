@@ -17,12 +17,11 @@
 
 package dev.macula.cloud.system.vo.user;
 
-import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
-import java.time.LocalDateTime;
+import java.util.Date;
 
 /**
  * 用户分页视图对象
@@ -66,7 +65,6 @@ public class UserVO {
     private String roleNames;
 
     @Schema(description = "创建时间")
-    @JsonFormat(pattern = "yyyy-MM-dd")
-    private LocalDateTime createTime;
+    private Date createTime;
 
 }

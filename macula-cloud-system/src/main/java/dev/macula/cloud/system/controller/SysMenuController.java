@@ -20,7 +20,8 @@ package dev.macula.cloud.system.controller;
 import dev.macula.boot.result.Option;
 import dev.macula.boot.starter.auditlog.annotation.AuditLog;
 import dev.macula.cloud.system.form.MenuForm;
-import dev.macula.cloud.system.pojo.entity.SysMenu;
+import dev.macula.cloud.system.converter.MenuConverter;
+import dev.macula.cloud.system.vo.menu.MenuDetailVO;
 import dev.macula.cloud.system.query.MenuQuery;
 import dev.macula.cloud.system.service.SysMenuService;
 import dev.macula.cloud.system.service.SysPermissionService;
@@ -57,6 +58,7 @@ import java.util.List;
 @Slf4j
 public class SysMenuController {
     private final SysMenuService menuService;
+    private final MenuConverter menuConverter;
 
     private final SysPermissionService permissionService;
 
@@ -90,18 +92,20 @@ public class SysMenuController {
         return menuService.listRoutes();
     }
 
+    /** 读取菜单详情，使用Date接口模型返回审计时间。 */
     @Operation(summary = "菜单详情")
     @Parameter(name = "菜单ID")
     @GetMapping("/{id}")
-    public SysMenu detail(@PathVariable Long id) {
-        return menuService.getById(id);
+    public MenuDetailVO detail(@PathVariable Long id) {
+        return menuConverter.entity2Detail(menuService.getById(id));
     }
 
+    /** 通过业务表单创建菜单，数据库审计字段由服务端维护。 */
     @Operation(summary = "新增菜单")
     @AuditLog(title = "新增菜单")
     @PostMapping
-    public boolean addMenu(@RequestBody SysMenu sysMenu) {
-        return menuService.saveMenu(sysMenu);
+    public boolean addMenu(@RequestBody MenuForm form) {
+        return menuService.saveMenu(menuConverter.form2Entity(form));
     }
 
     @Operation(summary = "修改菜单")

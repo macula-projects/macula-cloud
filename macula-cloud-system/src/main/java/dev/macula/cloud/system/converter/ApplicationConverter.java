@@ -22,6 +22,7 @@ import dev.macula.cloud.system.form.ApplicationForm;
 import dev.macula.cloud.system.pojo.bo.ApplicationBO;
 import dev.macula.cloud.system.pojo.entity.SysApplication;
 import dev.macula.cloud.system.vo.app.ApplicationVO;
+import dev.macula.boot.mapstruct.GlobalMapperConfig;
 import org.mapstruct.Mapper;
 
 /**
@@ -30,11 +31,11 @@ import org.mapstruct.Mapper;
  * @author Rain
  * @since 6.1.0
  */
-@Mapper
+@Mapper(config = GlobalMapperConfig.class)
 public interface ApplicationConverter {
-
+    /** 将应用表单映射为数据库实体，审计字段由服务端维护。 */
     SysApplication form2Entity(ApplicationForm appForm);
-
+    /** 将应用分页查询结果转换为Date接口模型。 */
     Page<ApplicationVO> bo2Vo(Page<ApplicationBO> bo);
 
 }

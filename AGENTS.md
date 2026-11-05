@@ -50,6 +50,9 @@ npm run lint
 - 通用框架能力应进入 Macula Boot；本仓库只承载可部署的平台服务、服务间 API 契约和对应管理端，避免复制 Starter 或框架基础设施。
 - `macula-cloud-api` 只放跨服务契约及必要模型、Feign 客户端和回退抽象，不放数据库访问、服务实现或运行时配置。
 - Controller 只处理协议适配、校验和服务编排；事务与业务规则放在 Service，数据访问留在 Mapper。延续 Query、Form、DTO、VO、BO、Entity 的现有语义，不直接把 Entity 暴露为新的远程契约。
+- 日期时间类型按对象职责选择：仅 Entity、BO 等直接与数据库层交互的对象，按数据库字段语义使用 `LocalDate`、`LocalTime`、`LocalDateTime`；其他 POJO（如 Form、DTO、VO、Query 及接口请求/响应对象）的时间点字段允许使用 `java.util.Date` 或 `java.time.Instant`，避免直接向接口暴露 `LocalDateTime`。已有 Date 接口无需为统一类型批量替换；Date 为毫秒精度，Instant 可保留纳秒，互转时注意精度损失。不要仅凭类名决定类型，应以对象是否参与数据库层映射为准。
+- 数据库层对象与接口 POJO 之间的日期时间映射，复用 Macula Boot 的公共 `DateTimeConverter` 和 Mapper 配置，避免在业务代码中重复编写时区转换；外部配置存储时区时使用配置值，未配置时使用 JVM 默认时区。
+- 接口时间点的 JSON 统一使用携带 `Z` 或时区偏移的 ISO 格式，不使用剥离时区的字段级格式注解；前端按当地时区展示，提交时保留时区信息。纯日期筛选、时长及 Excel 展示格式按各自业务语义处理。
 - 认证、授权、租户、网关路由、缓存权限规则属于跨服务安全契约。修改时必须检查 IAM、Gateway、System、System API 和管理端的调用链，默认拒绝不能确认授权的信息。
 - 配置按 `local`、`dev`、`stg`、`pet`、`prd` profile 管理。不得提交真实凭据、令牌、私钥或不可公开的环境地址；生产配置优先由环境变量或配置中心注入。
 - API、配置键、数据库结构、远程契约或管理端交互变化时，同步更新相关 README、SQL/迁移材料、调用方和测试。

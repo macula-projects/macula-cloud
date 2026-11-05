@@ -26,7 +26,7 @@ import dev.macula.cloud.system.pojo.bo.UserBO;
 import dev.macula.cloud.system.pojo.bo.UserFormBO;
 import dev.macula.cloud.system.pojo.entity.SysUser;
 import dev.macula.cloud.system.query.UserPageQuery;
-import dev.macula.cloud.system.vo.user.UserExportVO;
+import dev.macula.cloud.system.pojo.bo.UserExportBO;
 import org.apache.ibatis.annotations.Mapper;
 
 import java.util.List;
@@ -79,11 +79,11 @@ public interface SysUserMapper extends BaseMapper<SysUser> {
     UserAuthInfo getUserAuthInfo(Long tenantId, String username);
 
     /**
-     * 获取导出用户列表
+     * 获取导出用户数据库查询结果，日期时间在Service边界转换为接口Date。
      *
      * @param queryParams 查询条件
      * @return 用户导出列表
      */
     @DataPermission(deptAlias = "u")
-    List<UserExportVO> listExportUsers(UserPageQuery queryParams);
+    List<UserExportBO> listExportUsers(UserPageQuery queryParams);
 }

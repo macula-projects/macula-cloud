@@ -28,12 +28,22 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.Parameters;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 import jakarta.validation.Valid;
 
 /**
- * 应用控制器
+ * 应用控制器，凭据缓存由业务事务提交后维护。
+ * @author Rain
+ * @since 6.1.0
  */
 @Tag(name = "应用接口", description = "应用接口")
 @RestController
@@ -53,22 +63,14 @@ public class SysApplicationController {
     @AuditLog(title = "新增应用")
     @PostMapping
     public boolean saveApplication(@Valid @RequestBody ApplicationForm formData) {
-        boolean result = applicationService.saveApplication(formData);
-        if (result) {
-            applicationService.refreshApplicationCache();
-        }
-        return result;
+        return applicationService.saveApplication(formData);
     }
 
     @Operation(summary = "修改应用")
     @AuditLog(title = "修改应用")
     @PutMapping(value = "/{appId}")
     public boolean updateApplication(@PathVariable Long appId, @Valid @RequestBody ApplicationForm formData) {
-        boolean result = applicationService.updateApplication(appId, formData);
-        if (result) {
-            applicationService.refreshApplicationCache();
-        }
-        return result;
+        return applicationService.updateApplication(appId, formData);
     }
 
     @Operation(summary = "删除应用")
@@ -76,11 +78,7 @@ public class SysApplicationController {
     @Parameter(name = "应用ID，多个以英文逗号(,)分割")
     @DeleteMapping("/{ids}")
     public boolean deleteApplications(@PathVariable("ids") String ids) {
-        boolean result = applicationService.deleteApplications(ids);
-        if (result) {
-            applicationService.refreshApplicationCache();
-        }
-        return result;
+        return applicationService.deleteApplications(ids);
     }
 
     @Operation(summary = "添加维护人")

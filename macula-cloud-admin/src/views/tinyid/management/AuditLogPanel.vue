@@ -14,7 +14,7 @@
 			</el-table-column>
 			<el-table-column prop="errorSummary" label="错误摘要（已脱敏）" min-width="220" show-overflow-tooltip />
 			<el-table-column prop="clientIp" label="客户端 IP" width="150" />
-			<el-table-column prop="createTime" label="时间" width="180" />
+			<el-table-column :formatter="(row, column, value) => $TOOL.formatDateTime(value)" prop="createTime" label="时间" width="180" />
 		</el-table>
 		<el-pagination class="pagination" background layout="total, prev, pager, next" :total="total"
 			:page-size="pageSize" v-model:current-page="page" @current-change="load" />

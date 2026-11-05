@@ -17,13 +17,17 @@
 
 package dev.macula.cloud.system.vo.role;
 
-import com.fasterxml.jackson.annotation.JsonFormat;
 import dev.macula.boot.enums.DataScopeEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
-import java.time.LocalDateTime;
+import java.util.Date;
 
+/**
+ * 角色分页接口对象，审计时间统一使用Date时间点。
+ * @author Rain
+ * @since 6.1.0
+ */
 @Schema(description = "角色分页视图对象")
 @Data
 public class RolePageVO {
@@ -51,10 +55,6 @@ public class RolePageVO {
 
     @Schema(description = "角色数据范围")
     private DataScopeEnum dataScope;
-
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    private LocalDateTime createTime;
-
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    private LocalDateTime lastUpdateTime;
+    private Date createTime;
+    private Date lastUpdateTime;
 }

@@ -70,3 +70,19 @@ describe("application auth tenant", () => {
     }
   );
 });
+
+
+describe("application mobile validation", () => {
+  const rules = ApplicationSave.data.call({ $API: { system_user: { user: { list: {} } } } }).rules.mobile;
+  const pattern = rules.find(rule => rule.pattern).pattern;
+  it.each(["1222", "11", "1380013800", "138001380000", "11111111111", "15400138000"])(
+    "rejects invalid contact %s before submission", value => {
+      expect(pattern.test(value)).toBe(false);
+    }
+  );
+  it.each(["13800138000", "14500138000", "16600138000", "19900138000"])(
+    "accepts backend-supported mobile %s", value => {
+      expect(pattern.test(value)).toBe(true);
+    }
+  );
+});

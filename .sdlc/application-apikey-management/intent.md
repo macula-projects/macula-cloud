@@ -6,8 +6,8 @@ Macula Boot 网关已支持 API Key 与 HMAC 认证，但 Macula Cloud 应用管
 
 ## Proposed outcome
 - 应用列表增加 APIKEY 入口，按参考图提供应用级管理界面，支持多把 Key 的创建、脱敏列表、显示/隐藏、复制、备注维护和删除；展示创建时间，创建成功后可复制保存。
-- 一个应用允许创建多把 API Key，每把 Key 可独立维护备注及允许访问的 URL（permitUrl）。
-- API Key 缓存的新增与更新采用相同规则：优先使用该 Key 自己配置的 permitUrl；未设置时使用所属应用的可访问路径。两个 URL 独立配置，不合并、不取交集。
+- 一个应用允许创建多把 API Key，每把 Key 可独立维护备注及允许访问的 URL（accessPath）。
+- API Key 缓存的新增与更新采用相同规则：优先使用该 Key 自己配置的 accessPath；未设置时使用所属应用的可访问路径。两个 URL 独立配置，不合并、不取交集。
 - API Key 创建、修改、删除时维护相应网关缓存；删除 Key 或应用后，旧 Key 不能继续通过网关认证，服务重启后可恢复有效缓存。
 
 ## Affected users and systems
@@ -23,4 +23,4 @@ Macula Boot 网关已支持 API Key 与 HMAC 认证，但 Macula Cloud 应用管
 ## Open questions
 - 是否需要有效期、启停或轮换？当前需求及参考图未指定，暂不计入本轮确认范围。
 
-用户在确认多 Key 及新增、更新缓存统一使用 permitUrl 优先规则后回复“YES”，接受本需求。
+用户在确认多 Key 及新增、更新缓存统一使用 accessPath 优先规则后回复“YES”，接受本需求。

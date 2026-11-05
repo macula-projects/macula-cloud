@@ -18,6 +18,7 @@
 package dev.macula.cloud.system.listener;
 
 import dev.macula.cloud.system.service.SysPermissionService;
+import dev.macula.cloud.system.service.ApplicationCredentialCacheService;
 import dev.macula.cloud.system.service.SysTenantService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,11 +38,14 @@ import org.springframework.stereotype.Component;
 public class ApplicationListener {
     private final SysPermissionService sysPermissionService;
     private final SysTenantService sysTenantService;
+    private final ApplicationCredentialCacheService credentialCache;
 
     @EventListener(ApplicationStartedEvent.class)
     public void onStarted(ApplicationStartedEvent event) {
         sysTenantService.refreshTenantCache();
         log.info("Tenant code mappings refreshed");
+        credentialCache.rebuild();
+        log.info("Application credential caches refreshed");
         sysPermissionService.refreshPermRolesRules();
         log.info("Url permission and roles refreshed");
     }

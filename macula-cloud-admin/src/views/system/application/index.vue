@@ -21,12 +21,13 @@
 				<el-table-column label="可访问路径" prop="accessPath" width="370"></el-table-column>
 				<el-table-column label="负责人" prop="manager" width="120"></el-table-column>
 				<el-table-column label="联系方式" prop="mobile" width="150"></el-table-column>
-				<el-table-column label="创建时间" prop="createTime" width="170"></el-table-column>
-				<el-table-column label="操作" fixed="right" align="right" width="300">
+				<el-table-column :formatter="(row, column, value) => $TOOL.formatDateTime(value)" label="创建时间" prop="createTime" width="170"></el-table-column>
+				<el-table-column label="操作" fixed="right" align="right" width="380">
 					<template #default="scope">
 						<el-button-group>
 							<el-button text type="primary" size="small" @click="table_show(scope.row, scope.$index)">查看维护人</el-button>
 							<el-button text type="primary" size="small" @click="table_add_maintainer(scope.row, scope.$index)">添加维护人</el-button>
+							<el-button text type="primary" size="small" @click="table_api_keys(scope.row)">APIKEY</el-button>
 							<el-button text type="primary" size="small" @click="table_edit(scope.row, scope.$index)">编辑</el-button>
 							<el-popconfirm title="确定删除吗？" @confirm="table_del(scope.row, scope.$index)">
 								<template #reference>
@@ -39,6 +40,7 @@
 			</scTable>
 		</el-main>
 	</el-container>
+	<api-keys v-if="dialog.apiKeys" ref="apiKeys" @closed="dialog.apiKeys=false" />
 	<save-dialog v-if="dialog.save" ref="saveDialog" @success="handleSuccess" @closed="dialog.save=false"></save-dialog>
 	<list-dialog v-if="dialog.list" ref="listDialog" @success="handleSuccess" @closed="dialog.list=false"></list-dialog>
 	<show-dialog v-if="dialog.show" ref="showDialog" @success="handleSuccess" @closed="dialog.show=false"></show-dialog>
@@ -47,6 +49,7 @@
 
 <script>
 import { ElMessage, ElMessageBox } from 'element-plus'
+	import apiKeys from './apiKeys.vue'
 	import saveDialog from './save'
 	import listDialog from './addMaintainer'
 	import showDialog from './showMaintainer'
@@ -54,6 +57,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 	export default {
 		name: 'SystemApplicationPage',
 		components: {
+			apiKeys,
 			saveDialog,
 			listDialog,
 			showDialog
@@ -62,6 +66,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 			return {
 				dialog: {
 					save: false,
+					apiKeys: false,
 					list: false,
 					show: false,
 				},
@@ -73,6 +78,11 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 			}
 		},
 		methods: {
+			// 打开当前应用的 API Key 管理抽屉。
+			table_api_keys(row) {
+				this.dialog.apiKeys = true
+				this.$nextTick(() => this.$refs.apiKeys.open(row))
+			},
 			//添加
 			add(){
 				this.dialog.save = true

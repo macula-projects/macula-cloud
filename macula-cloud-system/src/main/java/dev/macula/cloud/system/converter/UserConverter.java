@@ -20,11 +20,15 @@ package dev.macula.cloud.system.converter;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import dev.macula.cloud.system.form.UserForm;
 import dev.macula.cloud.system.pojo.bo.UserBO;
+import dev.macula.cloud.system.pojo.bo.UserExportBO;
+import dev.macula.cloud.system.vo.user.UserExportVO;
+import java.util.List;
 import dev.macula.cloud.system.pojo.bo.UserFormBO;
 import dev.macula.cloud.system.pojo.entity.SysUser;
 import dev.macula.cloud.system.vo.user.UserLoginVO;
 import dev.macula.cloud.system.vo.user.UserVO;
 import org.mapstruct.InheritInverseConfiguration;
+import dev.macula.boot.mapstruct.GlobalMapperConfig;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.Mappings;
@@ -35,20 +39,25 @@ import org.mapstruct.Mappings;
  * @author haoxr
  * @since 2022/6/8
  */
-@Mapper
+@Mapper(config = GlobalMapperConfig.class)
 public interface UserConverter {
 
+    /** 转换用户展示模型，同时解析性别标签和审计时间。 */
     @Mappings({@Mapping(target = "genderLabel",
         expression = "java(dev.macula.boot.base.IBaseEnum.getLabelByValue(po.getGender(), dev.macula.boot.enums.GenderEnum.class))")})
     UserVO po2Vo(UserBO po);
-
+    /** 将数据库用户查询分页转换为接口分页。 */
     Page<UserVO> bo2Vo(Page<UserBO> po);
-
+    /** 将用户编辑查询结果转换为表单。 */
     UserForm bo2Form(UserFormBO po);
 
+    /** 将用户表单映射为数据库实体。 */
     @InheritInverseConfiguration(name = "entity2Form")
     SysUser form2Entity(UserForm entity);
 
+    /** 将用户实体转换为登录信息，不增加数据库字段。 */
     @Mappings({@Mapping(target = "userId", source = "id")})
     UserLoginVO entity2LoginUser(SysUser entity);
+    /** 将数据库导出查询结果转换为Date导出模型，复用公共存储时区。 */
+    List<UserExportVO> toExportVOs(List<UserExportBO> source);
 }

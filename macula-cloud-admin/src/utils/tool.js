@@ -211,6 +211,12 @@ tool.dateFormat = function (date, fmt='yyyy-MM-dd hh:mm:ss') {
 	return fmt;
 }
 
+/** 将接口ISO时间转换为浏览器当地时间；空值或非法值显示占位符。 */
+tool.formatDateTime = function (value) {
+    if (value == null || value === '' || Number.isNaN(new Date(value).getTime())) return '—';
+    return tool.dateFormat(value);
+}
+
 /* 千分符 */
 tool.groupSeparator = function (num) {
 	num = num + '';

@@ -42,7 +42,7 @@
 						<el-table-column prop="remainder" label="remainder（只读）" width="160" />
 						<el-table-column prop="maxId" label="max_id" min-width="130" />
 						<el-table-column prop="version" label="version" width="100" />
-						<el-table-column prop="updateTime" label="更新时间" min-width="180" />
+						<el-table-column :formatter="(row, column, value) => $TOOL.formatDateTime(value)" prop="updateTime" label="更新时间" min-width="180" />
 					</el-table>
 				</template>
 			</el-table-column>

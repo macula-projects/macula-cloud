@@ -71,6 +71,10 @@ cp deploy/.env.example deploy/.env
 
 Compose 固定激活 `docker` profile，并显式传入每个应用的 `SERVER_PORT`。数据库地址和库名由模块配置维护；System、IAM、TinyID、Seata、SnailJob 的 MySQL 账号密码使用 `MYSQL_APP_USER`、`MYSQL_APP_PASSWORD`，Compose 从 `deploy/.env` 注入，并与 MySQL 初始化账号保持一致。
 
+应用容器统一设置 `TZ=Asia/Shanghai` 和 JVM 参数 `-Duser.timezone=Asia/Shanghai`，与本地 MySQL 和 JDBC 的时区保持一致。共享环境会保留外部 `JAVA_TOOL_OPTIONS` 并追加时区参数；不要在 `JAVA_OPTS` 中再指定冲突的 `user.timezone`。暂不配置 `macula.time.storage-zone`，日期转换器使用 JVM 默认时区；System、TinyID 的 JSON 仍输出 UTC ISO 时间，前端按用户当地时区显示。IDE 启动时也应使用相同 JVM 时区参数。
+
+该配置在容器重建后生效，不会转换已有 DATETIME 数据；调整已有环境前须确认历史数据的写入时区。
+
 完整容器模式还要求配置以下两个相互独立的密钥：
 
 - `MACULA_CRYPTO_PASSWORD`：System 与 IAM 共享的 16/24/32 字符字段加密密钥。

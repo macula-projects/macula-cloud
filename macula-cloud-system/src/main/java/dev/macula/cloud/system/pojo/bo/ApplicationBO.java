@@ -17,12 +17,11 @@
 
 package dev.macula.cloud.system.pojo.bo;
 
-import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Data;
 import tools.jackson.databind.annotation.JsonSerialize;
 import tools.jackson.databind.ser.std.ToStringSerializer;
 
-import java.util.Date;
+import java.time.LocalDateTime;
 
 /**
  * 应用业务对象
@@ -82,8 +81,7 @@ public class ApplicationBO {
     /**
      * 创建时间
      */
-    @JsonFormat(pattern = "yyyy-MM-dd")
-    private Date createTime;
+    private LocalDateTime createTime;
 
     /**
      * 是否回传属性

@@ -25,6 +25,7 @@ import dev.macula.cloud.tinyid.pojo.vo.TinyIdAuditLogVO;
 import dev.macula.cloud.tinyid.pojo.vo.TinyIdBusinessAggregateVO;
 import dev.macula.cloud.tinyid.pojo.vo.TinyIdBusinessVO;
 import dev.macula.cloud.tinyid.pojo.vo.TinyIdDataSourceVO;
+import dev.macula.boot.mapstruct.GlobalMapperConfig;
 import org.mapstruct.Mapper;
 
 import java.util.List;
@@ -35,7 +36,7 @@ import java.util.List;
  * @author Rain
  * @since 6.1.0
  */
-@Mapper(componentModel = "spring")
+@Mapper(config = GlobalMapperConfig.class)
 public interface TinyIdManagementConverter {
 
     /**

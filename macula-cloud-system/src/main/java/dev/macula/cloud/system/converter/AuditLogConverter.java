@@ -20,11 +20,17 @@ package dev.macula.cloud.system.converter;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import dev.macula.cloud.system.pojo.bo.AuditLogBO;
 import dev.macula.cloud.system.vo.log.AuditLogVO;
+import dev.macula.boot.mapstruct.GlobalMapperConfig;
 import org.mapstruct.Mapper;
 
-@Mapper
+/**
+ * 转换数据库查询对象与接口对象，统一使用公共日期时区规则。
+ * @author Rain
+ * @since 6.1.0
+ */
+@Mapper(config = GlobalMapperConfig.class)
 public interface AuditLogConverter {
-
+    /** 将审计日志查询分页转换为Date接口分页。 */
     Page<AuditLogVO> bo2Vo(Page<AuditLogBO> bo);
 
 }

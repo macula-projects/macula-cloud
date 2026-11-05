@@ -17,7 +17,6 @@
 
 package dev.macula.cloud.system.service.impl;
 
-import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.collection.CollectionUtil;
 import cn.hutool.core.lang.Validator;
 import cn.hutool.core.util.StrUtil;
@@ -36,7 +35,11 @@ import dev.macula.cloud.system.vo.dept.DeptVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Optional;
+import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -51,6 +54,7 @@ public class SysDeptServiceImpl extends ServiceImpl<SysDeptMapper, SysDept> impl
 
     private final DeptConverter deptConverter;
 
+    /** 查询部门层级，树形和孤立节点分支均使用公共日期时区转换。 */
     @Override
     public List<DeptVO> listDepartments(DeptQuery queryParams) {
         // 查询参数
@@ -80,11 +84,8 @@ public class SysDeptServiceImpl extends ServiceImpl<SysDeptMapper, SysDept> impl
 
         //  列表为空说明所有的节点都是独立的
         if (list.isEmpty()) {
-            return deptList.stream().map(item -> {
-                DeptVO deptVO = new DeptVO();
-                BeanUtil.copyProperties(item, deptVO);
-                return deptVO;
-            }).collect(Collectors.toList());
+            // 兜底分支同样走Mapper，不能让通用Bean复制绕过存储时区配置。
+            return deptList.stream().map(deptConverter::entity2Vo).collect(Collectors.toList());
         }
 
         return list;

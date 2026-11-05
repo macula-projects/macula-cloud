@@ -2,12 +2,12 @@
 Status: accepted
 
 ## Source intent
-[intent.md](intent.md) 已接受：应用支持多把 API Key，新增及更新缓存均使用 Key permitUrl 优先、应用 URL 兜底的规则。
+[intent.md](intent.md) 已接受：应用支持多把 API Key，新增及更新缓存均使用 Key accessPath 优先、应用 URL 兜底的规则。
 
 ## Requirements
-1. 应用列表增加 APIKEY 入口，以抽屉提供分页列表、创建、默认脱敏、显示/隐藏、复制、编辑备注及 permitUrl、删除和创建时间展示。
+1. 应用列表增加 APIKEY 入口，以抽屉提供分页列表、创建、默认脱敏、显示/隐藏、复制、编辑备注及 accessPath、删除和创建时间展示。
 2. 一个应用支持多把 Key；服务端生成随机 sk- 凭据，创建后不可改写凭据或所属应用。
-3. 两个 URL 独立存储；新增、更新及重建缓存统一优先取 Key 的非空 permitUrl，否则取应用 accessPath，不合并、不取交集。
+3. 两个 URL 独立存储；新增、更新及重建缓存统一优先取 Key 的非空 accessPath，否则取应用 accessPath，不合并、不取交集。
 4. 所有操作校验应用管理权限、归属租户及 Key 所属应用；列表不返回完整 Key，创建和单独查看响应禁止缓存；日志、审计不保存完整 Key。
 5. 事务成功后维护缓存，回滚不发布缓存；删除 Key 或应用后撤销相应凭据，启动可重建有效缓存，并发重建不得复活已删除 Key。
 
@@ -21,12 +21,12 @@ Admin 复用 Element Plus 实现管理抽屉、编辑表单及创建成功弹窗
 
 使用 SecureRandom 生成至少 256 位熵的 sk- 凭据并建立唯一索引。为支持再次显示及缓存重建，服务端需可恢复保存凭据，沿用现有应用密钥存储边界。
 
-集中维护缓存字段组装；新增、更新、重建共用 URL 优先规则。参考现有租户缓存 afterCommit/刷新锁模式，串行化 Key 更新、撤销和重建，提交后读取数据库；Redis 失败明确报告并允许重试或重建。应用原有缓存刷新如需维护其 Key，也复用相同规则，不修改 Key 的 permitUrl。
+集中维护缓存字段组装；新增、更新、重建共用 URL 优先规则。参考现有租户缓存 afterCommit/刷新锁模式，串行化 Key 更新、撤销和重建，提交后读取数据库；Redis 失败明确报告并允许重试或重建。应用原有缓存刷新如需维护其 Key，也复用相同规则，不修改 Key 的 accessPath。
 
 ## Data and interfaces
-- 新增 Flyway V13 和 sys_application_apikey_tenant 表，保存应用关联、租户、唯一凭据、备注、permit_url、审计和逻辑删除字段，沿用既有基表约定；不回填历史 Key。
+- 新增 Flyway V13 和 sys_application_apikey_tenant 表，保存应用关联、租户、唯一凭据、备注、access_path、审计和逻辑删除字段，沿用既有基表约定；不回填历史 Key。
 - GET/POST /api/v1/app/{appId}/api-keys：分页脱敏列表、创建。
-- PUT/DELETE /api/v1/app/{appId}/api-keys/{keyId}：更新备注及 permitUrl、删除。空 permitUrl 表示未单独配置。
+- PUT/DELETE /api/v1/app/{appId}/api-keys/{keyId}：更新备注及 accessPath、删除。空 accessPath 表示未单独配置。
 - GET /api/v1/app/{appId}/api-keys/{keyId}/secret：授权查看。创建和查看响应设置 Cache-Control: no-store，关闭敏感响应审计。
 - Redis Hash 使用 APIKEY_CACHE_PREFIX + 完整 Key，写入现有 applicationCode、applicationId、tenantId、authTenantId、permitUrls 字符串字段；认证租户按应用配置，空则回退归属租户。
 - URL 使用网关既有逗号分隔 METHOD:/path Ant 模式；两处均为空沿用网关既有“不限制应用 URL”行为。删除认证 Hash 后网关即拒绝旧 Key，无需清理共享 JWT 缓存。
