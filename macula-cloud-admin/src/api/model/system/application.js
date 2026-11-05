@@ -1,7 +1,16 @@
 import config from "@/config"
 import http from "@/utils/request"
 
+const keyUrl = appId => `${config.API_URL}/${config.MODEL.system}/api/v1/app/${appId}/api-keys`
+
 export default {
+    apiKeys: {
+        list: (appId, params) => http.get(keyUrl(appId), params),
+        create: (appId, data) => http.post(keyUrl(appId), data),
+        update: (appId, keyId, data) => http.put(`${keyUrl(appId)}/${keyId}`, data),
+        remove: (appId, keyId) => http.delete(`${keyUrl(appId)}/${keyId}`),
+        secret: (appId, keyId) => http.get(`${keyUrl(appId)}/${keyId}/secret`)
+    },
 	application: {
 		listPages: {
             url: `${config.API_URL}/${config.MODEL.system}/api/v1/app`,

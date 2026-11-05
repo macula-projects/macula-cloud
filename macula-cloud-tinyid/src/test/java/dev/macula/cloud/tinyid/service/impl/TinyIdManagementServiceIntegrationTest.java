@@ -26,6 +26,8 @@ import org.flywaydb.core.Flyway;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.junit.jupiter.api.Test;
 import org.mapstruct.factory.Mappers;
+import dev.macula.boot.mapstruct.DateTimeConverter;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.mybatis.spring.SqlSessionTemplate;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -50,7 +52,6 @@ import java.util.function.Predicate;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Exercises aggregate business writes and compensation on two MySQL databases.
@@ -268,10 +269,13 @@ class TinyIdManagementServiceIntegrationTest {
             registerMapper(factory, TinyIdInfoMapper.class);
             registerMapper(factory, TinyIdAuditLogMapper.class);
             SqlSessionTemplate template = new SqlSessionTemplate(factory);
+            TinyIdManagementConverter converter = Mappers.getMapper(TinyIdManagementConverter.class);
+            DateTimeConverter dates = new DateTimeConverter(null);
+            ReflectionTestUtils.setField(converter, "dateTimeConverter", dates);
             return new TinyIdManagementServiceImpl(template.getMapper(TinyIdInfoMapper.class),
                 template.getMapper(TinyIdAuditLogMapper.class),
                 routingDataSource,
-                Mappers.getMapper(TinyIdManagementConverter.class));
+                converter, dates);
         } catch (Exception ex) {
             throw new IllegalStateException("Unable to create TinyID MyBatis integration test fixture", ex);
         }

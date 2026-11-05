@@ -360,9 +360,10 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
 
     }
 
+    /** 查询保留数据库日期时间的BO，再按公共存储时区转换为导出Date。 */
     @Override
     public List<UserExportVO> listExportUsers(UserPageQuery queryParams) {
-        return this.baseMapper.listExportUsers(queryParams);
+        return userConverter.toExportVOs(this.baseMapper.listExportUsers(queryParams));
     }
 
     @Override

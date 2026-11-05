@@ -47,7 +47,7 @@
 						<el-tag v-if="scope.row.status==0" type="danger">停用</el-tag>
 					</template>
 				</el-table-column>
-				<el-table-column label="创建时间" prop="createTime" width="180"></el-table-column>
+				<el-table-column :formatter="(row, column, value) => $TOOL.formatDateTime(value)" label="创建时间" prop="createTime" width="180"></el-table-column>
 				<el-table-column label="操作" fixed="right" align="right" width="170">
 					<template #default="scope">
 						<el-button-group>

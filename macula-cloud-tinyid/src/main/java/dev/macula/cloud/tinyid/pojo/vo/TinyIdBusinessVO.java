@@ -18,7 +18,7 @@ package dev.macula.cloud.tinyid.pojo.vo;
 
 import lombok.Data;
 
-import java.time.LocalDateTime;
+import java.util.Date;
 
 /**
  * Read-only TinyID business configuration from one physical data source.
@@ -51,7 +51,7 @@ public class TinyIdBusinessVO {
     /** 乐观锁版本号。 */
     private Long version;
     /** 业务配置创建时间。 */
-    private LocalDateTime createTime;
+    private Date createTime;
     /** 业务配置最后更新时间。 */
-    private LocalDateTime updateTime;
+    private Date updateTime;
 }

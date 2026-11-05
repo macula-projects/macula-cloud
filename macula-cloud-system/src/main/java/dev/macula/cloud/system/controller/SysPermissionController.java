@@ -22,6 +22,9 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import dev.macula.boot.result.Option;
 import dev.macula.boot.starter.auditlog.annotation.AuditLog;
 import dev.macula.cloud.system.form.PermissionValidtorForm;
+import dev.macula.cloud.system.form.PermissionForm;
+import dev.macula.cloud.system.converter.PermissionConverter;
+import dev.macula.cloud.system.vo.perm.PermissionVO;
 import dev.macula.cloud.system.pojo.entity.SysPermission;
 import dev.macula.cloud.system.query.PermPageQuery;
 import dev.macula.cloud.system.service.SysPermissionService;
@@ -32,10 +35,23 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
+/**
+ * 权限接口协议适配，使用独立表单和VO隔离数据库实体。
+ * @author Rain
+ * @since 6.1.0
+ */
 @Tag(name = "权限接口")
 @RestController
 @RequestMapping("/api/v1/permissions")
@@ -43,6 +59,7 @@ import java.util.List;
 public class SysPermissionController {
 
     private final SysPermissionService sysPermissionService;
+    private final PermissionConverter permissionConverter;
 
     @Operation(summary = "权限分页列表")
     @GetMapping("/page")
@@ -50,33 +67,40 @@ public class SysPermissionController {
         return sysPermissionService.listPermPages(permPageQuery);
     }
 
+    /** 读取权限列表并转换审计日期时间。 */
     @Operation(summary = "权限列表")
     @Parameter(name = "菜单ID")
     @GetMapping
-    public List<SysPermission> listPermissions(@RequestParam(required = false) Long menuId) {
-        return sysPermissionService.list(
-            new LambdaQueryWrapper<SysPermission>().eq(menuId != null, SysPermission::getMenuId, menuId));
+    public List<PermissionVO> listPermissions(@RequestParam(required = false) Long menuId) {
+        return permissionConverter.entities2VOs(sysPermissionService.list(
+            new LambdaQueryWrapper<SysPermission>().eq(menuId != null, SysPermission::getMenuId, menuId)));
     }
 
+    /** 读取权限详情，不直接序列化数据库实体。 */
     @Operation(summary = "权限详情")
     @Parameter(name = "权限ID")
     @GetMapping("/{permissionId}")
-    public SysPermission getPermissionDetail(@PathVariable Long permissionId) {
-        return sysPermissionService.getById(permissionId);
+    public PermissionVO getPermissionDetail(@PathVariable Long permissionId) {
+        return permissionConverter.entity2VO(sysPermissionService.getById(permissionId));
     }
 
+    /** 通过权限业务表单创建记录，忽略客户端审计字段。 */
     @Operation(summary = "新增权限")
     @AuditLog(title = "新增权限")
     @PostMapping
-    public boolean addPerm(@RequestBody SysPermission permission) {
-        return sysPermissionService.save(permission);
+    public boolean addPerm(@RequestBody PermissionForm form) {
+        return sysPermissionService.save(permissionConverter.form2Entity(form));
     }
 
+    /** 按路径ID更新权限业务字段，审计字段由服务端维护。 */
     @Operation(summary = "修改权限")
     @AuditLog(title = "修改权限")
     @Parameter(name = "权限ID")
     @PutMapping(value = "/{permissionId}")
-    public boolean updatePerm(@PathVariable Long permissionId, @RequestBody SysPermission permission) {
+    public boolean updatePerm(@PathVariable Long permissionId, @RequestBody PermissionForm form) {
+        SysPermission permission = permissionConverter.form2Entity(form);
+        // 路径决定更新目标，客户端不能通过表单ID改变本次操作对象。
+        permission.setId(permissionId);
         boolean result = sysPermissionService.updateById(permission);
         if (result) {
             sysPermissionService.refreshPermRolesRules();

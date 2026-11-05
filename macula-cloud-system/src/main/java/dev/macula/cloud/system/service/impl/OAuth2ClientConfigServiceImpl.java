@@ -53,6 +53,7 @@ import tools.jackson.databind.json.JsonMapper;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.time.Instant;
+import java.util.Date;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -548,7 +549,8 @@ public class OAuth2ClientConfigServiceImpl implements OAuth2ClientConfigService 
     }
 
     private OAuth2ClientVO toVO(SysOAuth2ClientConfig e) {
-        return new OAuth2ClientVO(e.getId(), e.getClientId(), e.getClientName(), e.getClientIdIssuedAt(),
+        return new OAuth2ClientVO(e.getId(), e.getClientId(), e.getClientName(),
+            e.getClientIdIssuedAt() == null ? null : Date.from(e.getClientIdIssuedAt()),
             e.getClientAuthenticationMethods(), e.getAuthorizationGrantTypes(), e.getRedirectUris(), e.getScopes(),
             csv(e.getExternalCodeTypes()), csv(e.getAllowedOrigins()), externalProviderBindings(e.getClientId()),
             csv(e.getBrowserLoginProviderTypes()), e.getDirectLoginProviderType(),

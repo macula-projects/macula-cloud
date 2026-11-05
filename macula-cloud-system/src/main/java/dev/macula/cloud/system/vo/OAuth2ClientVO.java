@@ -20,7 +20,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.Instant;
+import java.util.Date;
 import java.util.Map;
 import java.util.Set;
 
@@ -37,7 +37,7 @@ public class OAuth2ClientVO {
     private Long id;
     private String clientId;
     private String clientName;
-    private Instant clientIdIssuedAt;
+    private Date clientIdIssuedAt;
     private String clientAuthenticationMethods;
     private String authorizationGrantTypes;
     private String redirectUris;

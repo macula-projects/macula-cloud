@@ -23,21 +23,34 @@ import dev.macula.cloud.tinyid.config.DynamicDataSource;
 import dev.macula.cloud.tinyid.converter.TinyIdManagementConverter;
 import dev.macula.cloud.tinyid.mapper.TinyIdAuditLogMapper;
 import dev.macula.cloud.tinyid.mapper.TinyIdInfoMapper;
-import dev.macula.cloud.tinyid.pojo.bo.*;
+import dev.macula.cloud.tinyid.pojo.bo.TinyIdAuditLogBO;
+import dev.macula.cloud.tinyid.pojo.bo.TinyIdBusinessAggregateBO;
+import dev.macula.cloud.tinyid.pojo.bo.TinyIdBusinessBO;
+import dev.macula.cloud.tinyid.pojo.bo.TinyIdDataSourceBO;
 import dev.macula.cloud.tinyid.pojo.entity.TinyIdAuditLog;
 import dev.macula.cloud.tinyid.pojo.entity.TinyIdInfo;
 import dev.macula.cloud.tinyid.pojo.form.CreateBusinessForm;
 import dev.macula.cloud.tinyid.pojo.query.AuditLogPageQuery;
 import dev.macula.cloud.tinyid.pojo.query.BusinessPageQuery;
-import dev.macula.cloud.tinyid.pojo.vo.*;
+import dev.macula.cloud.tinyid.pojo.vo.TinyIdAuditLogVO;
+import dev.macula.cloud.tinyid.pojo.vo.TinyIdBusinessAggregateVO;
+import dev.macula.cloud.tinyid.pojo.vo.TinyIdBusinessConsistencyVO;
+import dev.macula.cloud.tinyid.pojo.vo.TinyIdDataSourceVO;
 import dev.macula.cloud.tinyid.service.TinyIdManagementService;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import java.time.LocalDateTime;
-import java.time.ZoneId;
-import java.util.*;
+import dev.macula.boot.mapstruct.DateTimeConverter;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Date;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.function.BiConsumer;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -62,6 +75,8 @@ public class TinyIdManagementServiceImpl implements TinyIdManagementService {
     private final TransactionTemplate transactionTemplate;
     /** 管理领域对象到对外视图对象的转换器。 */
     private final TinyIdManagementConverter converter;
+    /** 数据库旧日期与本地日期时间共用的时区转换规则。 */
+    private final DateTimeConverter dateTimeConverter;
 
     /**
      * 创建 TinyID 管理服务。
@@ -70,15 +85,17 @@ public class TinyIdManagementServiceImpl implements TinyIdManagementService {
      * @param auditLogMapper    管理审计日志 Mapper
      * @param routingDataSource 动态路由数据源
      * @param converter         管理领域对象转换器
+     * @param dateTimeConverter 公共日期时间转换器
      */
     public TinyIdManagementServiceImpl(TinyIdInfoMapper infoMapper,
         TinyIdAuditLogMapper auditLogMapper, DynamicDataSource routingDataSource,
-        TinyIdManagementConverter converter) {
+        TinyIdManagementConverter converter, DateTimeConverter dateTimeConverter) {
         this.infoMapper = infoMapper;
         this.auditLogMapper = auditLogMapper;
         this.routingDataSource = routingDataSource;
         this.transactionTemplate = new TransactionTemplate(new DataSourceTransactionManager(routingDataSource));
         this.converter = converter;
+        this.dateTimeConverter = dateTimeConverter;
     }
 
     /** {@inheritDoc} */
@@ -476,8 +493,8 @@ public class TinyIdManagementServiceImpl implements TinyIdManagementService {
         business.setDelta(entity.getDelta());
         business.setRemainder(entity.getRemainder());
         business.setVersion(entity.getVersion());
-        business.setCreateTime(toLocalDateTime(entity.getCreateTime()));
-        business.setUpdateTime(toLocalDateTime(entity.getUpdateTime()));
+        business.setCreateTime(dateTimeConverter.toLocalDateTime(entity.getCreateTime()));
+        business.setUpdateTime(dateTimeConverter.toLocalDateTime(entity.getUpdateTime()));
         return business;
     }
 
@@ -499,16 +516,6 @@ public class TinyIdManagementServiceImpl implements TinyIdManagementService {
         auditLog.setClientIp(entity.getClientIp());
         auditLog.setCreateTime(entity.getCreateTime());
         return auditLog;
-    }
-
-    /**
-     * 将旧版日期转换为本地日期时间。
-     *
-     * @param value 日期值
-     * @return 本地日期时间，输入为空时返回 {@code null}
-     */
-    private LocalDateTime toLocalDateTime(Date value) {
-        return value == null ? null : LocalDateTime.ofInstant(value.toInstant(), ZoneId.systemDefault());
     }
 
     /**

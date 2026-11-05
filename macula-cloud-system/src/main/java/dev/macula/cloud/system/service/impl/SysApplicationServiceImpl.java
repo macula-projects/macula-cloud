@@ -28,12 +28,15 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.Objects;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
-import dev.macula.boot.constants.CacheConstants;
-import dev.macula.boot.constants.GlobalConstants;
 import dev.macula.boot.context.TenantContextHolder;
+import dev.macula.boot.security.ResourceAccessException;
+import dev.macula.cloud.system.service.MenuRouteTenantContext;
 import dev.macula.cloud.system.converter.ApplicationConverter;
 import dev.macula.cloud.system.form.ApplicationForm;
 import dev.macula.cloud.system.mapper.SysApplicationMapper;
+import dev.macula.cloud.system.mapper.SysApplicationApiKeyMapper;
+import dev.macula.cloud.system.pojo.entity.SysApplicationApiKey;
+import dev.macula.cloud.system.service.ApplicationCredentialCacheService;
 import dev.macula.cloud.system.pojo.bo.ApplicationBO;
 import dev.macula.cloud.system.pojo.entity.SysApplication;
 import dev.macula.cloud.system.pojo.entity.SysTenantInfo;
@@ -42,16 +45,12 @@ import dev.macula.cloud.system.service.SysApplicationService;
 import dev.macula.cloud.system.service.SysTenantService;
 import dev.macula.cloud.system.vo.app.ApplicationVO;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
+
 
 /**
  * 维护第三方应用、认证租户授权以及网关应用凭据缓存。
@@ -66,7 +65,9 @@ public class SysApplicationServiceImpl extends ServiceImpl<SysApplicationMapper,
 
     private final ApplicationConverter applicationConverter;
     private final SysTenantService tenantService;
-    private final RedisTemplate<String, Object> redisTemplate;
+    private final ApplicationCredentialCacheService credentialCache;
+    private final SysApplicationApiKeyMapper apiKeys;
+    private final MenuRouteTenantContext tenantContext;
 
     @Override
     public Page<ApplicationVO> listApplicationPages(ApplicationPageQuery queryParams) {
@@ -76,16 +77,22 @@ public class SysApplicationServiceImpl extends ServiceImpl<SysApplicationMapper,
     }
 
     @Override
+    @Transactional
     public boolean saveApplication(ApplicationForm appForm) {
         Long ownerTenantId = currentTenantId();
         validateAuthTenant(appForm, ownerTenantId);
         SysApplication sysApplication = applicationConverter.form2Entity(appForm);
-        return this.save(sysApplication);
+        boolean saved = this.save(sysApplication);
+        if (saved) {
+            credentialCache.afterCommit(ownerTenantId, sysApplication.getId(), null);
+        }
+        return saved;
     }
 
     @Override
+    @Transactional
     public boolean updateApplication(Long appId, ApplicationForm appForm) {
-        SysApplication existing = this.getById(appId);
+        SysApplication existing = apiKeys.lockApplication(appId, currentTenantId());
         if (existing == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "应用不存在或无权访问");
         }
@@ -97,16 +104,38 @@ public class SysApplicationServiceImpl extends ServiceImpl<SysApplicationMapper,
         if (appForm.isAuthTenantIdProvided()) {
             update.set(SysApplication::getAuthTenantId, appForm.getAuthTenantId());
         }
-        return this.update(sysApplication, update);
+        update.set(SysApplication::getAccessPath, appForm.getAccessPath());
+        boolean updated = this.update(sysApplication, update);
+        if (updated) {
+            credentialCache.afterCommit(existing.getTenantId(), appId, existing.getCode());
+        }
+        return updated;
     }
 
     @Override
     @Transactional
     public boolean deleteApplications(String idsStr) {
         Assert.isTrue(StrUtil.isNotBlank(idsStr), "删除的应用数据为空");
-        // 逻辑删除
-        List<Long> ids = Arrays.stream(idsStr.split(",")).map(Long::parseLong).collect(Collectors.toList());
-        return this.removeByIds(ids);
+        Long tenantId = currentTenantId();
+        if (tenantId == null) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无法确认当前租户");
+        }
+        List<Long> ids = Arrays.stream(idsStr.split(",")).map(Long::parseLong).distinct().sorted().toList();
+        // 与创建 Key 先锁同一应用，防止删除捕获集合后出现新的有效凭据。
+        for (Long id : ids) {
+            SysApplication app = apiKeys.lockApplication(id, tenantId);
+            if (app == null) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "应用不存在或无权访问");
+            }
+            apiKeys.update(null, new LambdaUpdateWrapper<SysApplicationApiKey>()
+                .eq(SysApplicationApiKey::getTenantId, tenantId).eq(SysApplicationApiKey::getApplicationId, id)
+                .set(SysApplicationApiKey::getDeleted, true));
+            credentialCache.afterCommit(tenantId, id, app.getCode());
+        }
+        if (!this.removeByIds(ids)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "删除应用失败");
+        }
+        return true;
     }
 
     @Override
@@ -117,32 +146,8 @@ public class SysApplicationServiceImpl extends ServiceImpl<SysApplicationMapper,
     }
 
     @Override
-    @Async
     public void refreshApplicationCache() {
-        List<SysTenantInfo> tenantInfos = tenantService.list();
-        // 获取当前上下文默认的租户id
-        Long contextTenantId = TenantContextHolder.getCurrentTenantId();
-        try {
-            tenantInfos.forEach(tenant -> {
-                TenantContextHolder.setCurrentTenantId(tenant.getId());
-                List<SysApplication> applications = this.list();
-                applications.forEach(application -> {
-                    Map<String, String> apps = new HashMap<>();
-                    apps.put(CacheConstants.SECURITY_SYSTEM_APPS_SECRIT_KEY, application.getSk());
-                    apps.put(GlobalConstants.TENANT_ID_NAME, String.valueOf(tenant.getId()));
-                    Long authTenantId = application.getAuthTenantId() == null
-                        ? tenant.getId() : application.getAuthTenantId();
-                    apps.put(CacheConstants.SECURITY_SYSTEM_APPS_AUTH_TENANT_ID, String.valueOf(authTenantId));
-                    apps.put(CacheConstants.SECURITY_SYSTEM_APPS_PERMIT_URLS,
-                        StrUtil.nullToEmpty(application.getAccessPath()));
-                    String key = CacheConstants.SECURITY_SYSTEM_APPS + application.getCode();
-                    redisTemplate.delete(key);
-                    redisTemplate.opsForHash().putAll(key, apps);
-                });
-            });
-        } finally {
-            restoreTenant(contextTenantId);
-        }
+        credentialCache.rebuild();
     }
 
     @Override
@@ -185,8 +190,11 @@ public class SysApplicationServiceImpl extends ServiceImpl<SysApplicationMapper,
     }
 
     private Long currentTenantId() {
-        Long tenantId = TenantContextHolder.getCurrentTenantId();
-        return tenantId == null ? SecurityUtils.getTenantId() : tenantId;
+        try {
+            return tenantContext.resolve().tenantId();
+        } catch (ResourceAccessException exception) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问当前租户应用");
+        }
     }
 
     private void restoreTenant(Long tenantId) {

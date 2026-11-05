@@ -30,3 +30,15 @@ private final UserFeignClient userFeignClient;
 ```
 
 调用时需要保证 `macula-cloud-system` 已注册到 Nacos，并继续传递认证与租户上下文。
+
+## 接口日期时间约定
+
+接口 VO/Form/DTO 的时间点可使用 `java.util.Date` 或 `java.time.Instant`，已有Date字段保持兼容，数据库实体和查询 BO 保留 `LocalDateTime`。JSON 使用带时区的 ISO 格式，例如 `2026-11-05T00:50:30.000Z`；浏览器提交时间点时同样携带 `Z` 或偏移，显示时按浏览器当地时区格式化。纯业务日期筛选和 Excel 显示格式保持原有语义。
+
+System/TinyID 保留 Jackson 的标准 ISO 日期格式，仅设置 `spring.jackson.time-zone=UTC`。普通 MapStruct Converter 显式引用 Boot 的 `GlobalMapperConfig`，日期映射由自动注册的 `DateTimeConverter` 完成；`macula.time.storage-zone` 配置后优先使用外部值，未配置则使用 JVM 默认时区。该时区应与数据库中日期时间的实际写入约定一致，JSON 输出 UTC 不代表修改数据库存储时区。
+
+角色、菜单、权限的详情接口保留现有路径和业务字段，通过独立 VO 返回审计时间，不直接返回 Entity；菜单及权限写入使用业务表单，审计字段由服务端维护。旧的仅日期或不带时区的 JSON 时间会变为完整 ISO 时间，调用方应使用日期解析器处理，不能按固定位置截取字符串。
+
+运行本次改动需要包含 `GlobalMapperConfig`、`DateTimeConverter` 和自动配置的新版本 `macula-boot-starter-mapstruct`；仅在本地验证时，应先安装对应 Boot Parent 和 Starter。本轮不修改 IAM 协议、授权 Redis 记录或数据库表结构。
+
+JSON时间点同样可以使用 `Instant`：Jackson原生支持带时区ISO读写。`Date`保留毫秒，`Instant`可保留纳秒，转换为Date时超出毫秒的精度会丢弃；不使用固定 `SSS` 的 `spring.jackson.date-format` 作为通用ISO解析器，避免纳秒输入被错误解析。接口调用约定仍要求时间点携带Z或偏移。公共实体映射转换器同时支持Date/Instant与LocalDateTime双向映射，两种接口类型均遵循同一存储时区配置；Instant映射不经过Date，保留纳秒。

@@ -29,6 +29,8 @@ import dev.macula.cloud.tinyid.pojo.query.BusinessPageQuery;
 import dev.macula.cloud.tinyid.pojo.vo.TinyIdBusinessAggregateVO;
 import org.junit.jupiter.api.Test;
 import org.mapstruct.factory.Mappers;
+import dev.macula.boot.mapstruct.DateTimeConverter;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 
@@ -134,8 +136,10 @@ class TinyIdManagementServiceImplTest {
         DynamicDataSource routingDataSource = new DynamicDataSource();
         routingDataSource.setDataSourceKeys(List.of("datasource-0"));
         TinyIdManagementConverter converter = Mappers.getMapper(TinyIdManagementConverter.class);
+        DateTimeConverter dates = new DateTimeConverter(null);
+        ReflectionTestUtils.setField(converter, "dateTimeConverter", dates);
         return spy(new TinyIdManagementServiceImpl(mock(TinyIdInfoMapper.class),
-            mock(TinyIdAuditLogMapper.class), routingDataSource, converter));
+            mock(TinyIdAuditLogMapper.class), routingDataSource, converter, dates));
     }
 
     /** 创建发号业务表单。 */

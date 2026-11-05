@@ -17,13 +17,12 @@
 
 package dev.macula.cloud.system.vo.app;
 
-import com.fasterxml.jackson.annotation.JsonFormat;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import tools.jackson.databind.annotation.JsonSerialize;
 import tools.jackson.databind.ser.std.ToStringSerializer;
 
-import java.time.LocalDateTime;
+import java.util.Date;
 
 /**
  * 应用分页视图对象
@@ -66,8 +65,7 @@ public class ApplicationVO {
     private String accessPath;
 
     @Schema(description = "创建时间")
-    @JsonFormat(pattern = "yyyy-MM-dd")
-    private LocalDateTime createTime;
+    private Date createTime;
 
     @Schema(description = "是否回传属性")
     private boolean useAttrs;

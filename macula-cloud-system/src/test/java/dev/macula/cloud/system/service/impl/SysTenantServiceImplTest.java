@@ -108,7 +108,9 @@ class SysTenantServiceImplTest {
     void startupInitializesTenantCacheWithoutApplicationEdits() {
         doReturn(List.of(tenant("macula-cloud", 1L))).when(service).list();
         SysPermissionService permissions = mock(SysPermissionService.class);
-        new ApplicationListener(permissions, service).onStarted(null);
+        var credentials = mock(dev.macula.cloud.system.service.ApplicationCredentialCacheService.class);
+        new ApplicationListener(permissions, service, credentials).onStarted(null);
+        verify(credentials).rebuild();
         verify(hashes).putAll(CacheConstants.SECURITY_SYSTEM_TENANTS, Map.of("macula-cloud", "1"));
         verify(permissions).refreshPermRolesRules();
     }

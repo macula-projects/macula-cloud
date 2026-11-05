@@ -22,7 +22,8 @@ import dev.macula.boot.enums.DataScopeEnum;
 import dev.macula.boot.result.Option;
 import dev.macula.boot.starter.auditlog.annotation.AuditLog;
 import dev.macula.cloud.system.form.RoleForm;
-import dev.macula.cloud.system.pojo.entity.SysRole;
+import dev.macula.cloud.system.converter.RoleConverter;
+import dev.macula.cloud.system.vo.role.RoleDetailVO;
 import dev.macula.cloud.system.query.RolePageQuery;
 import dev.macula.cloud.system.service.SysPermissionService;
 import dev.macula.cloud.system.service.SysRoleService;
@@ -31,17 +32,31 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 import jakarta.validation.Valid;
 import java.util.List;
 
+/**
+ * 角色接口协议适配，使用独立表单和VO隔离数据库实体。
+ * @author Rain
+ * @since 6.1.0
+ */
 @Tag(name = "角色接口")
 @RestController
 @RequestMapping("/api/v1/roles")
 @RequiredArgsConstructor
 public class SysRoleController {
     private final SysRoleService roleService;
+    private final RoleConverter roleConverter;
 
     private final SysPermissionService sysPermissionService;
 
@@ -57,11 +72,12 @@ public class SysRoleController {
         return roleService.listRoleOptions();
     }
 
+    /** 查询角色详情，响应使用接口VO隔离数据库审计时间。 */
     @Operation(summary = "角色详情")
     @Parameter(name = "角色ID")
     @GetMapping("/{roleId}")
-    public SysRole getRoleDetail(@PathVariable Long roleId) {
-        return roleService.getById(roleId);
+    public RoleDetailVO getRoleDetail(@PathVariable Long roleId) {
+        return roleConverter.entity2Detail(roleService.getById(roleId));
     }
 
     @Operation(summary = "新增角色")

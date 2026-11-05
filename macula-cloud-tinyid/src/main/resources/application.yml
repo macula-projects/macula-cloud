@@ -2,6 +2,10 @@ server:
   port: ${SERVER_PORT:9082}
 
 spring:
+  jackson:
+    # 保留Jackson标准ISO解析，兼容Date毫秒与Instant可变小数精度；不要使用固定SSS日期解析器。
+    # JSON输出时区不改变实体映射时区，后者由macula.time.storage-zone控制。
+    time-zone: UTC
   profiles:
     active: @profile.active@
     group:

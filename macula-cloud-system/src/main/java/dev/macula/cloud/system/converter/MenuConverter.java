@@ -20,6 +20,8 @@ package dev.macula.cloud.system.converter;
 import dev.macula.cloud.system.form.MenuForm;
 import dev.macula.cloud.system.pojo.entity.SysMenu;
 import dev.macula.cloud.system.vo.menu.MenuVO;
+import dev.macula.cloud.system.vo.menu.MenuDetailVO;
+import dev.macula.boot.mapstruct.GlobalMapperConfig;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
@@ -29,11 +31,14 @@ import org.mapstruct.Mapping;
  * @author haoxr
  * @since 2022/7/29
  */
-@Mapper
+@Mapper(config = GlobalMapperConfig.class)
 public interface MenuConverter {
 
+    /** 转换菜单列表模型，保留路由字段映射并转换审计时间。 */
     @Mapping(source = "path", target = "routePath")
     MenuVO entity2VO(SysMenu entity);
-
+    /** 将菜单可维护字段映射为数据库实体。 */
     SysMenu form2Entity(MenuForm menuForm);
+    /** 保留详情业务字段，并按公共时区转换审计时间。 */
+    MenuDetailVO entity2Detail(SysMenu entity);
 }

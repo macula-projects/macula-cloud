@@ -18,7 +18,7 @@ package dev.macula.cloud.tinyid.pojo.vo;
 
 import lombok.Data;
 
-import java.time.LocalDateTime;
+import java.util.Date;
 
 /**
  * Sanitized TinyID management audit record.
@@ -45,5 +45,5 @@ public class TinyIdAuditLogVO {
     /** 客户端 IP 地址。 */
     private String clientIp;
     /** 日志创建时间。 */
-    private LocalDateTime createTime;
+    private Date createTime;
 }

@@ -19,7 +19,7 @@
 				<el-table-column label="请求方法" prop="opRequestMethod" width="150"></el-table-column>
 				<el-table-column label="操作人" prop="opName" width="150"></el-table-column>
 				<el-table-column label="客户端IP" prop="opIp" width="150"></el-table-column>
-				<el-table-column label="日志时间" prop="createTime" width="170"></el-table-column>
+				<el-table-column :formatter="(row, column, value) => $TOOL.formatDateTime(value)" label="日志时间" prop="createTime" width="170"></el-table-column>
 				<el-table-column label="响应结果" prop="jsonResult" width="170"  :show-overflow-tooltip="true" min-width="150"></el-table-column>
 				<el-table-column label="异常信息" prop="errorMsg" width="170" :show-overflow-tooltip='true'></el-table-column>
 			</scTable>

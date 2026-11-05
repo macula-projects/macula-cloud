@@ -17,12 +17,16 @@
 
 package dev.macula.cloud.system.vo.dept;
 
-import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Data;
 
-import java.time.LocalDateTime;
+import java.util.Date;
 import java.util.List;
 
+/**
+ * 部门展示接口对象，审计时间统一使用Date时间点。
+ * @author Rain
+ * @since 6.1.0
+ */
 @Data
 public class DeptVO {
 
@@ -45,11 +49,7 @@ public class DeptVO {
     private String email;
 
     private List<DeptVO> children;
-
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    private LocalDateTime createTime;
-
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    private LocalDateTime updateTime;
+    private Date createTime;
+    private Date updateTime;
 
 }

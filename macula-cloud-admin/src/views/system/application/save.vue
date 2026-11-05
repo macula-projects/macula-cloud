@@ -27,8 +27,11 @@
 				<el-input v-model="form.homepage" clearable></el-input>
 			</el-form-item>
 			<el-form-item label="可访问路径" prop="accessPath">
-				<el-input v-model="form.accessPath" clearable></el-input>
-				<div class="el-form-item-msg">多个使用英文逗号,隔开，例: /a,/b,/c</div>
+				<!-- 网关按 HTTP 方法和路径匹配；单独填写 /path 无法匹配 METHOD:/path。 -->
+                <el-input v-model="form.accessPath" type="textarea" :rows="3"
+                    placeholder="GET:/service/api/**,POST:/service/api/orders" />
+                <div class="el-form-item-msg">格式为 HTTP方法:/路径，支持 Ant 通配符（*、**），多个规则以英文逗号分隔。</div>
+                <div class="el-form-item-msg">留空表示不限制应用访问路径；API Key 未单独配置时使用此处规则。</div>
 			</el-form-item>
 			<el-form-item label="负责人" prop="manager">
 				<sc-table-select v-model="form.manager" :apiObj="apiObj" :table-width="450" multiple clearable collapse-tags
@@ -50,7 +53,7 @@
 				</sc-table-select>
 			</el-form-item>
 			<el-form-item label="联系方式" prop="mobile">
-				<el-input v-model="form.mobile" clearable></el-input>
+				<el-input v-model="form.mobile" placeholder="请输入11位手机号" maxlength="11" clearable></el-input>
 			</el-form-item>
 			<el-form-item label="是否回传属性" prop="useAttrs">
 				<el-switch v-model="form.useAttrs"></el-switch>
@@ -117,7 +120,10 @@ export default {
 					{ required: true, message: '请输入负责人' }
 				],
 				mobile: [
-					{ required: true, message: '请输入联系方式' }
+					{ required: true, message: '请输入联系方式', trigger: 'blur' },
+                    // 与 ApplicationForm.mobile 的后端校验保持一致，在提交前定位到具体字段。
+                    { pattern: /^1(3\d|4[5-9]|5[0-35-9]|6[2567]|7[0-8]|8\d|9[0-35-9])\d{8}$/,
+                        message: '请输入有效的11位手机号', trigger: 'blur' }
 				]
 			},
 
