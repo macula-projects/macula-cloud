@@ -17,23 +17,18 @@
 package dev.macula.cloud.iam.authentication.thirdparty;
 
 import dev.macula.cloud.iam.enums.UserTypeEnum;
+import java.io.Serializable;
+import java.time.Instant;
 
 /**
- * 服务端保存的外部身份绑定票据内容，原始 ticket 永不进入该对象。
- *
+ * Redis中的服务端绑定材料，绝不包含原始opaque票据。
  * @author Rain
  * @since 6.1.0
  */
 public record ExternalBindingTicket(String clientId, Long tenantId, UserTypeEnum userType,
-                                    BindingType bindingType, String providerType, String subject,
-                                    String mobile, int failedAttempts) {
-    /**
-     * 待绑定数据类别。
-     *
-     * @since 6.1.0
-     */
-    public enum BindingType {
-        EXTERNAL_IDENTITY,
-        MOBILE
-    }
+                                    VerifiedExternalIdentity identity, Instant expiresAt,
+                                    int failedAttempts) implements Serializable {
+    /** 避免日志输出身份材料。 */
+    @Override
+    public String toString() { return "ExternalBindingTicket[clientId=" + clientId + "]"; }
 }

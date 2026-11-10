@@ -33,7 +33,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
 
 /**
  * 验证浏览器 Token 请求在 Client 认证后绑定精确 Origin。
@@ -54,7 +53,10 @@ class OAuth2TokenOriginFilterTest {
     @Test
     void allowsOriginOwnedByAuthenticatedClient() throws Exception {
         authenticate(client());
-        when(clientService.isAllowedOrigin("client-a", ORIGIN)).thenReturn(true);
+        authenticate(RegisteredClient.from(client()).clientSettings(
+            org.springframework.security.oauth2.server.authorization.settings.ClientSettings.builder()
+                .setting(dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeClientSettings.ALLOWED_ORIGINS,
+                    java.util.Set.of(ORIGIN)).build()).build());
         MockHttpServletRequest request = tokenRequest();
         MockHttpServletResponse response = new MockHttpServletResponse();
         FilterChain chain = mock(FilterChain.class);

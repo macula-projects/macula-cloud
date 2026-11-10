@@ -19,7 +19,6 @@ package dev.macula.cloud.iam.authentication.wecom;
 import dev.macula.cloud.iam.authentication.thirdparty.IdentityProviderConfigService;
 import dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyAuthenticationToken;
 import dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyIdentityResolutionService;
-import dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyLoginContext;
 import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeInfrastructureException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -58,12 +57,12 @@ class WecomAuthenticationProviderTest {
         WecomClient wecom = mock(WecomClient.class);
         IdentityProviderConfigService configs = mock(IdentityProviderConfigService.class);
         ThirdPartyIdentityResolutionService identities = mock(ThirdPartyIdentityResolutionService.class);
-        var config = new IdentityProviderConfigService.ProviderConfig("WECOM", "corp", "secret",
+        var config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(dev.macula.cloud.system.enums.IdentitySourceType.WECOM_WEB, "WECOM", "corp", "secret",
             Map.of("corpId", "corp", "agentId", "agent"));
-        var context = new ThirdPartyLoginContext("WECOM", "BROWSER", "test-client", Instant.now(), "/");
-        when(configs.requireEnabled("WECOM")).thenReturn(config);
+        var context = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.context("WECOM", "BROWSER", "test-client", Instant.now(), "/");
+        when(configs.requireEnabledById(1L, "WECOM")).thenReturn(config);
         when(wecom.fetchUserId(config, "code")).thenReturn("zhangsan");
-        when(identities.resolve("WECOM", "zhangsan", context))
+        when(identities.resolve(dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.browserIdentity(context, "zhangsan"), context))
             .thenReturn(User.withUsername("zhangsan").password("n/a").authorities("USER").build());
 
         var result = new WecomAuthenticationProvider(wecom, configs, identities).authenticate(
@@ -72,7 +71,7 @@ class WecomAuthenticationProviderTest {
 
         assertEquals("zhangsan", result.getName());
         assertEquals("WECOM", ((ThirdPartyAuthenticationToken)result).getProviderType());
-        verify(identities).resolve("WECOM", "zhangsan", context);
+        verify(identities).resolve(dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.browserIdentity(context, "zhangsan"), context);
     }
 
     @Test
@@ -80,7 +79,7 @@ class WecomAuthenticationProviderTest {
         WecomClient wecom = mock(WecomClient.class);
         IdentityProviderConfigService configs = mock(IdentityProviderConfigService.class);
         ThirdPartyIdentityResolutionService identities = mock(ThirdPartyIdentityResolutionService.class);
-        var context = new ThirdPartyLoginContext("GITHUB", "", "test-client", Instant.now(), "/");
+        var context = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.context("GITHUB", "", "test-client", Instant.now(), "/");
 
         var result = new WecomAuthenticationProvider(wecom, configs, identities).authenticate(
             ThirdPartyAuthenticationToken.unauthenticated("GITHUB", "code", context,
@@ -92,7 +91,7 @@ class WecomAuthenticationProviderTest {
 
     @Test
     void clientAcceptsOnlyMemberUserId(CapturedOutput output) {
-        var config = new IdentityProviderConfigService.ProviderConfig("WECOM", "corp", "secret",
+        var config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(dev.macula.cloud.system.enums.IdentitySourceType.WECOM_WEB, "WECOM", "corp", "secret",
             Map.of("corpId", "corp", "agentId", "agent"));
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
@@ -141,7 +140,7 @@ class WecomAuthenticationProviderTest {
 
     @Test
     void logsWecomErrorCodeWithoutProviderTextOrCredentials(CapturedOutput output) {
-        var config = new IdentityProviderConfigService.ProviderConfig("WECOM", "corp", "corp-secret-marker",
+        var config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(dev.macula.cloud.system.enums.IdentitySourceType.WECOM_WEB, "WECOM", "corp", "corp-secret-marker",
             Map.of("corpId", "corp", "agentId", "agent"));
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();

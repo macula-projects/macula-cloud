@@ -51,4 +51,23 @@
         WHERE t1.username = #{username}
           AND t1.deleted = 0
     </select>
+    <!-- 列和规范化表达式全部固定；用户提供的值不作为SQL标识符。二次查询保持相同条件。 -->
+    <select id="findIdentityBindingCandidates" resultType="dev.macula.cloud.iam.pojo.entity.SysUser" timeout="5">
+        SELECT id, username, mobile, email, status, deleted FROM sys_user
+        WHERE deleted = 0 AND
+        <choose>
+            <when test="target == 'username'">
+                CAST(REGEXP_REPLACE(username, #{trimPattern}, '') AS BINARY) = CAST(#{value} AS BINARY)
+            </when>
+            <when test="target == 'mobile'">
+                CAST(REGEXP_REPLACE(REGEXP_REPLACE(mobile, #{trimPattern}, ''), #{mobilePattern}, '') AS BINARY) = CAST(#{value} AS BINARY)
+            </when>
+            <when test="target == 'email'">
+                CAST(LOWER(REGEXP_REPLACE(email, #{trimPattern}, '')) AS BINARY) = CAST(#{value} AS BINARY)
+            </when>
+            <otherwise>1 = 0</otherwise>
+        </choose>
+        ORDER BY id LIMIT 2
+        <if test="forUpdate">FOR UPDATE</if>
+    </select>
 </mapper>

@@ -72,6 +72,7 @@ public abstract class AbstractThirdPartyAuthenticationFilter extends AbstractAut
         this.issuerUri = URI.create(this.issuer);
     }
 
+    /** 从受控授权请求发起一次性state，回调复核当前Client版本及固定来源后才验证平台Code。 */
     @Override
     public Authentication attemptAuthentication(HttpServletRequest request, HttpServletResponse response)
         throws AuthenticationException, IOException {
@@ -87,13 +88,24 @@ public abstract class AbstractThirdPartyAuthenticationFilter extends AbstractAut
                 throw new AuthenticationServiceException("第三方授权失败");
             }
             validateSavedRequestTarget(request, response, context);
-            clientPolicyService.requireAllowed(request, response, context.clientId(), provider());
-            configService.requireEnabled(providerType);
+            BrowserLoginClientPolicyService.ClientPolicy policy = clientPolicyService.requireAllowed(
+                request, response, context.clientId(), provider());
+            IdentityProviderConfigService.ProviderConfig source = clientPolicyService.requireSource(policy, providerType, context.loginMode());
+            if ("IN_APP".equals(policy.applicationType()) && !java.util.Objects.equals(policy.authorizationVersion(), context.clientAuthorizationVersion())
+                || !java.util.Objects.equals(source.registrationId(), context.registrationId())
+                || !source.sourceType().value().equals(context.sourceType())
+                || !java.util.Objects.equals(source.loginCapability(), context.loginCapability())
+                || !java.util.Objects.equals(source.version(), context.sourceVersion())
+                || !source.flow().value().equals(context.flow())
+                || !callbackUri().equals(context.upstreamRedirectUri())
+                || !java.util.Objects.equals(policy.tenantId(), context.tenantId()) || policy.userType() != context.userType()) {
+                throw new AuthenticationServiceException("身份源或应用路由已变更，请重新登录");
+            }
+            validateMode(source, context.loginMode());
             return getAuthenticationManager().authenticate(ThirdPartyAuthenticationToken.unauthenticated(
                 providerType, code, context, callbackUri()));
         }
 
-        IdentityProviderConfigService.ProviderConfig config = configService.requireEnabled(providerType);
         BrowserLoginClientPolicyService.ClientPolicy clientPolicy =
             clientPolicyService.requireAllowed(request, response, provider());
         String mode = loginMode(request);
@@ -101,12 +113,32 @@ public abstract class AbstractThirdPartyAuthenticationFilter extends AbstractAut
             response.sendRedirect(request.getContextPath() + "/login");
             return null;
         }
+        IdentityProviderConfigService.ProviderConfig config = clientPolicyService.requireSource(clientPolicy, providerType, mode);
+        validateMode(config, mode);
+        // 仅限制新发起的交互；回调继续核对一次性state，不因UA变化切换兑换合同。
+        var environment = dev.macula.cloud.system.enums.IdentityBrowserEnvironment.fromUserAgent(request.getHeader("User-Agent"));
+        if (!config.sourceType().supportsBrowserEnvironment(environment, mode)) {
+            throw new AuthenticationServiceException("当前浏览器环境不支持该第三方登录，请使用适用入口");
+        }
         ThirdPartyLoginContext context = new ThirdPartyLoginContext(providerType, mode, clientPolicy.clientId(),
             Instant.now(),
-            resolveSavedRequestTarget(request, response));
+            resolveSavedRequestTarget(request, response), config.registrationId(), config.sourceType().value(),
+            clientPolicy.tenantId(), clientPolicy.userType(), config.version(), config.flow().value(), callbackUri(), config.loginCapability(), clientPolicy.authorizationVersion());
         String generatedState = stateRepository.create(request, context);
         response.sendRedirect(authorizationUri(config, generatedState, callbackUri(), context));
         return null;
+    }
+
+    /** 来源类型固定实际授权模式，公众号不能借用网站凭据。 */
+    private void validateMode(IdentityProviderConfigService.ProviderConfig source, String mode) {
+        boolean valid = switch (source.sourceType()) {
+            case WECHAT_WEBSITE, FEISHU_WEB, DINGTALK_WEB -> "BROWSER".equals(mode);
+            case WECHAT_OFFICIAL_ACCOUNT -> "WEBVIEW".equals(mode);
+            case WECOM_WEB -> "BROWSER".equals(mode) || "WEBVIEW".equals(mode);
+            case GITHUB_OAUTH -> mode.isEmpty();
+            default -> false;
+        };
+        if (!valid) { throw new AuthenticationServiceException("身份源不支持当前登录场景"); }
     }
 
     protected abstract String authorizationUri(IdentityProviderConfigService.ProviderConfig config,

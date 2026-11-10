@@ -1,3 +1,4 @@
+import {installSessionApi,seedAuthenticatedSession} from '../support/auth-session'
 describe('应用 API Key 管理', () => {
   const ok = data => ({ statusCode: 200, body: { success: true, code: '00000', data } })
   let keys
@@ -11,12 +12,12 @@ describe('应用 API Key 管理', () => {
     cy.intercept('GET', '**/system/api/v1/tenants/options*', ok([]))
     cy.intercept('GET', '**/system/api/v1/users?*', ok({ records: [], total: 0 }))
     cy.intercept('GET', '**/system/api/v1/app/validtor/appCode*', ok(true))
-    cy.setCookie('TOKEN', 'root-test-token')
+    installSessionApi()
     cy.visit('/#/system/application', {
       onBeforeLoad(win) {
-        win.localStorage.setItem('MACULA_CLOUD_ADMIN_STORAGE_VERSION', '2')
-        win.localStorage.setItem('USER_INFO', JSON.stringify({ content: { username: 'root', roles: ['ROOT'] }, datetime: 0 }))
-        win.localStorage.setItem('MENU', JSON.stringify({ content: [{ path: '/system', component: 'Layout', meta: { title: '系统管理' }, children: [{ path: '/system/application', component: 'system/application/index', meta: { title: '应用管理' } }] }], datetime: 0 }))
+        seedAuthenticatedSession(win)
+        win.sessionStorage.setItem('USER_INFO', JSON.stringify({ content: { username: 'root', roles: ['ROOT'] }, datetime: 0 }))
+        win.sessionStorage.setItem('MENU', JSON.stringify({ content: [{ path: '/system', component: 'Layout', meta: { title: '系统管理' }, children: [{ path: '/system/application', component: 'system/application/index', meta: { title: '应用管理' } }] }], datetime: 0 }))
       }
     })
     cy.wait('@apps')

@@ -1,30 +1,12 @@
-import {describe, expect, it} from "vitest"
-
-import config, {mergeRuntimeConfig} from "@/config"
-
-describe("admin login configuration", () => {
-    it("loads the local demo defaults", () => {
-        expect(config).toMatchObject({
-            OAUTH_CLIENT_ID: "e4da4a32-592b-46f0-ae1d-784310e88423",
-            OAUTH_CLIENT_SECRET: "secret",
-            OAUTH_SCOPE: "message.read message.write userinfo",
-            DEMO_USERNAME: "admin",
-            DEMO_PASSWORD: "admin"
-        })
+import {describe,expect,it} from 'vitest'
+import config,{mergeRuntimeConfig} from '@/config'
+describe('public SPA configuration',()=>{
+    it('has OIDC scope and no browser secret or demo credentials',()=>{
+        expect(config.OAUTH_SCOPE).toBe('openid profile')
+        for(const key of ['OAUTH_CLIENT_SECRET','DEMO_USERNAME','DEMO_PASSWORD']) expect(config).not.toHaveProperty(key)
+        expect(config.OAUTH_CLIENT_ID).not.toBe('e4da4a32-592b-46f0-ae1d-784310e88423')
     })
-
-    it("applies runtime configuration last", () => {
-        const target = {
-            OAUTH_CLIENT_ID: "build-client",
-            DEMO_USERNAME: "build-user"
-        }
-
-        expect(mergeRuntimeConfig(target, {
-            OAUTH_CLIENT_ID: "runtime-client",
-            DEMO_USERNAME: "runtime-user"
-        })).toEqual({
-            OAUTH_CLIENT_ID: "runtime-client",
-            DEMO_USERNAME: "runtime-user"
-        })
+    it('applies runtime public configuration last',()=>{
+        expect(mergeRuntimeConfig({OAUTH_CLIENT_ID:'build'},{OAUTH_CLIENT_ID:'runtime'}).OAUTH_CLIENT_ID).toBe('runtime')
     })
 })

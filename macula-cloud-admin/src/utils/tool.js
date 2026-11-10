@@ -23,13 +23,14 @@
  */
 
 import sysConfig from "@/config";
+import {AUTH_KEYS, clearAuth} from './adminAuthSession';
 
 const tool = {}
 
 const STORAGE_VERSION_KEY = 'MACULA_CLOUD_ADMIN_STORAGE_VERSION'
-const STORAGE_VERSION = '2'
+const STORAGE_VERSION = '3'
 const LEGACY_STORAGE_KEYS = [
-	'USER_INFO', 'MENU', 'PERMISSIONS', 'APP_LANG', sysConfig.TENANT_ID,
+	'USER_INFO', 'MENU', 'PERMISSIONS', sysConfig.TENANT_ID,
 	'tenantStoreTenantOptions', 'tenantLabel'
 ]
 
@@ -48,7 +49,9 @@ function clearLegacyToken() {
 // Run before locale, router, request interceptors, or stores read cached state.
 export function migrateLegacyStorage() {
 	try {
+		clearLegacyToken()
 		if (localStorage.getItem(STORAGE_VERSION_KEY) === STORAGE_VERSION) return
+		clearAuth()
 		for (const key of LEGACY_STORAGE_KEYS) localStorage.removeItem(key)
 		// The old token cannot be used after its related user and permission cache is removed.
 		clearLegacyToken()
@@ -61,6 +64,8 @@ export function migrateLegacyStorage() {
 
 migrateLegacyStorage()
 
+function storageFor(key) { return AUTH_KEYS.includes(key) ? sessionStorage : localStorage }
+
 /* localStorage */
 tool.data = {
 	set(key, data, datetime = 0) {
@@ -68,15 +73,15 @@ tool.data = {
             content: data,
             datetime: parseInt(datetime) === 0 ? 0 : new Date().getTime() + parseInt(datetime) * 1000
         }
-        return localStorage.setItem(key, JSON.stringify(cacheValue))
+        return storageFor(key).setItem(key, JSON.stringify(cacheValue))
 	},
 	get(key) {
         try {
-            const value = JSON.parse(localStorage.getItem(key))
+            const value = JSON.parse(storageFor(key).getItem(key))
             if (value) {
                 let nowTime = new Date().getTime()
                 if (nowTime > value.datetime && value.datetime != 0) {
-                    localStorage.removeItem(key)
+                    storageFor(key).removeItem(key)
                     return null;
                 }
                 return value.content
@@ -87,9 +92,10 @@ tool.data = {
         }
 	},
 	remove(key) {
-		return localStorage.removeItem(key)
+		return storageFor(key).removeItem(key)
 	},
 	clear() {
+		clearAuth()
 		return localStorage.clear()
 	}
 }

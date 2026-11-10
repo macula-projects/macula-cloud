@@ -36,7 +36,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * 校验 external_code Client 策略、外部凭证和本地账号后签发 access token。
+ * 校验第三方Code及真实账号绑定后按当前协议签发用户令牌。
  *
  * @author Rain
  * @since 6.1.0
@@ -47,6 +47,8 @@ public class OAuth2ExternalCodeAuthenticationProvider implements AuthenticationP
     private final ExternalCodeReplayStore replayStore;
     private final ExternalCodeAccountResolver accountResolver;
     private final OAuth2UserGrantTokenIssuer tokenIssuer;
+    private dev.macula.cloud.iam.authentication.thirdparty.IdentityProviderConfigService sources;
+    private ExternalCodeRateLimiter limiter;
 
     public OAuth2ExternalCodeAuthenticationProvider(ExternalCodeVerifierRegistry verifiers,
         ExternalCodeReplayStore replayStore, ExternalCodeAccountResolver accountResolver,
@@ -57,6 +59,15 @@ public class OAuth2ExternalCodeAuthenticationProvider implements AuthenticationP
         this.tokenIssuer = tokenIssuer;
     }
 
+    /** 生产请求在claim前读取明确来源并执行Client/IP限流。 */
+    public OAuth2ExternalCodeAuthenticationProvider(ExternalCodeVerifierRegistry verifiers,
+        ExternalCodeReplayStore replayStore, ExternalCodeAccountResolver accountResolver, OAuth2UserGrantTokenIssuer tokenIssuer,
+        dev.macula.cloud.iam.authentication.thirdparty.IdentityProviderConfigService sources, ExternalCodeRateLimiter limiter) {
+        this(verifiers, replayStore, accountResolver, tokenIssuer);
+        this.sources = java.util.Objects.requireNonNull(sources);
+        this.limiter = java.util.Objects.requireNonNull(limiter);
+    }
+
     @Override
     public Authentication authenticate(@NonNull Authentication authentication) {
         OAuth2ExternalCodeAuthenticationToken grant = (OAuth2ExternalCodeAuthenticationToken)authentication;
@@ -65,17 +76,33 @@ public class OAuth2ExternalCodeAuthenticationProvider implements AuthenticationP
         validateClient(clientPrincipal, registeredClient, grant);
         Long registrationId = providerRegistration(registeredClient, grant.getCodeType());
         Set<String> scopes = validateScopes(registeredClient, grant.getScopes());
+        String providerVerifier = validateSourceAndFlow(registeredClient, registrationId, grant);
+        if (limiter != null) {
+            String remote = grant.getDetails() instanceof org.springframework.security.web.authentication.WebAuthenticationDetails details
+                ? details.getRemoteAddress() : null;
+            limiter.check(registeredClient.getClientId(), remote);
+        }
         ExternalCodeReplayStore.ReplayClaim replayClaim = replayStore.claim(grant.getCodeType(), grant.getCode());
+        boolean codeVerified = false;
         try {
             ExternalCodeVerifier verifier = verifiers.require(grant.getCodeType());
-            ExternalCodeVerification verification = verifier.verify(grant.getCodeType(), registrationId,
-                grant.getCode());
+            ExternalCodeVerification verification = providerVerifier == null
+                ? verifier.verify(grant.getCodeType(), registrationId, grant.getCode())
+                : verifier.verify(grant.getCodeType(), registrationId, grant.getCode(), providerVerifier,
+                    (String) grant.getAdditionalParameters().get(OAuth2ExternalCodeParameterNames.PROVIDER_REDIRECT_URI));
+            codeVerified = true;
             Authentication userPrincipal = accountResolver.resolve(registeredClient, grant.getCodeType(),
                 verification);
             return tokenIssuer.issue(registeredClient, clientPrincipal, userPrincipal, grant,
                 OAuth2ExternalCodeAuthenticationToken.GRANT_TYPE, scopes, false);
         } catch (ExternalCodeInfrastructureException ex) {
-            replayStore.release(replayClaim);
+            // 只有明确尚未向平台提交Code时才安全重试；超时/已换码后的资料失败仍保留占用。
+            if (!codeVerified && ex.getConsumptionState() == ExternalCodeConsumptionState.NOT_SUBMITTED) {
+                try { replayStore.release(replayClaim); }
+                catch (RuntimeException releaseFailure) {
+                    log.warn("External code claim release unavailable category=INFRASTRUCTURE");
+                }
+            }
             log.warn("External code grant failed provider={} codeType={} stage=VERIFY "
                     + "category=PROVIDER_UNAVAILABLE exception={}", grant.getCodeType().providerType(),
                 grant.getCodeType().name(), ex.getClass().getSimpleName());
@@ -100,6 +127,44 @@ public class OAuth2ExternalCodeAuthenticationProvider implements AuthenticationP
         return OAuth2ExternalCodeAuthenticationToken.class.isAssignableFrom(authentication);
     }
 
+    /** 来源与条件参数先校验，未核实flow不能通过requireProofKey被误认为已执行PKCE。 */
+    private String validateSourceAndFlow(RegisteredClient client, Long registrationId,
+        OAuth2ExternalCodeAuthenticationToken grant) {
+        Object raw = grant.getAdditionalParameters().get(OAuth2ExternalCodeParameterNames.PROVIDER_CODE_VERIFIER);
+        String verifier = raw instanceof String value ? value : null;
+        Object rawRedirect = grant.getAdditionalParameters().get(OAuth2ExternalCodeParameterNames.PROVIDER_REDIRECT_URI);
+        String redirect = rawRedirect instanceof String value ? value : null;
+        if (sources == null) {
+            if (raw != null || rawRedirect != null) { throw error(OAuth2ErrorCodes.INVALID_REQUEST, "Provider proof is not allowed."); }
+            return null;
+        }
+        try {
+            var source = sources.requireEnabledById(registrationId, grant.getCodeType().providerType()).forCode(grant.getCodeType());
+            if (!source.sourceType().supports(grant.getCodeType())) {
+                throw error(OAuth2ErrorCodes.UNAUTHORIZED_CLIENT, "External source is not allowed.");
+            }
+            boolean pkce = source.flow().providerPkce();
+            if (pkce && (grant.getCodeType() != dev.macula.cloud.system.enums.ExternalCodeType.FEISHU_APP_CODE
+                || verifier == null || !verifier.matches("[A-Za-z0-9._~-]{43,128}")
+                || !validProviderRedirect(redirect) || !client.getRedirectUris().contains(redirect))
+                || !pkce && (raw != null || rawRedirect != null)) {
+                throw error(OAuth2ErrorCodes.INVALID_REQUEST, "Provider proof is invalid for this flow.");
+            }
+            return verifier;
+        } catch (OAuth2AuthenticationException ex) { throw ex; }
+        catch (RuntimeException ex) { throw error(OAuth2ErrorCodes.UNAUTHORIZED_CLIENT, "External source is unavailable."); }
+    }
+
+    /** 回调只作为固定厂商换码端点的参数，不是可由用户控制的HTTP目标。 */
+    private boolean validProviderRedirect(String value) {
+        if (value == null || value.length() > 2048 || value.chars().anyMatch(Character::isWhitespace)) { return false; }
+        try {
+            var uri = java.net.URI.create(value);
+            return "https".equalsIgnoreCase(uri.getScheme()) && uri.getHost() != null
+                && uri.getRawUserInfo() == null && uri.getRawFragment() == null;
+        } catch (IllegalArgumentException ex) { return false; }
+    }
+
     private OAuth2ClientAuthenticationToken authenticatedClient(Authentication authentication) {
         Object principal = authentication.getPrincipal();
         if (principal instanceof OAuth2ClientAuthenticationToken client && client.isAuthenticated()) {
@@ -108,6 +173,12 @@ public class OAuth2ExternalCodeAuthenticationProvider implements AuthenticationP
         throw error(OAuth2ErrorCodes.INVALID_CLIENT, "OAuth client authentication is invalid.");
     }
 
+    /**
+     * 按受信任注册Client的应用架构再次限制凭证场景，不依赖Admin保存或请求自报终端。
+     * @param principal 已通过客户端认证的主体
+     * @param client 服务端注册策略
+     * @param grant 当前外部凭证请求
+     */
     private void validateClient(OAuth2ClientAuthenticationToken principal, RegisteredClient client,
         OAuth2ExternalCodeAuthenticationToken grant) {
         if (client == null || !ClientAuthenticationMethod.NONE.equals(principal.getClientAuthenticationMethod())) {
@@ -118,14 +189,33 @@ public class OAuth2ExternalCodeAuthenticationProvider implements AuthenticationP
             || !client.getAuthorizationGrantTypes().contains(OAuth2ExternalCodeAuthenticationToken.GRANT_TYPE)) {
             throw error(OAuth2ErrorCodes.UNAUTHORIZED_CLIENT, "OAuth client is not allowed to use this grant.");
         }
+        String applicationType = client.getClientSettings().getSetting(ExternalCodeClientSettings.APPLICATION_TYPE);
+        if (applicationType != null) {
+            try {
+                var type = dev.macula.cloud.system.enums.OAuth2ClientApplicationType.valueOf(applicationType);
+                String platform = client.getClientSettings().getSetting(ExternalCodeClientSettings.MINIAPP_PLATFORM);
+                Map<String, Long> bindings = client.getClientSettings().getSetting(ExternalCodeClientSettings.PROVIDER_BINDINGS);
+                dev.macula.cloud.system.security.OAuth2ApplicationLoginPolicy.validate(type, platform, Map.of(),
+                    bindings == null ? Map.of() : bindings, true);
+                if (!type.supportsExternalCode(grant.getCodeType(), platform)) {
+                    throw error(OAuth2ErrorCodes.UNAUTHORIZED_CLIENT, "External credential scene is not allowed.");
+                }
+            } catch (IllegalArgumentException ex) {
+                throw error(OAuth2ErrorCodes.UNAUTHORIZED_CLIENT, "Application type is invalid.");
+            }
+        }
+        // 未分类历史Client保留原白名单，不从其Code反推架构或回填业务数据。
         Set<String> allowedTypes = stringSet(client, ExternalCodeClientSettings.CODE_TYPES);
         if (allowedTypes.isEmpty() || !allowedTypes.contains(grant.getCodeType().name())) {
             throw error(OAuth2ErrorCodes.UNAUTHORIZED_CLIENT, "External credential type is not allowed.");
         }
     }
 
+    /** 当前协议与明确Scope共同约束响应，不能用openid切换业务协议。 */
     private Set<String> validateScopes(RegisteredClient client, Set<String> requestedScopes) {
-        if (CollectionUtils.isEmpty(requestedScopes) || requestedScopes.contains(OidcScopes.OPENID)) {
+        boolean oidc = "OIDC".equals(client.getClientSettings().getSetting(
+            dev.macula.cloud.iam.protocol.oauth2.ApplicationProtocolResolver.EFFECTIVE_PROTOCOL));
+        if (CollectionUtils.isEmpty(requestedScopes) || oidc != requestedScopes.contains(OidcScopes.OPENID)) {
             throw error(OAuth2ErrorCodes.INVALID_SCOPE, "Requested scope is invalid.");
         }
         for (String scope : requestedScopes) {

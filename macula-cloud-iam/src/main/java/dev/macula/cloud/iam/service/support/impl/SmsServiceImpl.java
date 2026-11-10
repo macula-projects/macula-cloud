@@ -35,6 +35,10 @@ public class SmsServiceImpl implements SmsService {
     private final LoginSmsDispatcher dispatcher;
     private final UserIdentifierNormalizer normalizer;
 
+    /** 实例仅在存储和发送器均已装配时创建。 */
+    @Override
+    public boolean isAvailable() { return true; }
+
     @Override
     public boolean verifyCode(String phone, String rawCode) {
         if (phone == null || rawCode == null) {
@@ -80,6 +84,25 @@ public class SmsServiceImpl implements SmsService {
         String code = store.issue(normalized, source, clientId);
         dispatcher.send(normalized, code);
         store.activate(normalized, code, clientId);
+    }
+
+    /** 绑定证明不会消费其他Client或托管登录用途验证码。 */
+    @Override
+    public boolean verifyCode(String phone, String code, String clientId,
+        dev.macula.cloud.iam.authentication.sms.SmsCodePurpose purpose) {
+        if (phone == null || code == null || clientId == null || purpose == null) { return false; }
+        try { return store.consume(normalize(phone), code, clientId, purpose); }
+        catch (IllegalArgumentException ex) { return false; }
+    }
+
+    /** 用途域贯穿申请、供应商发送与激活。 */
+    @Override
+    public void sendCode(String phone, String remoteAddress, String clientId,
+        dev.macula.cloud.iam.authentication.sms.SmsCodePurpose purpose) {
+        String normalized = normalize(phone);
+        String code = store.issue(normalized, remoteAddress == null ? "unknown" : remoteAddress, clientId, purpose);
+        dispatcher.send(normalized, code);
+        store.activate(normalized, code, clientId, purpose);
     }
 
     private String normalize(String phone) {

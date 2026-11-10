@@ -1,17 +1,18 @@
+import {installSessionApi,seedAuthenticatedSession} from '../support/auth-session'
+beforeEach(() => installSessionApi())
 describe('TinyID management', () => {
 	const ok = data => ({statusCode: 200, body: {success: true, code: '00000', data}})
 
 	beforeEach(() => {
-		cy.setCookie('TOKEN', 'root-test-token')
 		cy.intercept('GET', '**/tinyid/api/v1/admin/businesses*', ok({records: [], total: 0}))
 	})
 
 	function openPage() {
 		cy.visit('/#/tinyid/management', {
 				onBeforeLoad(win) {
-				win.localStorage.setItem('MACULA_CLOUD_ADMIN_STORAGE_VERSION', '2')
-				win.localStorage.setItem('USER_INFO', JSON.stringify({content: {username: 'root', roles: ['ROOT']}, datetime: 0}))
-				win.localStorage.setItem('MENU', JSON.stringify({content: [{
+        seedAuthenticatedSession(win)
+				win.sessionStorage.setItem('USER_INFO', JSON.stringify({content: {username: 'root', roles: ['ROOT']}, datetime: 0}))
+				win.sessionStorage.setItem('MENU', JSON.stringify({content: [{
 					path: '/system',
 					component: 'Layout',
 					meta: {title: '系统管理'},

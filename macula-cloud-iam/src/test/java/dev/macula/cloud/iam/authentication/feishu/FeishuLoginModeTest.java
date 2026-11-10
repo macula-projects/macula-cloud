@@ -49,7 +49,7 @@ class FeishuLoginModeTest {
     @Test
     void browserUsesOfficialEndpointAndWebviewLoginIsRejected() {
         FeishuClient client = new FeishuClient();
-        ProviderConfig config = new ProviderConfig("FEISHU", "app", "secret", Map.of("appId", "app"));
+        ProviderConfig config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(dev.macula.cloud.system.enums.IdentitySourceType.FEISHU_WEB, "FEISHU", "app", "secret", Map.of("appId", "app"));
         String callback = "https://iam.example/login/feishu";
         assertTrue(client.authorizationUri(config, "state-value", callback, FeishuLoginMode.BROWSER)
             .startsWith("https://accounts.feishu.cn/open-apis/authen/v1/authorize?"));

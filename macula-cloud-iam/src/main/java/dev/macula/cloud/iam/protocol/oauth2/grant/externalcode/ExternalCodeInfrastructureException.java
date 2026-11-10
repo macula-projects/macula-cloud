@@ -19,13 +19,27 @@ package dev.macula.cloud.iam.protocol.oauth2.grant.externalcode;
 import org.springframework.security.authentication.AuthenticationServiceException;
 
 /**
- * 标识第三方服务网络或服务端故障，允许释放尚未完成核验的防重放占用。
+ * 标识平台故障及凭据消费确定性；默认不能推断Code尚未被消费。
  *
  * @author Rain
  * @since 6.1.0
  */
 public class ExternalCodeInfrastructureException extends AuthenticationServiceException {
+    private final ExternalCodeConsumptionState consumptionState;
+
+    /** 超时/网络错误未证明请求没有到达平台，默认保留占用。 */
     public ExternalCodeInfrastructureException() {
+        this(ExternalCodeConsumptionState.UNKNOWN);
+    }
+
+    /** 仅平台适配器可根据实际执行阶段声明尚未提交或已消费。 */
+    public ExternalCodeInfrastructureException(ExternalCodeConsumptionState consumptionState) {
         super("External identity provider is temporarily unavailable.");
+        this.consumptionState = java.util.Objects.requireNonNull(consumptionState);
+    }
+
+    /** 返回执行阶段证明的消费状态，不包括凭据或远端正文。 */
+    public ExternalCodeConsumptionState getConsumptionState() {
+        return consumptionState;
     }
 }

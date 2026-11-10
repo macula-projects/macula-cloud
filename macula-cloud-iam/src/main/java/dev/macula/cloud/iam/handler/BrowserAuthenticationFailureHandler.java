@@ -53,6 +53,10 @@ public class BrowserAuthenticationFailureHandler implements AuthenticationFailur
     @Override
     public void onAuthenticationFailure(HttpServletRequest request, HttpServletResponse response,
         AuthenticationException exception) throws IOException, ServletException {
+        if (exception instanceof dev.macula.cloud.iam.authentication.mfa.AdditionalAuthenticationRequiredException) {
+            response.sendError(HttpServletResponse.SC_SERVICE_UNAVAILABLE, "Authentication unavailable");
+            return;
+        }
         if (exception instanceof BindingRequiredException required) {
             pending.save(request, required);
             redirectStrategy.sendRedirect(request, response, issuer + BINDING_PATH);

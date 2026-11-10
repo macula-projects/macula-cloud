@@ -1,3 +1,5 @@
+import {installSessionApi,seedAuthenticatedSession} from '../support/auth-session'
+beforeEach(() => installSessionApi())
 describe("租户安全策略", () => {
   const response = {
     success: true,
@@ -38,18 +40,17 @@ describe("租户安全策略", () => {
       ...response,
       data: response.data.basic,
     }).as("saveBasic");
-    cy.setCookie("TOKEN", "root-test-token");
     cy.visit("/#/system/security-policy", {
       onBeforeLoad(win) {
-        win.localStorage.setItem("MACULA_CLOUD_ADMIN_STORAGE_VERSION", "2");
-        win.localStorage.setItem(
+        seedAuthenticatedSession(win)
+        win.sessionStorage.setItem(
           "USER_INFO",
           JSON.stringify({
             content: { username: "root", roles: ["ROOT"] },
             datetime: 0,
           })
         );
-        win.localStorage.setItem(
+        win.sessionStorage.setItem(
           "MENU",
           JSON.stringify({
             content: [

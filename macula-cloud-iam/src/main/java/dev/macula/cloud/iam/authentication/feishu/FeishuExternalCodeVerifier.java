@@ -47,14 +47,40 @@ public class FeishuExternalCodeVerifier implements ExternalCodeVerifier {
         return TYPES;
     }
 
+    /** JSAPI沿独立合同核验；AppLink必须使用带本次回调与PKCE的专用重载。 */
     @Override
     public ExternalCodeVerification verify(ExternalCodeType codeType, Long identityProviderId, String code) {
-        ProviderConfig config = configs.requireEnabledById(identityProviderId, PROVIDER_TYPE);
+        if (codeType == ExternalCodeType.FEISHU_APP_CODE) {
+            throw new IllegalArgumentException("AppLink需提交本次授权回调和PKCE材料");
+        }
+        ProviderConfig config = configs.requireEnabledById(identityProviderId, PROVIDER_TYPE).forCode(codeType);
+            if (!config.sourceType().supports(codeType)) { throw new IllegalArgumentException("来源不支持此凭证类型"); }
         FeishuLoginMode mode = switch (codeType) {
             case FEISHU_APP_CODE -> FeishuLoginMode.APP;
             case FEISHU_WEBVIEW_CODE -> FeishuLoginMode.WEBVIEW;
             default -> throw new IllegalArgumentException("Unsupported Feishu external code type");
         };
-        return ExternalCodeVerification.identity(PROVIDER_TYPE, client.fetchEmployeeNo(config, code, null, mode));
+        return new ExternalCodeVerification(client.fetchIdentity(config, code, null, mode, codeType.name()));
     }
+    /** 旧扩展调用缺少本次授权回调时不使用来源配置猜测补齐。 */
+    @Override
+    public ExternalCodeVerification verify(ExternalCodeType codeType, Long identityProviderId, String code,
+        String providerCodeVerifier) {
+        return verify(codeType, identityProviderId, code, providerCodeVerifier, null);
+    }
+    /** AppLink使用已认证Client白名单校验后的本次授权回调及专用PKCE材料。 */
+    @Override
+    public ExternalCodeVerification verify(ExternalCodeType codeType, Long identityProviderId, String code,
+        String providerCodeVerifier, String providerRedirectUri) {
+        ProviderConfig config = configs.requireEnabledById(identityProviderId, PROVIDER_TYPE).forCode(codeType);
+        if (codeType != ExternalCodeType.FEISHU_APP_CODE || !config.sourceType().supports(codeType)
+            || !config.flow().providerPkce() || providerCodeVerifier == null
+            || !providerCodeVerifier.matches("[A-Za-z0-9._~-]{43,128}")
+            || providerRedirectUri == null || providerRedirectUri.isBlank()) {
+            throw new IllegalArgumentException("当前飞书能力缺少授权回调或PKCE材料");
+        }
+        return new ExternalCodeVerification(client.fetchIdentity(config, code, providerRedirectUri,
+            FeishuLoginMode.APP, codeType.name(), providerCodeVerifier));
+    }
+
 }

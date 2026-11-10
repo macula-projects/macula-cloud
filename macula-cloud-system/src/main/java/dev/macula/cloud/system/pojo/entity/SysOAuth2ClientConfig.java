@@ -35,12 +35,27 @@ import java.time.Instant;
 @EqualsAndHashCode(callSuper = true)
 @TableName("sys_oauth2_client")
 public class SysOAuth2ClientConfig extends BaseEntity {
+    private String purpose;
+    private String managedKey;
+    private Long authorizationVersion;
+    private String resourcePermissions;
+
     private String clientId;
     private Instant clientIdIssuedAt;
     @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private String clientSecret;
     private Instant clientSecretExpiresAt;
     private String clientName;
+    private String protocolMode;
+    private String enabledProtocols;
+    private String defaultProtocol;
+    private String configurationStatus;
+    private String browserProviderBindings;
+    private String browserCapabilityBindings;
+    private String applicationType;
+    private String miniappPlatform;
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
+    private String hostedLoginMethods;
     private String clientAuthenticationMethods;
     private String authorizationGrantTypes;
     private String redirectUris;
@@ -59,6 +74,8 @@ public class SysOAuth2ClientConfig extends BaseEntity {
     private Boolean reuseRefreshTokens;
     private Long refreshTokenTimeToLive;
     private String idTokenSignatureAlgorithm;
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private String userType;
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private Long tenantId;
 }

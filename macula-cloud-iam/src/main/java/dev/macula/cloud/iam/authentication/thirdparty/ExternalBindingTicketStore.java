@@ -62,7 +62,8 @@ public class ExternalBindingTicketStore {
     private static final String FIELD_CLIENT_ID = "clientId";
     private static final String FIELD_TENANT_ID = "tenantId";
     private static final String FIELD_USER_TYPE = "userType";
-    private static final String FIELD_BINDING_TYPE = "bindingType";
+    private static final String FIELD_IDENTITY = "identity";
+    private static final String FIELD_EXPIRES_AT = "expiresAt";
     private static final String FIELD_PROVIDER_TYPE = "providerType";
     private static final String FIELD_SUBJECT = "subject";
     private static final String FIELD_MOBILE = "mobile";
@@ -151,14 +152,9 @@ public class ExternalBindingTicketStore {
         values.put(FIELD_TENANT_ID, tenantId.toString());
         values.put(FIELD_USER_TYPE, userType.getType());
         values.put(FIELD_FAILED_ATTEMPTS, "0");
-        if (verification.mobile() != null) {
-            values.put(FIELD_BINDING_TYPE, ExternalBindingTicket.BindingType.MOBILE.name());
-            values.put(FIELD_MOBILE, encrypt(FIELD_MOBILE, verification.mobile()));
-        } else {
-            values.put(FIELD_BINDING_TYPE, ExternalBindingTicket.BindingType.EXTERNAL_IDENTITY.name());
-            values.put(FIELD_PROVIDER_TYPE, verification.providerType());
-            values.put(FIELD_SUBJECT, encrypt(FIELD_SUBJECT, verification.subject()));
-        }
+        values.put(FIELD_IDENTITY, encrypt(FIELD_IDENTITY,
+            tools.jackson.databind.json.JsonMapper.builder().build().writeValueAsString(verification.identity())));
+        values.put(FIELD_EXPIRES_AT, java.time.Instant.now().plus(properties.getBindingTicketTtl()).toString());
         java.util.ArrayList<String> arguments = new java.util.ArrayList<>(values.size() * 2 + 1);
         values.forEach((field, value) -> {
             arguments.add(field);
@@ -194,9 +190,9 @@ public class ExternalBindingTicketStore {
             }
             ExternalBindingTicket value = new ExternalBindingTicket(required(values, FIELD_CLIENT_ID),
                 Long.valueOf(required(values, FIELD_TENANT_ID)), userType(required(values, FIELD_USER_TYPE)),
-                ExternalBindingTicket.BindingType.valueOf(required(values, FIELD_BINDING_TYPE)),
-                text(values, FIELD_PROVIDER_TYPE), decrypt(FIELD_SUBJECT, text(values, FIELD_SUBJECT)),
-                decrypt(FIELD_MOBILE, text(values, FIELD_MOBILE)),
+                tools.jackson.databind.json.JsonMapper.builder().build().readValue(
+                    decrypt(FIELD_IDENTITY, required(values, FIELD_IDENTITY)), VerifiedExternalIdentity.class),
+                java.time.Instant.parse(required(values, FIELD_EXPIRES_AT)),
                 Integer.parseInt(required(values, FIELD_FAILED_ATTEMPTS)));
             return new ClaimedTicket(key, owner, value);
         } catch (BadCredentialsException | IllegalArgumentException ex) {
@@ -206,6 +202,37 @@ public class ExternalBindingTicketStore {
             redis.execute(RELEASE, List.of(key), owner);
             throw ex;
         }
+    }
+
+    /** 将Redis claim固定至原过期时间，页面停留不能重置TTL或让其他浏览器抢占。 */
+    public ClaimedTicket claimForBrowser(String ticket) {
+        ClaimedTicket claimed = claim(ticket);
+        Long result = redis.execute(new DefaultRedisScript<>("""
+            if redis.call('hget',KEYS[1],'owner') ~= ARGV[1] then return 0 end
+            redis.call('hset',KEYS[1],'leaseUntil',ARGV[2])
+            return 1
+            """, Long.class), List.of(claimed.key()), claimed.owner(), Long.toString(claimed.value().expiresAt().toEpochMilli()));
+        if (!Long.valueOf(1).equals(result)) { throw invalid(); }
+        return claimed;
+    }
+
+    /** 检查当前浏览器仍持有原票据，缺失/过期/取消后不得继续绑定。 */
+    public void requireBrowserClaim(ClaimedTicket claimed) {
+        Map<Object, Object> values = redis.opsForHash().entries(claimed.key());
+        if (!"CLAIMED".equals(text(values, FIELD_STATE)) || !claimed.owner().equals(text(values, FIELD_OWNER))
+            || !claimed.value().expiresAt().isAfter(java.time.Instant.now())) { throw invalid(); }
+    }
+
+    /** 页面验证失败保持同一持有者并累计Redis全局次数，不能换页面重置。 */
+    public void failedBrowserAttempt(ClaimedTicket claimed) {
+        Long result = redis.execute(new DefaultRedisScript<>("""
+            if redis.call('hget',KEYS[1],'state') ~= 'CLAIMED' or
+               redis.call('hget',KEYS[1],'owner') ~= ARGV[1] then return 0 end
+            local attempts=redis.call('hincrby',KEYS[1],'failedAttempts',1)
+            if attempts >= tonumber(ARGV[2]) then redis.call('hset',KEYS[1],'state','TERMINATED') end
+            return attempts
+            """, Long.class), List.of(claimed.key()), claimed.owner(), Integer.toString(properties.getBindingTicketMaxAttempts()));
+        if (result == null || result == 0) { throw invalid(); }
     }
 
     public void failedAttempt(ClaimedTicket claimed) {
@@ -312,6 +339,6 @@ public class ExternalBindingTicketStore {
      *
      * @since 6.1.0
      */
-    public record ClaimedTicket(String key, String owner, ExternalBindingTicket value) {
+    public record ClaimedTicket(String key, String owner, ExternalBindingTicket value) implements java.io.Serializable {
     }
 }

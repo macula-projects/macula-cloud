@@ -36,7 +36,6 @@ import dev.macula.cloud.iam.protocol.oauth2.client.PublicTokenClientAuthenticati
 import dev.macula.cloud.iam.protocol.oauth2.endpoint.OAuth2AuthenticationExceptionEntryPoint;
 import dev.macula.cloud.iam.protocol.oauth2.endpoint.OAuth2TokenEndpointFailureHandler;
 import dev.macula.cloud.iam.protocol.oauth2.endpoint.OAuth2TokenOriginFilter;
-import dev.macula.cloud.iam.protocol.oauth2.grant.CompatibilityRefreshTokenAuthenticationProvider;
 import dev.macula.cloud.iam.protocol.oauth2.grant.CustomeOAuth2AccessTokenGenerator;
 import dev.macula.cloud.iam.protocol.oauth2.grant.base.OAuth2UserGrantTokenIssuer;
 import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeAccountResolver;
@@ -46,8 +45,6 @@ import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.OAuth2ExternalCod
 import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.OAuth2ExternalCodeAuthenticationProvider;
 import dev.macula.cloud.iam.protocol.oauth2.grant.email.OAuth2ResourceOwnerEmailAuthenticationConverter;
 import dev.macula.cloud.iam.protocol.oauth2.grant.email.OAuth2ResourceOwnerEmailAuthenticationProvider;
-import dev.macula.cloud.iam.protocol.oauth2.grant.password.OAuth2ResourceOwnerPasswordAuthenticationConverter;
-import dev.macula.cloud.iam.protocol.oauth2.grant.password.OAuth2ResourceOwnerPasswordAuthenticationProvider;
 import dev.macula.cloud.iam.protocol.oauth2.grant.sms.OAuth2ResourceOwnerSmsAuthenticationConverter;
 import dev.macula.cloud.iam.protocol.oauth2.grant.sms.OAuth2ResourceOwnerSmsAuthenticationProvider;
 import dev.macula.cloud.iam.service.oauth2.MaculaOAuth2AuthorizationConsentService;
@@ -82,7 +79,6 @@ import org.springframework.security.oauth2.server.authorization.authentication.O
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationCodeRequestAuthenticationToken;
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationConsentAuthenticationProvider;
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationConsentAuthenticationToken;
-import org.springframework.security.oauth2.server.authorization.authentication.OAuth2RefreshTokenAuthenticationProvider;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
 import org.springframework.security.oauth2.server.authorization.token.DelegatingOAuth2TokenGenerator;
@@ -107,14 +103,17 @@ import org.springframework.web.cors.CorsConfigurationSource;
  * @author rain
  * @since 2023/3/11 22:25
  */
+@org.springframework.context.annotation.Import(MfaExtensionConfiguration.class)
 @Configuration(proxyBeanMethods = false)
 @ConfigurationProperties(prefix = "macula.cloud.iam")
 @EnableAsync
 public class ProtocolOAuth2Configuration {
+    private static final int MAX_ASSERTION_DECODERS = 256;
     private static final String CUSTOM_CONSENT_PAGE_URI = "/oauth2/consent";
     @Setter
     private String issuerUri;
 
+    /** 安装协议原生安全链；端内证明隔离位于上下文加载后，回调/Scope/PKCE仍由SAS校验。 */
     @Bean("authorizationServerSecurityFilterChain")
     @Order(Ordered.HIGHEST_PRECEDENCE)
     SecurityFilterChain authorizationServerSecurityFilterChain(HttpSecurity http,
@@ -124,8 +123,14 @@ public class ProtocolOAuth2Configuration {
         ClientAwareAccountResolver accountResolver, OAuthClientUserDetailsService userDetails,
         ExternalCodeVerifierRegistry externalCodeVerifiers, ExternalCodeReplayStore externalCodeReplayStore,
         ExternalCodeAccountResolver externalCodeAccountResolver,
+        dev.macula.cloud.iam.authentication.thirdparty.IdentityProviderConfigService identitySources,
+        dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeRateLimiter externalCodeLimiter,
+        dev.macula.cloud.iam.authentication.mfa.MfaCompletionService mfaCompletion,
         RegisteredClientRepository registeredClientRepository,
-        AuthorizationServerSettings authorizationServerSettings) throws Exception {
+        @org.springframework.beans.factory.annotation.Qualifier("baseRegisteredClientRepository") RegisteredClientRepository baseRegisteredClientRepository,
+        AuthorizationServerSettings authorizationServerSettings,
+        dev.macula.cloud.iam.authentication.inapp.InAppLoginPolicyService inAppPolicy,
+        org.springframework.security.web.savedrequest.RequestCache browserRequestCache) throws Exception {
 
         // @formatter:off
 
@@ -133,15 +138,35 @@ public class ProtocolOAuth2Configuration {
         RequestMatcher tokenEndpointMatcher = PathPatternRequestMatcher.pathPattern(HttpMethod.POST,
             authorizationServerSettings.getTokenEndpoint());
 
+        var assertionDecoders = protocolClientAssertionDecoders();
+
         //  把自定义的授权确认URI加入配置
         authorizationServerConfigurer
             .clientAuthentication(clientAuthentication -> clientAuthentication
                 .authenticationConverter(new PublicTokenClientAuthenticationConverter(tokenEndpointMatcher))
-                .authenticationProvider(new PublicTokenClientAuthenticationProvider(registeredClientRepository)))
+                .authenticationProvider(new PublicTokenClientAuthenticationProvider(registeredClientRepository))
+                .authenticationProviders(providers -> providers.forEach(provider -> {
+                    if (provider instanceof org.springframework.security.oauth2.server.authorization.authentication.JwtClientAssertionAuthenticationProvider assertion) {
+                        assertion.setJwtDecoderFactory(assertionDecoders);
+                    }
+                })))
+            .tokenIntrospectionEndpoint(introspection -> introspection.authenticationProviders(providers -> {
+                for (int index = 0; index < providers.size(); index++) {
+                    if (providers.get(index) instanceof org.springframework.security.oauth2.server.authorization.authentication.OAuth2TokenIntrospectionAuthenticationProvider) {
+                        // 调用方已在clientAuthentication中使用有效协议完成认证。
+                        // 原生内省此处按ID读取的是目标Client，仅用于恢复claims，不能对公共目标再做机密认证选择。
+                        providers.set(index, new dev.macula.cloud.iam.protocol.oauth2.ResourceTokenIntrospectionAuthenticationProvider(
+                            baseRegisteredClientRepository, authorizationService, clientService));
+                    }
+                }
+            }))
             .authorizationEndpoint(authorizationEndpoint ->
                 authorizationEndpoint
                     .consentPage(CUSTOM_CONSENT_PAGE_URI)
                     .authenticationProviders(providers -> providers.forEach(provider -> {
+                        if (provider instanceof org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationCodeRequestAuthenticationProvider codeProvider) {
+                            codeProvider.setAuthenticationValidator(new dev.macula.cloud.iam.protocol.oauth2.OAuth2ClientProtocolValidator());
+                        }
                         if (provider instanceof OAuth2AuthorizationConsentAuthenticationProvider consentProvider) {
                             consentProvider.setAuthorizationConsentCustomizer(context -> {
                                 OAuth2AuthorizationConsentAuthenticationToken consent = context.getAuthentication();
@@ -165,27 +190,29 @@ public class ProtocolOAuth2Configuration {
             )
             .tokenEndpoint(tokenEndpoint ->
                 tokenEndpoint
-                    .accessTokenRequestConverter(new OAuth2ResourceOwnerPasswordAuthenticationConverter())
                     .accessTokenRequestConverter(new OAuth2ResourceOwnerSmsAuthenticationConverter())
                     .accessTokenRequestConverter(new OAuth2ResourceOwnerEmailAuthenticationConverter())
                     .accessTokenRequestConverter(new OAuth2ExternalCodeAuthenticationConverter())
-                    .errorResponseHandler(new OAuth2TokenEndpointFailureHandler())
+                    .errorResponseHandler(new OAuth2TokenEndpointFailureHandler(authorizationServerSettings.getIssuer()))
                     .authenticationProviders(providers -> {
-                        providers.replaceAll(provider -> provider instanceof OAuth2RefreshTokenAuthenticationProvider
-                            ? new CompatibilityRefreshTokenAuthenticationProvider(provider, authorizationService, tokenGenerator)
-                            : provider);
                         // The shared manager exists at request time, after HttpSecurity has been built.
                         AuthenticationManager userAuthentication = authentication ->
                             http.getSharedObject(AuthenticationManager.class).authenticate(authentication);
-                        providers.add(new OAuth2ResourceOwnerPasswordAuthenticationProvider(
-                            userAuthentication, authorizationService, tokenGenerator));
-                        providers.add(new OAuth2ResourceOwnerSmsAuthenticationProvider(
-                            userAuthentication, authorizationService, tokenGenerator));
-                        providers.add(new OAuth2ResourceOwnerEmailAuthenticationProvider(
-                            userAuthentication, authorizationService, tokenGenerator));
+                        var smsProvider = new OAuth2ResourceOwnerSmsAuthenticationProvider(
+                            userAuthentication, authorizationService, tokenGenerator);
+                        smsProvider.setMfaCompletion(mfaCompletion);
+                        providers.add(smsProvider);
+                        var emailProvider = new OAuth2ResourceOwnerEmailAuthenticationProvider(
+                            userAuthentication, authorizationService, tokenGenerator);
+                        emailProvider.setMfaCompletion(mfaCompletion);
+                        providers.add(emailProvider);
                         providers.add(new OAuth2ExternalCodeAuthenticationProvider(externalCodeVerifiers,
                             externalCodeReplayStore, externalCodeAccountResolver,
-                            new OAuth2UserGrantTokenIssuer(authorizationService, tokenGenerator)));
+                            new OAuth2UserGrantTokenIssuer(authorizationService, tokenGenerator, mfaCompletion), identitySources, externalCodeLimiter));
+                        for (int index = 0; index < providers.size(); index++) {
+                            providers.set(index, new dev.macula.cloud.iam.protocol.oauth2.ProtocolBoundAuthenticationProvider(
+                                providers.get(index), registeredClientRepository));
+                        }
                     })
             )
             .oidc(Customizer.withDefaults());
@@ -199,15 +226,26 @@ public class ProtocolOAuth2Configuration {
             PathPatternRequestMatcher.pathPattern(ProtocolVerificationCodeController.EMAIL_CODE_PATH));
         RequestMatcher protocolMatcher = new OrRequestMatcher(endpointsMatcher,
             PathPatternRequestMatcher.pathPattern(HttpMethod.OPTIONS,
-                authorizationServerSettings.getTokenEndpoint()), externalBindingMatcher, verificationMatcher);
+                authorizationServerSettings.getTokenEndpoint()),
+            // 元数据预检也必须经过同一受控 CORS，不能落入托管登录链产生 302。
+            PathPatternRequestMatcher.pathPattern(HttpMethod.OPTIONS, ProtocolLoginCorsConfigurationSource.DISCOVERY_PATH),
+            PathPatternRequestMatcher.pathPattern(HttpMethod.OPTIONS, ProtocolLoginCorsConfigurationSource.JWKS_PATH),
+            PathPatternRequestMatcher.pathPattern(HttpMethod.OPTIONS, ProtocolLoginCorsConfigurationSource.OAUTH_METADATA_PATH),
+            externalBindingMatcher, verificationMatcher,
+            PathPatternRequestMatcher.pathPattern(dev.macula.cloud.iam.controller.ProfileController.PATH));
 
+        http.addFilterAfter(new dev.macula.cloud.iam.authentication.inapp.InAppAuthorizationRequestFilter(
+            inAppPolicy, authorizationServerSettings),
+            org.springframework.security.web.context.SecurityContextHolderFilter.class);
         // 拦截 授权服务器相关的请求端点
         http
             .securityMatcher(protocolMatcher)
+            .requestCache(cache -> cache.requestCache(browserRequestCache))
             .cors(cors -> cors.configurationSource(protocolCorsConfigurationSource(authorizationServerSettings,
                 registeredClientRepository, clientService)))
             .authorizeHttpRequests(authorize -> authorize
                 .requestMatchers(verificationMatcher).permitAll()
+                .requestMatchers(dev.macula.cloud.iam.controller.ProfileController.PATH).permitAll()
                 .anyRequest().authenticated())
             // 忽略掉相关端点的csrf
             .csrf(csrf -> csrf.ignoringRequestMatchers(endpointsMatcher, externalBindingMatcher,
@@ -235,6 +273,37 @@ public class ProtocolOAuth2Configuration {
         // @formatter:on
         return http.build();
     }
+
+    /**
+     * 原生factory仅按Client ID缓存解码器，不能用于同ID不同协议/JWKS。
+     * 此处以权威策略作为有界缓存键；签名、claims及audience仍完全由原生factory校验。
+     */
+    private org.springframework.security.oauth2.jwt.JwtDecoderFactory<org.springframework.security.oauth2.server.authorization.client.RegisteredClient> protocolClientAssertionDecoders() {
+        var cache = new java.util.LinkedHashMap<ClientAssertionPolicy, org.springframework.security.oauth2.jwt.JwtDecoder>(16, 0.75f, true);
+        return client -> {
+            var settings = client.getClientSettings();
+            ClientAssertionPolicy key = new ClientAssertionPolicy(client.getId(),
+                settings.getSetting(dev.macula.cloud.iam.protocol.oauth2.ApplicationProtocolResolver.EFFECTIVE_PROTOCOL),
+                settings.getJwkSetUrl(), settings.getTokenEndpointAuthenticationSigningAlgorithm().getName());
+            synchronized (cache) {
+                var decoder = cache.get(key);
+                if (decoder == null) {
+                    decoder = new org.springframework.security.oauth2.server.authorization.authentication.JwtClientAssertionDecoderFactory().createDecoder(client);
+                    if (cache.size() >= MAX_ASSERTION_DECODERS) {
+                        cache.remove(cache.keySet().iterator().next());
+                    }
+                    cache.put(key, decoder);
+                }
+                return decoder;
+            }
+        };
+    }
+
+    /**
+     * 客户端断言验证器的策略身份，不包含原始断言或应用Secret。
+     * @since 6.1.0
+     */
+    private record ClientAssertionPolicy(String clientId, String protocol, String jwksUrl, String algorithm) { }
 
     private CorsConfigurationSource protocolCorsConfigurationSource(
         AuthorizationServerSettings authorizationServerSettings,
@@ -267,14 +336,26 @@ public class ProtocolOAuth2Configuration {
 
     @Bean
     OAuth2AuthorizationService oauth2AuthorizationService(RedisTemplate<String, Object> redisTemplate,
-        RegisteredClientRepository registeredClientRepository) {
-        return new MaculaOAuth2AuthorizationService(redisTemplate, registeredClientRepository);
+        @org.springframework.beans.factory.annotation.Qualifier("baseRegisteredClientRepository") RegisteredClientRepository registeredClientRepository,
+        SysOAuth2ClientService clients) {
+        return new MaculaOAuth2AuthorizationService(redisTemplate, registeredClientRepository, clients);
     }
 
+    /** 授权恢复专用基础仓库，不依赖HTTP请求或授权服务。 */
+    @Bean("baseRegisteredClientRepository")
+    RegisteredClientRepository baseRegisteredClientRepository(SysOAuth2ClientService clients,
+        SysOAuth2ClientExternalProviderMapper mappings) {
+        return new MaculaRegisteredClientRepository(clients, mappings);
+    }
+
+    /** 原生provider使用无缓存的协议视图；授权服务通过Qualifier固定使用基础仓库。 */
     @Bean
-    RegisteredClientRepository registeredClientRepository(SysOAuth2ClientService sysOAuth2ClientService,
-        SysOAuth2ClientExternalProviderMapper externalProviderMapper) {
-        return new MaculaRegisteredClientRepository(sysOAuth2ClientService, externalProviderMapper);
+    @org.springframework.context.annotation.Primary
+    RegisteredClientRepository registeredClientRepository(
+        @org.springframework.beans.factory.annotation.Qualifier("baseRegisteredClientRepository") RegisteredClientRepository base,
+        SysOAuth2ClientService clients,
+        org.springframework.beans.factory.ObjectProvider<OAuth2AuthorizationService> authorizations) {
+        return new dev.macula.cloud.iam.protocol.oauth2.ProtocolAwareRegisteredClientRepository(base, clients, authorizations);
     }
 
     @Bean
@@ -284,12 +365,15 @@ public class ProtocolOAuth2Configuration {
 
     @Bean
     OAuth2TokenGenerator<OAuth2Token> tokenGenerator(JWKSource<SecurityContext> jwkSource,
-        OAuth2TokenCustomizer<OAuth2TokenClaimsContext> accessTokenCustomizer) {
+        OAuth2TokenCustomizer<OAuth2TokenClaimsContext> accessTokenCustomizer, SysOAuth2ClientService clients,
+        dev.macula.cloud.iam.authentication.mfa.MfaCompletionService mfaCompletion) {
         CustomeOAuth2AccessTokenGenerator accessTokenGenerator = new CustomeOAuth2AccessTokenGenerator();
         accessTokenGenerator.setAccessTokenCustomizer(accessTokenCustomizer);
         JwtGenerator jwtGenerator = new JwtGenerator(new NimbusJwtEncoder(jwkSource));
         jwtGenerator.setJwtCustomizer(new CustomOidcTokenCustomizer());
-        return new DelegatingOAuth2TokenGenerator(jwtGenerator, accessTokenGenerator,
-            new OAuth2RefreshTokenGenerator());
+        var generator = new dev.macula.cloud.iam.protocol.oauth2.ProtocolCheckingTokenGenerator(
+            new DelegatingOAuth2TokenGenerator(jwtGenerator, accessTokenGenerator, new OAuth2RefreshTokenGenerator()), clients);
+        generator.setMfaCompletion(mfaCompletion);
+        return generator;
     }
 }

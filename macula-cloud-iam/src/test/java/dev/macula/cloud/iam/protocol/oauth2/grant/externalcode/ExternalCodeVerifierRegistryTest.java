@@ -55,4 +55,14 @@ class ExternalCodeVerifierRegistryTest {
         assertThatThrownBy(() -> new ExternalCodeVerifierRegistry(List.of(first, second)))
             .isInstanceOf(IllegalStateException.class);
     }
+    /** 未实现专用合同的适配器不能默默忽略回调或PKCE扩展材料。 */
+    @Test
+    void defaultAdapterRejectsUnexpectedProviderContext() {
+        var verifier = mock(ExternalCodeVerifier.class, org.mockito.Mockito.CALLS_REAL_METHODS);
+        assertThatThrownBy(() -> verifier.verify(ExternalCodeType.WECOM_APP_CODE, 7L, "fixture-code", null, "https://app.example/callback"))
+            .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> verifier.verify(ExternalCodeType.WECOM_APP_CODE, 7L, "fixture-code", "p".repeat(43), null))
+            .isInstanceOf(IllegalArgumentException.class);
+    }
+
 }

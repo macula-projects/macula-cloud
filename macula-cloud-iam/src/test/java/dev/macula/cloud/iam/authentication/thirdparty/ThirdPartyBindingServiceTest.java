@@ -17,9 +17,7 @@
 package dev.macula.cloud.iam.authentication.thirdparty;
 
 import dev.macula.cloud.iam.authentication.sms.SmsService;
-import dev.macula.cloud.iam.mapper.SysUserIdentityBindingMapper;
 import dev.macula.cloud.iam.pojo.entity.SysUser;
-import dev.macula.cloud.iam.pojo.entity.SysUserIdentityBinding;
 import dev.macula.cloud.iam.service.support.SysUserService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,8 +27,6 @@ import org.springframework.security.core.userdetails.User;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.Instant;
-import java.util.List;
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -44,14 +40,14 @@ import static org.mockito.Mockito.*;
  */
 class ThirdPartyBindingServiceTest {
     PendingThirdPartyBindingRepository pending = new PendingThirdPartyBindingRepository();
-    IdentityProviderConfigService configs = mock(IdentityProviderConfigService.class);
+
     SysUserService users = mock(SysUserService.class);
-    ThirdPartyUserDetailsService details = mock(ThirdPartyUserDetailsService.class);
-    SysUserIdentityBindingMapper bindings = mock(SysUserIdentityBindingMapper.class);
+
+    RegistrationIdentityBindingService bindings = mock(RegistrationIdentityBindingService.class);
     PasswordEncoder passwords = mock(PasswordEncoder.class);
     SmsService sms = mock(SmsService.class);
-    ThirdPartyBindingService service = new ThirdPartyBindingService(pending, configs, users, details,
-        bindings, passwords, sms);
+    ThirdPartyBindingService service = new ThirdPartyBindingService(pending, bindings, users, passwords, sms,
+        new dev.macula.cloud.system.security.UserIdentifierNormalizer());
     MockHttpServletRequest request = new MockHttpServletRequest();
     SysUser account = new SysUser();
 
@@ -63,11 +59,13 @@ class ThirdPartyBindingServiceTest {
         account.setPassword("encoded");
         account.setStatus(1);
         when(users.findUniqueByUsername("alice")).thenReturn(account);
-        when(details.load("alice")).thenReturn(User.withUsername("alice").password("encoded").authorities("USER").build());
-        when(configs.findBoundUsername("GITHUB", "123")).thenReturn(Optional.empty());
-        when(bindings.selectList(any())).thenReturn(List.of());
-        pending.save(request, new ThirdPartyIdentityResolutionService.BindingRequiredException("GITHUB", "123",
-            new ThirdPartyLoginContext("GITHUB", "", "test-client", Instant.now(), "/")));
+        org.springframework.transaction.support.TransactionSynchronizationManager.initSynchronization();
+        when(bindings.requireClient(any(), any(), eq(false), eq(1L), eq(dev.macula.cloud.iam.enums.UserTypeEnum.EMPLOYEE)))
+            .thenReturn(new dev.macula.cloud.iam.pojo.entity.SysOAuth2Client());
+        when(bindings.bind(any(), eq(1L), eq(dev.macula.cloud.iam.enums.UserTypeEnum.EMPLOYEE), any(), eq(7L), eq(false)))
+            .thenReturn(User.withUsername("alice").password("encoded").authorities("USER").build());
+        pending.save(request, dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.bindingRequired("GITHUB", "123",
+            dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.context("GITHUB", "", "test-client", Instant.now(), "/")));
     }
 
     @Test
@@ -75,8 +73,10 @@ class ThirdPartyBindingServiceTest {
         when(passwords.matches("correct", "encoded")).thenReturn(true);
         assertEquals("alice", service.bind(request, "alice", "password", "correct", null, null, null)
             .user().getUsername());
-        verify(bindings).insert(org.mockito.ArgumentMatchers.<SysUserIdentityBinding>argThat(binding -> "GITHUB".equals(binding.getProviderType())
-            && "123".equals(binding.getProviderSubject()) && "alice".equals(binding.getUsername())));
+        verify(bindings).bind(eq("test-client"), eq(1L), eq(dev.macula.cloud.iam.enums.UserTypeEnum.EMPLOYEE),
+            argThat(identity -> "GITHUB".equals(identity.providerType()) && "123".equals(identity.identityValue())), eq(7L), eq(false));
+        org.springframework.transaction.support.TransactionSynchronizationManager.getSynchronizations()
+            .forEach(org.springframework.transaction.support.TransactionSynchronization::afterCommit);
         assertThrows(BadCredentialsException.class, () -> pending.current(request));
     }
 
@@ -87,17 +87,17 @@ class ThirdPartyBindingServiceTest {
         when(users.findUniqueByMobile("13800000000")).thenThrow(new BadCredentialsException("duplicate"));
         assertThrows(BadCredentialsException.class,
             () -> service.bind(request, "alice", "sms", null, "13800000000", "123456", null));
-        verify(bindings, never()).insert(any(SysUserIdentityBinding.class));
+        verify(bindings, never()).bind(any(), any(), any(), any(), any(), anyBoolean());
         verify(sms, never()).verifyCode(any(), any());
     }
 
     @Test
     void smsProofRequiresTargetPhoneAndOneUseCode() {
         when(users.findUniqueByMobile("13800000000")).thenReturn(account);
-        when(sms.verifyCode("13800000000", "123456")).thenReturn(true);
+        when(sms.verifyCode("13800000000", "123456", "test-client", dev.macula.cloud.iam.authentication.sms.SmsCodePurpose.IDENTITY_BINDING)).thenReturn(true);
         service.bind(request, "alice", "sms", null, "13800000000", "123456", null);
-        verify(sms).verifyCode("13800000000", "123456");
-        verify(bindings).insert(any(SysUserIdentityBinding.class));
+        verify(sms).verifyCode("13800000000", "123456", "test-client", dev.macula.cloud.iam.authentication.sms.SmsCodePurpose.IDENTITY_BINDING);
+        verify(bindings).bind(any(), any(), any(), any(), eq(7L), eq(false));
     }
 
     @Test
@@ -106,6 +106,12 @@ class ThirdPartyBindingServiceTest {
 
         assertThrows(BadCredentialsException.class,
             () -> service.bind(request, "alice", "password", "correct", null, null, null));
-        verify(bindings, never()).insert(any(SysUserIdentityBinding.class));
+        verify(bindings, never()).bind(any(), any(), any(), any(), any(), anyBoolean());
     }
+    /** 每个用例清理事务同步上下文。 */
+    @org.junit.jupiter.api.AfterEach
+    void clearTransaction() {
+        org.springframework.transaction.support.TransactionSynchronizationManager.clearSynchronization();
+    }
+
 }

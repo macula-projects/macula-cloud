@@ -23,6 +23,8 @@ package dev.macula.cloud.iam.protocol.oauth2.grant.externalcode;
  * @since 6.1.0
  */
 public final class ExternalCodeClientSettings {
+    public static final String APPLICATION_TYPE = "macula.external-code.application-type";
+    public static final String MINIAPP_PLATFORM = "macula.external-code.miniapp-platform";
     public static final String CODE_TYPES = "macula.external-code.types";
     public static final String PROVIDER_BINDINGS = "macula.external-code.provider-bindings";
     public static final String ALLOWED_ORIGINS = "macula.login-code.allowed-origins";

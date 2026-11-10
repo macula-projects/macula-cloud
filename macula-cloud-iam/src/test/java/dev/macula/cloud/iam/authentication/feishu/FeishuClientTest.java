@@ -58,67 +58,93 @@ class FeishuClientTest {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         FeishuClient client = new FeishuClient(builder.build());
-        ProviderConfig config = new ProviderConfig("FEISHU", "app", "secret", Map.of("appId", "app"));
-        server.expect(requestTo("https://open.feishu.cn/open-apis/authen/v2/oauth/token"))
+        ProviderConfig config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(dev.macula.cloud.system.enums.IdentitySourceType.FEISHU_WEB, "FEISHU", "app", "secret", Map.of("appId", "app"));
+        server.expect(requestTo("https://accounts.feishu.cn/oauth/v3/token"))
             .andExpect(content().string(containsString(
                 "\"redirect_uri\":\"https://iam.example/login/feishu\"")))
             .andRespond(withSuccess("{\"access_token\":\"token\"}", MediaType.APPLICATION_JSON));
         server.expect(requestTo("https://open.feishu.cn/open-apis/authen/v1/user_info"))
-            .andRespond(withSuccess("{\"code\":0,\"data\":{\"employee_no\":\"E1001\"}}",
+            .andRespond(withSuccess("{\"code\":0,\"data\":{\"open_id\":\"stable-open-id\",\"employee_no\":\"E1001\"}}",
                 MediaType.APPLICATION_JSON));
-        assertEquals("E1001", client.fetchEmployeeNo(config, "code",
-            "https://iam.example/login/feishu", FeishuLoginMode.BROWSER));
+        assertEquals("E1001", client.fetchIdentity(config, "code",
+            "https://iam.example/login/feishu", FeishuLoginMode.BROWSER, "BROWSER").attributes().get("employee_no"));
         server.verify();
     }
 
+    /** AppLink严格发送本次回调及平台PKCE证明，不把IAM PKCE当作上游已核验。 */
     @Test
-    void appCodeUsesOauthTokenEndpointWithoutRedirectUri() {
+    void appLinkSendsExactRuntimeCallbackAndProviderVerifier() {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         FeishuClient client = new FeishuClient(builder.build());
-        ProviderConfig config = new ProviderConfig("FEISHU", "app", "secret", Map.of("appId", "app"));
-        server.expect(requestTo("https://open.feishu.cn/open-apis/authen/v2/oauth/token"))
-            .andRespond(withSuccess("{\"access_token\":\"token\"}", MediaType.APPLICATION_JSON));
+        String proof = "p".repeat(43);
+        var config = new ProviderConfig(9L, dev.macula.cloud.system.enums.IdentitySourceType.FEISHU_APPLINK,
+            false, null, 1L, "FEISHU", "app", "fixture-secret", Map.of("appId", "app"), Map.of(), true,
+            dev.macula.cloud.system.enums.IdentitySourceFlow.FEISHU_APPLINK_V3,
+            dev.macula.cloud.system.enums.IdentityDirectoryPolicy.IDENTITY_ONLY, null, "https://obsolete.example/callback");
+        assertThrows(AuthenticationServiceException.class, () -> client.fetchIdentity(config, "code", null,
+            FeishuLoginMode.APP, "FEISHU_APP_CODE", null));
+        server.expect(requestTo("https://accounts.feishu.cn/oauth/v3/token"))
+            .andExpect(org.springframework.test.web.client.match.MockRestRequestMatchers.method(HttpMethod.POST))
+            .andExpect(content().json("{\"grant_type\":\"authorization_code\",\"client_id\":\"app\",\"client_secret\":\"fixture-secret\","
+                + "\"code\":\"code\",\"redirect_uri\":\"https://app.example/callback\",\"code_verifier\":\"" + proof + "\"}"))
+            .andRespond(withSuccess("{\"access_token\":\"fixture-token\"}", MediaType.APPLICATION_JSON));
         server.expect(requestTo("https://open.feishu.cn/open-apis/authen/v1/user_info"))
-            .andRespond(withSuccess("{\"code\":0,\"data\":{\"employee_no\":\"E1002\"}}",
-                MediaType.APPLICATION_JSON));
+            .andExpect(org.springframework.test.web.client.match.MockRestRequestMatchers.header("Authorization", "Bearer fixture-token"))
+            .andRespond(withSuccess("{\"code\":0,\"data\":{\"open_id\":\"open-fixture\"}}", MediaType.APPLICATION_JSON));
+        assertEquals("open-fixture", client.fetchIdentity(config, "code", "https://app.example/callback",
+            FeishuLoginMode.APP, "FEISHU_APP_CODE", proof).identityValue());
+        server.verify();
+    }
 
-        assertEquals("E1002", client.fetchEmployeeNo(config, "code", null, FeishuLoginMode.APP));
+    /** 非AppLink合同不能通过APP模式绕过回调与专用PKCE。 */
+    @Test
+    void appCodeRejectsWebContractWithoutProviderProof() {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        FeishuClient client = new FeishuClient(builder.build());
+        ProviderConfig config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(dev.macula.cloud.system.enums.IdentitySourceType.FEISHU_WEB, "FEISHU", "app", "secret", Map.of("appId", "app"));
+        assertThrows(AuthenticationServiceException.class, () -> client.fetchIdentity(config, "code", null, FeishuLoginMode.APP, "FEISHU_APP_CODE"));
         server.verify();
     }
 
     @Test
-    void webviewCodeResolvesOnlyEmployeeNumber() {
+    void webviewCodeUsesV3AndResolvesVerifiedIdentity() {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         FeishuClient client = new FeishuClient(builder.build());
-        ProviderConfig config = new ProviderConfig("FEISHU", "app", "secret", Map.of("appId", "app"));
-        server.expect(requestTo("https://open.feishu.cn/open-apis/auth/v3/app_access_token/internal"))
-            .andRespond(withSuccess("{\"code\":0,\"app_access_token\":\"app-token\"}",
-                MediaType.APPLICATION_JSON));
-        server.expect(requestTo("https://open.feishu.cn/open-apis/authen/v1/access_token"))
-            .andRespond(withSuccess("{\"code\":0,\"data\":{\"access_token\":\"user-token\"}}",
-                MediaType.APPLICATION_JSON));
+        var config = new ProviderConfig(10L, dev.macula.cloud.system.enums.IdentitySourceType.FEISHU_WEBVIEW,
+            false, null, 1L, "FEISHU", "app", "fixture-secret", Map.of("appId", "app"), Map.of(), true,
+            dev.macula.cloud.system.enums.IdentitySourceFlow.FEISHU_WEBVIEW_V3,
+            dev.macula.cloud.system.enums.IdentityDirectoryPolicy.IDENTITY_ONLY, null, null);
+        server.expect(requestTo("https://accounts.feishu.cn/oauth/v3/token"))
+            .andExpect(org.springframework.test.web.client.match.MockRestRequestMatchers.method(HttpMethod.POST))
+            .andExpect(content().json("{\"grant_type\":\"authorization_code\",\"client_id\":\"app\","
+                + "\"client_secret\":\"fixture-secret\",\"code\":\"jsapi-code\"}"))
+            .andExpect(content().string(org.hamcrest.Matchers.not(containsString("redirect_uri"))))
+            .andExpect(content().string(org.hamcrest.Matchers.not(containsString("code_verifier"))))
+            .andRespond(withSuccess("{\"code\":0,\"access_token\":\"user-token\"}", MediaType.APPLICATION_JSON));
         server.expect(requestTo("https://open.feishu.cn/open-apis/authen/v1/user_info"))
-            .andRespond(withSuccess("{\"code\":0,\"data\":{\"employee_no\":\"E1002\"}}",
-                MediaType.APPLICATION_JSON));
-
-        assertEquals("E1002", client.fetchEmployeeNo(config, "code", null, FeishuLoginMode.WEBVIEW));
+            .andExpect(org.springframework.test.web.client.match.MockRestRequestMatchers.header("Authorization", "Bearer user-token"))
+            .andRespond(withSuccess("{\"code\":0,\"data\":{\"open_id\":\"stable-open-id\",\"employee_no\":\"E1002\"}}", MediaType.APPLICATION_JSON));
+        var identity = client.fetchIdentity(config, "jsapi-code", null, FeishuLoginMode.WEBVIEW, "FEISHU_WEBVIEW_CODE");
+        assertEquals("stable-open-id", identity.identityValue());
+        assertEquals("E1002", identity.attributes().get("employee_no"));
         server.verify();
     }
 
     @Test
-    void missingEmployeeNumberFailsClosed() {
+    void missingStableOpenIdFailsClosed() {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         FeishuClient client = new FeishuClient(builder.build());
-        ProviderConfig config = new ProviderConfig("FEISHU", "app", "secret", Map.of("appId", "app"));
-        server.expect(requestTo("https://open.feishu.cn/open-apis/authen/v2/oauth/token"))
+        ProviderConfig config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(dev.macula.cloud.system.enums.IdentitySourceType.FEISHU_WEB, "FEISHU", "app", "secret", Map.of("appId", "app"));
+        server.expect(requestTo("https://accounts.feishu.cn/oauth/v3/token"))
             .andRespond(withSuccess("{\"access_token\":\"token\"}", MediaType.APPLICATION_JSON));
         server.expect(requestTo("https://open.feishu.cn/open-apis/authen/v1/user_info"))
             .andRespond(withSuccess("{\"code\":0,\"data\":{}}", MediaType.APPLICATION_JSON));
-        assertThrows(AuthenticationServiceException.class, () -> client.fetchEmployeeNo(config, "code",
-            "https://iam.example/login/feishu", FeishuLoginMode.BROWSER));
+        assertThrows(AuthenticationServiceException.class, () -> client.fetchIdentity(config, "code",
+            "https://iam.example/login/feishu", FeishuLoginMode.BROWSER, "BROWSER"));
     }
 
     @Test
@@ -126,14 +152,14 @@ class FeishuClientTest {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         FeishuClient client = new FeishuClient(builder.build());
-        ProviderConfig config = new ProviderConfig("FEISHU", "app", "client-secret-marker",
+        ProviderConfig config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(dev.macula.cloud.system.enums.IdentitySourceType.FEISHU_WEB, "FEISHU", "app", "client-secret-marker",
             Map.of("appId", "app"));
-        server.expect(requestTo("https://open.feishu.cn/open-apis/authen/v2/oauth/token"))
+        server.expect(requestTo("https://accounts.feishu.cn/oauth/v3/token"))
             .andRespond(withSuccess("{\"code\":20003,\"msg\":\"provider-text-marker\"}",
                 MediaType.APPLICATION_JSON));
 
-        assertThrows(AuthenticationServiceException.class, () -> client.fetchEmployeeNo(config, "code-marker",
-            "https://iam.example/login/feishu", FeishuLoginMode.BROWSER));
+        assertThrows(AuthenticationServiceException.class, () -> client.fetchIdentity(config, "code-marker",
+            "https://iam.example/login/feishu", FeishuLoginMode.BROWSER, "BROWSER"));
         String logs = output.toString();
         assertTrue(logs.contains("provider=FEISHU"));
         assertTrue(logs.contains("errcode=20003"));
@@ -147,12 +173,12 @@ class FeishuClientTest {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         FeishuClient client = new FeishuClient(builder.build());
-        ProviderConfig config = new ProviderConfig("FEISHU", "app", "secret", Map.of("appId", "app"));
-        server.expect(requestTo("https://open.feishu.cn/open-apis/authen/v2/oauth/token"))
+        ProviderConfig config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(dev.macula.cloud.system.enums.IdentitySourceType.FEISHU_WEB, "FEISHU", "app", "secret", Map.of("appId", "app"));
+        server.expect(requestTo("https://accounts.feishu.cn/oauth/v3/token"))
             .andRespond(withSuccess("not-json", MediaType.APPLICATION_JSON));
 
-        assertThrows(AuthenticationServiceException.class, () -> client.fetchEmployeeNo(config, "code",
-            "https://iam.example/login/feishu", FeishuLoginMode.BROWSER));
+        assertThrows(AuthenticationServiceException.class, () -> client.fetchIdentity(config, "code",
+            "https://iam.example/login/feishu", FeishuLoginMode.BROWSER, "BROWSER"));
     }
 
     @Test
@@ -160,12 +186,12 @@ class FeishuClientTest {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         FeishuClient client = new FeishuClient(builder.build());
-        ProviderConfig config = new ProviderConfig("FEISHU", "app", "secret", Map.of("appId", "app"));
-        server.expect(requestTo("https://open.feishu.cn/open-apis/authen/v2/oauth/token"))
+        ProviderConfig config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(dev.macula.cloud.system.enums.IdentitySourceType.FEISHU_WEB, "FEISHU", "app", "secret", Map.of("appId", "app"));
+        server.expect(requestTo("https://accounts.feishu.cn/oauth/v3/token"))
             .andRespond(withStatus(HttpStatus.BAD_GATEWAY));
 
-        assertThrows(AuthenticationServiceException.class, () -> client.fetchEmployeeNo(config, "code",
-            "https://iam.example/login/feishu", FeishuLoginMode.BROWSER));
+        assertThrows(AuthenticationServiceException.class, () -> client.fetchIdentity(config, "code",
+            "https://iam.example/login/feishu", FeishuLoginMode.BROWSER, "BROWSER"));
     }
 
     @Test
@@ -174,10 +200,10 @@ class FeishuClientTest {
             throw new SocketTimeoutException("timeout-message-marker");
         }).build();
         FeishuClient client = new FeishuClient(restClient);
-        ProviderConfig config = new ProviderConfig("FEISHU", "app", "secret", Map.of("appId", "app"));
+        ProviderConfig config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(dev.macula.cloud.system.enums.IdentitySourceType.FEISHU_WEB, "FEISHU", "app", "secret", Map.of("appId", "app"));
 
-        assertThrows(AuthenticationServiceException.class, () -> client.fetchEmployeeNo(config, "code",
-            "https://iam.example/login/feishu", FeishuLoginMode.BROWSER));
+        assertThrows(AuthenticationServiceException.class, () -> client.fetchIdentity(config, "code",
+            "https://iam.example/login/feishu", FeishuLoginMode.BROWSER, "BROWSER"));
         assertFalse(output.toString().contains("timeout-message-marker"));
     }
 

@@ -16,12 +16,9 @@
  */
 package dev.macula.cloud.iam.authentication.thirdparty;
 
-import dev.macula.cloud.iam.authentication.thirdparty.ExternalBindingTicket.BindingType;
 import dev.macula.cloud.iam.authentication.thirdparty.ExternalBindingTicketStore.ClaimedTicket;
 import dev.macula.cloud.iam.enums.UserTypeEnum;
-import dev.macula.cloud.iam.mapper.SysUserIdentityBindingMapper;
 import dev.macula.cloud.iam.pojo.entity.SysUser;
-import dev.macula.cloud.iam.pojo.entity.SysUserIdentityBinding;
 import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeClientSettings;
 import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.OAuth2ExternalCodeAuthenticationToken;
 import dev.macula.cloud.iam.service.support.SysUserService;
@@ -71,7 +68,7 @@ class ExternalIdentityBindingServiceTest {
     private final OAuth2AuthorizationService authorizations = mock(OAuth2AuthorizationService.class);
     private final RegisteredClientRepository clients = mock(RegisteredClientRepository.class);
     private final SysUserService users = mock(SysUserService.class);
-    private final SysUserIdentityBindingMapper bindings = mock(SysUserIdentityBindingMapper.class);
+    private final RegistrationIdentityBindingService bindings = mock(RegistrationIdentityBindingService.class);
     private final ExternalIdentityBindingService service =
         new ExternalIdentityBindingService(tickets, authorizations, clients, users, bindings);
 
@@ -90,20 +87,18 @@ class ExternalIdentityBindingServiceTest {
     @Test
     void bindsExternalIdentityAndConsumesTicketAfterCommit() {
         RegisteredClient client = client();
-        ClaimedTicket claimed = claimed(BindingType.EXTERNAL_IDENTITY, "WECOM", "member-id", null);
+        ClaimedTicket claimed = claimed("EXTERNAL_IDENTITY", "WECOM", "member-id", null);
         when(tickets.claim("binding-ticket")).thenReturn(claimed);
         when(authorizations.findByToken(ACCESS_TOKEN,
             org.springframework.security.oauth2.server.authorization.OAuth2TokenType.ACCESS_TOKEN))
             .thenReturn(authorization(client, AuthorizationGrantType.AUTHORIZATION_CODE));
         when(clients.findById(client.getId())).thenReturn(client);
-        when(users.findUniqueByUsername("alice")).thenReturn(account(null));
-        when(bindings.selectList(any())).thenReturn(List.of());
-        when(bindings.insert(any(SysUserIdentityBinding.class))).thenReturn(1);
+        when(users.getById(7L)).thenReturn(account(null));
 
         service.bind(ACCESS_TOKEN, "binding-ticket");
         completeTransaction(true);
 
-        verify(bindings).insert(any(SysUserIdentityBinding.class));
+        verify(bindings).bind(CLIENT_ID, 1L, UserTypeEnum.EMPLOYEE, claimed.value().identity(), 7L, false);
         verify(tickets).consume(claimed);
         verify(tickets, never()).failedAttempt(claimed);
     }
@@ -111,7 +106,7 @@ class ExternalIdentityBindingServiceTest {
     @Test
     void rejectsExternalCodeTokenAsAccountOwnershipProof() {
         RegisteredClient client = client();
-        ClaimedTicket claimed = claimed(BindingType.EXTERNAL_IDENTITY, "WECOM", "member-id", null);
+        ClaimedTicket claimed = claimed("EXTERNAL_IDENTITY", "WECOM", "member-id", null);
         when(tickets.claim("binding-ticket")).thenReturn(claimed);
         when(authorizations.findByToken(ACCESS_TOKEN,
             org.springframework.security.oauth2.server.authorization.OAuth2TokenType.ACCESS_TOKEN))
@@ -122,19 +117,21 @@ class ExternalIdentityBindingServiceTest {
             .isInstanceOf(BadCredentialsException.class);
 
         verify(tickets).failedAttempt(claimed);
-        verify(bindings, never()).insert(any(SysUserIdentityBinding.class));
+        verify(bindings, never()).bind(any(), any(), any(), any(), any(), org.mockito.ArgumentMatchers.anyBoolean());
     }
 
     @Test
     void rejectsMobileThatWouldOverwriteAnotherValue() {
         RegisteredClient client = client();
-        ClaimedTicket claimed = claimed(BindingType.MOBILE, null, null, "13800000000");
+        ClaimedTicket claimed = claimed("MOBILE", null, null, "13800000000");
         when(tickets.claim("binding-ticket")).thenReturn(claimed);
         when(authorizations.findByToken(ACCESS_TOKEN,
             org.springframework.security.oauth2.server.authorization.OAuth2TokenType.ACCESS_TOKEN))
             .thenReturn(authorization(client, AuthorizationGrantType.AUTHORIZATION_CODE));
         when(clients.findById(client.getId())).thenReturn(client);
-        when(users.findUniqueByUsername("alice")).thenReturn(account("13900000000"));
+        when(users.getById(7L)).thenReturn(account("13900000000"));
+        when(bindings.bind(CLIENT_ID, 1L, UserTypeEnum.EMPLOYEE, claimed.value().identity(), 7L, false))
+            .thenThrow(new BadCredentialsException("phone mismatch"));
 
         assertThatThrownBy(() -> service.bind(ACCESS_TOKEN, "binding-ticket"))
             .isInstanceOf(BadCredentialsException.class);
@@ -177,9 +174,10 @@ class ExternalIdentityBindingServiceTest {
             .build();
     }
 
-    private ClaimedTicket claimed(BindingType bindingType, String providerType, String subject, String mobile) {
+    private ClaimedTicket claimed(String bindingType, String providerType, String subject, String mobile) {
         ExternalBindingTicket ticket = new ExternalBindingTicket(CLIENT_ID, 1L, UserTypeEnum.EMPLOYEE,
-            bindingType, providerType, subject, mobile, 0);
+            mobile == null ? IdentitySourceTestFixtures.sdkIdentity(providerType, subject).identity()
+                : IdentitySourceTestFixtures.mobile(mobile).identity(), Instant.now().plusSeconds(300), 0);
         return new ClaimedTicket("ticket-key", "owner-nonce", ticket);
     }
 

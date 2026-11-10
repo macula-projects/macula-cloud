@@ -35,6 +35,8 @@ import java.util.Map;
 @Mapper
 public interface IdentityProviderConverter {
 
+    /** 映射普通脱敏属性；多条绑定由服务层按共享严格codec显式投影。 */
+    @Mapping(target = "bindingMappings", ignore = true)
     @Mapping(target = "category", source = "category")
     @Mapping(target = "callbackUrl", source = "callbackUrl")
     @Mapping(target = "config", source = "config")

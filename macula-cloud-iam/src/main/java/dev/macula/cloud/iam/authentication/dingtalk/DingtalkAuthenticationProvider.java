@@ -17,6 +17,8 @@
 package dev.macula.cloud.iam.authentication.dingtalk;
 
 import dev.macula.cloud.iam.authentication.thirdparty.IdentityProviderConfigService;
+import dev.macula.cloud.iam.authentication.thirdparty.VerifiedExternalIdentity;
+import java.util.Map;
 import dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyAuthenticationToken;
 import dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyIdentityResolutionService;
 import dev.macula.cloud.iam.enums.ThirdPartyProviderType;
@@ -43,10 +45,12 @@ public class DingtalkAuthenticationProvider implements AuthenticationProvider {
         if (!ThirdPartyProviderType.DINGTALK.providerType().equals(token.getProviderType())) {
             return null;
         }
-        var config = configs.requireEnabled(ThirdPartyProviderType.DINGTALK.providerType());
+        var config = configs.requireEnabledById(token.getLoginContext().registrationId(), ThirdPartyProviderType.DINGTALK.providerType()).forCapability(token.getLoginContext().loginCapability());
         String subject = client.fetchUserId(config, token.getCredentials().toString(),
             DingtalkLoginMode.valueOf(token.getLoginContext().loginMode()));
-        UserDetails user = identities.resolve(ThirdPartyProviderType.DINGTALK.providerType(), subject,
+        VerifiedExternalIdentity identity = VerifiedExternalIdentity.of(config, VerifiedExternalIdentity.BROWSER,
+            VerifiedExternalIdentity.MEMBER_ID, subject, Map.of("member_id", subject));
+        UserDetails user = identities.resolve(identity,
             token.getLoginContext());
         return ThirdPartyAuthenticationToken.authenticated(ThirdPartyProviderType.DINGTALK.providerType(), user,
             token.getLoginContext());

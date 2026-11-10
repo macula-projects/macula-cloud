@@ -16,11 +16,13 @@
  */
 
 export default {
+  identitySourceIntegration: {"codeTypeHelp": "小程序前端按实际获取方式提交 code_type：wx.login 使用登录 Code，getPhoneNumber 使用手机号 Code；两者共享应用凭据，但不能混用。", "wecomMemberOnly": "企业微信当前支持成员 ID 匹配；手机号、邮箱需要额外本人授权，后续接入。", "sourceField": "身份源字段", "targetField": "IAM 匹配字段", "selectSourceField": "选择已核验的外部属性", "selectTargetField": "选择IAM账号字段", "mappingHelp": "可配置多条映射；任一命中且所有命中指向同一账号时自动绑定。冲突或多账号匹配时需验证已有账号，不覆盖用户资料。", "legacyAdmission": "该来源原有的企业成员准入要求继续执行。", "sourceUnavailable": "该接入方式的客户端合同尚待核实，暂不可启用。", "wechatWebsiteHelp": "用于普通浏览器扫码登录，使用微信开放平台「网站应用」的 AppID / AppSecret；微信端内网页请另建「微信公众号」来源。", "wechatOfficialHelp": "用于微信端内网页授权，使用公众号的 AppID / AppSecret；与网站应用分别配置，不共用凭据。", "wecomWebHelp": "同一自建应用覆盖浏览器扫码与企业微信端内网页授权，共用 CorpID / AgentId / Secret；需分别配置企业微信授权登录与网页授权可信域名。", "flow": "平台接口版本 / Flow", "flowRequired": "请选择已核实的接口版本", "directory": "通讯录策略", "organization": "固定组织标识", "organizationHelp": "飞书填写应用所属企业真实的 tenant_key，不是文字“tenant_key”；用于校验登录者所属企业，保存后不能直接替换。", "unverified": "该 Flow 尚未核实，只能保留为禁用记录；不提供可直接使用的登录示例。", "codeType": "第三方认证能力", "codeTypeRequired": "选择已关联且可用的第三方认证能力", "nonceBoundary": "扩展请求的 nonce 只用于请求与 ID Token 的关联，不证明第三方 Code 与 nonce 绑定。", "identityOnly": "仅验证身份（保持现有准入）", "optional": "补充资料可选（仍拒绝非成员/停用）", "required": "实时企业成员准入（必须查询成功）", "background": "已绑定成员后台刷新资料", "addMapping": "添加绑定规则", "removeMapping": "移除规则", "appLinkClientCallback": "供业务App代码使用：AppLink回调须同时登记在飞书后台和此Client白名单。无需开启IAM授权码登录；两种用途共用白名单，但平台PKCE与IAM PKCE分别处理。"},
+ applicationProtocols: {authenticationTitle:"认证与授权",authenticationHelp:"客户端认证证明应用身份，授权方式决定应用如何取得令牌。",callbacksTitle:"回调与浏览器来源",permissionsTitle:"权限与登录保护",oidcScopeHelp:"openid 用于身份认证，profile 用于请求基础资料；资源 API 的业务权限按登记目录选择。",oauthScopeHelp:"profile 授权读取用户名和昵称，使用平台 /api/v1/profile；系统 API 另需 system:access 及角色权限。",oauthScopeEmpty:"当前授权方式没有适用的 Scope，请调整授权方式或登记实际资源能力。",default:'默认协议',enabled:'启用此协议',savedWhenDisabled:'关闭后保留配置，再次启用重新校验',noEnabled:'尚无已启用协议，应用只能保存为草稿',endpoints:'协议端点信息'},
 	adminSettings: {
 		identity: '身份提供商',
 		identitySocial: '社交身份提供商',
 		identityEnterprise: '企业身份提供商',
-		identityPending: '配置仅保存，尚未接入 IAM 第三方登录。',
+		identityPending: '身份源凭据统一维护，应用在登录控制中关联已启用渠道。',
 		message: '消息设置',
 		messageDescription:
 			'管理邮件、短信服务及模板。测试发送只向本次输入的地址或手机号投递，服务端返回提交状态，最终收件请在收件端确认。',
@@ -200,6 +202,12 @@ export default {
 		complexity5: '数字、大小写字母和特殊字符至少三类'
 	},
 	login: {
+        iamLogin: '前往 IAM 登录',
+        iamDescription: '通过统一身份平台登录管理控制台。',
+        iamFailed: '登录未完成，请重新登录或联系管理员。',
+        iamRetry: '返回登录',
+        iamInitializing: '正在确认身份并加载访问权限…',
+
 		slogan: '高性能 / 精致 / 优雅',
 		describe: '基于Vue3 + Element-Plus 的中后台前端解决方案。',
 		signInTitle: '用户登录',
@@ -235,5 +243,7 @@ export default {
 		nightmode_msg: '适合光线较弱的环境，当前黑暗模式为beta版本',
 		language: '语言',
 		language_msg: '翻译进行中，暂翻译了本视图的文本'
-	}
+	},
+ applicationBoundary: {inApp: '端内应用只能选择一个端内登录能力，不提供IAM标准登录页。', native: '移动客户端只能选择一个SDK或AppLink来源，可同时启用IAM内置登录。', miniapp: '小程序只能关联一个本平台来源；微信登录Code与手机号Code可同源并存。'}
+
 }

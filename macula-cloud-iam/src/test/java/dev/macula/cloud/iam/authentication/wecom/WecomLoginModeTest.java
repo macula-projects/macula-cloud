@@ -47,7 +47,7 @@ class WecomLoginModeTest {
     @Test
     void buildsCorpAppAndWebviewUrlsWithTheSameCallback() {
         WecomClient client = new WecomClient();
-        var config = new dev.macula.cloud.iam.authentication.thirdparty.IdentityProviderConfigService.ProviderConfig(
+        var config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(dev.macula.cloud.system.enums.IdentitySourceType.WECOM_WEB,
             "WECOM", "corp", "secret", Map.of("corpId", "corp", "agentId", "agent"));
         String callback = "https://iam.example/login/wecom";
         String browser = client.authorizationUri(config, "state-value", callback, WecomLoginMode.BROWSER);

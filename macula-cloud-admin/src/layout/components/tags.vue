@@ -146,13 +146,15 @@ import { ElMessageBox } from 'element-plus'
 			//增加tag
 			addViewTags(route) {
 				if(route.name && !route.meta.fullpage){
-					this.pushViewTags(route)
+                    // 应用配置的query仅代表草稿分区，保留一个应用管理标签。
+                    const tagRoute = route.meta.reuseQueryView ? { ...route, fullPath: route.path, query: {}, hash: '' } : route
+                    this.pushViewTags(tagRoute)
 					this.pushKeepLive(route.name)
 				}
 			},
 			//高亮tag
 			isActive(route) {
-				return route.fullPath === this.$route.fullPath
+				return route.meta.reuseQueryView ? route.path === this.$route.path : route.fullPath === this.$route.fullPath
 			},
 			//关闭tag
 			closeSelectedTag(tag, autoPushLatestView=true) {

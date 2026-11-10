@@ -39,6 +39,11 @@ public class OAuth2TokenEndpointFailureHandler implements AuthenticationFailureH
         + "\"error_description\":\"The verified identity must be bound to an existing account.\","
         + "\"binding_ticket\":\"%s\"}";
 
+    private final String issuer;
+
+    /** 使用服务器配置的issuer，不读取请求Host或Forwarded头。 */
+    public OAuth2TokenEndpointFailureHandler(String issuer) { this.issuer = issuer; }
+
     private final AuthenticationFailureHandler delegate = new OAuth2ErrorAuthenticationFailureHandler();
 
     @Override
@@ -53,6 +58,17 @@ public class OAuth2TokenEndpointFailureHandler implements AuthenticationFailureH
         response.setCharacterEncoding(java.nio.charset.StandardCharsets.UTF_8.name());
         response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store");
         response.setHeader(HttpHeaders.PRAGMA, "no-cache");
-        response.getWriter().write(BINDING_REQUIRED_RESPONSE.formatted(bindingRequired.getBindingTicket()));
+        java.net.URI base = java.net.URI.create(issuer);
+        if (!base.isAbsolute() || base.getHost() == null || base.getUserInfo() != null || base.getQuery() != null
+            || base.getFragment() != null || !("https".equals(base.getScheme()) || "http".equals(base.getScheme())
+                && java.util.Set.of("localhost", "127.0.0.1").contains(base.getHost()))) {
+            throw new IllegalStateException("绑定入口需要可信issuer配置");
+        }
+        String bindingUri = org.springframework.web.util.UriComponentsBuilder.fromUriString(issuer.replaceAll("/+$", ""))
+            .path("/login/bind/external").queryParam("ticket", "{ticket}").encode().buildAndExpand(bindingRequired.getBindingTicket()).toUriString();
+        response.setHeader("Referrer-Policy", "no-referrer");
+        response.getWriter().write(tools.jackson.databind.json.JsonMapper.builder().build().writeValueAsString(
+            java.util.Map.of("error", "binding_required", "error_description", "请打开绑定页面确认已有账号。",
+                "binding_ticket", bindingRequired.getBindingTicket(), "binding_uri", bindingUri)));
     }
 }

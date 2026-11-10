@@ -17,6 +17,8 @@
 package dev.macula.cloud.iam.authentication.wechat;
 
 import dev.macula.cloud.iam.authentication.thirdparty.IdentityProviderConfigService;
+import dev.macula.cloud.iam.authentication.thirdparty.VerifiedExternalIdentity;
+import java.util.Map;
 import dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyAuthenticationToken;
 import dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyIdentityResolutionService;
 import dev.macula.cloud.iam.enums.ThirdPartyProviderType;
@@ -26,7 +28,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
 
 /**
- * 微信授权码认证，以开放平台 unionid 作为绑定主体。
+ * 微信授权码认证，使用具体应用OpenID作为绑定主体。
  *
  * @author Rain
  * @since 6.1.0
@@ -43,10 +45,12 @@ public class WechatAuthenticationProvider implements AuthenticationProvider {
         if (!ThirdPartyProviderType.WECHAT.providerType().equals(token.getProviderType())) {
             return null;
         }
-        var config = configs.requireEnabled(ThirdPartyProviderType.WECHAT.providerType());
-        String subject = client.fetchUnionId(config, token.getCredentials().toString(),
+        var config = configs.requireEnabledById(token.getLoginContext().registrationId(), ThirdPartyProviderType.WECHAT.providerType()).forCapability(token.getLoginContext().loginCapability());
+        String subject = client.fetchOpenId(config, token.getCredentials().toString(),
             WechatLoginMode.valueOf(token.getLoginContext().loginMode()));
-        UserDetails user = identities.resolve(ThirdPartyProviderType.WECHAT.providerType(), subject,
+        VerifiedExternalIdentity identity = VerifiedExternalIdentity.of(config, VerifiedExternalIdentity.BROWSER,
+            VerifiedExternalIdentity.OPEN_ID, subject, Map.of());
+        UserDetails user = identities.resolve(identity,
             token.getLoginContext());
         return ThirdPartyAuthenticationToken.authenticated(ThirdPartyProviderType.WECHAT.providerType(), user,
             token.getLoginContext());

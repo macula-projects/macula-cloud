@@ -36,23 +36,27 @@ import static org.mockito.Mockito.when;
  * @since 6.1.0
  */
 class FeishuExternalCodeVerifierTest {
+    /** AppLink必须传本次授权回调及专用PKCE，来源中的历史回调不作兜底。 */
     @Test
-    void appCodeUsesNativeAppExchangeWithoutRedirectUri() {
+    void appLinkUsesRuntimeCallbackAndRejectsLegacyCalls() {
         IdentityProviderConfigService configs = mock(IdentityProviderConfigService.class);
         FeishuClient client = mock(FeishuClient.class);
-        ProviderConfig config = new ProviderConfig("FEISHU", "app", "secret",
-            Map.of("appId", "app"));
+        ProviderConfig config = new ProviderConfig(7L, dev.macula.cloud.system.enums.IdentitySourceType.FEISHU_APPLINK,
+            false, null, 1L, "FEISHU", "app", "fixture-secret", Map.of("appId", "app"), Map.of(), true,
+            dev.macula.cloud.system.enums.IdentitySourceFlow.FEISHU_APPLINK_V3,
+            dev.macula.cloud.system.enums.IdentityDirectoryPolicy.IDENTITY_ONLY, null, "https://old.example/callback");
         when(configs.requireEnabledById(7L, "FEISHU")).thenReturn(config);
-        when(client.fetchEmployeeNo(config, "app-code", null, FeishuLoginMode.APP))
-            .thenReturn("E1001");
+        String proof = "p".repeat(43);
+        when(client.fetchIdentity(config, "app-code", "https://app.example/callback", FeishuLoginMode.APP, "FEISHU_APP_CODE", proof))
+            .thenReturn(dev.macula.cloud.iam.authentication.thirdparty.VerifiedExternalIdentity.of(config, "FEISHU_APP_CODE",
+                "OPEN_ID", "fixture-open-id", Map.of()));
         FeishuExternalCodeVerifier verifier = new FeishuExternalCodeVerifier(configs, client);
-
-        ExternalCodeVerification verification = verifier.verify(
-            ExternalCodeType.FEISHU_APP_CODE, 7L, "app-code");
-
-        assertEquals("FEISHU", verification.providerType());
-        assertEquals("E1001", verification.subject());
-        verify(client).fetchEmployeeNo(config, "app-code", null, FeishuLoginMode.APP);
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
+            () -> verifier.verify(ExternalCodeType.FEISHU_APP_CODE, 7L, "app-code"));
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
+            () -> verifier.verify(ExternalCodeType.FEISHU_APP_CODE, 7L, "app-code", proof));
+        ExternalCodeVerification result = verifier.verify(ExternalCodeType.FEISHU_APP_CODE, 7L, "app-code", proof, "https://app.example/callback");
+        assertEquals("fixture-open-id", result.subject());
+        verify(client).fetchIdentity(config, "app-code", "https://app.example/callback", FeishuLoginMode.APP, "FEISHU_APP_CODE", proof);
     }
-
 }

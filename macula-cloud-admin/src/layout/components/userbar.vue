@@ -47,6 +47,7 @@
   import tenant from './tenant'
   import {useTenantStore} from '@/stores/tenant';
   import {mapActions} from 'pinia';
+  import {clearAuth} from '@/utils/adminAuthSession';
   
   export default {
 	name: 'LayoutUserbar',
@@ -74,7 +75,7 @@
 		  }).then(() => {
 			const loading = ElLoading.service({fullscreen: true})
 			this.$TOOL.data.clear()
-			this.clearTenantOptions()
+			clearAuth()
 			this.$router.replace({path: '/login'})
 			setTimeout(() => {
 			  loading.close()
@@ -90,8 +91,7 @@
 			confirmButtonText: '退出',
 			confirmButtonClass: 'el-button--danger'
 		  }).then(() => {
-			this.$TOOL.data.clear()
-			this.clearTenantOptions()
+			clearAuth()
 			this.$router.replace({path: '/login'});
 		  }).catch(() => {
 			//取消退出

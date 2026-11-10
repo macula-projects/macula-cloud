@@ -3,7 +3,7 @@
 ## Files that change
 - `.sdlc/iam-client-terminal-login-config-ui/intent.md`、`spec.md`、`plan.md`、`review-findings.md`：记录用户已确认的
   终端优先交互、实现顺序、风险和 Plan 评审。
-- `macula-cloud-system/src/main/resources/db/migration/V12__oauth_client_terminal_type.sql`：为 OAuth Client 新增 nullable
+- `macula-cloud-system/src/main/resources/db/migration/V14__oauth_client_terminal_type.sql`：为 OAuth Client 新增 nullable
   `terminal_type`，不猜测、不回填已有 Client 的终端归属。
 - `macula-cloud-system/src/main/java/dev/macula/cloud/system/enums/OAuth2ClientTerminalType.java`：定义五种稳定终端值及
   provider/code type allowlist。
@@ -12,7 +12,7 @@
 - `macula-cloud-system/src/main/java/dev/macula/cloud/system/service/impl/OAuth2ClientConfigServiceImpl.java`：保存时拒绝
   缺失终端、跨终端 provider/code type 和与登录能力不一致的派生 grant。
 - `macula-cloud-system/src/test/java/dev/macula/cloud/system/service/impl/OAuth2ClientConfigServiceImplTest.java`、
-  `integration/ExternalCredentialLoginMigrationIT.java`：覆盖单终端校验和 V12 不回填升级。
+  `integration/ExternalCredentialLoginMigrationIT.java`：覆盖单终端校验和 V14 不回填升级。
 - `macula-cloud-admin/src/api/model/system/oauth2Client.js`：集中定义终端与中文登录方式目录，以及业务方式到现有
   网页 provider/external code type 的稳定映射；REST 端点不变，但请求/响应合同新增必填 `terminalType`。
 - `macula-cloud-admin/src/views/system/oauth2Client/index.vue`：把当前平铺的网页登录和 code type 配置重构为终端
@@ -60,7 +60,7 @@
 
 ## Proof
 - `OAuth2ClientConfigServiceImplTest` 证明五类终端合法组合允许，缺失终端、跨终端 provider/code type、错误绑定
-  和不一致派生 grant 在写库前拒绝；`ExternalCredentialLoginMigrationIT` 证明 V12 只加列且不改原登录字段。
+  和不一致派生 grant 在写库前拒绝；`ExternalCredentialLoginMigrationIT` 证明 V14 只加列且不改原登录字段。
 - `admin-identity-security-settings.test.js` 证明五类终端只显示各自方式，切换后旧终端 provider/code type/绑定/
   direct/grant 全部清除，微信小程序两种 code 不混淆，端内企微/公众号由 `terminalType` 区分归属。
 - 同一测试证明 external code 一个身份源自动绑定、多个身份源要求显式选择、无身份源不可选，网页登录要求
@@ -154,3 +154,18 @@
 - 未修改 `CLAUDE.md`、`REVIEW.md`、`.claude/`、`.codex/` 或 `.agents/`，无适用配置 eval；未执行真实第三方
   平台联调、Docker 更新、提交、推送或部署。
 - Stage 5 已达到三轮自动评审上限，未启动 Round 4；本次变更交由人工依据上述实现、评审记录与验证证据确认。
+
+## 2026-11-05 恢复已接受的单终端实现
+- 用户明确纠正“终端类型切换是要清空的”，恢复本计划已接受的单终端持久化和切换清理，不再沿用终端只作导航的历史实现。
+- V12 已被 application_auth_tenant 使用，V13 为 application_apikey，因此终端列迁移顺延为 V14；只加 nullable 列，不推断历史数据。
+- 新建 client_id 自动生成 UUID 的要求在当前 grant-selection 页面/helper 的已接受文件范围内实现；保存后的 ID 保持不可修改。
+- “编辑状态不能再改终端类型”存在希望锁定或希望允许的语义歧义，已询问用户；该具体编辑限制待回复，不自行选择。
+
+## 2026-11-05 单终端恢复实施与验证
+- 已增加 V14 nullable terminal_type、System Entity/Form/VO 字段与跨终端 provider/code type 校验；旧记录不回填。保存/回显使用明确终端，不从 catalog 或登录能力猜测。
+- 新建切换终端清空原终端 provider、code type、绑定、直登、回调 URI 以及 authorization_code/external_code 派生授权；scope、Origin、refresh、TTL 保留。切回旧终端不会恢复旧勾选。
+- Client ID 新建自动生成 UUID，可按接入约定修改；保存后沿用服务端既有不可变约束。历史 terminalType 缺失/null 均显示待选择，必须明确选择后保存。
+- 验证：完整 Admin Vitest 14文件133项通过；两组 Cypress 27/27通过；System目标22项通过，完整System单测141项（140通过、1项环境门控跳过）；隔离MySQL8.4.6的 ExternalCredentialLoginMigrationIT 1/1通过，覆盖V14列不回填及历史Client字段保持；定向Checkstyle 0违规，生产构建、ESLint及diff检查通过。
+- 临时MySQL容器已清理，没有修改业务数据库或部署新版System/Admin。本次尚待用户澄清“编辑状态不能再改终端类型”是希望锁定还是希望允许编辑切换，该分支不自行决定。
+
+2026-11-06：后续应用模型重构由已接受的 iam-application-configuration/plan.md 承接；保留UUID、grant复选框与密钥生命周期，旧终端模型被应用架构类型替代，历史证据保持原样。

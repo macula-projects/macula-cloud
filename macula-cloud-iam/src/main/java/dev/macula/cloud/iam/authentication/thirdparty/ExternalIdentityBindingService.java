@@ -16,18 +16,13 @@
  */
 package dev.macula.cloud.iam.authentication.thirdparty;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import dev.macula.boot.constants.SecurityConstants;
 import dev.macula.cloud.iam.authentication.thirdparty.ExternalBindingTicketStore.ClaimedTicket;
-import dev.macula.cloud.iam.mapper.SysUserIdentityBindingMapper;
 import dev.macula.cloud.iam.pojo.entity.SysUser;
-import dev.macula.cloud.iam.pojo.entity.SysUserIdentityBinding;
 import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeClientSettings;
 import dev.macula.cloud.iam.service.support.SysUserService;
 import dev.macula.cloud.iam.service.userdetails.SysUserDetails;
 import dev.macula.cloud.system.security.OAuth2LoginGrantTypes;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -40,13 +35,11 @@ import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.StringUtils;
 
 import java.security.Principal;
-import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
@@ -58,7 +51,7 @@ import java.util.Set;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
+
 public class ExternalIdentityBindingService {
     private static final AuthorizationGrantType SMS_GRANT =
         new AuthorizationGrantType(SecurityConstants.GRANT_TYPE_SMS);
@@ -68,28 +61,76 @@ public class ExternalIdentityBindingService {
 
     private final ExternalBindingTicketStore tickets;
     private final OAuth2AuthorizationService authorizations;
+    @org.springframework.beans.factory.annotation.Qualifier("baseRegisteredClientRepository")
     private final RegisteredClientRepository clients;
     private final SysUserService users;
-    private final SysUserIdentityBindingMapper bindings;
+    private final RegistrationIdentityBindingService bindings;
+    private ProviderDirectoryPolicyService directory;
+    private org.springframework.transaction.support.TransactionTemplate transactions;
 
-    @Transactional
+
+    /** 先核验受信用途Token和目录，再在显式事务内绑定及注册票据提交回调。 */
     public void bind(String accessToken, String bindingTicket) {
         ClaimedTicket claimed = tickets.claim(bindingTicket);
-        registerCompletion(claimed);
+        var failureRecorded = new java.util.concurrent.atomic.AtomicBoolean();
         try {
             BindingAccount account = validateAccessToken(accessToken, claimed.value());
-            if (claimed.value().bindingType() == ExternalBindingTicket.BindingType.EXTERNAL_IDENTITY) {
-                bindExternalIdentity(claimed.value(), account);
-            } else {
-                bindMobile(claimed.value(), account);
-            }
+            var admission = directory == null ? null : directory.check(claimed.value().identity());
+            Runnable action = () -> {
+                registerCompletion(claimed);
+                try {
+                if (directory == null) {
+                    bindings.bind(claimed.value().clientId(), claimed.value().tenantId(), claimed.value().userType(),
+                        claimed.value().identity(), account.id(), false);
+                } else {
+                    bindings.bind(claimed.value().clientId(), claimed.value().tenantId(), claimed.value().userType(),
+                        claimed.value().identity(), account.id(), false, admission);
+                    TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                        /** 仅已提交的已绑定成员进入后台刷新。 */
+                        @Override
+                        public void afterCommit() { directory.bound(claimed.value().identity()); }
+                    });
+                }
+                } catch (BadCredentialsException | DataIntegrityViolationException ex) {
+                    // 在回滚释放owner之前累计失败；避免事务模板退出后owner已释放而漏计。
+                    tickets.failedAttempt(claimed);
+                    failureRecorded.set(true);
+                    throw ex;
+                }
+            };
+            if (transactions == null) { action.run(); }
+            else { transactions.executeWithoutResult(status -> action.run()); }
         } catch (BadCredentialsException | DataIntegrityViolationException ex) {
-            tickets.failedAttempt(claimed);
+            if (!failureRecorded.get()) { tickets.failedAttempt(claimed); }
             throw denied();
         } catch (RuntimeException ex) {
             tickets.release(claimed);
             throw ex;
         }
+    }
+
+    /** 基础身份仅用于已验证访问令牌绑定，不能回查当前绑定HTTP请求。 */
+    public ExternalIdentityBindingService(ExternalBindingTicketStore tickets,
+        OAuth2AuthorizationService authorizations,
+        @org.springframework.beans.factory.annotation.Qualifier("baseRegisteredClientRepository") RegisteredClientRepository clients,
+        SysUserService users,
+        RegistrationIdentityBindingService bindings) {
+        this.tickets = tickets;
+        this.authorizations = authorizations;
+        this.clients = clients;
+        this.users = users;
+        this.bindings = bindings;
+    }
+
+    /** 生产明确使用事务模板，目录调用不位于事务代理内部。 */
+    @org.springframework.beans.factory.annotation.Autowired
+    public ExternalIdentityBindingService(ExternalBindingTicketStore tickets, OAuth2AuthorizationService authorizations,
+        @org.springframework.beans.factory.annotation.Qualifier("baseRegisteredClientRepository") RegisteredClientRepository clients,
+        SysUserService users, RegistrationIdentityBindingService bindings, ProviderDirectoryPolicyService directory,
+        org.springframework.transaction.PlatformTransactionManager manager) {
+        this(tickets, authorizations, clients, users, bindings);
+        this.directory = java.util.Objects.requireNonNull(directory);
+        this.transactions = new org.springframework.transaction.support.TransactionTemplate(manager);
     }
 
     private BindingAccount validateAccessToken(String token, ExternalBindingTicket ticket) {
@@ -122,7 +163,7 @@ public class ExternalIdentityBindingService {
             || !ticket.tenantId().equals(details.getTenantId())) {
             throw denied();
         }
-        SysUser account = users.findUniqueByUsername(details.getUsername());
+        SysUser account = users.getById(details.getUserId());
         if (account == null || !Objects.equals(account.getId(), details.getUserId())) {
             throw denied();
         }
@@ -138,64 +179,6 @@ public class ExternalIdentityBindingService {
             throw denied();
         }
         return new AuthorizationGrantType(grantType);
-    }
-
-    private void bindExternalIdentity(ExternalBindingTicket ticket, BindingAccount account) {
-        if (!StringUtils.hasText(ticket.providerType()) || !StringUtils.hasText(ticket.subject())) {
-            throw denied();
-        }
-        List<SysUserIdentityBinding> subjectBindings = bindings.selectList(
-            new LambdaQueryWrapper<SysUserIdentityBinding>()
-                .eq(SysUserIdentityBinding::getProviderType, ticket.providerType())
-                .eq(SysUserIdentityBinding::getProviderSubject, ticket.subject()));
-        List<SysUserIdentityBinding> userBindings = bindings.selectList(
-            new LambdaQueryWrapper<SysUserIdentityBinding>()
-                .eq(SysUserIdentityBinding::getProviderType, ticket.providerType())
-                .eq(SysUserIdentityBinding::getUsername, account.username()));
-        if (sameBinding(subjectBindings, userBindings, account.username(), ticket.subject())) {
-            return;
-        }
-        if (!subjectBindings.isEmpty() || !userBindings.isEmpty()) {
-            throw denied();
-        }
-        SysUserIdentityBinding binding = new SysUserIdentityBinding();
-        binding.setProviderType(ticket.providerType());
-        binding.setProviderSubject(ticket.subject());
-        binding.setUsername(account.username());
-        bindings.insert(binding);
-    }
-
-    private boolean sameBinding(List<SysUserIdentityBinding> subjectBindings,
-        List<SysUserIdentityBinding> userBindings, String username, String subject) {
-        if (subjectBindings.size() != 1 || userBindings.size() != 1) {
-            return false;
-        }
-        SysUserIdentityBinding bySubject = subjectBindings.get(0);
-        SysUserIdentityBinding byUser = userBindings.get(0);
-        return Objects.equals(bySubject.getId(), byUser.getId())
-            && username.equals(bySubject.getUsername()) && subject.equals(bySubject.getProviderSubject());
-    }
-
-    private void bindMobile(ExternalBindingTicket ticket, BindingAccount account) {
-        if (!StringUtils.hasText(ticket.mobile())) {
-            throw denied();
-        }
-        if (StringUtils.hasText(account.mobile())) {
-            if (!ticket.mobile().equals(account.mobile())) {
-                throw denied();
-            }
-            return;
-        }
-        SysUser owner = users.findUniqueByMobile(ticket.mobile());
-        if (owner != null && !Objects.equals(owner.getId(), account.id())) {
-            throw denied();
-        }
-        boolean updated = users.update(new LambdaUpdateWrapper<SysUser>()
-            .eq(SysUser::getId, account.id()).isNull(SysUser::getMobile)
-            .set(SysUser::getMobile, ticket.mobile()));
-        if (!updated) {
-            throw denied();
-        }
     }
 
     private void registerCompletion(ClaimedTicket claimed) {

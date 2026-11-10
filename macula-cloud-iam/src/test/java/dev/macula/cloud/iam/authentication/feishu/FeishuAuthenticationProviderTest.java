@@ -19,7 +19,6 @@ package dev.macula.cloud.iam.authentication.feishu;
 import dev.macula.cloud.iam.authentication.thirdparty.IdentityProviderConfigService;
 import dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyAuthenticationToken;
 import dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyIdentityResolutionService;
-import dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyLoginContext;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.core.userdetails.User;
 
@@ -44,14 +43,15 @@ class FeishuAuthenticationProviderTest {
         FeishuClient client = mock(FeishuClient.class);
         IdentityProviderConfigService configs = mock(IdentityProviderConfigService.class);
         ThirdPartyIdentityResolutionService identities = mock(ThirdPartyIdentityResolutionService.class);
-        var config = new IdentityProviderConfigService.ProviderConfig("FEISHU", "app", "secret",
+        var config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(dev.macula.cloud.system.enums.IdentitySourceType.FEISHU_WEB, "FEISHU", "app", "secret",
             Map.of("appId", "app"));
-        when(configs.requireEnabled("FEISHU")).thenReturn(config);
-        var context = new ThirdPartyLoginContext("FEISHU", FeishuLoginMode.BROWSER.name(), "test-client",
+        when(configs.requireEnabledById(1L, "FEISHU")).thenReturn(config);
+        var context = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.context("FEISHU", FeishuLoginMode.BROWSER.name(), "test-client",
             Instant.now(), "/");
-        when(client.fetchEmployeeNo(config, "code", "https://iam.example/login/feishu", FeishuLoginMode.BROWSER))
-            .thenReturn("E1001");
-        when(identities.resolve("FEISHU", "E1001", context))
+        when(client.fetchIdentity(config, "code", "https://iam.example/login/feishu", FeishuLoginMode.BROWSER, "BROWSER"))
+            .thenReturn(dev.macula.cloud.iam.authentication.thirdparty.VerifiedExternalIdentity.of(config, "BROWSER",
+                "OPEN_ID", "E1001", Map.of()));
+        when(identities.resolve(dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.browserIdentity(context, "E1001"), context))
             .thenReturn(User.withUsername("sales").password("n/a").authorities("USER").build());
         var result = new FeishuAuthenticationProvider(client, configs, identities).authenticate(
             ThirdPartyAuthenticationToken.unauthenticated("FEISHU", "code", context,
@@ -64,7 +64,7 @@ class FeishuAuthenticationProviderTest {
         FeishuClient client = mock(FeishuClient.class);
         IdentityProviderConfigService configs = mock(IdentityProviderConfigService.class);
         ThirdPartyIdentityResolutionService identities = mock(ThirdPartyIdentityResolutionService.class);
-        var context = new ThirdPartyLoginContext("WECHAT", "BROWSER", "test-client", Instant.now(), "/");
+        var context = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.context("WECHAT", "BROWSER", "test-client", Instant.now(), "/");
         assertNull(new FeishuAuthenticationProvider(client, configs, identities).authenticate(
             ThirdPartyAuthenticationToken.unauthenticated("WECHAT", "code", context, "/login/wechat")));
         verifyNoInteractions(client, configs, identities);

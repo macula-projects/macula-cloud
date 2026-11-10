@@ -73,7 +73,9 @@ export default defineConfig(({ mode }) => {
 
     Inspect(),
   ],
+  preview: {headers: {'Referrer-Policy': 'no-referrer', 'Cache-Control': 'no-store'}},
   server: {
+    headers: {'Referrer-Policy': 'no-referrer', 'Cache-Control': 'no-store'},
     port: 5900,
     host: true,
     open: true,

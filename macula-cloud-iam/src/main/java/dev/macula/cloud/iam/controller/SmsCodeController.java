@@ -17,6 +17,7 @@
 package dev.macula.cloud.iam.controller;
 
 import dev.macula.cloud.iam.authentication.sms.SmsService;
+import dev.macula.cloud.iam.authentication.hosted.HostedLoginClientPolicyService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.constraints.Pattern;
 import lombok.RequiredArgsConstructor;
@@ -41,11 +42,17 @@ import java.util.Map;
 public class SmsCodeController {
     private final SmsService smsService;
 
+    /** 使用安全过滤器已校验的Client上下文发送验证码。 */
     @PostMapping("/api/v1/sms-code")
     public Map<String, String> send(@RequestParam @Pattern(regexp = "^\\+?[0-9 -]{6,24}$") String phone,
         HttpServletRequest request) {
         try {
-            smsService.sendCode(phone, request.getRemoteAddr());
+            String clientId = HostedLoginClientPolicyService.context(request).clientId();
+            if (clientId == null) {
+                smsService.sendCode(phone, request.getRemoteAddr());
+            } else {
+                smsService.sendCode(phone, request.getRemoteAddr(), clientId);
+            }
         } catch (RuntimeException ex) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "验证码暂时无法发送");
         }

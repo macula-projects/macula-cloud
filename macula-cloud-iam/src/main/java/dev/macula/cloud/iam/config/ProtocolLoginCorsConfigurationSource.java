@@ -27,6 +27,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.util.StringUtils;
 import org.springframework.web.cors.CorsConfigurationSource;
 
 import java.time.Duration;
@@ -45,6 +46,10 @@ import java.util.stream.Collectors;
  */
 @RequiredArgsConstructor
 public class ProtocolLoginCorsConfigurationSource implements CorsConfigurationSource {
+    public static final String DISCOVERY_PATH = "/.well-known/openid-configuration";
+    public static final String OAUTH_METADATA_PATH = "/.well-known/oauth-authorization-server";
+    public static final String JWKS_PATH = "/oauth2/jwks";
+    private static final Set<String> METADATA_PATHS = Set.of(DISCOVERY_PATH, OAUTH_METADATA_PATH, JWKS_PATH);
     private static final Duration MAX_AGE = Duration.ofMinutes(10);
     private static final List<String> PATHS = List.of(
         ProtocolVerificationCodeController.CAPTCHA_PATH,
@@ -55,9 +60,16 @@ public class ProtocolLoginCorsConfigurationSource implements CorsConfigurationSo
     private final SysOAuth2ClientService clientService;
     private final String tokenEndpoint;
 
+    /** 公开元数据只扩展 GET，仍绑定已启用 Client 的精确 Origin。 */
     @Override
     public CorsConfiguration getCorsConfiguration(HttpServletRequest request) {
         String path = applicationPath(request);
+        if (dev.macula.cloud.iam.controller.ProfileController.PATH.equals(path)) {
+            return profileConfiguration(request);
+        }
+        if (METADATA_PATHS.contains(path)) {
+            return metadataConfiguration(request);
+        }
         boolean tokenRequest = tokenEndpoint.equals(path);
         if (!tokenRequest && !PATHS.contains(path)) {
             return null;
@@ -81,6 +93,50 @@ public class ProtocolLoginCorsConfigurationSource implements CorsConfigurationSo
             return null;
         }
         return verificationConfiguration(origin);
+    }
+
+    /** Profile只允许已登记Origin的GET，不允许Cookie凭据或任意请求头。 */
+    private CorsConfiguration profileConfiguration(HttpServletRequest request) {
+        if (!hasOriginHeader(request)) { return null; }
+        String origin = singleHeader(request, HttpHeaders.ORIGIN);
+        boolean preflight = HttpMethod.OPTIONS.matches(request.getMethod());
+        String requested = request.getHeader(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS);
+        if (origin == null || !clientService.allowedOrigins().contains(origin)
+            || !(HttpMethod.GET.matches(request.getMethod()) || preflight)
+            || preflight && (!HttpMethod.GET.matches(request.getHeader(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD))
+                || requested != null && !Set.of("authorization").containsAll(java.util.Arrays.stream(requested.split(","))
+                    .map(String::trim).map(value -> value.toLowerCase(Locale.ROOT)).toList()))) {
+            return deniedConfiguration();
+        }
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOrigins(List.of(origin));
+        configuration.setAllowedMethods(List.of("GET", "OPTIONS"));
+        configuration.setAllowedHeaders(List.of(HttpHeaders.AUTHORIZATION));
+        configuration.setAllowCredentials(false);
+        configuration.setMaxAge(MAX_AGE);
+        return configuration;
+    }
+
+    /** 无 Origin 保持公共元数据行为；跨域 GET/OPTIONS 禁止凭据和其他请求头。 */
+    private CorsConfiguration metadataConfiguration(HttpServletRequest request) {
+        if (!hasOriginHeader(request)) {
+            return null;
+        }
+        String origin = singleHeader(request, HttpHeaders.ORIGIN);
+        boolean preflight = HttpMethod.OPTIONS.matches(request.getMethod());
+        if (origin == null || !clientService.allowedOrigins().contains(origin)
+            || !(HttpMethod.GET.matches(request.getMethod()) || preflight)
+            || preflight && (!HttpMethod.GET.matches(request.getHeader(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD))
+                || StringUtils.hasText(request.getHeader(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS)))) {
+            return deniedConfiguration();
+        }
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOrigins(List.of(origin));
+        configuration.setAllowedMethods(List.of(HttpMethod.GET.name(), HttpMethod.OPTIONS.name()));
+        configuration.setAllowedHeaders(List.of());
+        configuration.setAllowCredentials(false);
+        configuration.setMaxAge(MAX_AGE);
+        return configuration;
     }
 
     private String applicationPath(HttpServletRequest request) {

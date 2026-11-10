@@ -13,7 +13,7 @@
     tab.addEventListener("click", () => {
       document.querySelectorAll("[data-tab]").forEach(item => item.setAttribute("aria-selected", String(item === tab)));
       document.querySelectorAll("[data-login]").forEach(form => { form.hidden = form.id !== tab.dataset.tab; });
-      document.getElementById(tab.dataset.tab).querySelector("input:not([type=hidden])")?.focus();
+      document.getElementById(tab.dataset.tab)?.querySelector("input:not([type=hidden])")?.focus();
     });
   });
   document.querySelectorAll("[data-send-code]").forEach(button => {
@@ -27,6 +27,9 @@
       if (csrf) body.set(csrf.name, csrf.value);
       button.disabled = true; error.textContent = "";
       try {
+        if (button.hasAttribute("data-binding-code")) {
+          body.set("username", form.querySelector("[name=username]")?.value || "");
+        }
         const response = await fetch(button.dataset.sendCodeUrl, { method: "POST", body, credentials: "same-origin" });
         if (!response.ok) throw new Error("验证码暂时无法发送，请稍后重试。");
         let remaining = 60; button.textContent = `${remaining} 秒后重试`;

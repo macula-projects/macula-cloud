@@ -19,19 +19,15 @@ package dev.macula.cloud.iam.service.userdetails;
 import dev.macula.cloud.iam.enums.UserTypeEnum;
 import dev.macula.cloud.iam.mapper.SysUserIdentityBindingMapper;
 import dev.macula.cloud.iam.pojo.entity.SysUser;
-import dev.macula.cloud.iam.pojo.entity.SysUserIdentityBinding;
 import dev.macula.cloud.iam.service.support.SysUserService;
 import dev.macula.cloud.system.security.UserIdentifierNormalizer;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.authentication.BadCredentialsException;
 
-import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -43,7 +39,7 @@ import static org.mockito.Mockito.when;
 class ClientAwareAccountResolverTest {
     private final SysUserService users = mock(SysUserService.class);
     private final SysUserIdentityBindingMapper bindings = mock(SysUserIdentityBindingMapper.class);
-    private final ClientAwareAccountResolver resolver = new ClientAwareAccountResolver(users, bindings,
+    private final ClientAwareAccountResolver resolver = new ClientAwareAccountResolver(users,
         new UserIdentifierNormalizer());
 
     @Test
@@ -67,28 +63,20 @@ class ClientAwareAccountResolverTest {
 
     @Test
     void resolvesOnlyTheExactProviderSubjectBinding() {
-        SysUserIdentityBinding binding = new SysUserIdentityBinding();
-        binding.setProviderType("WECOM");
-        binding.setProviderSubject("member-id");
-        binding.setUsername("alice");
-        when(bindings.selectList(any())).thenReturn(List.of(binding));
-        when(users.findUniqueByUsername("alice")).thenReturn(user(9L, "alice"));
-
-        assertThat(resolver.findByExternalIdentity(UserTypeEnum.EMPLOYEE, "WECOM", "member-id"))
-            .get().extracting(SysUser::getUsername).isEqualTo("alice");
-        verify(users).findUniqueByUsername("alice");
+        SysUser account = user(9L, "renamed-alice");
+        var service = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.registrationService(account);
+        var identity = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.sdkIdentity("WECOM", "member-id").identity();
+        assertThat(service.findBound("app",1L,UserTypeEnum.EMPLOYEE,identity))
+            .get().extracting(org.springframework.security.core.userdetails.UserDetails::getUsername).isEqualTo("renamed-alice");
+        org.mockito.Mockito.verifyNoInteractions(users, bindings);
     }
 
     @Test
     void rejectsBindingThatReferencesMissingLocalAccount() {
-        SysUserIdentityBinding binding = new SysUserIdentityBinding();
-        binding.setProviderType("WECOM");
-        binding.setProviderSubject("orphan-member-id");
-        binding.setUsername("deleted-user");
-        when(bindings.selectList(any())).thenReturn(List.of(binding));
-
-        assertThatThrownBy(() -> resolver.findByExternalIdentity(UserTypeEnum.EMPLOYEE, "WECOM",
-            "orphan-member-id")).isInstanceOf(BadCredentialsException.class);
+        var service = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.registrationService(null);
+        var identity = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.sdkIdentity("WECOM", "orphan-member-id").identity();
+        assertThatThrownBy(() -> service.findBound("app",1L,UserTypeEnum.EMPLOYEE,identity))
+            .isInstanceOf(BadCredentialsException.class);
     }
 
     @Test

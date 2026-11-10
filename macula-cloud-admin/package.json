@@ -34,6 +34,7 @@
     "cropperjs": "1.5.12",
     "echarts": "^6.1.0",
     "element-plus": "^2.14.7",
+    "jose": "6.2.15",
     "nprogress": "0.2.0",
     "pinia": "^2.0.33",
     "pinyin-match": "^1.2.2",

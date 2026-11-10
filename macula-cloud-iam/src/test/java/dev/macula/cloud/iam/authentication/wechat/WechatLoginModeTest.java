@@ -46,7 +46,7 @@ class WechatLoginModeTest {
     @Test
     void bothModesUseTheSameFixedCallback() {
         WechatClient client = new WechatClient();
-        ProviderConfig config = new ProviderConfig("WECHAT", "site-app", "site-secret",
+        ProviderConfig config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(dev.macula.cloud.system.enums.IdentitySourceType.WECHAT_WEBSITE, "WECHAT", "site-app", "site-secret",
             Map.of("appId", "site-app", "officialAccountAppId", "oa-app"),
             Map.of("officialAccountAppSecret", "oa-secret"));
         String callback = "https://iam.example/login/wechat";

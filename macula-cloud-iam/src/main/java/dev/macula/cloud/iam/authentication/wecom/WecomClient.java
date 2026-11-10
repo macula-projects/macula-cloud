@@ -71,14 +71,28 @@ public class WecomClient {
     private static final String USER_STAGE = "user";
     private static final String MINIAPP_SESSION_STAGE = "miniapp_session";
     private final RestClient restClient;
+    private final boolean httpContractTest;
     private final JsonMapper json = JsonMapper.builder().build();
+    private dev.macula.cloud.iam.authentication.thirdparty.ProviderApplicationTokenCache applicationTokens;
+
+    /** 生产装配来源隔离缓存；显式HTTP测试构造器仍可仅验证平台合同。 */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void applicationTokenCache(dev.macula.cloud.iam.authentication.thirdparty.ProviderApplicationTokenCache cache) { this.applicationTokens = cache; }
+
 
     public WecomClient() {
-        this(RestClient.builder().requestFactory(noRedirectRequestFactory()).build());
+        this(RestClient.builder().requestFactory(noRedirectRequestFactory()).build(), false);
     }
 
+    /** 显式HTTP合同测试可跳过Redis，仅此包内构造方式允许。 */
     WecomClient(RestClient restClient) {
+        this(restClient, true);
+    }
+
+    /** 默认生产构造不能在缓存缺失时直接返回未经过owner栅栏的结果。 */
+    private WecomClient(RestClient restClient, boolean httpContractTest) {
         this.restClient = restClient;
+        this.httpContractTest = httpContractTest;
     }
 
     public String authorizationUri(ProviderConfig config, String state, String redirectUri) {
@@ -198,7 +212,19 @@ public class WecomClient {
         }
     }
 
-    private String fetchAccessToken(ProviderConfig config) {
+    /** 使用当前来源版本的应用Token，不混用用户Token或其他企业凭据。 */
+    String fetchAccessToken(ProviderConfig config) {
+        if (applicationTokens == null && !httpContractTest) {
+            throw new ExternalCodeInfrastructureException(
+                dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeConsumptionState.NOT_SUBMITTED);
+        }
+        return applicationTokens == null ? loadApplicationToken(config).token()
+            : applicationTokens.get(config, dev.macula.cloud.iam.authentication.thirdparty.ProviderApplicationTokenCache.APPLICATION_TOKEN, () -> loadApplicationToken(config));
+    }
+
+    /** 该HTTP阶段尚未提交用户Code，明确的网络故障可安全释放占用。 */
+    private dev.macula.cloud.iam.authentication.thirdparty.ProviderApplicationTokenCache.TokenValue loadApplicationToken(ProviderConfig config) {
+        try {
         String tokenBody = restClient.get().uri(UriComponentsBuilder.fromUriString(TOKEN)
             .queryParam(CORP_ID_PARAMETER, config.require(CORP_ID_CONFIG))
             .queryParam(CORP_SECRET_PARAMETER, config.appSecret())
@@ -214,7 +240,17 @@ public class WecomClient {
                 TOKEN_STAGE);
             throw failed();
         }
-        return accessToken;
+        return new dev.macula.cloud.iam.authentication.thirdparty.ProviderApplicationTokenCache.TokenValue(accessToken, Duration.ofSeconds(tokenJson.path("expires_in").asLong()));
+        } catch (RestClientResponseException ex) {
+            LOGGER.warn("第三方接口 HTTP 失败 provider=WECOM stage={} status={}", TOKEN_STAGE,
+                ex.getStatusCode().value());
+            if (ex.getStatusCode().is5xxServerError()) {
+                throw new ExternalCodeInfrastructureException(dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeConsumptionState.NOT_SUBMITTED);
+            }
+            throw failed();
+        } catch (RestClientException ex) {
+            throw new ExternalCodeInfrastructureException(dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeConsumptionState.NOT_SUBMITTED);
+        }
     }
 
     private void logProviderError(String stage, JsonNode response) {

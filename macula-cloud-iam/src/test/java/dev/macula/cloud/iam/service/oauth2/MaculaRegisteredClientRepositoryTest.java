@@ -50,18 +50,33 @@ class MaculaRegisteredClientRepositoryTest {
         assertThat(result.getTokenSettings().getAuthorizationCodeTimeToLive()).isEqualTo(Duration.ofMinutes(5));
     }
 
+    /** 注册策略保留服务端应用类型，Token请求不能自报另一终端来获得Code能力。 */
     @Test
-    void confidentialClientKeepsExplicitPkcePolicyAndPasswordExtension() {
+    void carriesTrustedApplicationTypeIntoExternalCodeSettings() {
+        var row = entity("none");
+        row.setApplicationType("NATIVE");
+        var service = mock(SysOAuth2ClientService.class);
+        when(service.getClientByClientId("fixture")).thenReturn(row);
+        var result = repository(service).findByClientId("fixture");
+        assertThat(result.getClientSettings().<String>getSetting(
+            dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeClientSettings.APPLICATION_TYPE)).isEqualTo("NATIVE");
+    }
+
+    @Test
+    void confidentialCodeClientRequiresPkceAndRejectsPassword() {
         var client = entity("client_secret_basic");
-        client.setRequireProofKey(false);
+        ((dev.macula.cloud.system.protocol.OAuth2ProtocolSettings) client.getProtocolConfigurations().get(0).settings()).setRequireProofKey(false);
         var service = mock(SysOAuth2ClientService.class);
         when(service.getClientByClientId("fixture")).thenReturn(client);
         var repository = repository(service);
-        assertThat(repository.findByClientId("fixture").getClientSettings().isRequireProofKey()).isFalse();
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> repository.findByClientId("fixture"))
+            .isInstanceOf(org.springframework.security.oauth2.core.OAuth2AuthenticationException.class);
         client.setRequireProofKey(true);
+        dev.macula.cloud.iam.protocol.oauth2.ProtocolTestFixtures.configure(client);
         assertThat(repository.findByClientId("fixture").getClientSettings().isRequireProofKey()).isTrue();
-        assertThat(repository.findByClientId("fixture").getAuthorizationGrantTypes())
-            .extracting(org.springframework.security.oauth2.core.AuthorizationGrantType::getValue).contains("password");
+        ((dev.macula.cloud.system.protocol.OAuth2ProtocolSettings) client.getProtocolConfigurations().get(0).settings()).setAuthorizationGrantTypes("password");
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> repository.findByClientId("fixture"))
+            .isInstanceOf(org.springframework.security.oauth2.core.OAuth2AuthenticationException.class);
     }
 
     private SysOAuth2Client entity(String method) {
@@ -69,10 +84,15 @@ class MaculaRegisteredClientRepositoryTest {
         client.setClientId("fixture");
         client.setClientName("测试应用");
         client.setClientAuthenticationMethods(method);
-        client.setAuthorizationGrantTypes("authorization_code,password,refresh_token");
+        client.setProtocolMode("OIDC");
+        client.setEnabledProtocols("OIDC");
+        client.setDefaultProtocol("OIDC");
+        client.setConfigurationStatus("ENABLED");
+        client.setRequireProofKey(true);
+        client.setAuthorizationGrantTypes("none".equals(method) ? "authorization_code" : "authorization_code,refresh_token");
         client.setRedirectUris("https://client.example/callback");
         client.setScopes("openid,profile");
-        return client;
+        return dev.macula.cloud.iam.protocol.oauth2.ProtocolTestFixtures.configure(client);
     }
 
     private MaculaRegisteredClientRepository repository(SysOAuth2ClientService service) {

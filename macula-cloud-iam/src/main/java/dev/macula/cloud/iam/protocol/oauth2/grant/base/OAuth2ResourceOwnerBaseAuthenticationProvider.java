@@ -69,6 +69,11 @@ public abstract class OAuth2ResourceOwnerBaseAuthenticationProvider<T extends OA
         this.tokenIssuer = new OAuth2UserGrantTokenIssuer(authorizationService, tokenGenerator);
     }
 
+    /** 手动创建的既有私有grant也必须使用统一MFA策略，不改变允许的grant配置。 */
+    public void setMfaCompletion(dev.macula.cloud.iam.authentication.mfa.MfaCompletionService completion) {
+        tokenIssuer.setMfaCompletion(completion);
+    }
+
     public abstract AbstractAuthenticationToken buildToken(Map<String, Object> requestParameters,
         RegisteredClient registeredClient);
 

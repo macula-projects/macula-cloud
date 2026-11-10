@@ -78,8 +78,8 @@ spring:
     oauth2:
       resourceserver:
         opaquetoken:
-          client-id: e4da4a32-592b-46f0-ae1d-784310e88423
-          client-secret: secret
+          client-id: ${IAM_INTROSPECTION_CLIENT_ID:}
+          client-secret: ${IAM_INTROSPECTION_CLIENT_SECRET:}
           introspection-uri: http://127.0.0.1:${IAM_HOST_PORT:9010}/oauth2/introspect
   redis:
     host: 127.0.0.1

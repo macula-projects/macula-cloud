@@ -41,7 +41,7 @@ class WecomExternalCodeVerifierTest {
     void appCodeUsesNativeSdkExchange() {
         IdentityProviderConfigService configs = mock(IdentityProviderConfigService.class);
         WecomClient client = mock(WecomClient.class);
-        ProviderConfig config = new ProviderConfig("WECOM", "corp", "secret",
+        ProviderConfig config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(dev.macula.cloud.system.enums.IdentitySourceType.WECOM_SDK, "WECOM", "corp", "secret",
             Map.of("corpId", "corp", "agentId", "agent"));
         when(configs.requireEnabledById(6L, "WECOM")).thenReturn(config);
         when(client.fetchAppUserId(config, "app-code")).thenReturn("member01");
@@ -60,7 +60,7 @@ class WecomExternalCodeVerifierTest {
     void miniAppCodeUsesMiniAppSessionExchange() {
         IdentityProviderConfigService configs = mock(IdentityProviderConfigService.class);
         WecomClient client = mock(WecomClient.class);
-        ProviderConfig config = new ProviderConfig("WECOM", "corp", "secret",
+        ProviderConfig config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(dev.macula.cloud.system.enums.IdentitySourceType.WECOM_MINIAPP, "WECOM", "corp", "secret",
             Map.of("corpId", "corp", "agentId", "agent"));
         when(configs.requireEnabledById(7L, "WECOM")).thenReturn(config);
         when(client.fetchMiniAppUserId(config, "miniapp-code")).thenReturn("member02");

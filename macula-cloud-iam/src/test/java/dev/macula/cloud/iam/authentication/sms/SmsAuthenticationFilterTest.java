@@ -17,6 +17,8 @@
 
 package dev.macula.cloud.iam.authentication.sms;
 
+import dev.macula.cloud.iam.authentication.hosted.HostedLoginClientPolicyService;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -57,6 +59,8 @@ class SmsAuthenticationFilterTest {
         MockHttpServletRequest request = request("POST", "/login/sms");
         request.addParameter("phone", " 13800138000 ");
         request.addParameter("code", " 123456 ");
+        request.setAttribute(HostedLoginClientPolicyService.CONTEXT_ATTRIBUTE,
+            new HostedLoginClientPolicyService.Context(null, Set.of()));
 
         Authentication result = filter.attemptAuthentication(request, new MockHttpServletResponse());
 
@@ -80,6 +84,11 @@ class SmsAuthenticationFilterTest {
         return request;
     }
 
+    /**
+     * 暴露匹配条件以验证仅接受指定POST端点。
+     *
+     * @since 6.1.0
+     */
     private static final class TestSmsAuthenticationFilter extends SmsAuthenticationFilter {
 
         private TestSmsAuthenticationFilter(AuthenticationManager authenticationManager) {

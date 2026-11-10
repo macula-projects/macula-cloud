@@ -2,7 +2,7 @@
 <html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="color-scheme" content="light"><meta name="referrer" content="same-origin">
+  <meta name="color-scheme" content="light"><meta name="referrer" content="no-referrer">
   <title>绑定已有账号 · Macula</title>
   <link rel="stylesheet" th:href="@{/iam/auth.css}" href="/iam/auth.css">
   <script th:src="@{/iam/auth.js}" src="/iam/auth.js" defer></script>
@@ -19,29 +19,34 @@
     <div class="brand mobile-brand"><span class="brand-mark" aria-hidden="true">M</span>Macula</div>
     <div class="card">
       <span class="step">账号绑定</span><h1>关联已有账号</h1>
-      <p class="subtitle">请选择一种方式证明账号归属。本页面不提供注册。</p>
+      <p class="subtitle">请选择一种方式证明账号归属。本页面不提供注册；手机号认证需与账号当前已登记手机号一致。</p>
+      <p th:if="${bindingComplete}" role="status">绑定成功，请返回应用并重新发起登录。</p>
+      <div th:unless="${bindingComplete}">
       <form method="post" th:action="@{/login/bind}">
         <div class="error" role="alert" tabindex="-1" th:text="${bindingError}"></div>
         <div class="form-field"><label for="bind-username">已有账号</label>
           <input class="text-input" id="bind-username" name="username" autocomplete="username" required></div>
         <div class="form-field"><label for="bind-method">验证方式</label>
           <select class="text-input" id="bind-method" name="method">
-            <option value="password">账号密码</option><option value="sms">手机验证码</option>
-            <option value="session">当前已登录会话</option>
+            <option value="password">账号密码</option><option th:if="${enableBindingSms}" value="sms">手机验证码</option>
+            <option th:if="${enableBindingSession}" value="session">当前已登录会话</option>
           </select></div>
         <div class="form-field"><label for="bind-password">密码（选择账号密码时填写）</label>
           <input class="text-input" id="bind-password" name="password" type="password" autocomplete="current-password"></div>
+        <th:block th:if="${enableBindingSms}">
         <div class="form-field"><label for="bind-phone">已登记手机号（选择短信时填写）</label>
           <input class="text-input" id="bind-phone" name="phone" type="tel" autocomplete="tel"></div>
         <div class="form-field"><label for="bind-code">短信验证码</label><div class="password-wrap code-wrap">
           <input class="text-input" id="bind-code" name="code" autocomplete="one-time-code" inputmode="numeric">
-          <button class="reveal" type="button" data-send-code th:attr="data-send-code-url=@{/api/v1/sms-code}">获取验证码</button>
+          <button class="reveal" type="button" data-send-code th:attr="data-send-code-url=@{/login/bind/sms-code}" data-binding-code>获取验证码</button>
         </div></div>
+        </th:block>
         <button class="primary" type="submit">验证并绑定</button>
       </form>
       <form class="footnote" method="post" th:action="@{/login/bind/cancel}">
         <button class="secondary" type="submit">取消并返回登录</button>
       </form>
+      </div>
     </div>
     <footer class="footer">Macula Cloud · 统一身份认证</footer>
   </section>

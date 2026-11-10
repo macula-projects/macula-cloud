@@ -45,10 +45,33 @@ public class CustomOAuth2TokenCustomizer implements OAuth2TokenCustomizer<OAuth2
     public void customize(OAuth2TokenClaimsContext context) {
         if (OAuth2TokenType.ACCESS_TOKEN.equals(context.getTokenType())) {
             context.getClaims().claims(claims -> {
-                claims.putAll(accessClaims(context.getPrincipal(), context.getRegisteredClient().getClientId()));
-                claims.put(OAuth2ParameterNames.GRANT_TYPE, context.getAuthorizationGrantType().getValue());
+                claims.putAll(resourceClaims(context.getPrincipal(), context.getRegisteredClient(),
+                    context.getAuthorizedScopes(), context.getAuthorizationGrantType().getValue()));
             });
         }
+    }
+
+    /** 访问令牌统一绑定资源、配置版本及可信租户；服务令牌不能从请求参数取租户。 */
+    static java.util.Map<String, Object> resourceClaims(org.springframework.security.core.Authentication principal,
+        org.springframework.security.oauth2.server.authorization.client.RegisteredClient client, java.util.Set<String> scopes, String grant) {
+        java.util.Map<String, Object> claims = accessClaims(principal, client.getClientId());
+        java.util.Set<String> audience = ResourceAuthorizationPolicy.audiences(client, scopes);
+        claims.put("aud", new java.util.ArrayList<>(audience));
+        if (!audience.contains(dev.macula.cloud.system.security.OAuth2ResourcePolicy.SYSTEM_RESOURCE)) {
+            claims.remove(SecurityConstants.AUTHORITIES_KEY);
+            claims.remove(SecurityConstants.JWT_DEPTID_KEY);
+            claims.remove(SecurityConstants.JWT_DATASCOPE_KEY);
+        }
+        claims.put(dev.macula.cloud.system.security.OAuth2ResourcePolicy.AUTHORIZATION_VERSION,
+            client.getClientSettings().getSetting(dev.macula.cloud.system.security.OAuth2ResourcePolicy.AUTHORIZATION_VERSION));
+        claims.put(OAuth2ParameterNames.GRANT_TYPE, grant);
+        if ("client_credentials".equals(grant)) {
+            Object tenant = client.getClientSettings().getSetting(
+                dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeClientSettings.TENANT_ID);
+            if (tenant == null) { throw new org.springframework.security.oauth2.core.OAuth2AuthenticationException("unauthorized_client"); }
+            claims.put(GlobalConstants.TENANT_ID_NAME, tenant);
+        }
+        return claims;
     }
 
     /** Shared platform access claims for opaque and JWT formats; never add these to ID Tokens. */
@@ -63,9 +86,7 @@ public class CustomOAuth2TokenCustomizer implements OAuth2TokenCustomizer<OAuth2
             if (user.getTenantId() != null) {
                 claims.put(GlobalConstants.TENANT_ID_NAME, user.getTenantId());
             }
-            if (user.getNickname() != null) {
-                claims.put(SecurityConstants.JWT_NICKNAME_KEY, user.getNickname());
-            }
+            // 资料通过已授权的Profile/UserInfo读取，不能让JWT Access Token绕过profile Scope。
             claims.put(SecurityConstants.JWT_DATASCOPE_KEY, user.getDataScope());
             if (user.getDeptId() != null) {
                 claims.put(SecurityConstants.JWT_DEPTID_KEY, user.getDeptId());

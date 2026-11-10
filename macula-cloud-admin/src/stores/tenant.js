@@ -17,6 +17,12 @@ export const useTenantStore = defineStore({
         tenantLabel: tool.data.get('tenantLabel') || ''
     }),
 	actions: {
+        resetAuth() {
+            this.tenantOptions = []
+            this.tenantId = null
+            this.tenantLabel = ''
+            for (const key of ['tenantStoreTenantOptions', sysConfig.TENANT_ID, 'tenantLabel']) tool.data.remove(key)
+        },
 		pushTenantOptions(tenantOptions){
 			if(tenantOptions && tenantOptions instanceof Array){
 				tenantOptions.forEach(item=>{

@@ -50,6 +50,32 @@ class ProtocolLoginCorsConfigurationSourceTest {
     private final ProtocolLoginCorsConfigurationSource source =
         new ProtocolLoginCorsConfigurationSource(clients, clientService, "/oauth2/token");
 
+    /** Discovery/JWKS 只对已启用 Client 的精确 Origin 允许无凭据 GET。 */
+    @Test
+    void metadataCorsAllowsOnlyRegisteredGetWithoutCredentials() {
+        when(clientService.allowedOrigins()).thenReturn(Set.of(ORIGIN));
+        for (String path : Set.of("/.well-known/openid-configuration", "/.well-known/oauth-authorization-server", "/oauth2/jwks")) {
+            var request = new MockHttpServletRequest("GET", path);
+            request.addHeader(HttpHeaders.ORIGIN, ORIGIN);
+            var allowed = source.getCorsConfiguration(request);
+            assertThat(allowed.getAllowedMethods()).containsExactly("GET", "OPTIONS");
+            assertThat(allowed.getAllowCredentials()).isFalse();
+            assertThat(allowed.getAllowedOrigins()).containsExactly(ORIGIN);
+            request.removeHeader(HttpHeaders.ORIGIN);
+            request.addHeader(HttpHeaders.ORIGIN, "https://unregistered.example");
+            assertThat(source.getCorsConfiguration(request).getAllowedOrigins()).isNull();
+            request.removeHeader(HttpHeaders.ORIGIN);
+            request.addHeader(HttpHeaders.ORIGIN, ORIGIN);
+            request.setMethod("POST");
+            assertThat(source.getCorsConfiguration(request).getAllowedOrigins()).isNull();
+            request.setMethod("OPTIONS");
+            request.addHeader(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "GET");
+            assertThat(source.getCorsConfiguration(request).getAllowedOrigins()).containsExactly(ORIGIN);
+            request.addHeader(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, "authorization");
+            assertThat(source.getCorsConfiguration(request).getAllowedOrigins()).isNull();
+        }
+    }
+
     @Test
     void preflightUsesOriginWithoutRequiringUnavailableClientHeaderValue() {
         MockHttpServletRequest request = request(HttpMethod.OPTIONS);

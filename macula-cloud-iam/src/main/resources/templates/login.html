@@ -20,11 +20,12 @@
     <div class="card">
       <span class="step">统一身份认证</span><h1>欢迎回来</h1><p class="subtitle">使用你的企业账号登录，继续访问应用。</p>
       <div th:if="${authenticationError}" class="external-error" role="alert" th:text="${authenticationError}"></div>
-      <div th:if="${enableSmsLogin}" class="tabs" role="tablist" aria-label="登录方式">
+      <p class="alert" role="status" th:if="${!enablePasswordLogin and !enableSmsLogin and !githubLoginEnabled and !wecomLoginEnabled and !feishuLoginEnabled and !dingtalkLoginEnabled and !wechatLoginEnabled}">此应用暂无可用登录方式，请联系管理员。</p>
+      <div th:if="${enablePasswordLogin and enableSmsLogin}" class="tabs" role="tablist" aria-label="登录方式">
         <button class="tab" type="button" role="tab" data-tab="password-login" aria-selected="true" aria-controls="password-login">账号密码</button>
         <button class="tab" type="button" role="tab" data-tab="sms-login" aria-selected="false" aria-controls="sms-login">手机验证码</button>
       </div>
-      <form id="password-login" data-login method="post" th:action="@{/login}">
+      <form th:if="${enablePasswordLogin}" id="password-login" data-login method="post" th:action="@{/login}">
         <input th:if="${_csrf != null}" type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"><div class="error" role="alert" tabindex="-1"></div>
         <div class="form-field"><label for="username">账号</label><input class="text-input" id="username" name="username" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="请输入你的账号" required></div>
         <div class="form-field"><label for="password">密码</label><div class="password-wrap">
@@ -33,7 +34,7 @@
         </div></div>
         <button class="primary" type="submit">登录并继续 <span aria-hidden="true">&nbsp; →</span></button>
       </form>
-      <form th:if="${enableSmsLogin}" id="sms-login" data-login method="post" th:action="@{/login/sms}" hidden>
+      <form th:if="${enableSmsLogin}" id="sms-login" data-login method="post" th:action="@{/login/sms}" th:hidden="${enablePasswordLogin}">
         <input th:if="${_csrf != null}" type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"><div class="error" role="alert" tabindex="-1"></div>
         <div class="form-field"><label for="phone">手机号码</label><input class="text-input" id="phone" name="phone" type="tel" autocomplete="tel" placeholder="请输入手机号码" required></div>
         <div class="form-field"><label for="code">验证码</label><div class="password-wrap code-wrap"><input class="text-input" id="code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="请输入验证码" required><button class="reveal" type="button" data-send-code data-send-code-url="api/v1/sms-code">获取验证码</button></div></div>
@@ -42,17 +43,13 @@
       <div th:if="${githubLoginEnabled or wecomLoginEnabled or feishuLoginEnabled or dingtalkLoginEnabled or wechatLoginEnabled}" class="external-login">
         <div class="external-divider"><span>其他登录方式</span></div>
         <a th:if="${githubLoginEnabled}" class="external-button" th:href="@{${githubLoginPath}}">使用 GitHub 登录</a>
-        <a th:if="${wecomLoginEnabled}" class="external-button wecom" th:href="@{${wecomLoginPath}}">使用企业微信登录（自动选择）</a>
-        <a th:if="${wecomLoginEnabled}" class="external-button wecom" th:href="@{${wecomBrowserPath}}">使用系统浏览器登录企业微信</a>
-        <a th:if="${wecomLoginEnabled}" class="external-button wecom" th:href="@{${wecomWebviewPath}}">在企业微信内登录</a>
+        <a th:if="${wecomLoginEnabled}" class="external-button wecom" th:href="@{${wecomLoginPath}}">使用企业微信登录</a>
         <a th:if="${feishuLoginEnabled}" class="external-button feishu" th:href="@{${feishuLoginPath}}">使用飞书登录</a>
-        <a th:if="${feishuLoginEnabled}" class="external-button feishu" th:href="@{${feishuBrowserPath}}">使用浏览器登录飞书</a>
         <a th:if="${dingtalkLoginEnabled}" class="external-button dingtalk" th:href="@{${dingtalkLoginPath}}">使用钉钉登录</a>
-        <a th:if="${dingtalkLoginEnabled}" class="external-button dingtalk" th:href="@{${dingtalkBrowserPath}}">使用浏览器登录钉钉</a>
-        <a th:if="${wechatLoginEnabled}" class="external-button wechat" th:href="@{${wechatLoginPath}}">使用微信登录（自动选择）</a>
-        <a th:if="${wechatLoginEnabled}" class="external-button wechat" th:href="@{${wechatBrowserPath}}">使用浏览器登录微信</a>
-        <a th:if="${wechatLoginEnabled}" class="external-button wechat" th:href="@{${wechatWebviewPath}}">在微信内登录</a>
+        <a th:if="${wechatLoginEnabled}" class="external-button wechat" th:href="@{${wechatLoginPath}}">使用微信登录</a>
       </div>
+      <p th:if="${browserEnvironmentNotice}" class="footnote">部分第三方入口适用于桌面或其专用客户端，请使用当前可用的登录方式。</p>
+      <p th:if="${wechatNeedsWebview}" class="footnote">此应用关联微信公众号，请在微信内打开登录。</p>
       <p class="footnote">登录遇到问题？请联系你的企业管理员。</p>
     </div>
     <footer class="footer">Macula Cloud · 统一身份认证</footer>

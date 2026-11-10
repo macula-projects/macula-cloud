@@ -39,15 +39,34 @@ public class OAuth2ExternalCodeAuthenticationConverter
     extends OAuth2ResourceOwnerBaseAuthenticationConverter<OAuth2ExternalCodeAuthenticationToken> {
 
     static final int MAX_CODE_LENGTH = 8192;
+    private static final int MAX_NONCE_LENGTH = 256;
     private static final Set<String> ALLOWED_PARAMETERS = Set.of(OAuth2ParameterNames.GRANT_TYPE,
         OAuth2ParameterNames.CLIENT_ID, OAuth2ParameterNames.CODE, OAuth2ParameterNames.SCOPE,
-        OAuth2ExternalCodeParameterNames.CODE_TYPE);
+        OAuth2ExternalCodeParameterNames.CODE_TYPE, org.springframework.security.oauth2.core.oidc.endpoint.OidcParameterNames.NONCE,
+        OAuth2ExternalCodeParameterNames.PROVIDER_CODE_VERIFIER, OAuth2ExternalCodeParameterNames.PROVIDER_REDIRECT_URI);
+
+    /** 解包框架转发头包装，只使用连接地址或容器已校验的可信代理地址，防止任意XFF换IP限流。 */
+    @Override
+    public Authentication convert(HttpServletRequest request) {
+        Authentication result = super.convert(request);
+        if (result instanceof OAuth2ExternalCodeAuthenticationToken token) {
+            jakarta.servlet.ServletRequest connection = request;
+            while (connection instanceof jakarta.servlet.ServletRequestWrapper wrapper) {
+                connection = wrapper.getRequest();
+            }
+            var session = request.getSession(false);
+            token.setDetails(new org.springframework.security.web.authentication.WebAuthenticationDetails(
+                connection.getRemoteAddr(), session == null ? null : session.getId()));
+        }
+        return result;
+    }
 
     @Override
     public boolean support(String grantType) {
         return ExternalCodeType.GRANT_TYPE.equals(grantType);
     }
 
+    /** 先拒绝重复/越界参数；nonce只用于本扩展的请求响应关联。 */
     @Override
     public void checkParams(HttpServletRequest request) {
         MultiValueMap<String, String> parameters = OAuth2EndpointUtils.getParameters(request);
@@ -55,6 +74,16 @@ public class OAuth2ExternalCodeAuthenticationConverter
             .findFirst().ifPresent(this::invalid);
         requireSingle(parameters, OAuth2ParameterNames.GRANT_TYPE, ExternalCodeType.GRANT_TYPE.length());
         String code = requireSingle(parameters, OAuth2ParameterNames.CODE, MAX_CODE_LENGTH);
+        if (parameters.containsKey(org.springframework.security.oauth2.core.oidc.endpoint.OidcParameterNames.NONCE)) {
+            requireSingle(parameters, org.springframework.security.oauth2.core.oidc.endpoint.OidcParameterNames.NONCE, MAX_NONCE_LENGTH);
+        }
+        if (parameters.containsKey(OAuth2ExternalCodeParameterNames.PROVIDER_CODE_VERIFIER)) {
+            String verifier = requireSingle(parameters, OAuth2ExternalCodeParameterNames.PROVIDER_CODE_VERIFIER, 128);
+            if (!verifier.matches("[A-Za-z0-9._~-]{43,128}")) { invalid(OAuth2ExternalCodeParameterNames.PROVIDER_CODE_VERIFIER); }
+        }
+        if (parameters.containsKey(OAuth2ExternalCodeParameterNames.PROVIDER_REDIRECT_URI)) {
+            requireSingle(parameters, OAuth2ExternalCodeParameterNames.PROVIDER_REDIRECT_URI, 2048);
+        }
         String codeType = requireSingle(parameters, OAuth2ExternalCodeParameterNames.CODE_TYPE, 64);
         if (!ExternalCodeType.GRANT_TYPE.equals(parameters.getFirst(OAuth2ParameterNames.GRANT_TYPE))) {
             invalid(OAuth2ParameterNames.GRANT_TYPE);

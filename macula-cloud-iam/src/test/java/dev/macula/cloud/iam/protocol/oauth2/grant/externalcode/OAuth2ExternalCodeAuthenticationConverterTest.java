@@ -84,6 +84,24 @@ class OAuth2ExternalCodeAuthenticationConverterTest {
         assertThatThrownBy(() -> converter.convert(duplicate)).isInstanceOf(OAuth2AuthenticationException.class);
     }
 
+    /** nonce可以省略；提供时必须唯一、非空且长度受限。 */
+    @Test
+    void acceptsOptionalNonceAndRejectsMalformedNonce() {
+        authenticateClient();
+        MockHttpServletRequest valid = request();
+        valid.addParameter("nonce", "request-nonce");
+        var token = (OAuth2ExternalCodeAuthenticationToken) converter.convert(valid);
+        assertThat(token.getAdditionalParameters()).containsEntry("nonce", "request-nonce");
+        for (String value : new String[] {"", " ", "x".repeat(257)}) {
+            MockHttpServletRequest invalid = request();
+            invalid.addParameter("nonce", value);
+            assertThatThrownBy(() -> converter.convert(invalid)).isInstanceOf(OAuth2AuthenticationException.class);
+        }
+        MockHttpServletRequest duplicate = request();
+        duplicate.addParameter("nonce", "one", "two");
+        assertThatThrownBy(() -> converter.convert(duplicate)).isInstanceOf(OAuth2AuthenticationException.class);
+    }
+
     private MockHttpServletRequest request() {
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setMethod("POST");
@@ -96,6 +114,39 @@ class OAuth2ExternalCodeAuthenticationConverterTest {
         return request;
     }
 
+    /** 平台专用Verifier只解析为条件材料，不把客户端参数当IAM授权码PKCE。 */
+    @Test
+    void parsesConditionalProofAndUsesConnectionAddress() {
+        authenticateClient();
+        MockHttpServletRequest request = request();
+        request.setRemoteAddr("192.0.2.1");
+        request.addHeader("X-Forwarded-For", "198.51.100.1");
+        request.addParameter(OAuth2ExternalCodeParameterNames.PROVIDER_CODE_VERIFIER, "a".repeat(43));
+        var token = (OAuth2ExternalCodeAuthenticationToken) converter.convert(request);
+        assertThat(token.getAdditionalParameters().get(OAuth2ExternalCodeParameterNames.PROVIDER_CODE_VERIFIER))
+            .isEqualTo("a".repeat(43));
+        assertThat(((org.springframework.security.web.authentication.WebAuthenticationDetails) token.getDetails())
+            .getRemoteAddress()).isEqualTo("192.0.2.1");
+        request.addParameter(OAuth2ExternalCodeParameterNames.PROVIDER_CODE_VERIFIER, "b".repeat(43));
+        assertThatThrownBy(() -> converter.convert(request)).isInstanceOf(OAuth2AuthenticationException.class);
+    }
+
+    /** framework转发头包装的remoteAddr也不等于已验证代理地址。 */
+    @Test
+    void forwardedRequestWrapperCannotOverrideRateAddress() {
+        authenticateClient();
+        MockHttpServletRequest request = request();
+        request.setRemoteAddr("192.0.2.1");
+        var wrapped = new jakarta.servlet.http.HttpServletRequestWrapper(request) {
+            /** 模拟任意ForwardedHeaderFilter根据请求头生成的地址。 */
+            @Override
+            public String getRemoteAddr() { return "198.51.100.1"; }
+        };
+        var token = (OAuth2ExternalCodeAuthenticationToken) converter.convert(wrapped);
+        assertThat(((org.springframework.security.web.authentication.WebAuthenticationDetails) token.getDetails())
+            .getRemoteAddress()).isEqualTo("192.0.2.1");
+    }
+
     private void authenticateClient() {
         RegisteredClient client = RegisteredClient.withId("public-client")
             .clientId("public-client")
@@ -106,4 +157,20 @@ class OAuth2ExternalCodeAuthenticationConverterTest {
         SecurityContextHolder.getContext().setAuthentication(
             new OAuth2ClientAuthenticationToken(client, ClientAuthenticationMethod.NONE, null));
     }
+    /** 专用回调参数单值透传；重复、空白及越界参数在协议层拒绝。 */
+    @Test
+    void acceptsSingleProviderCallbackAndRejectsDuplicateOrOversizedValues() {
+        authenticateClient();
+        var valid = request();
+        valid.setParameter(OAuth2ExternalCodeParameterNames.CODE_TYPE, "FEISHU_APP_CODE");
+        valid.setParameter(OAuth2ExternalCodeParameterNames.PROVIDER_REDIRECT_URI, "https://app.example/callback");
+        var token = (OAuth2ExternalCodeAuthenticationToken) converter.convert(valid);
+        assertThat(token.getAdditionalParameters()).containsEntry(OAuth2ExternalCodeParameterNames.PROVIDER_REDIRECT_URI, "https://app.example/callback");
+        for (String[] values : java.util.List.of(new String[] {""}, new String[] {"x".repeat(2049)}, new String[] {"https://a.example", "https://b.example"})) {
+            var invalid = request();
+            invalid.setParameter(OAuth2ExternalCodeParameterNames.PROVIDER_REDIRECT_URI, values);
+            assertThatThrownBy(() -> converter.convert(invalid)).isInstanceOf(OAuth2AuthenticationException.class);
+        }
+    }
+
 }

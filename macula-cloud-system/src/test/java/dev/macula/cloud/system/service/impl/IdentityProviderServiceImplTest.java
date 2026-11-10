@@ -30,10 +30,12 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -52,7 +54,9 @@ import static org.mockito.Mockito.when;
 class IdentityProviderServiceImplTest {
     private final SysIdentityProviderMapper mapper = mock(SysIdentityProviderMapper.class);
     private final IdentityProviderServiceImpl service = new IdentityProviderServiceImpl(mapper,
-        Mappers.getMapper(IdentityProviderConverter.class));
+        Mappers.getMapper(IdentityProviderConverter.class),
+        mock(dev.macula.cloud.system.mapper.SysOAuth2ClientConfigMapper.class),
+        mock(dev.macula.cloud.system.mapper.SysOAuth2ClientExternalProviderMapper.class));
 
     @Test
     void catalogIsTheSourceOfProviderCodesAndValidationFields() {
@@ -108,8 +112,7 @@ class IdentityProviderServiceImplTest {
         assertProvider("GITHUB", "social", Map.of("clientId", "github-id", "clientSecret", "secret"));
         assertProvider("ALIPAY", "social", Map.of("appId", "ali-id", "appPrivateKey", "private-key",
             "alipayPublicKey", "public-key"));
-        assertProvider("WECHAT", "social", Map.of("appId", "wechat-id", "appSecret", "secret",
-            "officialAccountAppId", "official-id", "officialAccountAppSecret", "official-secret"));
+        assertProvider("WECHAT", "social", Map.of("appId", "wechat-id", "appSecret", "secret"));
         assertProvider("WECOM", "enterprise", Map.of("corpId", "corp-id", "agentId", "agent-id",
             "appSecret", "secret"));
         assertProvider("FEISHU", "enterprise", Map.of("appId", "feishu-id", "appSecret", "secret"));
@@ -142,40 +145,67 @@ class IdentityProviderServiceImplTest {
                 entity.getConfigJson().contains("public-key")));
         assertFalse(result.getConfig().containsKey("appPrivateKey"));
         assertEquals(Boolean.TRUE, result.getConfiguredSecrets().get("appPrivateKey"));
-        assertEquals("/login/alipay", result.getCallbackUrl());
+        assertNull(result.getCallbackUrl());
     }
 
     @Test
-    void storesAdditionalSecretsSeparatelyAndRetainsBlankValuesOnUpdate() {
+    void storesOnlySpecificSourceSecretAndRetainsBlankValueOnUpdate() {
         when(mapper.selectCount(any())).thenReturn(0L);
         IdentityProviderVO result = service.save(null, form("WECHAT", "social", Map.of(
-            "appId", "website-id", "appSecret", "website-secret",
-            "officialAccountAppId", "official-id", "officialAccountAppSecret", "official-secret")));
+            "appId", "website-id", "appSecret", "website-secret")));
 
         verify(mapper).insert((SysIdentityProvider)argThat((SysIdentityProvider entity) ->
             "website-secret".equals(entity.getAppSecret()) &&
-                "{\"officialAccountAppSecret\":\"official-secret\"}".equals(entity.getSecretConfigJson()) &&
+                "{}".equals(entity.getSecretConfigJson()) &&
                 !entity.getConfigJson().contains("official-secret")));
-        assertEquals(Map.of("appSecret", true, "officialAccountAppSecret", true,
-            "mobileAppSecret", false, "miniAppSecret", false), result.getConfiguredSecrets());
+        assertEquals(Map.of("appSecret", true), result.getConfiguredSecrets());
         assertFalse(result.getConfig().containsKey("officialAccountAppSecret"));
 
         SysIdentityProvider existing = new SysIdentityProvider();
         existing.setId(9L);
         existing.setName("微信登录");
         existing.setProviderType("WECHAT");
+        existing.setSourceType("WECHAT_WEBSITE");
+        existing.setVersion(0L);
         existing.setAppId("website-id");
         existing.setAppSecret("website-secret");
-        existing.setSecretConfigJson("{\"officialAccountAppSecret\":\"old-official-secret\"}");
-        existing.setConfigJson("{\"appId\":\"website-id\",\"officialAccountAppId\":\"official-id\"}");
+
+        existing.setConfigJson("{\"appId\":\"website-id\"}");
         when(mapper.selectById(9L)).thenReturn(existing);
+        when(mapper.update(any(SysIdentityProvider.class), any(com.baomidou.mybatisplus.core.conditions.Wrapper.class))).thenReturn(1);
 
         service.save(9L, form("WECHAT", "social", Map.of(
-            "appId", "website-id", "appSecret", "",
-            "officialAccountAppId", "official-id", "officialAccountAppSecret", "")));
+            "appId", "website-id", "appSecret", "")));
 
         assertEquals("website-secret", existing.getAppSecret());
-        assertEquals("{\"officialAccountAppSecret\":\"old-official-secret\"}", existing.getSecretConfigJson());
+        assertEquals("{}", existing.getSecretConfigJson());
+    }
+
+    /** 验证持久化加密空值在详情及分页投影中都保持无附加凭据。 */
+    @Test
+    void readsLegacyEncryptedNullAndEmptyAdditionalSecrets() {
+        com.baomidou.mybatisplus.core.metadata.TableInfoHelper.initTableInfo(
+            new org.apache.ibatis.builder.MapperBuilderAssistant(
+                new com.baomidou.mybatisplus.core.MybatisConfiguration(), "identity-source-test"),
+            SysIdentityProvider.class);
+        SysIdentityProvider existing = new SysIdentityProvider();
+        existing.setId(10L);
+        existing.setProviderType("GITHUB");
+        existing.setSourceType("GITHUB_OAUTH");
+        existing.setAppId("github-id");
+        existing.setAppSecret("decrypted-secret");
+        existing.setConfigJson("{\"clientId\":\"github-id\"}");
+        when(mapper.selectById(10L)).thenReturn(existing);
+        var page = new com.baomidou.mybatisplus.extension.plugins.pagination.Page<SysIdentityProvider>(1, 20);
+        page.setRecords(java.util.List.of(existing));
+        page.setTotal(1);
+        when(mapper.selectPage(any(), any())).thenReturn(page);
+        for (String empty : new String[] {null, "null", "{}"}) {
+            existing.setSecretConfigJson(empty);
+            page.setRecords(java.util.List.of(existing));
+            assertEquals(Map.of("clientSecret", true), service.get(10L).getConfiguredSecrets());
+            assertEquals(1, service.page(1, 20, null, null, "social").getRecords().size());
+        }
     }
 
     @Test
@@ -215,16 +245,11 @@ class IdentityProviderServiceImplTest {
     }
 
     @Test
-    void rejectsSecondEnabledProviderOfTheSameType() {
-        when(mapper.selectCount(any())).thenReturn(0L, 1L);
-
-        ResponseStatusException error = assertThrows(ResponseStatusException.class,
-            () -> service.save(null, form("GITHUB", "social",
-                Map.of("clientId", "github-id", "clientSecret", "secret"))));
-
-        assertEquals(409, error.getStatusCode().value());
-        assertEquals("同类型仅允许一个启用配置", error.getReason());
-        verify(mapper, never()).insert(any(SysIdentityProvider.class));
+    void permitsSeparateEnabledSourcesOfTheSameProvider() {
+        when(mapper.selectCount(any())).thenReturn(0L);
+        service.save(null, form("GITHUB", "social", Map.of("clientId", "github-id", "clientSecret", "secret")));
+        service.save(null, form("GITHUB", "social", Map.of("clientId", "other-id", "clientSecret", "other-secret")));
+        verify(mapper, times(2)).insert(any(SysIdentityProvider.class));
     }
 
     @Test
@@ -233,6 +258,8 @@ class IdentityProviderServiceImplTest {
         existing.setId(7L);
         existing.setName("GitHub Login");
         existing.setProviderType("GITHUB");
+        existing.setSourceType("GITHUB_OAUTH");
+        existing.setVersion(0L);
         existing.setAppId("github-id");
         existing.setAppSecret("old-secret");
         existing.setConfigJson("{\"clientId\":\"github-id\"}");
@@ -240,11 +267,12 @@ class IdentityProviderServiceImplTest {
         existing.setVisible(true);
         when(mapper.selectById(7L)).thenReturn(existing);
         when(mapper.selectCount(any())).thenReturn(0L);
+        when(mapper.update(any(SysIdentityProvider.class), any(com.baomidou.mybatisplus.core.conditions.Wrapper.class))).thenReturn(1);
 
         service.save(7L, form("GITHUB", "social",
             Map.of("clientId", "github-id", "clientSecret", "")));
 
-        verify(mapper).updateById(existing);
+        verify(mapper).update(eq(existing), any(com.baomidou.mybatisplus.core.conditions.Wrapper.class));
     }
 
     @Test
@@ -280,12 +308,15 @@ class IdentityProviderServiceImplTest {
         existing.setId(7L);
         existing.setName("github");
         existing.setProviderType("GITHUB");
+        existing.setSourceType("GITHUB_OAUTH");
+        existing.setVersion(0L);
         existing.setAppId("old-id");
         existing.setAppSecret("old-secret");
         existing.setConfigJson("{\"clientId\":\"old-id\"}");
         when(mapper.selectById(7L)).thenReturn(existing);
         when(mapper.selectCount(any())).thenReturn(0L);
-        IdentityProviderForm form = form("GITHUB", "social", Map.of("clientId", "new-id", "clientSecret", ""));
+        when(mapper.update(any(SysIdentityProvider.class), any(com.baomidou.mybatisplus.core.conditions.Wrapper.class))).thenReturn(1);
+        IdentityProviderForm form = form("GITHUB", "social", Map.of("clientId", "old-id", "clientSecret", ""));
         service.save(7L, form);
         assertEquals("old-secret", existing.getAppSecret());
         assertEquals("/login/github", service.get(7L).getCallbackUrl());
@@ -294,7 +325,7 @@ class IdentityProviderServiceImplTest {
     }
 
     @Test
-    void readsLegacyColumnsButRejectsUnknownJsonFields() {
+    void untypedSourceRequiresExplicitReconfigurationAndRejectsPublicSecrets() {
         SysIdentityProvider existing = new SysIdentityProvider();
         existing.setId(8L);
         existing.setName("github");
@@ -305,9 +336,10 @@ class IdentityProviderServiceImplTest {
         when(mapper.selectById(8L)).thenReturn(existing);
         IdentityProviderVO result = service.get(8L);
         assertEquals("github", result.getName());
-        assertEquals("legacy-id", result.getConfig().get("clientId"));
+        assertTrue(result.getConfig().isEmpty());
         assertFalse(result.getConfig().containsKey("clientSecret"));
-        assertEquals(Boolean.TRUE, result.getConfiguredSecrets().get("clientSecret"));
+        assertTrue(result.getConfiguredSecrets().isEmpty());
+        assertNull(result.getSourceType());
         assertFalse(result.isEnabled());
         assertFalse(result.isVisible());
         existing.setConfigJson("{\"clientSecret\":\"plaintext\"}");
@@ -317,8 +349,54 @@ class IdentityProviderServiceImplTest {
         verify(mapper, never()).updateById(any(SysIdentityProvider.class));
     }
 
+    /** 企业来源没有默认自动绑定；开启必须声明该来源支持的规则。 */
+    @Test
+    void autoBindingRequiresExplicitSupportedRule() {
+        when(mapper.selectCount(any())).thenReturn(0L);
+        var form = form("WECOM", "enterprise", Map.of("corpId", "corp", "agentId", "agent", "appSecret", "secret"));
+        assertFalse(service.save(null, form).getAutoBindEnabled());
+        form.setAutoBindEnabled(true);
+        assertThrows(ResponseStatusException.class, () -> service.save(null, form));
+        form.setBindingRule("EMPLOYEE_NO_TO_USERNAME");
+        assertThrows(ResponseStatusException.class, () -> service.save(null, form));
+        form.setBindingRule("MEMBER_ID_TO_USERNAME");
+        assertEquals("MEMBER_ID_TO_USERNAME", service.save(null, form).getBindingRule());
+        form.setAutoBindEnabled(false);
+        assertThrows(ResponseStatusException.class, () -> service.save(null, form));
+        var social = form("GITHUB", "social", Map.of("clientId", "github", "clientSecret", "secret"));
+        social.setAutoBindEnabled(true);
+        social.setBindingRule("MEMBER_ID_TO_USERNAME");
+        assertThrows(ResponseStatusException.class, () -> service.save(null, social));
+    }
+
+    /** 过期版本不能覆盖策略；更新竞争失败由409明确返回。 */
+    @Test
+    void staleVersionAndCompareAndSetFailureRejectPolicyUpdate() {
+        var existing = new SysIdentityProvider();
+        existing.setId(7L);
+        existing.setProviderType("WECOM");
+        existing.setSourceType("WECOM_WEB");
+        existing.setAppId("corp");
+        existing.setAppSecret("secret");
+        existing.setConfigJson("{\"corpId\":\"corp\",\"agentId\":\"agent\"}");
+        existing.setVersion(2L);
+        when(mapper.selectById(7L)).thenReturn(existing);
+        var form = form("WECOM", "enterprise", Map.of("corpId", "corp", "agentId", "agent", "appSecret", ""));
+        assertEquals(409, assertThrows(ResponseStatusException.class, () -> service.save(7L, form)).getStatusCode().value());
+        form.setVersion(2L);
+        when(mapper.selectCount(any())).thenReturn(0L);
+        when(mapper.update(any(SysIdentityProvider.class), any(com.baomidou.mybatisplus.core.conditions.Wrapper.class))).thenReturn(0);
+        assertEquals(409, assertThrows(ResponseStatusException.class, () -> service.save(7L, form)).getStatusCode().value());
+    }
+
+    /** 验证各来源独立字段；企业资料自动补充必须声明固定组织。 */
     private void assertProvider(String type, String category, Map<String, Object> config) {
-        IdentityProviderVO result = service.save(null, form(type, category, config));
+        var input = form(type, category, config);
+        if ("FEISHU".equals(type)) {
+            input.setIdentityFlow("FEISHU_OAUTH_V3");
+            input.setOrganizationId("fixture-tenant");
+        }
+        IdentityProviderVO result = service.save(null, input);
         assertEquals(category, result.getCategory());
         assertEquals(type, result.getProviderType());
     }
@@ -327,10 +405,185 @@ class IdentityProviderServiceImplTest {
         IdentityProviderForm form = new IdentityProviderForm();
         form.setName(type + " Login");
         form.setProviderType(type);
+        form.setSourceType(switch (type) {
+            case "GITHUB" -> "GITHUB_OAUTH";
+            case "WECHAT" -> "WECHAT_WEBSITE";
+            case "WECOM" -> "WECOM_WEB";
+            case "FEISHU" -> "FEISHU_WEB";
+            case "DINGTALK" -> "DINGTALK_WEB";
+            case "ALIYUN_MOBILE" -> "ALIYUN_MOBILE";
+            default -> "ALIPAY_APPLICATION";
+        });
+        form.setAutoBindEnabled(false);
+        form.setVersion(0L);
         form.setCategory(category);
         form.setConfig(new HashMap<>(config));
         form.setEnabled(true);
         form.setVisible(true);
         return form;
     }
+    /** 新来源不要求界面提供Flow，默认采用已核实版本；新映射可保持及显式清除。 */
+    @Test
+    void createsAndPreservesExplicitMappingWithInternalDefaults() {
+        when(mapper.selectCount(any())).thenReturn(0L);
+        var form = form("FEISHU", "enterprise", Map.of("appId", "app", "appSecret", "secret"));
+        form.setSourceType("FEISHU_WEB");
+        form.setIdentityFlow(null);
+        form.setDirectoryPolicy(null);
+        form.setOrganizationId("tenant-fixed");
+        form.setAutoBindEnabled(true);
+        form.setBindingSourceField("email");
+        form.setBindingTargetField("email");
+        var saved = service.save(null, form);
+        assertEquals("FEISHU_OAUTH_V3", saved.getIdentityFlow());
+        assertEquals("AUTO", saved.getDirectoryPolicy());
+        assertEquals("email", saved.getBindingSourceField());
+        assertNull(saved.getBindingRule());
+        var captured = org.mockito.ArgumentCaptor.forClass(SysIdentityProvider.class);
+        verify(mapper).insert(captured.capture());
+        var stored = captured.getValue();
+        stored.setId(7L);
+        when(mapper.selectById(7L)).thenReturn(stored);
+        when(mapper.update(any(SysIdentityProvider.class), any(com.baomidou.mybatisplus.core.conditions.Wrapper.class))).thenReturn(1);
+        var update = form("FEISHU", "enterprise", Map.of("appId", "app", "appSecret", ""));
+        update.setAutoBindEnabled(true);
+        update.setVersion(stored.getVersion());
+        var retained = service.save(7L, update);
+        assertEquals("email", retained.getBindingTargetField());
+        assertEquals("AUTO", retained.getDirectoryPolicy());
+        update.setVersion(stored.getVersion());
+        update.setBindingRule(null);
+        assertThrows(ResponseStatusException.class, () -> service.save(7L, update));
+        update.setAutoBindEnabled(false);
+        update.setBindingSourceField(null);
+        update.setBindingTargetField(null);
+        var cleared = service.save(7L, update);
+        assertNull(cleared.getBindingSourceField());
+        assertNull(cleared.getBindingTargetField());
+    }
+
+    /** 新旧客户端不能丢掉新规则或用半组更新绕过校验。 */
+    @Test
+    void rejectsPartialAndConflictingMappingWrites() {
+        var form = form("WECOM", "enterprise", Map.of("corpId", "corp", "agentId", "1001", "appSecret", "secret"));
+        form.setAutoBindEnabled(true);
+        form.setBindingSourceField("member_id");
+        assertThrows(ResponseStatusException.class, () -> service.save(null, form));
+        form.setBindingTargetField("username");
+        form.setBindingRule("VERIFIED_MOBILE_TO_MOBILE");
+        assertThrows(ResponseStatusException.class, () -> service.save(null, form));
+        form.setBindingSourceField(null);
+        form.setBindingTargetField(null);
+        form.setBindingRule("MEMBER_ID_TO_USERNAME");
+        assertThrows(ResponseStatusException.class, () -> service.save(null, form));
+    }
+
+    /** 隐藏组织策略后，企微固定企业来自同一来源已规范化配置，不能因首尾空白生成不同身份域。 */
+    @Test
+    void derivesFixedWecomOrganizationFromNormalizedApplicationConfig() {
+        when(mapper.selectCount(any())).thenReturn(0L);
+        var input = form("WECOM","enterprise",Map.of("corpId"," corp-fixed ","agentId","1001","appSecret","secret"));
+        var saved = service.save(null,input);
+        assertEquals("corp-fixed",saved.getOrganizationId());
+        assertEquals("AUTO",saved.getDirectoryPolicy());
+    }
+
+    /** 同一企微注册一次填写凭据，显式多选能力；旧PUT不能把新增能力清空。 */
+    @Test
+    void oneWecomRegistrationSharesCredentialsAndPreservesCapabilitiesForOldPut() {
+        when(mapper.selectCount(any())).thenReturn(0L);
+        var input = form("WECOM", "enterprise", Map.of("corpId", "corp", "agentId", "1001", "appSecret", "secret"));
+        input.setCredentialType("WECOM_APPLICATION");
+        input.setLoginCapabilities(java.util.Set.of("WECOM_BROWSER", "WECOM_WEBVIEW", "WECOM_MINIAPP"));
+        var saved = service.save(null, input);
+        assertEquals("WECOM_APPLICATION", saved.getCredentialType());
+        assertEquals(input.getLoginCapabilities(), saved.getLoginCapabilities());
+        var capture = org.mockito.ArgumentCaptor.forClass(SysIdentityProvider.class);
+        verify(mapper).insert(capture.capture());
+        var stored = capture.getValue();
+         stored.setId(7L);
+        assertEquals("secret", stored.getAppSecret());
+        when(mapper.selectById(7L)).thenReturn(stored);
+        when(mapper.update(any(SysIdentityProvider.class), any(com.baomidou.mybatisplus.core.conditions.Wrapper.class))).thenReturn(1);
+        var oldPut = form("WECOM", "enterprise", Map.of("corpId", "corp", "agentId", "1001", "appSecret", ""));
+        oldPut.setVersion(stored.getVersion());
+        assertEquals(input.getLoginCapabilities(), service.save(7L, oldPut).getLoginCapabilities());
+        var disabled = form("WECOM", "enterprise", Map.of("corpId", "corp", "agentId", "1001", "appSecret", ""));
+        disabled.setVersion(stored.getVersion());
+         disabled.setLoginCapabilities(java.util.Set.of());
+        assertTrue(service.save(7L, disabled).getLoginCapabilities().isEmpty());
+    }
+
+    /** 微信各平台注册独立，钉钉同一应用三种能力共用一套凭据。 */
+    @Test
+    void rejectsCrossWechatRegistrationAndSharesDingtalkSdkCredentials() {
+        var website = form("WECHAT", "social", Map.of("appId", "site", "appSecret", "secret"));
+        website.setSourceType("WECHAT_WEBSITE");
+        website.setLoginCapabilities(java.util.Set.of("WECHAT_MOBILE_APP"));
+        assertThrows(ResponseStatusException.class, () -> service.save(null, website));
+        var ding = form("DINGTALK", "enterprise", Map.of("appKey", "ding", "corpId", "corp", "appSecret", "secret"));
+        when(mapper.selectCount(any())).thenReturn(0L);
+        ding.setLoginCapabilities(java.util.Set.of("DINGTALK_WEB", "DINGTALK_SDK", "DINGTALK_WEBVIEW"));
+        var saved = service.save(null, ding);
+        assertEquals("DINGTALK_APPLICATION", saved.getCredentialType());
+        assertEquals(ding.getLoginCapabilities(), saved.getLoginCapabilities());
+        var captured = org.mockito.ArgumentCaptor.forClass(SysIdentityProvider.class);
+        verify(mapper).insert(captured.capture());
+        assertEquals("ding", captured.getValue().getAppId());
+        assertEquals("secret", captured.getValue().getAppSecret());
+        assertEquals("ding", saved.getConfig().get("appKey"));
+        assertFalse(saved.getConfig().containsKey("appSecret"));
+    }
+
+    /** 真实Jackson输入、持久化与VO回显保留多条规则，旧写入不得截断。 */
+    @Test
+    void savesCompleteMappingArrayAndRejectsLossyLegacyUpdates() {
+        when(mapper.selectCount(any())).thenReturn(0L);
+        var json = tools.jackson.databind.json.JsonMapper.builder().build();
+        var input = form("FEISHU", "enterprise", Map.of("appId", "app", "appSecret", "secret"));
+        input.setSourceType("FEISHU_WEB");
+        input.setOrganizationId("tenant-fixed");
+        input.setAutoBindEnabled(true);
+        var wire = json.readValue("{\"bindingMappings\":[{\"sourceField\":\"mobile\",\"targetField\":\"mobile\"},{\"sourceField\":\"email\",\"targetField\":\"email\"}]}", IdentityProviderForm.class);
+        input.setBindingMappings(wire.getBindingMappings());
+        var saved = service.save(null, input);
+        assertEquals(2, saved.getBindingMappings().size());
+        assertNull(saved.getBindingSourceField());
+        var captured = org.mockito.ArgumentCaptor.forClass(SysIdentityProvider.class);
+        verify(mapper).insert(captured.capture());
+        var stored = captured.getValue();
+        assertEquals(saved.getBindingMappings(), dev.macula.cloud.system.enums.IdentityBindingMappings.toWire(
+            dev.macula.cloud.system.enums.IdentityBindingMappings.decode(stored.getBindingMappingsJson(), null, null, null)));
+        stored.setId(7L);
+        when(mapper.selectById(7L)).thenReturn(stored);
+        when(mapper.update(any(SysIdentityProvider.class), any(com.baomidou.mybatisplus.core.conditions.Wrapper.class))).thenReturn(1);
+        var update = form("FEISHU", "enterprise", Map.of("appId", "app", "appSecret", ""));
+        update.setAutoBindEnabled(null);
+        update.setVersion(stored.getVersion());
+        var retained = service.save(7L, update);
+        assertEquals(saved.getBindingMappings(), retained.getBindingMappings());
+        update.setVersion(stored.getVersion());
+        update.setBindingSourceField("email");
+        update.setBindingTargetField("email");
+        assertThrows(ResponseStatusException.class, () -> service.save(7L, update));
+        update.setBindingMappings(java.util.List.of());
+        update.setBindingSourceField(null);
+        update.setBindingTargetField(null);
+        update.setAutoBindEnabled(false);
+        var cleared = service.save(7L, update);
+        assertTrue(cleared.getBindingMappings().isEmpty());
+    }
+    /** AppLink能力不需要身份源回调，历史坏地址也不参与保存校验。 */
+    @Test
+    void enablesAppLinkWithoutSourceCallback() {
+        when(mapper.selectCount(any())).thenReturn(0L);
+        var input = form("FEISHU", "enterprise", Map.of("appId", "app", "appSecret", "secret"));
+        input.setSourceType("FEISHU_WEB");
+        input.setOrganizationId("tenant-fixed");
+        input.setLoginCapabilities(java.util.Set.of("FEISHU_WEB", "FEISHU_APPLINK", "FEISHU_WEBVIEW"));
+        var saved = service.save(null, input);
+        assertTrue(saved.getLoginCapabilities().contains("FEISHU_APPLINK"));
+        assertNull(saved.getOauthRedirectUri());
+    }
+
 }

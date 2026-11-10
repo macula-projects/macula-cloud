@@ -21,6 +21,7 @@ import config from "@/config"
 import NProgress from 'nprogress'
 import 'nprogress/nprogress.css'
 import tool from '@/utils/tool';
+import {readSession, onAuthCleared} from '@/utils/adminAuthSession';
 import systemRouter from './systemRouter';
 import userRoutes from '@/config/route';
 import {beforeEach, afterEach} from './scrollBehavior';
@@ -54,6 +55,18 @@ document.title = config.APP_NAME
 
 //判断是否已加载过动态/静态路由
 var isGetRouter = false;
+const dynamicRemovers = []
+export function resetAuthRoutes() {
+    dynamicRemovers.splice(0).forEach(remove => remove())
+    routes_404_r()
+    isGetRouter = false
+}
+onAuthCleared(() => {
+    resetAuthRoutes()
+    if (!['/login', '/auth/callback'].includes(router.currentRoute.value.path)) {
+        router.replace({path: '/login', query: {reason: 'session'}})
+    }
+})
 
 router.beforeEach(async (to, from, next) => {
 
@@ -61,28 +74,26 @@ router.beforeEach(async (to, from, next) => {
     //动态标题
     document.title = to.meta.title ? `${to.meta.title} - ${config.APP_NAME}` : `${config.APP_NAME}`
 
-    let token = tool.cookie.get("TOKEN");
-
-    if (to.path === "/login") {
-        //删除路由(替换当前layout路由)
-        router.addRoute(routes[0])
-        //删除路由(404)
-        routes_404_r()
-        isGetRouter = false;
+    if (['/login', '/auth/callback', '/user_register', '/reset_password'].includes(to.path)) {
         next();
-        return false;
+        return;
     }
-
-    if (routes.findIndex(r => r.path === to.path) >= 0) {
-        next();
-        return false;
+    if (!readSession()) {
+        next({path: '/login', query: {returnTo: to.fullPath}});
+        return;
     }
-
-    if (!token) {
-        next({
-            path: '/login'
-        });
-        return false;
+    try {
+        const {ensureSessionInitialized} = await import('@/utils/adminAuthBootstrap')
+        await ensureSessionInitialized()
+        if (!readSession()) throw new Error('AUTH_SUPERSEDED')
+    } catch (error) {
+        if ((error.status ?? error.response?.status) === 503 && readSession()) {
+            ElNotification.error({title: '认证服务暂不可用', message: '会话已保留，请稍后刷新重试。', duration: 0})
+            next(false)
+            return
+        }
+        next({path: '/login', query: {returnTo: to.fullPath, reason: 'session'}})
+        return
     }
 
     //整页路由处理
@@ -100,11 +111,13 @@ router.beforeEach(async (to, from, next) => {
         var menuRouter = filterAsyncRouter(menu)
         menuRouter = flatAsyncRoutes(menuRouter)
         menuRouter.forEach(item => {
-            router.addRoute("layout", item)
+            dynamicRemovers.push(router.addRoute("layout", item))
         })
         routes_404_r = router.addRoute(routes_404)
         if (to.matched.length == 0) {
-            router.push(to.fullPath);
+            isGetRouter = true;
+            next({...to, replace: true});
+            return;
         }
         isGetRouter = true;
     }
@@ -141,6 +154,10 @@ function filterAsyncRouter(routerMap) {
     const accessedRouters = []
     routerMap.forEach(item => {
         item.meta = item.meta ? item.meta : {};
+        // 应用配置的id/tab是同一草稿的分区，query切换不能重建页面丢失未保存值。
+        if (['system/oauth2Client', 'system/oauth2Client/index'].includes(item.component)) {
+            item.meta.reuseQueryView = true;
+        }
         //处理外部链接特殊路由
         if (item.meta.type == 'IFRAME') {
             item.meta.url = item.path;

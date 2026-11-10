@@ -38,6 +38,11 @@ public class PendingThirdPartyBindingRepository {
     private static final Duration MAX_AGE = Duration.ofMinutes(5);
     private static final int MAX_ATTEMPTS = 5;
     private final Clock clock;
+    private ExternalBindingTicketStore tickets;
+
+    /** 注入SDK票据存储，浏览器pending仍使用会话有效期。 */
+    @org.springframework.beans.factory.annotation.Autowired
+    public void setTickets(ExternalBindingTicketStore tickets) { this.tickets = tickets; }
 
     public PendingThirdPartyBindingRepository() {
         this(Clock.systemUTC());
@@ -50,7 +55,22 @@ public class PendingThirdPartyBindingRepository {
     public void save(HttpServletRequest request, ThirdPartyIdentityResolutionService.BindingRequiredException ex) {
         HttpSession session = request.getSession(true);
         synchronized (session) {
-            session.setAttribute(KEY, new Pending(ex.providerType(), ex.subject(), ex.context(), clock.instant(), 0));
+            session.setAttribute(KEY, new Pending(ex.identity(), ex.context(), clock.instant(), 0, null));
+        }
+    }
+
+    /** SDK入口不能覆盖会话中另一个尚未完成的绑定。 */
+    public void saveSdk(HttpServletRequest request, ExternalBindingTicketStore.ClaimedTicket claimed) {
+        HttpSession session = request.getSession(true);
+        synchronized (session) {
+            if (session.getAttribute(KEY) != null) { throw invalid(); }
+            ExternalBindingTicket value = claimed.value();
+            VerifiedExternalIdentity identity = value.identity();
+            ThirdPartyLoginContext context = new ThirdPartyLoginContext(identity.providerType(), "SDK", value.clientId(),
+                clock.instant(), "/login/bind/complete", identity.registrationId(), identity.sourceType(),
+                value.tenantId(), value.userType(), identity.sourceVersion(), identity.flow(), null, identity.loginCapability());
+            session.setAttribute(KEY, new Pending(identity, context,
+                value.expiresAt().minus(MAX_AGE), value.failedAttempts(), claimed));
         }
     }
 
@@ -67,6 +87,7 @@ public class PendingThirdPartyBindingRepository {
                 session.removeAttribute(KEY);
                 throw invalid();
             }
+            if (pending.claimed() != null) { tickets.requireBrowserClaim(pending.claimed()); }
             return pending;
         }
     }
@@ -79,8 +100,9 @@ public class PendingThirdPartyBindingRepository {
         synchronized (session) {
             try {
                 Pending pending = current(request);
-                session.setAttribute(KEY, new Pending(pending.providerType(), pending.subject(), pending.context(),
-                    pending.createdAt(), pending.attempts() + 1));
+                if (pending.claimed() != null) { tickets.failedBrowserAttempt(pending.claimed()); }
+                session.setAttribute(KEY, new Pending(pending.identity(), pending.context(),
+                    pending.createdAt(), pending.attempts() + 1, pending.claimed()));
             } catch (BadCredentialsException ignored) {
                 // The pending identity was already expired or consumed; do not recreate it.
             }
@@ -97,6 +119,7 @@ public class PendingThirdPartyBindingRepository {
             if (!current.equals(expected)) {
                 throw invalid();
             }
+            if (current.claimed() != null) { tickets.consume(current.claimed()); }
             session.removeAttribute(KEY);
         }
     }
@@ -107,6 +130,8 @@ public class PendingThirdPartyBindingRepository {
             return;
         }
         synchronized (session) {
+            Object value = session.getAttribute(KEY);
+            if (value instanceof Pending pending && pending.claimed() != null) { tickets.consume(pending.claimed()); }
             session.removeAttribute(KEY);
         }
     }
@@ -120,6 +145,6 @@ public class PendingThirdPartyBindingRepository {
      *
      * @since 6.1.0
      */
-    public record Pending(String providerType, String subject, ThirdPartyLoginContext context,
-                          Instant createdAt, int attempts) implements Serializable { }
+    public record Pending(VerifiedExternalIdentity identity, ThirdPartyLoginContext context,
+                          Instant createdAt, int attempts, ExternalBindingTicketStore.ClaimedTicket claimed) implements Serializable { }
 }

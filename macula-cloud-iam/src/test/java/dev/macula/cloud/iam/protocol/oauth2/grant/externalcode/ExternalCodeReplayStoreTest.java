@@ -93,4 +93,25 @@ class ExternalCodeReplayStoreTest {
         verify(redis).execute(any(org.springframework.data.redis.core.script.RedisScript.class),
             eq(java.util.List.of("digest-key")), eq("owner-nonce"));
     }
+    /** 运营商最长有效期不能被通用10分钟配置缩短，且仍允许更保守的延长。 */
+    @Test
+    void aliyunCredentialUsesAtLeastThirtyOneMinutes() {
+        when(values.setIfAbsent(anyString(), anyString(), any(Duration.class))).thenReturn(true);
+        store.claim(ExternalCodeType.ALIYUN_MOBILE_TOKEN, "fixture-aliyun-code");
+        verify(values).setIfAbsent(anyString(), anyString(), eq(Duration.ofMinutes(31)));
+        org.mockito.Mockito.clearInvocations(values);
+        properties.setReplayTtl(Duration.ofHours(1));
+        store.claim(ExternalCodeType.ALIYUN_MOBILE_TOKEN, "another-fixture-code");
+        verify(values).setIfAbsent(anyString(), anyString(), eq(Duration.ofHours(1)));
+    }
+
+    /** Redis claim不确定时闭合拒绝，不能当作尚未使用而绕过防重放。 */
+    @Test
+    void infrastructureFailureIsSafeServerError() {
+        when(values.setIfAbsent(anyString(), anyString(), any(Duration.class))).thenThrow(new IllegalStateException("fixture outage"));
+        var error = catchThrowableOfType(() -> store.claim(ExternalCodeType.WECOM_MINIAPP_CODE, "fixture-code"),
+            OAuth2AuthenticationException.class);
+        assertThat(error.getError().getErrorCode()).isEqualTo(OAuth2ErrorCodes.SERVER_ERROR);
+    }
+
 }

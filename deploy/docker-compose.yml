@@ -189,6 +189,13 @@ services:
     environment:
       <<: *app-environment
       SERVER_PORT: "9081"
+      IAM_DISCOVERY_URL: ${IAM_DISCOVERY_URL:-http://macula-cloud-iam:9010/.well-known/openid-configuration}
+      IAM_ISSUER_URI: ${IAM_ISSUER_URI:-http://127.0.0.1:${IAM_HOST_PORT:-9010}}
+      IAM_METADATA_ALLOW_HTTP: ${IAM_METADATA_ALLOW_HTTP:-true}
+      IAM_PLATFORM_CLIENTS_ENABLED: ${IAM_PLATFORM_CLIENTS_ENABLED:-false}
+      IAM_ADMIN_CLIENT_ID: ${IAM_ADMIN_CLIENT_ID:-}
+      # 平台初始化只认领Gateway身份，不用于System二次内省。
+      IAM_INTROSPECTION_CLIENT_ID: ${IAM_INTROSPECTION_CLIENT_ID:-}
       MACULA_CRYPTO_PASSWORD: ${MACULA_CRYPTO_PASSWORD:?Set a 16/24/32-character System crypto key}
       MACULA_MESSAGE_AUDIT_HMAC_KEY: ${MACULA_MESSAGE_AUDIT_HMAC_KEY:?Set a separate 32+ character message audit HMAC key}
     ports:
@@ -276,6 +283,8 @@ services:
       dockerfile: macula-cloud-gateway/Dockerfile
     image: ${IMAGE_REGISTRY:-macula}/macula-cloud-gateway:${IMAGE_TAG:-6.1.0-SNAPSHOT}
     environment:
+      IAM_INTROSPECTION_CLIENT_ID: ${IAM_INTROSPECTION_CLIENT_ID:-}
+      IAM_INTROSPECTION_CLIENT_SECRET: ${IAM_INTROSPECTION_CLIENT_SECRET:-}
       <<: *app-environment
       SERVER_PORT: "9000"
     ports:
@@ -320,11 +329,10 @@ services:
         VITE_MODE: docker
     image: ${IMAGE_REGISTRY:-macula}/macula-cloud-admin:${IMAGE_TAG:-6.1.0-SNAPSHOT}
     environment:
-      VITE_APP_OAUTH_CLIENT_ID: ${VITE_APP_OAUTH_CLIENT_ID:-e4da4a32-592b-46f0-ae1d-784310e88423}
-      VITE_APP_OAUTH_CLIENT_SECRET: ${VITE_APP_OAUTH_CLIENT_SECRET:-secret}
-      VITE_APP_OAUTH_SCOPE: ${VITE_APP_OAUTH_SCOPE:-message.read message.write userinfo}
-      VITE_APP_DEMO_USERNAME: ${VITE_APP_DEMO_USERNAME:-admin}
-      VITE_APP_DEMO_PASSWORD: ${VITE_APP_DEMO_PASSWORD:-admin}
+      VITE_APP_OAUTH_CLIENT_ID: ${VITE_APP_OAUTH_CLIENT_ID:-}
+      VITE_APP_OAUTH_AUTHORITY: ${VITE_APP_OAUTH_AUTHORITY:-http://127.0.0.1:9010}
+      VITE_APP_ADMIN_PUBLIC_URL: ${VITE_APP_ADMIN_PUBLIC_URL:-http://127.0.0.1:5900}
+      VITE_APP_OAUTH_SCOPE: ${VITE_APP_OAUTH_SCOPE:-openid profile}
     ports:
       - "${BIND_ADDRESS:-127.0.0.1}:${ADMIN_HOST_PORT:-5900}:8080"
     healthcheck:
