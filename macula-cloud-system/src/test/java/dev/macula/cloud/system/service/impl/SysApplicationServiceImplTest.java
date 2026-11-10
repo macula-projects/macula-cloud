@@ -202,4 +202,37 @@ class SysApplicationServiceImplTest {
         application.setAuthTenantId(authTenantId);
         return application;
     }
+    /** 应用 IP 缺省保持，显式清空使用 wrapper 覆盖旧限制。 */
+    @Test
+    void preservesOmittedIpAndExplicitlyClearsIp() {
+        var existing = new SysApplication();
+        existing.setTenantId(12L);
+        existing.setAllowIps("192.0.2.7");
+        when(keys.lockApplication(34L, 12L)).thenReturn(existing);
+        when(mapper.update(any(SysApplication.class), any(Wrapper.class))).thenAnswer(call -> {
+            LambdaUpdateWrapper<?> update = call.getArgument(1);
+            assertThat(update.getSqlSet()).doesNotContain("allow_ips");
+            return 1;
+        });
+        service.updateApplication(34L, new ApplicationForm());
+        var clear = new ApplicationForm();
+        clear.setAllowIps(null);
+        when(mapper.update(any(SysApplication.class), any(Wrapper.class))).thenAnswer(call -> {
+            LambdaUpdateWrapper<?> update = call.getArgument(1);
+            assertThat(update.getSqlSet()).contains("allow_ips");
+            assertThat(update.getParamNameValuePairs()).containsValue("");
+            return 1;
+        });
+        service.updateApplication(34L, clear);
+    }
+
+    /** 非 HTTP 应用写入也必须拒绝错误 IP。 */
+    @Test
+    void rejectsInvalidApplicationIpBeforePersistence() {
+        var invalid = new ApplicationForm();
+        invalid.setAllowIps("192.0.2.1/33");
+        assertThatThrownBy(() -> service.saveApplication(invalid)).isInstanceOf(ResponseStatusException.class);
+        verify(mapper, never()).insert(any(SysApplication.class));
+    }
+
 }

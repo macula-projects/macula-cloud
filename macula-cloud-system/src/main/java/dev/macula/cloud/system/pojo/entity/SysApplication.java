@@ -57,6 +57,9 @@ public class SysApplication extends BaseEntity {
 
     private String accessPath;
 
+    /** 每行一个来源 IP/CIDR，空白表示未单独限制。 */
+    private String allowIps;
+
     private boolean useAttrs;
 
     private String allowedAttrs;

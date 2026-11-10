@@ -64,6 +64,9 @@ public class ApplicationVO {
     @Schema(description = "可访问url")
     private String accessPath;
 
+    /** 每行一个来源 IP/CIDR，空白表示未单独限制。 */
+    private String allowIps;
+
     @Schema(description = "创建时间")
     private Date createTime;
 

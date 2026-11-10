@@ -18,6 +18,7 @@
 package dev.macula.cloud.system.service.impl;
 
 import cn.hutool.core.util.StrUtil;
+import dev.macula.boot.security.AccessRuleUtils;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -94,6 +95,15 @@ public class SysApplicationApiKeyServiceImpl implements SysApplicationApiKeyServ
         return key;
     }
 
+    /** 非 HTTP 调用也执行共享规则校验，错误不回显原始配置内容。 */
+    private void normalizeRules(ApplicationApiKeyForm form) {
+        try {
+            form.normalizeAccessRules();
+        } catch (IllegalArgumentException exception) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "URL/IP 规则不合法或超过 2000 字符");
+        }
+    }
+
     /** 生成仅包含当前应用有效凭据的查询条件。 */
     private LambdaQueryWrapper<SysApplicationApiKey> scope(SysApplication app) {
         return new LambdaQueryWrapper<SysApplicationApiKey>().eq(SysApplicationApiKey::getTenantId, app.getTenantId())
@@ -113,23 +123,26 @@ public class SysApplicationApiKeyServiceImpl implements SysApplicationApiKeyServ
         return page;
     }
 
-    /** 列表仅返回掩码，并按审计写入时的服务端时区转换为确定的时间点。 */
+    /** 列表仅返回凭据掩码、多行规则，并按配置的存储时区转换创建时间。 */
     private ApplicationApiKeyVO toView(SysApplicationApiKey key) {
         ApplicationApiKeyVO view = new ApplicationApiKeyVO();
         view.setId(key.getId().toString());
         String value = key.getApiKey();
         view.setMaskedKey(value.substring(0, 7) + "****" + value.substring(value.length() - 4));
         view.setRemark(key.getRemark());
-        view.setAccessPath(key.getAccessPath());
+        view.setAccessPath(AccessRuleUtils.normalizeUrls(key.getAccessPath()));
+        view.setAllowIps(key.getAllowIps());
         // 审计时间按公共存储时区解释，避免绕过外部时区配置。
         view.setCreateTime(dateTimeConverter.toDate(key.getCreateTime()));
         return view;
     }
 
+    /** 校验 URL/IP 后创建服务端生成的 Key；提交后按各自继承规则发布缓存。 */
     @Override
     @Transactional
     public ApplicationApiKeySecretVO create(Long appId, ApplicationApiKeyForm form) {
         SysApplication app = application(appId, true);
+        normalizeRules(form);
         byte[] bytes = new byte[KEY_BYTES];
         RANDOM.nextBytes(bytes);
         SysApplicationApiKey key = new SysApplicationApiKey();
@@ -138,6 +151,7 @@ public class SysApplicationApiKeyServiceImpl implements SysApplicationApiKeyServ
         key.setApiKey("sk-" + Base64.getUrlEncoder().withoutPadding().encodeToString(bytes));
         key.setRemark(StrUtil.trimToNull(form.getRemark()));
         key.setAccessPath(StrUtil.trimToNull(form.getAccessPath()));
+        key.setAllowIps(form.getAllowIps());
         key.setDeleted(false);
         try {
             mapper.insert(key);
@@ -149,16 +163,19 @@ public class SysApplicationApiKeyServiceImpl implements SysApplicationApiKeyServ
         return new ApplicationApiKeySecretVO(key.getId().toString(), key.getApiKey());
     }
 
+    /** 在应用行锁内更新独立规则，省略 IP 保留，显式空白恢复应用继承。 */
     @Override
     @Transactional
     public void update(Long appId, Long keyId, ApplicationApiKeyForm form) {
         SysApplication app = application(appId, true);
         key(app, keyId);
+        normalizeRules(form);
         mapper.update(null, new LambdaUpdateWrapper<SysApplicationApiKey>()
             .eq(SysApplicationApiKey::getId, keyId).eq(SysApplicationApiKey::getTenantId, app.getTenantId())
             .eq(SysApplicationApiKey::getApplicationId, appId).eq(SysApplicationApiKey::getDeleted, false)
             .set(SysApplicationApiKey::getRemark, StrUtil.trimToNull(form.getRemark()))
-            .set(SysApplicationApiKey::getAccessPath, StrUtil.trimToNull(form.getAccessPath())));
+            .set(SysApplicationApiKey::getAccessPath, StrUtil.trimToNull(form.getAccessPath()))
+            .set(form.isAllowIpsProvided(), SysApplicationApiKey::getAllowIps, form.getAllowIps()));
         cache.afterCommit(app.getTenantId(), appId, null);
     }
 

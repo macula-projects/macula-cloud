@@ -19,6 +19,9 @@ package dev.macula.cloud.system.form;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
+import dev.macula.boot.security.AccessRuleUtils;
+import jakarta.validation.constraints.AssertTrue;
+import jakarta.validation.constraints.Size;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
@@ -85,7 +88,51 @@ public class ApplicationForm {
     private String homepage;
 
     @Schema(description = "可访问路径")
+    @Size(max = AccessRuleUtils.MAX_RULES_LENGTH)
     private String accessPath;
+
+    @Size(max = AccessRuleUtils.MAX_RULES_LENGTH)
+    private String allowIps;
+
+    @JsonIgnore
+    @Getter(AccessLevel.NONE)
+    @Setter(AccessLevel.NONE)
+    private boolean allowIpsProvided;
+
+    /** 标记来源 IP 被显式提交，区分省略保留与 null 清空。 */
+    @JsonSetter("allowIps")
+    public void setAllowIps(String allowIps) {
+        this.allowIps = allowIps;
+        this.allowIpsProvided = true;
+    }
+
+    /** 返回是否显式提交来源 IP，服务层据此决定是否更新该列。 */
+    @JsonIgnore
+    public boolean isAllowIpsProvided() {
+        return allowIpsProvided;
+    }
+
+    /** 表单校验与网关使用同一解析规则，不接受错误 IP 或纯分隔符配置。 */
+    @JsonIgnore
+    @AssertTrue(message = "URL/IP 规则格式不合法或超过 2000 字符")
+    public boolean isAccessRulesValid() {
+        try {
+            AccessRuleUtils.normalizeUrls(accessPath);
+            AccessRuleUtils.normalizeIps(allowIps);
+            return true;
+        } catch (IllegalArgumentException exception) {
+            return false;
+        }
+    }
+
+    /** 在持久化前统一换行与空白，非 HTTP 调用也必须执行规则校验。 */
+    public void normalizeAccessRules() {
+        this.accessPath = AccessRuleUtils.normalizeUrls(accessPath);
+        if (allowIpsProvided) {
+            this.allowIps = AccessRuleUtils.normalizeIps(allowIps);
+        }
+    }
+
 
     @Schema(description = "负责人")
     @NotBlank(message = "负责人不能为空")

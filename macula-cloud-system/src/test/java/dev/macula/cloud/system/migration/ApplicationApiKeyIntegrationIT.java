@@ -348,4 +348,28 @@ class ApplicationApiKeyIntegrationIT {
             assertThat(pool.getHikariPoolMXBean().getTotalConnections()).isEqualTo(1);
         }
     }
+    /** 真实 Mapper 与 Redis 验证 IP 独立继承、清空及应用变更联动。 */
+    @Test
+    void peerIpConfigurationIsInheritedOverriddenAndClearedInRealCache() {
+        application(900109L);
+        jdbc.update("UPDATE sys_application_tenant SET allow_ips=? WHERE id=900109", "192.0.2.0/24");
+        var form = new ApplicationApiKeyForm();
+        form.setAccessPath("GET:/one, POST:/two");
+        var created = transaction.execute(status -> service.create(900109L, form));
+        String keyCache = CacheConstants.APIKEY_CACHE_PREFIX + created.getApiKey();
+        assertThat(redis.opsForHash().get(keyCache, "permitUrls")).isEqualTo("GET:/one\nPOST:/two");
+        assertThat(redis.opsForHash().get(keyCache, "permitIps")).isEqualTo("192.0.2.0/24");
+        form.setAllowIps("2001:db8::/32");
+        transaction.executeWithoutResult(status -> service.update(900109L, Long.valueOf(created.getId()), form));
+        assertThat(redis.opsForHash().get(keyCache, "permitIps")).isEqualTo("2001:db8::/32");
+        form.setAllowIps(null);
+        transaction.executeWithoutResult(status -> service.update(900109L, Long.valueOf(created.getId()), form));
+        assertThat(redis.opsForHash().get(keyCache, "permitIps")).isEqualTo("192.0.2.0/24");
+        jdbc.update("UPDATE sys_application_tenant SET allow_ips=NULL WHERE id=900109");
+        cache.refresh(1L, 900109L, null);
+        assertThat(redis.opsForHash().get(keyCache, "permitIps")).isEqualTo("");
+        assertThat(redis.opsForHash().get(CacheConstants.SECURITY_SYSTEM_APPS + "integration-900109", "permitIps"))
+            .isEqualTo("");
+    }
+
 }
