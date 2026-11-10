@@ -158,6 +158,17 @@ public enum IdentityProviderType {
         return createHint;
     }
 
+    /** 返回具体来源的独立字段，不借用同厂商其他应用凭据。 */
+    public List<Field> sourceFields(IdentitySourceType source) {
+        if (!code.equals(source.providerType())) {
+            throw new IllegalArgumentException("厂商与具体来源不匹配");
+        }
+        return fields.stream().filter(field -> source.requiredFields().contains(field.getKey()))
+            .map(field -> source.providerType().equals("WECHAT")
+                ? new Field(field.getKey(), field.getLabel(), field.isRequired(), field.isSecret(),
+                    field.isMultiline(), "填写该具体来源自身的凭据，不使用其他微信应用的凭据。") : field).toList();
+    }
+
     public List<Field> fields() {
         return fields;
     }

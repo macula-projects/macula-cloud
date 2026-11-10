@@ -19,22 +19,6 @@
 // 此文件非必要，在生产环境下此文件配置可覆盖运行配置，开发环境下不起效
 // 详情见 src/config/index.js
 
-const APP_CONFIG = {
-	//标题
-	//APP_NAME: "SCUI",
-
-	//接口地址，如遇跨域需使用nginx代理
-	//API_URL: "/api",
-
-	//IAM地址
-	//IAM_URL: "/iam",
-
-	// 以下配置只能使用 public/demo client，浏览器无法保护 client secret
-	//OAUTH_CLIENT_ID: "demo-client",
-	//OAUTH_CLIENT_SECRET: "demo-secret",
-	//OAUTH_SCOPE: "message.read message.write userinfo",
-	//DEMO_USERNAME: "admin",
-	//DEMO_PASSWORD: "admin"
-}
-
+// 部署入口注入 OAUTH_CLIENT_ID/OAUTH_AUTHORITY/ADMIN_PUBLIC_URL/OAUTH_SCOPE。
+const APP_CONFIG = {}
 globalThis.APP_CONFIG = APP_CONFIG

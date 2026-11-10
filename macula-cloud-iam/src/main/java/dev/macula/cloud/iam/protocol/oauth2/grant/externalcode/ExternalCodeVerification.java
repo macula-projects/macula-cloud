@@ -16,30 +16,23 @@
  */
 package dev.macula.cloud.iam.protocol.oauth2.grant.externalcode;
 
+import dev.macula.cloud.iam.authentication.thirdparty.VerifiedExternalIdentity;
 import org.springframework.util.Assert;
-import org.springframework.util.StringUtils;
 
 /**
- * 第三方服务端核验后得到的最小可信身份结果。
- *
+ * 外部凭证核验结果，始终保留确定来源和实际已核验属性。
  * @author Rain
  * @since 6.1.0
  */
-public record ExternalCodeVerification(String providerType, String subject, String mobile) {
-    public ExternalCodeVerification {
-        boolean identity = StringUtils.hasText(providerType) && StringUtils.hasText(subject) && mobile == null;
-        boolean phone = providerType == null && subject == null && StringUtils.hasText(mobile);
-        Assert.isTrue(identity || phone, "exactly one verified identity result is required");
-    }
-
-    public static ExternalCodeVerification identity(String providerType, String subject) {
-        Assert.hasText(providerType, "providerType cannot be empty");
-        Assert.hasText(subject, "subject cannot be empty");
-        return new ExternalCodeVerification(providerType, subject, null);
-    }
-
-    public static ExternalCodeVerification mobile(String mobile) {
-        Assert.hasText(mobile, "mobile cannot be empty");
-        return new ExternalCodeVerification(null, null, mobile);
+public record ExternalCodeVerification(VerifiedExternalIdentity identity) {
+    /** 缺少确定来源的结果不能进入后续解析。 */
+    public ExternalCodeVerification { Assert.notNull(identity, "verified identity is required"); }
+    /** 返回厂商协议值。 */
+    public String providerType() { return identity.providerType(); }
+    /** 返回外部身份键，仅身份型结果有值。 */
+    public String subject() { return mobile() == null ? identity.identityValue() : null; }
+    /** 返回已核验手机号，不是端侧提交的账号信息。 */
+    public String mobile() {
+        return VerifiedExternalIdentity.MOBILE_PROOF.equals(identity.identityKind()) ? identity.identityValue() : null;
     }
 }

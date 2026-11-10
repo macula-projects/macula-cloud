@@ -31,7 +31,11 @@ public interface OAuth2ClientConfigService {
     IPage<OAuth2ClientVO> page(int pageNum, int pageSize, String keyword);
     OAuth2ExternalCodeCatalogVO externalCodeCatalog();
     OAuth2ClientVO get(Long id);
+    /** 创建不具备认证能力的基础信息草稿。 */
+    OAuth2ClientVO createDraft(dev.macula.cloud.system.form.OAuth2ClientDraftForm form);
     OAuth2ClientVO save(Long id, OAuth2ClientForm form);
-    void resetSecret(Long id, String secret);
-    void delete(Long id);
+    /** 密钥轮换必须携带当前完整配置版本。 */
+    void resetSecret(Long id, String secret, String configurationVersion);
+    /** 删除同样拒绝过期配置快照，平台受管身份不能删除。 */
+    void delete(Long id, String configurationVersion);
 }

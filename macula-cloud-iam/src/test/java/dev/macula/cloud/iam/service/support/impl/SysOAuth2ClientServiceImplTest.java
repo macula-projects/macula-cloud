@@ -66,9 +66,39 @@ class SysOAuth2ClientServiceImplTest {
     @Autowired
     private CacheManager cacheManager;
 
+    @Autowired
+    private dev.macula.cloud.iam.mapper.SysApplicationProtocolConfigMapper protocols;
+    @Autowired
+    private dev.macula.cloud.iam.mapper.SysOAuth2ClientExternalProviderMapper externalProviders;
+    private final java.util.Map<String, SysOAuth2Client> rows = new java.util.HashMap<>();
+
+    /** 清理缓存及Mapper，协议与来源快照均来自本例数据。 */
     @BeforeEach
     void resetFixture() {
-        reset(mapper);
+        com.baomidou.mybatisplus.core.metadata.TableInfoHelper.initTableInfo(new org.apache.ibatis.builder.MapperBuilderAssistant(new com.baomidou.mybatisplus.core.MybatisConfiguration(), "test"), dev.macula.cloud.iam.pojo.entity.SysApplicationProtocolConfig.class);
+        reset(mapper, protocols, externalProviders);
+        when(externalProviders.selectList(any())).thenReturn(List.of());
+        rows.clear();
+        when(mapper.selectOne(any(), anyBoolean())).thenAnswer(call -> {
+            var wrapper = (com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<?>) call.getArgument(0);
+            if (wrapper == null) { return null; }
+            wrapper.getSqlSegment();
+            return rows.get(wrapper.getParamNameValuePairs().values().iterator().next());
+        });
+        when(protocols.selectList(any())).thenAnswer(call -> {
+            var wrapper = (com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<?>) call.getArgument(0);
+            wrapper.getSqlSegment();
+            Object id = wrapper.getParamNameValuePairs().values().iterator().next();
+            var row = rows.values().stream().filter(value -> java.util.Objects.equals(value.getId(), id)).findFirst().orElseThrow();
+            return row.getProtocolConfigurations().stream().map(configuration -> {
+                var value = new dev.macula.cloud.iam.pojo.entity.SysApplicationProtocolConfig();
+                value.setProtocol(configuration.protocol());
+                value.setSchemaVersion(configuration.schemaVersion());
+                value.setEnabled(configuration.enabled());
+                value.setConfiguration(tools.jackson.databind.json.JsonMapper.builder().build().writeValueAsString(configuration.settings()));
+                return value;
+            }).toList();
+        });
         cacheManager.getCache(CacheConstants.OAUTH2_CLIENT_CACHE_KEY).clear();
         cacheManager.getCache(OAuth2ClientCacheNames.TOKEN_ORIGIN_INDEX).clear();
     }
@@ -115,8 +145,7 @@ class SysOAuth2ClientServiceImplTest {
 
     @Test
     void authoritativeClientLookupIgnoresStaleGlobalIndex() {
-        when(mapper.selectOne(any(), anyBoolean()))
-            .thenReturn(client("client-a", "https://current.example"));
+        org.mockito.Mockito.doReturn(client("client-a", "https://current.example")).when(mapper).selectOne(any(), anyBoolean());
 
         assertThat(service.isAllowedOrigin("client-a", "https://current.example")).isTrue();
         assertThat(service.isAllowedOrigin("client-a", "https://revoked.example")).isFalse();
@@ -124,7 +153,7 @@ class SysOAuth2ClientServiceImplTest {
 
     @Test
     void originIndexDoesNotCollideWithReservedLookingClientId() {
-        String sharedKey = "__allowed_origins__";
+        String sharedKey = OAuth2ClientCacheNames.ORIGIN_INDEX_KEY;
         cacheManager.getCache(CacheConstants.OAUTH2_CLIENT_CACHE_KEY)
             .put(sharedKey, "registered-client-marker");
         when(mapper.selectList(any())).thenReturn(List.of(client("client-a", "https://a.example")));
@@ -136,10 +165,54 @@ class SysOAuth2ClientServiceImplTest {
             .get(sharedKey, Set.class)).containsExactly("https://a.example");
     }
 
+
+    /** 来源集合装配为不可变快照，Native的旧浏览器引用不会关闭合法内置授权。 */
+    @Test
+    void loadsCurrentBindingsWithoutGloballyDisablingNativeHostedLogin() {
+        var client=client("native","https://native.example");
+        client.setApplicationType("NATIVE");
+        client.setClientAuthenticationMethods("none");
+        client.setAuthorizationGrantTypes("authorization_code");
+        client.setExternalCodeTypes("WECOM_APP_CODE");
+        client.setBrowserProviderBindings("{\"GITHUB\":1}");
+        dev.macula.cloud.iam.protocol.oauth2.ProtocolTestFixtures.configure(client);
+        var binding=new dev.macula.cloud.iam.pojo.entity.SysOAuth2ClientExternalProvider();
+        binding.setCodeType("WECOM_APP_CODE");
+        binding.setIdentityProviderId(17L);
+        when(externalProviders.selectList(any())).thenReturn(List.of(binding));
+        var current=service.getClientByClientId("native");
+        assertThat(current).isNotNull();
+        assertThat(current.getExternalProviderBindings()).containsEntry("WECOM_APP_CODE",17L);
+        assertThat(current.getBrowserProviderBindings()).isEqualTo("{\"GITHUB\":1}");
+        assertThatThrownBy(()->current.getExternalProviderBindings().put("other",18L)).isInstanceOf(UnsupportedOperationException.class);
+    }
+    /** 损坏的重复映射不能按列表第一条选择固定来源。 */
+    @Test
+    void duplicateMappingsFailClosed() {
+        client("duplicate","https://app.example");
+        var first=new dev.macula.cloud.iam.pojo.entity.SysOAuth2ClientExternalProvider();
+        first.setCodeType("WECOM_APP_CODE");
+        first.setIdentityProviderId(17L);
+        var second=new dev.macula.cloud.iam.pojo.entity.SysOAuth2ClientExternalProvider();
+        second.setCodeType("WECOM_APP_CODE");
+        second.setIdentityProviderId(18L);
+        when(externalProviders.selectList(any())).thenReturn(List.of(first,second));
+        assertThat(service.getClientByClientId("duplicate")).isNull();
+    }
+
     private SysOAuth2Client client(String clientId, String origins) {
         SysOAuth2Client client = new SysOAuth2Client();
         client.setClientId(clientId);
+        client.setConfigurationStatus("ENABLED");
+        client.setEnabledProtocols("OAUTH2_1");
+        client.setDefaultProtocol("OAUTH2_1");
         client.setAllowedOrigins(origins);
+        client.setId((long) clientId.hashCode());
+        client.setAuthorizationGrantTypes("client_credentials");
+        client.setClientAuthenticationMethods("client_secret_basic");
+        client.setScopes("api.read");
+        dev.macula.cloud.iam.protocol.oauth2.ProtocolTestFixtures.configure(client);
+        rows.put(clientId, client);
         return client;
     }
 
@@ -164,8 +237,22 @@ class SysOAuth2ClientServiceImplTest {
         }
 
         @Bean
-        SysOAuth2ClientService clientService(SysOAuth2ClientMapper mapper) {
-            SysOAuth2ClientServiceImpl service = new SysOAuth2ClientServiceImpl();
+        dev.macula.cloud.iam.mapper.SysApplicationProtocolConfigMapper protocols() {
+            return mock(dev.macula.cloud.iam.mapper.SysApplicationProtocolConfigMapper.class);
+        }
+
+        /** 生产读取必须提供固定来源Mapper，不从基础缓存推断关联。 */
+        @Bean
+        dev.macula.cloud.iam.mapper.SysOAuth2ClientExternalProviderMapper externalProviders() {
+            return mock(dev.macula.cloud.iam.mapper.SysOAuth2ClientExternalProviderMapper.class);
+        }
+
+        /** 使用生产来源装配构造，缓存代理仍沿用现有配置。 */
+        @Bean
+        SysOAuth2ClientService clientService(SysOAuth2ClientMapper mapper,
+            dev.macula.cloud.iam.mapper.SysApplicationProtocolConfigMapper protocols,
+            dev.macula.cloud.iam.mapper.SysOAuth2ClientExternalProviderMapper externalProviders) {
+            SysOAuth2ClientServiceImpl service = new SysOAuth2ClientServiceImpl(protocols, externalProviders);
             ReflectionTestUtils.setField(service, "baseMapper", mapper);
             return service;
         }

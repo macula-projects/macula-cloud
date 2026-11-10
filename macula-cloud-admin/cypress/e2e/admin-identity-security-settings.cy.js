@@ -1,7 +1,10 @@
+import {installSessionApi,seedAuthenticatedSession} from '../support/auth-session'
+beforeEach(() => installSessionApi())
 describe("平台身份、消息与接入应用管理", () => {
   const ok = (data) => ({
     statusCode: 200,
-    body: { success: true, code: "00000", data },
+    body: { success: true, code: "00000", data: data?.records ? {...data, records:data.records.map(row => row.providerType ?
+      {...row,sourceType:sourceType(row.providerType),version:0,autoBindEnabled:false,bindingRule:null,identityFlow:flowType(row.providerType),directoryPolicy:"IDENTITY_ONLY"} : row)} : data },
   });
   const providerCatalog = {
     categories: [
@@ -105,6 +108,27 @@ describe("平台身份、消息与接入应用管理", () => {
       },
     ],
   };
+  const sourceType = vendor => ({GITHUB:"GITHUB_OAUTH",ALIPAY:"ALIPAY_APPLICATION",WECHAT:"WECHAT_WEBSITE",
+    WECOM:"WECOM_WEB",FEISHU:"FEISHU_WEB",DINGTALK:"DINGTALK_WEB"}[vendor]);
+  const flowType = vendor => ({GITHUB:'GITHUB_OAUTH_V1',WECHAT:'WECHAT_WEBSITE_V1',WECOM:'WECOM_WEB_V1',FEISHU:'FEISHU_OAUTH_V3',DINGTALK:'DINGTALK_OAUTH_V1'}[vendor]);
+  providerCatalog.sources = providerCatalog.providers.map(provider => ({
+    code:sourceType(provider.code),label:provider.label + '具体来源',providerType:provider.code,
+    scene:provider.code === 'ALIPAY' ? 'CONFIGURATION' : 'BROWSER',fields:provider.fields,
+    identityFields:provider.fields.filter(field => !field.secret && field.key !== 'alipayPublicKey').map(field => field.key),
+    bindingRules:provider.category === 'enterprise' ? [{value:provider.code === 'FEISHU' ? 'EMPLOYEE_NO_TO_USERNAME' : 'MEMBER_ID_TO_USERNAME',
+      label:provider.code === 'FEISHU' ? '员工编号 → 本地用户名' : '成员 UserID → 本地用户名',prerequisite:'需平台身份属性权限'}] : [],
+    flows: flowType(provider.code) ? [{value:flowType(provider.code),label:flowType(provider.code),available:true}] : [],
+    directoryPolicies:['IDENTITY_ONLY'],
+    autoBindUnavailableReason:provider.category === 'enterprise' ? null : '首次登录需要手动绑定'
+  }));
+  function selectSourceType() {
+    cy.contains('.el-drawer .el-form-item','接入类型').find('.el-radio').first().click();
+    cy.get('.el-drawer').then(drawer => {
+      if (drawer.find('.el-form-item').text().includes('平台接口版本')) {
+        cy.contains('.el-drawer .el-form-item', '平台接口版本').find('.el-radio').first().click();
+      }
+    });
+  }
   const createUrls = {
     GITHUB: "https://github.com/settings/developers",
     ALIPAY: "https://open.alipay.com/module/webApp",
@@ -134,7 +158,7 @@ describe("平台身份、消息与接入应用管理", () => {
 
   function open(
     path,
-    externalCodeCatalog = { codeTypes: [], providerRegistrations: [] },
+    externalCodeCatalog = { protocols: [], scopes: [], sources: [] },
     externalCodeCatalogDelay = 0,
     externalCodeCatalogAlias = "externalCodeCatalog",
     externalCodeCatalogTimes
@@ -147,25 +171,24 @@ describe("平台身份、消息与接入应用管理", () => {
     cy.intercept(
       {
         method: "GET",
-        url: "**/system/api/v1/oauth2-clients/external-code-catalog*",
+        url: "**/system/api/v1/oauth2-clients/configuration-catalog*",
         ...(externalCodeCatalogTimes
           ? { times: externalCodeCatalogTimes }
           : {}),
       },
       { ...ok(externalCodeCatalog), delay: externalCodeCatalogDelay }
     ).as(externalCodeCatalogAlias);
-    cy.setCookie("TOKEN", "root-test-token");
     cy.visit(`/#${path}`, {
       onBeforeLoad(win) {
-        win.localStorage.setItem("MACULA_CLOUD_ADMIN_STORAGE_VERSION", "2");
-        win.localStorage.setItem(
+        seedAuthenticatedSession(win)
+        win.sessionStorage.setItem(
           "USER_INFO",
           JSON.stringify({
             content: { username: "root", roles: ["ROOT"] },
             datetime: 0,
           })
         );
-        win.localStorage.setItem(
+        win.sessionStorage.setItem(
           "MENU",
           JSON.stringify({
             content: [
@@ -260,14 +283,15 @@ describe("平台身份、消息与接入应用管理", () => {
     cy.contains(".el-drawer .el-form-item", "企业 ID")
       .find("input")
       .should("have.value", "corp-1");
-    cy.contains(".el-drawer .el-form-item", "Secret")
+    cy.contains(".el-drawer .el-form-item__label", /^Secret$/).closest(".el-form-item")
       .find("input")
       .should("have.value", "");
     cy.contains(".el-drawer", "取消").contains("button", "取消").click();
     cy.contains("添加认证源").click();
+    selectSourceType();
     cy.contains(".el-drawer .el-form-item", "企业 ID").should("be.visible");
-    cy.contains(".el-drawer .el-form-item", "AgentId").should("be.visible");
-    cy.contains(".el-drawer .el-form-item", "Secret").should("be.visible");
+    cy.contains(".el-drawer .el-form-item__label", /^AgentId$/).closest(".el-form-item").should("be.visible");
+    cy.contains(".el-drawer .el-form-item__label", /^Secret$/).closest(".el-form-item").should("be.visible");
     cy.contains(".el-drawer .el-form-item", "Client ID").should("not.exist");
     cy.contains(".el-drawer .el-form-item", "回调地址")
       .should("contain", "/login/wecom")
@@ -279,10 +303,10 @@ describe("平台身份、消息与接入应用管理", () => {
     cy.contains(".el-drawer .el-form-item", "企业 ID")
       .find("input")
       .type("corp-new");
-    cy.contains(".el-drawer .el-form-item", "AgentId")
+    cy.contains(".el-drawer .el-form-item__label", /^AgentId$/).closest(".el-form-item")
       .find("input")
       .type("agent-new");
-    cy.contains(".el-drawer .el-form-item", "Secret")
+    cy.contains(".el-drawer .el-form-item__label", /^Secret$/).closest(".el-form-item")
       .find("input")
       .type("test-secret");
     cy.contains(".el-drawer", "确定").contains("button", "确定").dblclick();
@@ -290,6 +314,10 @@ describe("平台身份、消息与接入应用管理", () => {
       expect(request.body.category).to.equal("enterprise");
       expect(request.body).not.to.have.property("callbackUrl");
       expect(request.body.providerType).to.equal("WECOM");
+      expect(request.body.sourceType).to.equal("WECOM_WEB");
+      expect(request.body.autoBindEnabled).to.equal(false);
+      expect(request.body).not.to.have.property("bindingRule");
+      expect(request.body.bindingMappings).to.deep.equal([]);
       expect(request.body.config).to.deep.equal({
         corpId: "corp-new",
         agentId: "agent-new",
@@ -298,6 +326,37 @@ describe("平台身份、消息与接入应用管理", () => {
       expect(request.body.configJson).to.be.undefined;
     });
     cy.get("@createProvider.all").should("have.length", 1);
+  });
+
+  it("requires an explicit automatic binding rule and clears it when disabled", () => {
+    cy.intercept("GET", "**/system/api/v1/identity-providers*", ok({records:[],total:0}));
+    cy.intercept("POST", "**/system/api/v1/identity-providers", ok({id:9})).as("saveBindingPolicy");
+    open("/system/identity-provider");
+    cy.contains(".el-tabs__item", "企业身份提供商").click();
+    cy.contains("添加认证源").click();
+    selectSourceType();
+    cy.contains(".el-drawer .el-form-item", "认证源名称").find("input").type("显式绑定策略");
+    cy.contains(".el-drawer .el-form-item", "企业 ID").find("input").type("corp-policy");
+    cy.contains(".el-drawer .el-form-item__label", /^AgentId$/).closest(".el-form-item").find("input").type("agent-policy");
+    cy.contains(".el-drawer .el-form-item__label", /^Secret$/).closest(".el-form-item").find("input").type("test-secret");
+    cy.contains(".el-drawer .el-form-item", "自动绑定").find(".el-switch").click();
+    cy.contains(".el-drawer .el-form-item", "身份源字段").find(".el-select").click();
+    cy.get(".el-select-dropdown:visible .el-select-dropdown__item").contains("成员 ID").click();
+    cy.contains(".el-drawer .el-form-item", "IAM 匹配字段").find(".el-select").click();
+    cy.get(".el-select-dropdown:visible .el-select-dropdown__item").contains("用户名").click();
+    cy.contains(".el-drawer .el-form-item", "自动绑定").find(".el-switch").click();
+    cy.contains(".el-drawer .el-form-item", "身份源字段").should("not.exist");
+    cy.contains(".el-drawer .el-form-item", "自动绑定").find(".el-switch").click();
+    cy.contains(".el-drawer .el-form-item", "身份源字段").find(".el-select").click();
+    cy.get(".el-select-dropdown:visible .el-select-dropdown__item").contains("成员 ID").click();
+    cy.contains(".el-drawer .el-form-item", "IAM 匹配字段").find(".el-select").click();
+    cy.get(".el-select-dropdown:visible .el-select-dropdown__item").contains("用户名").click();
+    cy.contains(".el-drawer button", "确定").click();
+    cy.wait("@saveBindingPolicy").then(({request}) => {
+      expect(request.body.autoBindEnabled).to.equal(true);
+      expect(request.body.bindingMappings).to.deep.equal([{sourceField:"member_id",targetField:"username"}]);
+      expect(request.body).not.to.have.property("bindingRule");
+    });
   });
 
   [
@@ -369,13 +428,21 @@ describe("平台身份、消息与接入应用管理", () => {
         .find(".provider-icon svg")
         .should("be.visible");
       cy.contains("添加认证源").click();
-      cy.contains(".el-drawer .el-form-item", "认证源类型")
-        .find(".el-select")
-        .click();
-      cy.contains(".el-select-dropdown__item", label).click();
+    selectSourceType();
+      cy.contains(".el-drawer .el-form-item", "认证源类型").contains('.el-radio',label).click();
+      selectSourceType();
       cy.get(".el-drawer .el-form-item__label").then(($labels) => {
         const common = [
           "认证源类型",
+          "接入类型",
+          "平台接口版本 / Flow",
+          "通讯录策略",
+          "固定组织标识",
+          "已登记上游回调",
+          "自动绑定",
+          "绑定依据",
+          "身份源字段",
+          "IAM 匹配字段",
           "创建应用",
           "回调地址",
           "认证源名称",
@@ -477,643 +544,6 @@ describe("平台身份、消息与接入应用管理", () => {
     cy.get(".identity-page .scTable-do button").first().click();
     cy.wait("@providers");
     cy.contains("认证源列表失败").should("be.visible");
-  });
-
-  it("requires a selected tenant for OAuth client creation", () => {
-    cy.intercept(
-      "GET",
-      "**/system/api/v1/oauth2-clients*",
-      ok({ records: [], total: 0 })
-    ).as("clients");
-    cy.intercept(
-      "GET",
-      "**/system/api/v1/tenants/options*",
-      ok([{ value: 1, label: "平台租户" }])
-    ).as("tenants");
-    open("/system/oauth2-client");
-    cy.wait("@clients");
-    cy.wait("@tenants").then(({ request }) => {
-      expect(new URL(request.url).searchParams.get("filterMe")).to.equal("0");
-    });
-    cy.contains("新增接入应用").click();
-    cy.contains(".el-drawer", "所属租户").should("be.visible");
-    cy.contains(".el-drawer", "终端类型").should("be.visible");
-    cy.contains(".el-drawer", "高级协议配置").click();
-    cy.contains(".el-drawer", "强制 PKCE").should("be.visible");
-  });
-
-  it("maintains legacy verification client origins without hiding business errors", () => {
-    let updateRequests = 0;
-    let client = {
-      id: 2,
-      clientId: "e4da4a32-592b-46f0-ae1d-784310e88423",
-      clientName: "macula-cloud-gateway",
-      tenantId: 1,
-      userType: "employee",
-      clientAuthenticationMethods: "client_secret_basic,client_secret_post",
-      authorizationGrantTypes:
-        "authorization_code,client_credentials,refresh_token,password,sms",
-      redirectUris: "http://127.0.0.1:8083/login/oauth2/code/felord",
-      scopes: "message.read,message.write,userinfo",
-      externalCodeTypes: [],
-      externalProviderBindings: {},
-      allowedOrigins: ["http://127.0.0.1:5900"],
-      browserLoginProviderTypes: [],
-      directLoginProviderType: "",
-      requireProofKey: false,
-      requireAuthorizationConsent: true,
-      authorizationCodeTimeToLive: 300,
-      accessTokenTimeToLive: 43200,
-      refreshTokenTimeToLive: 2592000,
-      tokenFormat: "reference",
-      reuseRefreshTokens: true,
-      idTokenSignatureAlgorithm: "RS256",
-    };
-    cy.intercept("GET", "**/system/api/v1/oauth2-clients*", (req) => {
-      req.reply(ok({ records: [client], total: 1 }));
-    }).as("clients");
-    cy.intercept(
-      "GET",
-      "**/system/api/v1/tenants/options*",
-      ok([{ value: 1, label: "平台租户" }])
-    ).as("tenants");
-    cy.intercept("PUT", "**/system/api/v1/oauth2-clients/2", (req) => {
-      updateRequests += 1;
-      if (req.body.authorizationGrantTypes.includes("email")) {
-        req.reply({
-          statusCode: 500,
-          body: {
-            success: false,
-            code: "B0002",
-            msg: "系统异常",
-            cause:
-              '400 BAD_REQUEST "短信或邮箱验证码 grant 必须由公共客户端使用"',
-          },
-        });
-        return;
-      }
-      expect(req.body.clientAuthenticationMethods).to.equal(
-        "client_secret_basic,client_secret_post"
-      );
-      expect(req.body.authorizationGrantTypes).to.equal(
-        "authorization_code,client_credentials,refresh_token,password,sms"
-      );
-      expect(req.body.allowedOrigins).to.deep.equal([
-        "http://127.0.0.1:5900",
-        "http://127.0.0.1:5800",
-      ]);
-      client = { ...client, ...req.body };
-      req.reply({ ...ok(client), delay: 300 });
-    }).as("updateLegacyClient");
-
-    open("/system/oauth2-client");
-    cy.wait("@clients");
-    cy.wait("@tenants");
-    cy.contains("tr", "macula-cloud-gateway")
-      .contains("button", "编辑")
-      .click();
-    cy.get(".el-drawer:visible").within(() => {
-      cy.contains("历史验证码客户端兼容模式").should("be.visible");
-      cy.contains("高级协议配置").click();
-      cy.contains(".el-form-item", "浏览器协议允许 Origin")
-        .find("textarea")
-        .type("{end}{enter}http://127.0.0.1:5800");
-      cy.contains("button", "保存").click();
-      cy.contains("button", "保存")
-        .should("have.class", "is-loading")
-        .and("be.disabled");
-    });
-    cy.wait("@updateLegacyClient");
-    cy.then(() => expect(updateRequests).to.equal(1));
-    cy.wait("@clients");
-
-    cy.contains("tr", "macula-cloud-gateway")
-      .contains("button", "编辑")
-      .click();
-    cy.get(".el-drawer:visible").within(() => {
-      cy.contains("高级协议配置").click();
-      cy.contains(".el-form-item", "浏览器协议允许 Origin")
-        .find("textarea")
-        .should("have.value", "http://127.0.0.1:5900\nhttp://127.0.0.1:5800");
-      cy.contains(".el-form-item", "授权方式")
-        .find("input")
-        .clear()
-        .type(
-          "authorization_code,client_credentials,refresh_token,password,sms,email"
-        );
-      cy.contains("button", "保存").click();
-    });
-    cy.wait("@updateLegacyClient");
-    cy.contains("短信或邮箱验证码 grant 必须由公共客户端使用").should(
-      "be.visible"
-    );
-    cy.contains("系统异常").should("not.exist");
-  });
-
-  it("configures login methods by terminal without exposing code types", () => {
-    const catalog = {
-      codeTypes: [
-        {
-          value: "WECOM_APP_CODE",
-          providerType: "WECOM",
-          scene: "APP",
-          capability: "DEFAULT",
-        },
-        {
-          value: "WECHAT_MINIAPP_PHONE_CODE",
-          providerType: "WECHAT",
-          scene: "MINIAPP",
-          capability: "WECHAT_MINIAPP",
-        },
-      ],
-      providerRegistrations: [
-        {
-          id: 1,
-          name: "GitHub",
-          providerType: "GITHUB",
-          capabilities: ["DEFAULT"],
-        },
-        {
-          id: 2,
-          name: "企业微信",
-          providerType: "WECOM",
-          capabilities: ["DEFAULT"],
-        },
-        {
-          id: 3,
-          name: "微信小程序",
-          providerType: "WECHAT",
-          capabilities: ["WECHAT_MINIAPP"],
-        },
-      ],
-    };
-    cy.intercept(
-      "GET",
-      "**/system/api/v1/oauth2-clients*",
-      ok({ records: [], total: 0 })
-    ).as("clients");
-    cy.intercept(
-      "GET",
-      "**/system/api/v1/tenants/options*",
-      ok([{ value: 1, label: "平台租户" }])
-    ).as("tenants");
-    cy.intercept("POST", "**/system/api/v1/oauth2-clients", ok({ id: 3 })).as(
-      "createClient"
-    );
-
-    open("/system/oauth2-client", catalog);
-    cy.wait("@clients");
-    cy.wait("@tenants");
-    cy.contains("新增接入应用").click();
-    cy.get('[data-login-method="BROWSER_GITHUB"]').click();
-    cy.contains(".el-segmented__item", "App").click();
-    cy.get('[data-login-method="APP_WECOM"]').click();
-    cy.contains(".el-drawer .el-form-item__label", /^企业微信 SDK身份源$/)
-      .parents(".el-form-item")
-      .should("contain", "自动绑定");
-    cy.contains(".el-segmented__item", "微信小程序").click();
-    cy.get('[data-login-method="WECHAT_MINIAPP_MOBILE"]').click();
-    cy.contains("微信手机号登录身份源").should("contain", "自动绑定");
-    cy.contains(".el-drawer .el-form-item", "应用名称")
-      .find("input")
-      .type("多端应用");
-    cy.contains(".el-drawer .el-form-item", "Client ID")
-      .find("input")
-      .type("multi-terminal-app");
-    cy.contains(".el-drawer .el-form-item", "所属租户")
-      .find(".el-select")
-      .click();
-    cy.contains(".el-select-dropdown__item", "平台租户").click();
-    cy.contains(".el-drawer .el-form-item", "重定向 URI")
-      .find("textarea")
-      .type("https://example.test/callback");
-    cy.contains(".el-drawer", "保存").contains("button", "保存").click();
-    cy.wait("@createClient").then(({ request }) => {
-      expect(request.body.browserLoginProviderTypes).to.deep.equal(["GITHUB"]);
-      expect(request.body.externalCodeTypes).to.include.members([
-        "WECOM_APP_CODE",
-        "WECHAT_MINIAPP_PHONE_CODE",
-      ]);
-      expect(request.body.externalProviderBindings).to.deep.include({
-        WECOM_APP_CODE: 2,
-        WECHAT_MINIAPP_PHONE_CODE: 3,
-      });
-      expect(request.body.authorizationGrantTypes).to.contain(
-        "authorization_code"
-      );
-      expect(request.body.authorizationGrantTypes).to.contain("external_code");
-    });
-    cy.contains("允许的 code type").should("not.exist");
-  });
-
-  it("reconciles edited bindings and removes unsupported browser code settings", () => {
-    const catalog = {
-      codeTypes: [
-        {
-          value: "WECOM_APP_CODE",
-          providerType: "WECOM",
-          scene: "APP",
-          capability: "DEFAULT",
-        },
-        {
-          value: "FEISHU_APP_CODE",
-          providerType: "FEISHU",
-          scene: "APP",
-          capability: "DEFAULT",
-        },
-        {
-          value: "DINGTALK_APP_CODE",
-          providerType: "DINGTALK",
-          scene: "APP",
-          capability: "DEFAULT",
-        },
-      ],
-      providerRegistrations: [
-        {
-          id: 20,
-          name: "新企业微信",
-          providerType: "WECOM",
-          capabilities: ["DEFAULT"],
-        },
-        {
-          id: 30,
-          name: "飞书主应用",
-          providerType: "FEISHU",
-          capabilities: ["DEFAULT"],
-        },
-        {
-          id: 31,
-          name: "飞书备用应用",
-          providerType: "FEISHU",
-          capabilities: ["DEFAULT"],
-        },
-      ],
-    };
-    let client = {
-      id: 7,
-      clientId: "existing-terminal-app",
-      clientName: "旧多端应用",
-      tenantId: 1,
-      userType: "employee",
-      clientAuthenticationMethods: "none",
-      authorizationGrantTypes:
-        "authorization_code,refresh_token,urn:macula:params:oauth:grant-type:external_code",
-      redirectUris: "https://example.test/callback",
-      scopes: "openid,profile",
-      externalCodeTypes: [
-        "WECOM_APP_CODE",
-        "FEISHU_APP_CODE",
-        "DINGTALK_APP_CODE",
-        "FEISHU_BROWSER_CODE",
-      ],
-      externalProviderBindings: {
-        WECOM_APP_CODE: 10,
-        FEISHU_APP_CODE: 30,
-        DINGTALK_APP_CODE: 50,
-        FEISHU_BROWSER_CODE: 30,
-      },
-      allowedOrigins: [],
-      browserLoginProviderTypes: ["WECOM"],
-      directLoginProviderType: "WECOM",
-      requireProofKey: true,
-      requireAuthorizationConsent: false,
-      authorizationCodeTimeToLive: 300,
-      accessTokenTimeToLive: 3600,
-      refreshTokenTimeToLive: 2592000,
-      tokenFormat: "self-contained",
-      reuseRefreshTokens: true,
-      idTokenSignatureAlgorithm: "RS256",
-    };
-    cy.intercept("GET", "**/system/api/v1/oauth2-clients*", (req) => {
-      req.reply(ok({ records: [client], total: 1 }));
-    }).as("clients");
-    cy.intercept(
-      "GET",
-      "**/system/api/v1/tenants/options*",
-      ok([{ value: 1, label: "平台租户" }])
-    ).as("tenants");
-    cy.intercept("PUT", "**/system/api/v1/oauth2-clients/7", (req) => {
-      client = { ...client, ...req.body };
-      req.reply(ok(client));
-    }).as("updateClient");
-
-    open("/system/oauth2-client", catalog);
-    cy.wait("@clients");
-    cy.wait("@tenants");
-    cy.contains("tr", "旧多端应用")
-      .should("contain", "网页（浏览器/端内）：企业微信")
-      .and("not.contain", "高级兼容配置")
-      .contains("button", "编辑")
-      .click();
-    cy.contains(".el-drawer .el-form-item__label", /^企业微信 SDK身份源$/)
-      .parents(".el-form-item")
-      .should("contain", "新企业微信")
-      .and("contain", "自动绑定");
-    cy.contains(".el-drawer .el-form-item__label", /^飞书 AppLink身份源$/)
-      .parents(".el-form-item")
-      .find(".el-select__selected-item")
-      .should("contain", "飞书主应用");
-    cy.contains("钉钉 SDK缺少可用身份源").should("be.visible");
-    cy.get('[data-login-method="APP_DINGTALK"]').click();
-
-    cy.contains(".el-segmented__item", "端内网页").click();
-    cy.get('[data-login-method="WEBVIEW_WECOM"]').should(
-      "have.class",
-      "is-checked"
-    );
-    cy.contains(".el-segmented__item", "浏览器").click();
-    cy.get('[data-login-method="BROWSER_WECOM"]')
-      .should("have.class", "is-checked")
-      .click();
-    cy.contains(".el-segmented__item", "端内网页").click();
-    cy.get('[data-login-method="WEBVIEW_WECOM"]')
-      .should("not.have.class", "is-checked")
-      .click();
-    cy.contains(".el-segmented__item", "浏览器").click();
-    cy.get('[data-login-method="BROWSER_WECOM"]').should(
-      "have.class",
-      "is-checked"
-    );
-    cy.contains(".el-drawer .el-form-item", "进入登录页后")
-      .find(".el-select")
-      .click();
-    cy.contains(".el-select-dropdown__item", "直接进入企业微信认证").click();
-    cy.contains(".el-drawer", "保存").contains("button", "保存").click();
-    cy.wait("@updateClient").then(({ request }) => {
-      expect(request.body.externalCodeTypes).not.to.include(
-        "DINGTALK_APP_CODE"
-      );
-      expect(request.body.externalCodeTypes).not.to.include(
-        "FEISHU_BROWSER_CODE"
-      );
-      expect(request.body.externalProviderBindings).to.deep.include({
-        WECOM_APP_CODE: 20,
-        FEISHU_APP_CODE: 30,
-      });
-      expect(request.body.externalProviderBindings).not.to.have.property(
-        "FEISHU_BROWSER_CODE"
-      );
-      expect(request.body.externalProviderBindings).not.to.have.property(
-        "DINGTALK_APP_CODE"
-      );
-      expect(request.body.browserLoginProviderTypes).to.deep.equal(["WECOM"]);
-      expect(request.body.directLoginProviderType).to.equal("WECOM");
-      expect(request.body.allowedOrigins).to.deep.equal([]);
-    });
-    cy.wait("@clients");
-    cy.contains("tr", "旧多端应用")
-      .should("contain", "网页（浏览器/端内）：企业微信")
-      .and("not.contain", "高级兼容配置")
-      .contains("button", "编辑")
-      .click();
-    cy.contains(".el-drawer .el-form-item__label", /^企业微信 SDK身份源$/)
-      .parents(".el-form-item")
-      .should("contain", "新企业微信");
-    cy.contains(".el-drawer", "高级协议配置").click();
-    cy.contains(".el-checkbox", "FEISHU_BROWSER_CODE").should("not.exist");
-  });
-
-  it("re-infers the edited terminal after a delayed external catalog", () => {
-    const catalog = {
-      codeTypes: [
-        {
-          value: "WECOM_APP_CODE",
-          providerType: "WECOM",
-          scene: "APP",
-          capability: "DEFAULT",
-        },
-      ],
-      providerRegistrations: [
-        {
-          id: 20,
-          name: "企业微信",
-          providerType: "WECOM",
-          capabilities: ["DEFAULT"],
-        },
-      ],
-    };
-    cy.intercept(
-      "GET",
-      "**/system/api/v1/oauth2-clients*",
-      ok({
-        records: [
-          {
-            id: 10,
-            clientId: "delayed-catalog-app",
-            clientName: "延迟目录应用",
-            tenantId: 1,
-            userType: "employee",
-            clientAuthenticationMethods: "none",
-            authorizationGrantTypes:
-              "urn:macula:params:oauth:grant-type:external_code",
-            redirectUris: "",
-            scopes: "openid",
-            externalCodeTypes: ["WECOM_APP_CODE"],
-            externalProviderBindings: { WECOM_APP_CODE: 20 },
-            allowedOrigins: [],
-            browserLoginProviderTypes: [],
-            directLoginProviderType: "",
-            requireProofKey: true,
-          },
-        ],
-        total: 1,
-      })
-    ).as("clients");
-    cy.intercept(
-      "GET",
-      "**/system/api/v1/tenants/options*",
-      ok([{ value: 1, label: "平台租户" }])
-    ).as("tenants");
-
-    open(
-      "/system/oauth2-client",
-      catalog,
-      1000,
-      "manualExternalCodeCatalog",
-      1
-    );
-    cy.wait("@clients");
-    cy.contains("tr", "延迟目录应用").contains("button", "编辑").click();
-    cy.wait("@manualExternalCodeCatalog");
-    cy.get('[data-login-method="APP_WECOM"]')
-      .should("be.visible")
-      .and("have.class", "is-checked");
-    cy.contains(".el-drawer .el-form-item__label", /^企业微信 SDK身份源$/)
-      .parents(".el-form-item")
-      .should("contain", "企业微信");
-
-    cy.get(".el-drawer__close-btn:visible").click();
-    cy.intercept(
-      {
-        method: "GET",
-        url: "**/system/api/v1/oauth2-clients/external-code-catalog*",
-        times: 1,
-      },
-      { ...ok(catalog), delay: 1000 }
-    ).as("externalCodeCatalog");
-    cy.reload();
-    cy.wait("@clients");
-    cy.contains("tr", "延迟目录应用").contains("button", "编辑").click();
-    cy.contains(".el-segmented__item", "微信小程序").click();
-    cy.wait("@externalCodeCatalog");
-    cy.get('[data-login-method="WECHAT_MINIAPP_IDENTITY"]').should(
-      "be.visible"
-    );
-    cy.get('[data-login-method="APP_WECOM"]').should("not.exist");
-  });
-
-  it("blocks selected browser providers without one active registration", () => {
-    const clients = [
-      {
-        id: 11,
-        clientId: "missing-browser-provider",
-        clientName: "缺少网页身份源",
-        browserLoginProviderTypes: ["WECOM"],
-        directLoginProviderType: "WECOM",
-      },
-      {
-        id: 12,
-        clientId: "duplicate-browser-provider",
-        clientName: "重复网页身份源",
-        browserLoginProviderTypes: ["FEISHU"],
-        directLoginProviderType: "FEISHU",
-      },
-    ].map((client) => ({
-      tenantId: 1,
-      userType: "employee",
-      clientAuthenticationMethods: "none",
-      authorizationGrantTypes: "authorization_code",
-      redirectUris: "https://example.test/callback",
-      scopes: "openid",
-      externalCodeTypes: [],
-      externalProviderBindings: {},
-      allowedOrigins: [],
-      directLoginProviderType: "",
-      requireProofKey: true,
-      ...client,
-    }));
-    const catalog = {
-      codeTypes: [],
-      providerRegistrations: [
-        { id: 30, name: "飞书一", providerType: "FEISHU" },
-        { id: 31, name: "飞书二", providerType: "FEISHU" },
-      ],
-    };
-    let writes = 0;
-    cy.intercept(
-      "GET",
-      "**/system/api/v1/oauth2-clients*",
-      ok({ records: clients, total: 2 })
-    ).as("clients");
-    cy.intercept(
-      "GET",
-      "**/system/api/v1/tenants/options*",
-      ok([{ value: 1, label: "平台租户" }])
-    ).as("tenants");
-    cy.intercept("PUT", "**/system/api/v1/oauth2-clients/*", (req) => {
-      writes += 1;
-      req.reply(ok({}));
-    }).as("updateClient");
-
-    open("/system/oauth2-client", catalog);
-    cy.wait("@clients");
-    cy.wait("@externalCodeCatalog");
-    cy.contains("tr", "缺少网页身份源").contains("button", "编辑").click();
-    cy.contains(".el-drawer", "保存").contains("button", "保存").click();
-    cy.contains("网页登录方式必须且只能有一个启用身份源：企业微信").should(
-      "be.visible"
-    );
-    cy.then(() => expect(writes).to.equal(0));
-    cy.get('[data-login-method="BROWSER_WECOM"]').click();
-    cy.contains(".el-drawer", "保存").contains("button", "保存").click();
-    cy.wait("@updateClient").then(({ request }) => {
-      expect(request.body.browserLoginProviderTypes).to.deep.equal([]);
-      expect(request.body.directLoginProviderType).to.equal("");
-    });
-    cy.wait("@clients");
-    cy.contains("tr", "重复网页身份源").contains("button", "编辑").click();
-    cy.contains(".el-drawer", "保存").contains("button", "保存").click();
-    cy.contains("网页登录方式必须且只能有一个启用身份源：飞书").should(
-      "be.visible"
-    );
-    cy.then(() => expect(writes).to.equal(1));
-    cy.get('[data-login-method="BROWSER_FEISHU"]').click();
-    cy.contains(".el-drawer", "保存").contains("button", "保存").click();
-    cy.wait("@updateClient").then(({ request }) => {
-      expect(request.body.browserLoginProviderTypes).to.deep.equal([]);
-      expect(request.body.directLoginProviderType).to.equal("");
-    });
-    cy.then(() => expect(writes).to.equal(2));
-  });
-
-  it("rejects missing redirects and removes unsupported code types", () => {
-    const unsupportedClient = {
-      id: 8,
-      clientId: "unsupported-client",
-      clientName: "待迁移应用",
-      tenantId: 1,
-      userType: "employee",
-      clientAuthenticationMethods: "none",
-      authorizationGrantTypes: "authorization_code",
-      redirectUris: "https://example.test/callback",
-      scopes: "openid",
-      externalCodeTypes: ["REMOVED_CODE"],
-      externalProviderBindings: { REMOVED_CODE: 99 },
-      allowedOrigins: [],
-      browserLoginProviderTypes: [],
-      directLoginProviderType: "",
-      requireProofKey: true,
-    };
-    let writes = 0;
-    cy.intercept(
-      "GET",
-      "**/system/api/v1/oauth2-clients*",
-      ok({ records: [unsupportedClient], total: 1 })
-    ).as("clients");
-    cy.intercept(
-      "GET",
-      "**/system/api/v1/tenants/options*",
-      ok([{ value: 1, label: "平台租户" }])
-    ).as("tenants");
-    cy.intercept("POST", "**/system/api/v1/oauth2-clients", (req) => {
-      writes += 1;
-      req.reply(ok({ id: 9 }));
-    });
-    cy.intercept("PUT", "**/system/api/v1/oauth2-clients/8", (req) => {
-      writes += 1;
-      req.reply(ok({ id: 8 }));
-    }).as("updateClient");
-
-    open("/system/oauth2-client");
-    cy.wait("@clients");
-    cy.wait("@tenants");
-    cy.contains("新增接入应用").click();
-    cy.contains(".el-drawer .el-form-item", "应用名称")
-      .find("input")
-      .type("无回调应用");
-    cy.contains(".el-drawer .el-form-item", "Client ID")
-      .find("input")
-      .type("missing-redirect");
-    cy.contains(".el-drawer .el-form-item", "所属租户")
-      .find(".el-select")
-      .click();
-    cy.contains(".el-select-dropdown__item", "平台租户").click();
-    cy.contains(".el-drawer", "保存").contains("button", "保存").click();
-    cy.contains("使用 IAM 授权登录时必须配置重定向 URI").should("be.visible");
-    cy.then(() => expect(writes).to.equal(0));
-    cy.contains(".el-drawer", "取消").contains("button", "取消").click();
-
-    cy.contains("tr", "待迁移应用").contains("button", "编辑").click();
-    cy.contains(".el-drawer", "保存").contains("button", "保存").click();
-    cy.wait("@updateClient").then(({ request }) => {
-      expect(request.body.externalCodeTypes).to.deep.equal([]);
-      expect(request.body.externalProviderBindings).to.deep.equal({});
-      expect(request.body.authorizationGrantTypes).to.equal(
-        "authorization_code"
-      );
-    });
-    cy.wait("@clients");
-    cy.then(() => expect(writes).to.equal(1));
   });
 
   it("manages the fixed mail and SMS provider/template scope", () => {
@@ -1438,47 +868,72 @@ describe("平台身份、消息与接入应用管理", () => {
       cy.get(".el-dialog:visible").should("not.exist");
     });
   });
-
-  it("does not save OAuth client before the tenant is selected", () => {
-    cy.intercept(
-      "GET",
-      "**/system/api/v1/oauth2-clients*",
-      ok({ records: [], total: 0 })
-    ).as("clients");
-    cy.intercept(
-      "GET",
-      "**/system/api/v1/tenants/options*",
-      ok([{ value: 1, label: "平台租户" }])
-    ).as("tenants");
-    cy.intercept("POST", "**/system/api/v1/oauth2-clients", ok({ id: 3 })).as(
-      "createClient"
-    );
-    open("/system/oauth2-client");
-    cy.wait("@clients");
-    cy.wait("@tenants");
-    cy.contains("新增接入应用").click();
-    cy.contains(".el-drawer .el-form-item", "应用名称")
-      .find("input")
-      .type("PKCE App");
-    cy.contains(".el-drawer .el-form-item", "Client ID")
-      .find("input")
-      .type("pkce-app");
-    cy.contains(".el-drawer:visible .el-form-item:visible", "重定向 URI")
-      .find("textarea")
-      .type("https://example.test/callback");
-    cy.contains(".el-drawer", "保存").contains("button", "保存").click();
-    cy.contains("请选择租户").should("exist");
-    cy.get("@createClient.all").should("have.length", 0);
-    cy.contains(".el-drawer .el-form-item", "所属租户")
-      .find(".el-select")
-      .click();
-    cy.contains(".el-select-dropdown__item", "平台租户").click();
-    cy.contains(".el-drawer", "保存").contains("button", "保存").click();
-    cy.wait("@createClient").then(({ request }) => {
-      expect(request.body.tenantId).to.equal(1);
-      expect(request.body.requireProofKey).to.equal(true);
-      expect(request.body.clientAuthenticationMethods).to.equal("none");
-      expect(request.body.clientSecret).to.equal("");
+  [1440,390].forEach(width => {
+    it(`stores one WeCom app with several login capabilities at ${width}px`, () => {
+      cy.viewport(width,900);
+      const fields=[{key:'corpId',label:'企业ID',required:true},{key:'agentId',label:'Agent ID',required:true},
+        {key:'appSecret',label:'应用Secret',required:true,secret:true}];
+      providerCatalog.credentials=[{code:'WECOM_APPLICATION',label:'企业微信应用',providerType:'WECOM',sourceType:'WECOM_WEB',fields,
+        capabilities:[{code:'WECOM_BROWSER',label:'PC网页扫码',available:true,browser:true},
+          {code:'WECOM_WEBVIEW',label:'企微端内网页',available:true,browser:true},
+          {code:'WECOM_MINIAPP',label:'关联小程序登录',available:true,browser:false}]}];
+      cy.intercept('GET','**/system/api/v1/identity-providers*',ok({records:[],total:0}));
+      cy.intercept('POST','**/system/api/v1/identity-providers',ok({id:20})).as('saveCapabilities');
+      open('/system/identity-provider');
+      cy.contains('.el-tabs__item','企业身份提供商').click();
+      cy.contains('添加认证源').click();
+      cy.contains('.el-drawer .el-form-item','认证源类型').contains('.el-radio','企业微信').click();
+      cy.get('.el-drawer .el-form-item__label').should('not.contain','应用类型');
+      cy.contains('.el-drawer .el-checkbox','PC网页扫码').find('input').should('be.checked');
+      ['PC网页扫码','企微端内网页','关联小程序登录'].forEach(label => {
+        cy.contains('.el-drawer .el-checkbox',label).find('input').check({force:true});
+      });
+      [['认证源名称','统一企微应用'],['企业ID','corp-fixture'],['Agent ID','1001'],['应用Secret','fixture-secret']].forEach(([label,value]) => {
+        cy.contains('.el-drawer .el-form-item',label).find('input').first().type(value);
+      });
+      cy.get('.el-drawer .el-checkbox input:checked').should('have.length',3);
+      cy.get('.el-drawer__body').then($body => expect($body[0].scrollWidth).to.be.at.most($body[0].clientWidth+1));
+      cy.get('.el-drawer__body').scrollTo('top');
+      cy.screenshot(`identity-capabilities-${width}`);
+      cy.contains('.el-drawer button','确定').click();
+      cy.wait('@saveCapabilities').then(({request}) => {
+        expect(request.body.credentialType).to.eq('WECOM_APPLICATION');
+        expect(request.body.loginCapabilities).to.have.members(['WECOM_BROWSER','WECOM_WEBVIEW','WECOM_MINIAPP']);
+        expect(request.body.config).to.deep.eq({corpId:'corp-fixture',agentId:'1001',appSecret:'fixture-secret'});
+        expect(request.body).not.to.have.property('identityFlow');
+      });
+      cy.then(()=>{delete providerCatalog.credentials;});
     });
   });
+
+  it('enables mobile SDK with web and in-app login on the same DingTalk app', () => {
+    const fields=[{key:'appKey',label:'Client ID / AppKey',required:true},
+      {key:'appSecret',label:'AppSecret',required:true,secret:true},{key:'corpId',label:'企业ID',required:true}];
+    providerCatalog.credentials=[{code:'DINGTALK_APPLICATION',label:'钉钉应用',providerType:'DINGTALK',sourceType:'DINGTALK_WEB',fields,
+      capabilities:[{code:'DINGTALK_WEB',label:'网页授权',available:true,browser:true},
+        {code:'DINGTALK_SDK',label:'移动SDK授权登录',available:true,browser:false},
+        {code:'DINGTALK_WEBVIEW',label:'端内免登',available:true,browser:false}]}];
+    cy.intercept('GET','**/system/api/v1/identity-providers*',ok({records:[],total:0}));
+    cy.intercept('POST','**/system/api/v1/identity-providers',ok({id:21})).as('saveDingMobile');
+    open('/system/identity-provider');
+    cy.contains('.el-tabs__item','企业身份提供商').click();
+    cy.contains('添加认证源').click();
+    cy.contains('.el-drawer .el-form-item','认证源类型').contains('.el-radio','钉钉').click();
+    cy.get('.el-drawer .el-form-item__label').should('not.contain','应用类型');
+    ['网页授权','移动SDK授权登录','端内免登'].forEach(label=>{
+      cy.contains('.el-drawer .el-checkbox',label).find('input').should('not.be.disabled').check({force:true});
+    });
+    [['认证源名称','统一钉钉应用'],['Client ID / AppKey','ding-fixture'],['AppSecret','fixture-secret'],['企业ID','corp-fixture']].forEach(([label,value])=>{
+      cy.contains('.el-drawer .el-form-item',label).find('input').first().type(value);
+    });
+    cy.get('.el-drawer__body').scrollTo('top');cy.screenshot('dingtalk-unified-mobile');
+    cy.contains('.el-drawer button','确定').click();
+    cy.wait('@saveDingMobile').then(({request})=>{
+      expect(request.body.credentialType).to.eq('DINGTALK_APPLICATION');
+      expect(request.body.loginCapabilities).to.have.members(['DINGTALK_WEB','DINGTALK_SDK','DINGTALK_WEBVIEW']);
+      expect(request.body.config).to.deep.eq({appKey:'ding-fixture',appSecret:'fixture-secret',corpId:'corp-fixture'});
+    });
+    cy.then(()=>{delete providerCatalog.credentials;});
+  });
+
 });

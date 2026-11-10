@@ -16,12 +16,14 @@
  */
 
 export default {
+  identitySourceIntegration: {"codeTypeHelp": "Mini program clients select code_type from the actual API: wx.login returns a login code, while getPhoneNumber returns a phone code. Credentials may be shared, but codes are not interchangeable.", "wecomMemberOnly": "WeCom currently supports member ID matching. Phone and email require additional user consent and are deferred.", "sourceField": "Source attribute", "targetField": "IAM matching field", "selectSourceField": "Select a verified source attribute", "selectTargetField": "Select an IAM account field", "mappingHelp": "Multiple rules are supported. Automatic binding requires at least one match and all matches must identify the same account. Conflicts require account verification; user profiles are not overwritten.", "legacyAdmission": "Existing enterprise membership requirements remain enforced.", "sourceUnavailable": "This integration contract is not yet verified and cannot be enabled.", "wechatWebsiteHelp": "Browser QR login uses a WeChat Open Platform website application. Create a separate Official Account source for in-WeChat webpages.", "wechatOfficialHelp": "In-WeChat webpage authorization uses Official Account credentials, configured separately from website application credentials.", "wecomWebHelp": "One self-built application supports browser QR login and in-WeCom webpage authorization with the same CorpID / AgentId / Secret. Configure both login authorization and trusted webpage domains.", "flow": "Provider API flow", "flowRequired": "Select a verified provider flow", "directory": "Directory policy", "organization": "Fixed organization", "organizationHelp": "For Feishu, enter the actual tenant_key of the enterprise that owns this app, not the literal text tenant_key. It verifies enterprise membership and cannot be replaced after saving.", "unverified": "This flow is unverified. Keep it disabled; no working login example is generated.", "codeType": "Provider code type", "codeTypeRequired": "Select a linked and available provider code type", "nonceBoundary": "The extension nonce correlates this request and ID Token; it does not bind the provider code to that nonce.", "identityOnly": "Identity verification only", "optional": "Optional profile, membership still enforced", "required": "Require live membership verification", "background": "Refresh known bound members in background", "addMapping": "Add binding rule", "removeMapping": "Remove rule", "appLinkClientCallback": "AppLink callback URLs used in app code must be registered with Feishu and in this Client allowlist. IAM authorization-code login is optional; its PKCE is separate from provider PKCE."},
+ applicationProtocols: {authenticationTitle:"Authentication and grants",authenticationHelp:"Client authentication proves application identity; grants determine how tokens are obtained.",callbacksTitle:"Callbacks and browser origins",permissionsTitle:"Permissions and sign-in protection",oidcScopeHelp:"openid enables authentication and profile requests basic claims. Resource permissions come from the registered scope catalog.",oauthScopeHelp:"profile grants access to username and nickname through /api/v1/profile. System APIs additionally require system:access and role permissions.",oauthScopeEmpty:"No scopes apply to this grant. Choose a supported grant or register a resource capability.",default:'Default protocol',enabled:'Enable protocol',savedWhenDisabled:'Settings are retained when disabled and revalidated on enable',noEnabled:'Enable a protocol before activating this application',endpoints:'Protocol endpoints'},
 	adminSettings: {
 		identity: 'Identity Providers',
 		identitySocial: 'Social Providers',
 		identityEnterprise: 'Enterprise Providers',
 		identityPending:
-			'Configurations are stored only; third-party IAM login is not connected yet.',
+			'Manage identity credentials here and associate enabled channels in application login controls.',
 		message: 'Message Settings',
 		messageDescription:
 			'Manage mail and SMS providers and templates. Test sends use a temporary recipient; confirm final delivery at the recipient.',
@@ -211,6 +213,12 @@ export default {
 			'At least three of numbers, upper/lowercase letters and special characters'
 	},
 	login: {
+        iamLogin: 'Continue to IAM',
+        iamDescription: 'Sign in through the identity platform.',
+        iamFailed: 'Sign-in failed. Please retry or contact your administrator.',
+        iamRetry: 'Return to sign-in',
+        iamInitializing: 'Verifying identity and loading permissions…',
+
 		slogan: 'High performance / delicate / grace',
 		describe:
 			'Vue3 + element plus based front-end solutions in the background.',
@@ -250,5 +258,7 @@ export default {
 		language: 'language',
 		language_msg:
 			'Translation in progress,Temporarily translated the text of this view',
-	}
+	},
+ applicationBoundary: {inApp: 'An in-app application uses one container login capability and has no hosted IAM login page.', native: 'A mobile client uses one SDK or AppLink source and may also enable built-in IAM login.', miniapp: 'A miniapp uses one source for its platform. WeChat login and phone codes may share that source.'}
+
 }

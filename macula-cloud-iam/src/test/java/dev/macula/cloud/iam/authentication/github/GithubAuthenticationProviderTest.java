@@ -16,7 +16,9 @@
  */
 package dev.macula.cloud.iam.authentication.github;
 
-import dev.macula.cloud.iam.authentication.thirdparty.*;
+import dev.macula.cloud.iam.authentication.thirdparty.IdentityProviderConfigService;
+import dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyAuthenticationToken;
+import dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyIdentityResolutionService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.boot.test.system.CapturedOutput;
@@ -55,12 +57,12 @@ class GithubAuthenticationProviderTest {
         GithubClient github = mock(GithubClient.class);
         IdentityProviderConfigService configs = mock(IdentityProviderConfigService.class);
         ThirdPartyIdentityResolutionService identities = mock(ThirdPartyIdentityResolutionService.class);
-        var config = new IdentityProviderConfigService.ProviderConfig("GITHUB", "id", "secret",
+        var config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(dev.macula.cloud.system.enums.IdentitySourceType.GITHUB_OAUTH, "GITHUB", "id", "secret",
             Map.of("clientId", "id"));
-        var context = new ThirdPartyLoginContext("GITHUB", "", "test-client", Instant.now(), "/");
-        when(configs.requireEnabled("GITHUB")).thenReturn(config);
+        var context = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.context("GITHUB", "", "test-client", Instant.now(), "/");
+        when(configs.requireEnabledById(1L, "GITHUB")).thenReturn(config);
         when(github.fetchSubject(config, "code", "https://iam.example/login/github")).thenReturn("12345");
-        when(identities.resolve("GITHUB", "12345", context))
+        when(identities.resolve(dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.browserIdentity(context, "12345"), context))
             .thenReturn(User.withUsername("alice").password("n/a").authorities("USER").build());
 
         var result = new GithubAuthenticationProvider(github, configs, identities).authenticate(
@@ -69,7 +71,7 @@ class GithubAuthenticationProviderTest {
 
         assertEquals("alice", result.getName());
         assertEquals("GITHUB", ((ThirdPartyAuthenticationToken)result).getProviderType());
-        verify(identities).resolve("GITHUB", "12345", context);
+        verify(identities).resolve(dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.browserIdentity(context, "12345"), context);
     }
 
     @Test
@@ -77,7 +79,7 @@ class GithubAuthenticationProviderTest {
         GithubClient github = mock(GithubClient.class);
         IdentityProviderConfigService configs = mock(IdentityProviderConfigService.class);
         ThirdPartyIdentityResolutionService identities = mock(ThirdPartyIdentityResolutionService.class);
-        var context = new ThirdPartyLoginContext("WECOM", "BROWSER", "test-client", Instant.now(), "/");
+        var context = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.context("WECOM", "BROWSER", "test-client", Instant.now(), "/");
 
         var result = new GithubAuthenticationProvider(github, configs, identities).authenticate(
             ThirdPartyAuthenticationToken.unauthenticated("WECOM", "code", context,
@@ -92,7 +94,7 @@ class GithubAuthenticationProviderTest {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         GithubClient client = new GithubClient(builder.build());
-        var config = new IdentityProviderConfigService.ProviderConfig("GITHUB", "id", "secret",
+        var config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(dev.macula.cloud.system.enums.IdentitySourceType.GITHUB_OAUTH, "GITHUB", "id", "secret",
             Map.of("clientId", "id"));
         server.expect(once(), requestTo("https://github.com/login/oauth/access_token"))
             .andExpect(method(POST)).andRespond(withSuccess("{\"access_token\":\"token\"}", MediaType.APPLICATION_JSON));
@@ -137,7 +139,7 @@ class GithubAuthenticationProviderTest {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         GithubClient client = new GithubClient(builder.build());
-        var config = new IdentityProviderConfigService.ProviderConfig("GITHUB", "id", "client-secret-marker",
+        var config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(dev.macula.cloud.system.enums.IdentitySourceType.GITHUB_OAUTH, "GITHUB", "id", "client-secret-marker",
             Map.of("clientId", "id"));
         server.expect(requestTo("https://github.com/login/oauth/access_token"))
             .andRespond(withSuccess("{\"error\":\"sensitive-provider-error\","

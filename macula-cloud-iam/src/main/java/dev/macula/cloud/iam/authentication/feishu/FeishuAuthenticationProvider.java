@@ -17,6 +17,7 @@
 package dev.macula.cloud.iam.authentication.feishu;
 
 import dev.macula.cloud.iam.authentication.thirdparty.IdentityProviderConfigService;
+import dev.macula.cloud.iam.authentication.thirdparty.VerifiedExternalIdentity;
 import dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyAuthenticationToken;
 import dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyIdentityResolutionService;
 import dev.macula.cloud.iam.enums.ThirdPartyProviderType;
@@ -26,7 +27,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
 
 /**
- * 飞书授权码认证，以企业员工编号作为绑定主体。
+ * 飞书授权码认证，使用稳定OpenID识别身份，员工编号仅用于明确配置的匹配。
  *
  * @author Rain
  * @since 6.1.0
@@ -43,10 +44,10 @@ public class FeishuAuthenticationProvider implements AuthenticationProvider {
         if (!ThirdPartyProviderType.FEISHU.providerType().equals(token.getProviderType())) {
             return null;
         }
-        var config = configs.requireEnabled(ThirdPartyProviderType.FEISHU.providerType());
-        String subject = client.fetchEmployeeNo(config, token.getCredentials().toString(), token.getRedirectUri(),
-            FeishuLoginMode.valueOf(token.getLoginContext().loginMode()));
-        UserDetails user = identities.resolve(ThirdPartyProviderType.FEISHU.providerType(), subject,
+        var config = configs.requireEnabledById(token.getLoginContext().registrationId(), ThirdPartyProviderType.FEISHU.providerType()).forCapability(token.getLoginContext().loginCapability());
+        VerifiedExternalIdentity identity = client.fetchIdentity(config, token.getCredentials().toString(), token.getRedirectUri(),
+            FeishuLoginMode.valueOf(token.getLoginContext().loginMode()), VerifiedExternalIdentity.BROWSER);
+        UserDetails user = identities.resolve(identity,
             token.getLoginContext());
         return ThirdPartyAuthenticationToken.authenticated(ThirdPartyProviderType.FEISHU.providerType(), user,
             token.getLoginContext());

@@ -26,6 +26,12 @@ public final class OAuth2ClientCacheNames {
     /** Token CORS 全局 Origin 索引，独立于按 Client ID 缓存的 RegisteredClient。 */
     public static final String TOKEN_ORIGIN_INDEX = "cloud:iam:oauth2:origin-index";
 
+    /** 独立协议配置缓存版本，防止恢复旧共享RegisteredClient。 */
+    public static final String CONFIGURATION_VERSION = "v5-resource";
+    /** Origin索引键独立于任意Client ID。 */
+    public static final String ORIGIN_INDEX_KEY = CONFIGURATION_VERSION + ":__allowed_origins__";
+
+    /** 禁止实例化缓存标识。 */
     private OAuth2ClientCacheNames() {
     }
 }

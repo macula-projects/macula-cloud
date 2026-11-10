@@ -17,6 +17,8 @@
 
 package dev.macula.cloud.iam.service.userdetails;
 
+import dev.macula.cloud.iam.authentication.hosted.HostedLoginClientPolicyService;
+
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import dev.macula.boot.enums.StatusEnum;
@@ -166,9 +168,14 @@ public class SysUserDetailsServiceImpl implements UserDetailsService, UserDetail
         return user;
     }
 
+    /** 托管认证优先使用可信属性；Token入口保留既有已认证客户端路由。 */
     private String getClientId() {
         HttpServletRequest request = getCurrentRequest();
-        // 优先从HEADER中获取CLIENT_ID
+        if (request.getAttribute(HostedLoginClientPolicyService.CONTEXT_ATTRIBUTE)
+            instanceof HostedLoginClientPolicyService.Context context) {
+            return context.clientId();
+        }
+        // Token兼容入口的既有路由；托管页已由上游过滤器固定上下文。
         String clientId = request.getHeader(OAuth2ParameterNames.CLIENT_ID);
         if (StrUtil.isBlank(clientId)) {
             clientId = request.getParameter(OAuth2ParameterNames.CLIENT_ID);

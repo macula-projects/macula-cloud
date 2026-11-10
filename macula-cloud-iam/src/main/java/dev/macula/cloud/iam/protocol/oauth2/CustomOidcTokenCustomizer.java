@@ -18,31 +18,47 @@
 package dev.macula.cloud.iam.protocol.oauth2;
 
 import dev.macula.cloud.iam.service.userdetails.SysUserDetails;
+import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.OAuth2ExternalCodeAuthenticationToken;
+import dev.macula.cloud.system.enums.ExternalCodeType;
 import org.springframework.security.oauth2.core.oidc.endpoint.OidcParameterNames;
 import org.springframework.security.oauth2.core.oidc.OidcScopes;
-import org.springframework.security.oauth2.server.authorization.token.*;
+import org.springframework.security.oauth2.server.authorization.token.JwtEncodingContext;
+import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenCustomizer;
 import org.springframework.util.StringUtils;
 
 /**
- * OIDC ID Token 仅添加已授权且真实存在的用户信息，访问令牌不携带该用户资料。
+ * OIDC ID Token按资料Scope输出身份；Access Token仅携带获准资源所需的鉴权声明。
  * @author rain
  * @since 6.1.0
  */
 public final class CustomOidcTokenCustomizer implements OAuth2TokenCustomizer<JwtEncodingContext> {
+    /** Access Token使用统一资源声明，ID Token仅按openid/profile输出身份资料。 */
     @Override
     public void customize(JwtEncodingContext context) {
         if (org.springframework.security.oauth2.server.authorization.OAuth2TokenType.ACCESS_TOKEN.equals(context.getTokenType())) {
-            context.getClaims().claims(claims -> claims.putAll(CustomOAuth2TokenCustomizer.accessClaims(
-                context.getPrincipal(), context.getRegisteredClient().getClientId())));
+            context.getClaims().claims(claims -> claims.putAll(CustomOAuth2TokenCustomizer.resourceClaims(
+                context.getPrincipal(), context.getRegisteredClient(), context.getAuthorizedScopes(),
+                context.getAuthorizationGrantType().getValue())));
             return;
         }
-        if (!OidcParameterNames.ID_TOKEN.equals(context.getTokenType().getValue())) return;
+        if (!OidcParameterNames.ID_TOKEN.equals(context.getTokenType().getValue())) {
+            return;
+        }
+        // 这里只关联受控请求与ID Token，不声称厂商Code已与nonce绑定。
+        if (ExternalCodeType.GRANT_TYPE.equals(context.getAuthorizationGrantType().getValue())
+            && context.getAuthorizationGrant() instanceof OAuth2ExternalCodeAuthenticationToken grant) {
+            Object nonce = grant.getAdditionalParameters().get(OidcParameterNames.NONCE);
+            if (nonce instanceof String value) { context.getClaims().claim(OidcParameterNames.NONCE, value); }
+        }
         if (context.getPrincipal().getPrincipal() instanceof SysUserDetails user) {
-            if (user.getUserId() != null && user.getTenantId() != null)
+            if (user.getUserId() != null && user.getTenantId() != null) {
                 context.getClaims().subject(user.getTenantId() + ":" + user.getUserId());
+            }
             if (context.getAuthorizedScopes().contains(OidcScopes.PROFILE)) {
                 context.getClaims().claim("preferred_username", user.getUsername());
-                if (StringUtils.hasText(user.getNickname())) context.getClaims().claim("nickname", user.getNickname());
+                if (StringUtils.hasText(user.getNickname())) {
+                    context.getClaims().claim("nickname", user.getNickname());
+                }
             }
         }
     }

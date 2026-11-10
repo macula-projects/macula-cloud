@@ -17,6 +17,7 @@
 package dev.macula.cloud.iam.message;
 
 import lombok.RequiredArgsConstructor;
+import dev.macula.cloud.iam.authentication.sms.SmsCodePurpose;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Component;
@@ -55,20 +56,26 @@ public class SmsVerificationCodeStore {
         return issue(phone, ip, BROWSER_CONTEXT);
     }
 
+    /** 登录验证码使用显式LOGIN用途。 */
     public String issue(String phone, String ip, String clientId) {
-        String context = context(clientId);
-        String phoneHash = hmac("sms-send", context, phone);
+        return issue(phone, ip, clientId, SmsCodePurpose.LOGIN);
+    }
+
+    /** 在用途与Client双重作用域中申请验证码。 */
+    public String issue(String phone, String ip, String clientId, SmsCodePurpose purpose) {
+        String context = purpose.value() + "\0" + context(clientId);
+        String phoneHash = hmac("sms-send", phone);
         String phoneRateKey = phoneRateKey(phoneHash);
         if (!Boolean.TRUE.equals(redis.opsForValue().setIfAbsent(phoneRateKey, "1", properties.getSendInterval()))) {
             throw new IllegalStateException("发送过于频繁");
         }
-        Long clientAttempts = redis.execute(RATE, java.util.List.of(clientRateKey(context)),
+        Long clientAttempts = redis.execute(RATE, java.util.List.of(clientRateKey(context(clientId))),
             String.valueOf(properties.getSendInterval().toMillis()));
         if (clientAttempts == null || clientAttempts > properties.getMaxClientSendsPerInterval()) {
             redis.delete(phoneRateKey);
             throw new IllegalStateException("发送过于频繁");
         }
-        Long ipAttempts = redis.execute(RATE, java.util.List.of(ipRateKey(context, ip)),
+        Long ipAttempts = redis.execute(RATE, java.util.List.of(ipRateKey("all-purposes", ip)),
             String.valueOf(properties.getSendInterval().toMillis()));
         if (ipAttempts == null || ipAttempts > properties.getMaxIpSendsPerInterval()) {
             redis.delete(phoneRateKey);
@@ -81,8 +88,14 @@ public class SmsVerificationCodeStore {
         activate(phone, code, BROWSER_CONTEXT);
     }
 
+    /** 登录验证码使用显式LOGIN用途。 */
     public void activate(String phone, String code, String clientId) {
-        String context = context(clientId);
+        activate(phone, code, clientId, SmsCodePurpose.LOGIN);
+    }
+
+    /** 在用途与Client双重作用域中激活验证码。 */
+    public void activate(String phone, String code, String clientId, SmsCodePurpose purpose) {
+        String context = purpose.value() + "\0" + context(clientId);
         redis.opsForValue().set(key(context, phone), digest(context, phone, code) + ":" + properties.getMaxAttempts(),
             properties.getTtl());
     }
@@ -91,8 +104,14 @@ public class SmsVerificationCodeStore {
         return consume(phone, code, BROWSER_CONTEXT);
     }
 
+    /** 登录验证码使用显式LOGIN用途。 */
     public boolean consume(String phone, String code, String clientId) {
-        String context = context(clientId);
+        return consume(phone, code, clientId, SmsCodePurpose.LOGIN);
+    }
+
+    /** 在用途与Client双重作用域中消费验证码。 */
+    public boolean consume(String phone, String code, String clientId, SmsCodePurpose purpose) {
+        String context = purpose.value() + "\0" + context(clientId);
         return Long.valueOf(1).equals(redis.execute(CONSUME, java.util.List.of(key(context, phone)),
             digest(context, phone, code)));
     }
@@ -129,6 +148,6 @@ public class SmsVerificationCodeStore {
     }
 
     private String context(String clientId) {
-        return clientId == null || clientId.isBlank() ? BROWSER_CONTEXT : clientId;
+        return clientId == null || clientId.isBlank() ? BROWSER_CONTEXT : "client\0" + clientId;
     }
 }

@@ -37,4 +37,7 @@ public class ExternalCodeSecurityProperties {
     private Duration bindingTicketClaimLease = Duration.ofSeconds(30);
     private int bindingTicketMaxAttempts = 5;
     private String digestKey;
+    private Duration rateWindow = Duration.ofMinutes(1);
+    private int clientRateLimit = 120;
+    private int ipRateLimit = 300;
 }

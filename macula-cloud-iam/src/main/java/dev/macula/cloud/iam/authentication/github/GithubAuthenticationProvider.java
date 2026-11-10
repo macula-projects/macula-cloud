@@ -17,6 +17,8 @@
 package dev.macula.cloud.iam.authentication.github;
 
 import dev.macula.cloud.iam.authentication.thirdparty.IdentityProviderConfigService;
+import dev.macula.cloud.iam.authentication.thirdparty.VerifiedExternalIdentity;
+import java.util.Map;
 import dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyAuthenticationToken;
 import dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyIdentityResolutionService;
 import dev.macula.cloud.iam.enums.ThirdPartyProviderType;
@@ -43,9 +45,11 @@ public class GithubAuthenticationProvider implements AuthenticationProvider {
         if (!ThirdPartyProviderType.GITHUB.providerType().equals(token.getProviderType())) {
             return null;
         }
-        var config = configService.requireEnabled(ThirdPartyProviderType.GITHUB.providerType());
+        var config = configService.requireEnabledById(token.getLoginContext().registrationId(), ThirdPartyProviderType.GITHUB.providerType());
         String subject = githubClient.fetchSubject(config, token.getCredentials().toString(), token.getRedirectUri());
-        UserDetails user = identities.resolve(ThirdPartyProviderType.GITHUB.providerType(), subject,
+        VerifiedExternalIdentity identity = VerifiedExternalIdentity.of(config, VerifiedExternalIdentity.BROWSER,
+            VerifiedExternalIdentity.GITHUB_ID, subject, Map.of());
+        UserDetails user = identities.resolve(identity,
             token.getLoginContext());
         return ThirdPartyAuthenticationToken.authenticated(ThirdPartyProviderType.GITHUB.providerType(), user,
             token.getLoginContext());

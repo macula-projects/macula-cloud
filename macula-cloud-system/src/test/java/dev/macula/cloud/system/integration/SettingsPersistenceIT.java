@@ -115,6 +115,7 @@ class SettingsPersistenceIT {
         IdentityProviderForm identity = new IdentityProviderForm();
         identity.setName("settings-it-" + UUID.randomUUID());
         identity.setProviderType("GITHUB");
+        identity.setSourceType("GITHUB_OAUTH");
         identity.setCategory("social");
         identity.setConfig(Map.of("clientId", "fixture-client", "clientSecret", "fixture-idp-secret"));
         Long identityId = null;
@@ -124,6 +125,7 @@ class SettingsPersistenceIT {
             jdbc.update("UPDATE sys_identity_provider SET callback_url = ? WHERE id = ?",
                 "https://legacy.example.test/callback", identityId);
             identity.setConfig(Map.of("clientId", "fixture-client", "clientSecret", ""));
+            identity.setVersion(identityService.get(identityId).getVersion());
             identityService.save(identityId, identity);
             assertEquals("https://legacy.example.test/callback", jdbc.queryForObject(
                 "SELECT callback_url FROM sys_identity_provider WHERE id = ?", String.class, identityId));
@@ -164,6 +166,7 @@ class SettingsPersistenceIT {
         IdentityProviderForm form = new IdentityProviderForm();
         form.setName("settings-it-" + UUID.randomUUID());
         form.setProviderType("ALIPAY");
+        form.setSourceType("ALIPAY_APPLICATION");
         form.setCategory("social");
         form.setConfig(Map.of("appId", "fixture-app", "appPrivateKey", privateKey,
             "alipayPublicKey", "fixture-public-key"));
@@ -187,20 +190,19 @@ class SettingsPersistenceIT {
     }
 
     @Test
-    void additionalIdentitySecretIsEncryptedAndNeverReturned() {
+    void officialAccountCredentialIsIndependentAndNeverReturned() {
         IdentityProviderForm form = new IdentityProviderForm();
         form.setName("settings-it-" + UUID.randomUUID());
         form.setProviderType("WECHAT");
+        form.setSourceType("WECHAT_OFFICIAL_ACCOUNT");
         form.setCategory("social");
-        form.setConfig(Map.of("appId", "fixture-site-app", "appSecret", "fixture-site-secret",
-            "officialAccountAppId", "fixture-official-app",
-            "officialAccountAppSecret", "fixture-official-secret"));
+        form.setConfig(Map.of("appId", "fixture-official-app", "appSecret", "fixture-official-secret"));
         Long id = null;
         try {
             var saved = identityService.save(null, form);
             id = saved.getId();
             String ciphertext = jdbc.queryForObject(
-                "SELECT secret_config_json FROM sys_identity_provider WHERE id = ?", String.class, id);
+                "SELECT app_secret FROM sys_identity_provider WHERE id = ?", String.class, id);
             String publicJson = jdbc.queryForObject(
                 "SELECT config_json FROM sys_identity_provider WHERE id = ?", String.class, id);
             assertNotNull(ciphertext);
@@ -208,9 +210,10 @@ class SettingsPersistenceIT {
             assertFalse(publicJson.contains("fixture-site-secret"));
             assertFalse(publicJson.contains("fixture-official-secret"));
             assertEquals(Boolean.TRUE, saved.getConfiguredSecrets().get("appSecret"));
-            assertEquals(Boolean.TRUE, saved.getConfiguredSecrets().get("officialAccountAppSecret"));
+            assertFalse(saved.getConfiguredSecrets().containsKey("officialAccountAppSecret"));
             assertFalse(saved.getConfig().containsKey("officialAccountAppSecret"));
-            assertTrue(identityMapper.selectById(id).getSecretConfigJson().contains("fixture-official-secret"));
+            assertEquals("fixture-official-secret", identityMapper.selectById(id).getAppSecret());
+            assertNull(identityMapper.selectById(id).getSecretConfigJson());
         } finally {
             if (id != null) {
                 identityService.delete(id);
@@ -219,14 +222,15 @@ class SettingsPersistenceIT {
     }
 
     @Test
-    void legacyIdentityRowRemainsReadableAfterV3() {
+    void untypedSourceIsVisibleForExplicitReconfigurationWithoutFallback() {
         String name = "settings-it-legacy-" + UUID.randomUUID();
         jdbc.update("INSERT INTO sys_identity_provider (name, provider_type, app_id, config_json, " +
             "enabled, visible) VALUES (?, 'GITHUB', ?, '{}', 1, 1)", name, "fixture-legacy-client");
         Long id = jdbc.queryForObject("SELECT id FROM sys_identity_provider WHERE name = ?", Long.class, name);
         try {
-            assertEquals("fixture-legacy-client", identityService.get(id).getConfig().get("clientId"));
-            assertFalse(identityService.get(id).getConfiguredSecrets().get("clientSecret"));
+            assertTrue(identityService.get(id).getConfig().isEmpty());
+            assertTrue(identityService.get(id).getConfiguredSecrets().isEmpty());
+            assertNull(identityService.get(id).getSourceType());
         } finally {
             jdbc.update("DELETE FROM sys_identity_provider WHERE id = ?", id);
         }
@@ -257,8 +261,13 @@ class SettingsPersistenceIT {
         OAuth2ClientForm form = new OAuth2ClientForm();
         form.setClientId(clientId);
         form.setClientName("Public integration fixture");
+        form.setApplicationType("SPA");
+        form.setProtocolMode("OIDC");
+        form.setEnabledProtocols(java.util.Set.of("OIDC"));
+        form.setDefaultProtocol("OIDC");
+        form.setConfigurationStatus("ENABLED");
         form.setClientAuthenticationMethods("none");
-        form.setAuthorizationGrantTypes("authorization_code,refresh_token");
+        form.setAuthorizationGrantTypes("authorization_code");
         form.setRedirectUris("https://example.test/callback");
         form.setScopes("openid,profile");
         form.setRequireProofKey(true);
@@ -268,7 +277,7 @@ class SettingsPersistenceIT {
         form.setTenantId(1L);
         Long id = null;
         try {
-            id = clientService.save(null, form).getId();
+            id = clientService.save(null, dev.macula.cloud.system.service.impl.ProtocolConfigurationTestFixtures.configure(form)).getId();
             assertNull(cache.get(clientId));
             long deadline = System.nanoTime() + java.time.Duration.ofSeconds(3).toNanos();
             while (remoteCache.get(clientId) != null && System.nanoTime() < deadline) {
@@ -277,12 +286,13 @@ class SettingsPersistenceIT {
             assertNull(remoteCache.get(clientId), "另一个 Boot 缓存实例的本地缓存应收到 Redis 驱逐消息");
             assertNull(jdbc.queryForObject("SELECT client_secret FROM sys_oauth2_client WHERE id = ?",
                 String.class, id));
-            assertEquals("none", clientMapper.selectById(id).getClientAuthenticationMethods());
+            // 认证方式由唯一协议配置持有，主表旧共享列不再作为运行时来源。
+            assertEquals("none", clientService.get(id).getSettings().getClientAuthenticationMethods());
             assertEquals(2L, jdbc.queryForObject("SELECT COUNT(*) FROM sys_oauth2_client WHERE id IN (1, 2)",
                 Long.class));
         } finally {
             if (id != null) {
-                clientService.delete(id);
+                clientService.delete(id, clientService.get(id).getConfigurationVersion());
             }
             cache.evict(clientId);
             remoteListener.stop();

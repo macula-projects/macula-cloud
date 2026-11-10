@@ -38,7 +38,18 @@ import java.time.Instant;
 @Data
 @TableName(value = "sys_oauth2_client")
 public class SysOAuth2Client extends BaseEntity {
+    private String purpose;
+    private String managedKey;
+    private Long authorizationVersion;
+    private String resourcePermissions;
+
     /** 客户端ID */
+    @com.baomidou.mybatisplus.annotation.TableField(exist = false)
+    private java.util.List<dev.macula.cloud.system.protocol.ApplicationProtocolConfiguration> protocolConfigurations = java.util.List.of();
+
+    @com.baomidou.mybatisplus.annotation.TableField(exist = false)
+    private java.util.Map<String, Long> externalProviderBindings = java.util.Map.of();
+
     private String clientId;
     /** 创建时间 */
     private Instant clientIdIssuedAt;
@@ -48,6 +59,19 @@ public class SysOAuth2Client extends BaseEntity {
     private Instant clientSecretExpiresAt;
     /** 客户端名称 */
     private String clientName;
+    private String protocolMode;
+    private String enabledProtocols;
+    private String defaultProtocol;
+    private String configurationStatus;
+    private String browserProviderBindings;
+    private String browserCapabilityBindings;
+
+    /** 应用架构类型，历史记录不推断。 */
+    private String applicationType;
+    /** 小程序平台。 */
+    private String miniappPlatform;
+    /** null继承全局，空字符串关闭全部本地方式。 */
+    private String hostedLoginMethods;
 
     /** 客户端认证方式，逗号分隔 */
     private String clientAuthenticationMethods;

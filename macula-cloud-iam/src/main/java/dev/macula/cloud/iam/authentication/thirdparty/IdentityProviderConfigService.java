@@ -16,26 +16,23 @@
  */
 package dev.macula.cloud.iam.authentication.thirdparty;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import dev.macula.cloud.iam.enums.ThirdPartyProviderType;
 import dev.macula.cloud.iam.mapper.SysIdentityProviderMapper;
-import dev.macula.cloud.iam.mapper.SysUserIdentityBindingMapper;
 import dev.macula.cloud.iam.pojo.entity.SysIdentityProvider;
-import dev.macula.cloud.iam.pojo.entity.SysUserIdentityBinding;
+import dev.macula.cloud.system.enums.IdentityBindingRule;
+import dev.macula.cloud.system.enums.IdentityBindingMapping;
+import dev.macula.cloud.system.enums.IdentitySourceType;
+import dev.macula.cloud.system.enums.IdentityLoginCapability;
+import dev.macula.cloud.system.enums.IdentityCredentialType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationServiceException;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.json.JsonMapper;
-
-import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 /**
- * 从数据库读取唯一启用的身份源配置及全局账号绑定。
- *
+ * 按Client固定registration读取当前配置，禁止按厂商全局择源与旧绑定回退。
  * @author Rain
  * @since 6.1.0
  */
@@ -43,134 +40,204 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class IdentityProviderConfigService {
     private final SysIdentityProviderMapper providerMapper;
-    private final SysUserIdentityBindingMapper bindingMapper;
     private final JsonMapper json = JsonMapper.builder().build();
 
-    public boolean isEnabled(String providerType) {
-        try {
-            requireEnabled(providerType);
-            return true;
-        } catch (AuthenticationServiceException ex) {
-            return false;
-        }
-    }
-
-    public boolean isVisible(String providerType) {
-        try {
-            return providerMapper.selectCount(new LambdaQueryWrapper<SysIdentityProvider>()
-                .eq(SysIdentityProvider::getProviderType, providerType)
-                .eq(SysIdentityProvider::getEnabled, true)
-                .eq(SysIdentityProvider::getVisible, true)) == 1;
-        } catch (RuntimeException ex) {
-            return false;
-        }
-    }
-
-    public ProviderConfig requireEnabled(String providerType) {
-        try {
-            List<SysIdentityProvider> providers = providerMapper.selectList(
-                new LambdaQueryWrapper<SysIdentityProvider>()
-                    .eq(SysIdentityProvider::getProviderType, providerType)
-                    .eq(SysIdentityProvider::getEnabled, true));
-            if (providers.size() != 1) {
-                throw unavailable();
-            }
-            return toConfig(providers.get(0), providerType);
-        } catch (AuthenticationServiceException ex) {
-            throw ex;
-        } catch (RuntimeException ex) {
-            throw unavailable();
-        }
-    }
-
-    /**
-     * 按 OAuth Client 固定绑定的 registration ID 读取启用配置，并核对 provider 类型。
-     *
-     * @param registrationId 身份源 registration 主键
-     * @param expectedProviderType code type 固定的 provider 类型
-     * @return 受控运行时配置
-     */
+    /** 从权威数据库读取确定来源；缺少新模型字段要求重新配置。 */
     public ProviderConfig requireEnabledById(Long registrationId, String expectedProviderType) {
-        try {
-            if (registrationId == null || !StringUtils.hasText(expectedProviderType)) {
-                throw unavailable();
-            }
-            SysIdentityProvider provider = providerMapper.selectById(registrationId);
-            if (provider == null || !Boolean.TRUE.equals(provider.getEnabled())
-                || !expectedProviderType.equals(provider.getProviderType())) {
-                throw unavailable();
-            }
-            return toConfig(provider, expectedProviderType);
-        } catch (AuthenticationServiceException ex) {
-            throw ex;
-        } catch (RuntimeException ex) {
+        if (registrationId == null) {
             throw unavailable();
         }
-    }
-
-    public String requireBoundUsername(String providerType, String providerSubject) {
-        return findBoundUsername(providerType, providerSubject)
-            .orElseThrow(() -> new AuthenticationServiceException("第三方账号尚未绑定"));
-    }
-
-    public Optional<String> findBoundUsername(String providerType, String providerSubject) {
-        List<SysUserIdentityBinding> bindings = bindingMapper.selectList(
-            new LambdaQueryWrapper<SysUserIdentityBinding>()
-                .eq(SysUserIdentityBinding::getProviderType, providerType)
-                .eq(SysUserIdentityBinding::getProviderSubject, providerSubject));
-        if (bindings.size() > 1 || (bindings.size() == 1 && !StringUtils.hasText(bindings.get(0).getUsername()))) {
-            throw new AuthenticationServiceException("第三方账号绑定异常");
-        }
-        return bindings.isEmpty() ? Optional.empty() : Optional.of(bindings.get(0).getUsername());
-    }
-
-    private AuthenticationServiceException unavailable() {
-        return new AuthenticationServiceException("第三方登录暂不可用");
-    }
-
-    private ProviderConfig toConfig(SysIdentityProvider provider, String providerType) {
-        if (!StringUtils.hasText(provider.getAppSecret())) {
-            throw unavailable();
-        }
-        Map<String, String> config = StringUtils.hasText(provider.getConfigJson())
-            ? json.readValue(provider.getConfigJson(), new TypeReference<>() { }) : Map.of();
-        Map<String, String> secrets = StringUtils.hasText(provider.getSecretConfigJson())
-            ? json.readValue(provider.getSecretConfigJson(), new TypeReference<>() { }) : Map.of();
-        ThirdPartyProviderType type = ThirdPartyProviderType.fromProviderType(providerType);
-        if (!type.additionalSecretFields().containsAll(secrets.keySet())
-            || type.requiredPublicFields().stream().anyMatch(key -> !StringUtils.hasText(config.get(key)))
-            || type.requiredAdditionalSecretFields().stream().anyMatch(
-                key -> !StringUtils.hasText(secrets.get(key)))) {
-            throw unavailable();
-        }
-        return new ProviderConfig(providerType, provider.getAppId(), provider.getAppSecret(), config, secrets);
+        return requireLoaded(providerMapper.selectById(registrationId), registrationId, expectedProviderType);
     }
 
     /**
-     * 身份提供商的受控运行时配置。
-     *
+     * 校验已经读取的权威行；绑定事务传入FOR UPDATE结果，避免RR快照回读过期策略。
+     * @param provider 来源持久化行
+     * @param registrationId 固定来源ID
+     * @param expectedProviderType 已核验厂商
+     * @return 完整校验的当前配置
+     */
+    public ProviderConfig requireLoaded(SysIdentityProvider provider, Long registrationId, String expectedProviderType) {
+        if (provider == null || !java.util.Objects.equals(provider.getId(), registrationId) || !Boolean.TRUE.equals(provider.getEnabled())
+            || !expectedProviderType.equals(provider.getProviderType()) || provider.getSourceType() == null) {
+            throw unavailable();
+        }
+        IdentitySourceType type;
+        Map<String, String> capabilities;
+        String selectedCapability;
+        IdentityBindingRule rule = null;
+        IdentityBindingMapping mapping = null;
+        java.util.List<IdentityBindingMapping> mappings;
+        try {
+            type = IdentitySourceType.fromValue(provider.getSourceType());
+            if (provider.getCredentialType() != null && !IdentityCredentialType.forSource(type).value().equals(provider.getCredentialType())) { throw unavailable(); }
+            capabilities = IdentityLoginCapability.decode(provider.getCapabilitiesJson(), type, provider.getIdentityFlow());
+            var anchor = type;
+            selectedCapability = java.util.Arrays.stream(IdentityLoginCapability.values())
+                .filter(item -> item.source() == anchor && capabilities.containsKey(item.value())).findFirst()
+                .or(() -> java.util.Arrays.stream(IdentityLoginCapability.values()).filter(item -> capabilities.containsKey(item.value())).findFirst())
+                .orElseThrow(this::unavailable).value();
+            type = IdentityLoginCapability.fromValue(selectedCapability).source();
+            if (!type.providerType().equals(expectedProviderType)) {
+                throw unavailable();
+            }
+            mappings = dev.macula.cloud.system.enums.IdentityBindingMappings.decode(provider.getBindingMappingsJson(),
+                provider.getBindingSourceField(), provider.getBindingTargetField(), provider.getBindingRule());
+            if (Boolean.TRUE.equals(provider.getAutoBindEnabled())) {
+                if (mappings.isEmpty()) { throw unavailable(); }
+                for (var item : mappings) {
+                    for (String capability : capabilities.keySet()) { item.validateFor(IdentityLoginCapability.fromValue(capability).source()); }
+                }
+                mapping = mappings.size() == 1 ? mappings.get(0) : null;
+                rule = mapping == null || mapping.legacyValue() == null ? null : IdentityBindingRule.fromValue(mapping.legacyValue());
+            } else if (!mappings.isEmpty()) { throw unavailable(); }
+        } catch (IllegalArgumentException ex) {
+            throw unavailable();
+        }
+        Map<String, String> values;
+        try {
+            values = StringUtils.hasText(provider.getConfigJson())
+                ? json.readValue(provider.getConfigJson(), new TypeReference<>() { }) : Map.of();
+            if (StringUtils.hasText(provider.getSecretConfigJson())) {
+                // 独立来源不读取旧的混合凭据；仅兼容加密空值和新写入的空对象。
+                Object additional = json.readValue(provider.getSecretConfigJson(), Object.class);
+                if (additional != null && (!(additional instanceof Map<?, ?> fields) || !fields.isEmpty())) {
+                    throw unavailable();
+                }
+            }
+        } catch (tools.jackson.core.JacksonException ex) { throw unavailable(); }
+        var validationType = type;
+        String credentialField = type.credentialField();
+        if (values == null || values.keySet().stream().anyMatch(key -> credentialField.equals(key)
+            || !validationType.requiredFields().contains(key))) {
+            throw unavailable();
+        }
+        if (!StringUtils.hasText(provider.getAppSecret()) || !StringUtils.hasText(provider.getAppId())
+            || !provider.getAppId().equals(values.get(type.identifierField()))
+            || type.requiredFields().stream().filter(key -> !credentialField.equals(key))
+                .anyMatch(key -> !StringUtils.hasText(values.get(key)))) {
+            throw unavailable();
+        }
+        dev.macula.cloud.system.enums.IdentitySourceFlow flow;
+        dev.macula.cloud.system.enums.IdentityDirectoryPolicy directoryPolicy;
+        try {
+            flow = dev.macula.cloud.system.enums.IdentitySourceFlow.resolve(type, capabilities.get(selectedCapability));
+            directoryPolicy = dev.macula.cloud.system.enums.IdentityDirectoryPolicy.fromValue(provider.getDirectoryPolicy());
+            if (provider.getVersion() == null || provider.getVersion() < 0) { throw unavailable(); }
+            if (directoryPolicy != dev.macula.cloud.system.enums.IdentityDirectoryPolicy.IDENTITY_ONLY
+                && (!java.util.Set.of("WECOM", "DINGTALK", "FEISHU").contains(type.providerType())
+                    || !StringUtils.hasText(provider.getOrganizationId()))) { throw unavailable(); }
+        } catch (IllegalArgumentException ex) { throw unavailable(); }
+        if (type.providerType().equals("FEISHU") && Boolean.TRUE.equals(provider.getAutoBindEnabled())
+            && !StringUtils.hasText(provider.getOrganizationId())) { throw unavailable(); }
+        if (StringUtils.hasText(provider.getOrganizationId()) && values.containsKey("corpId")
+            && !provider.getOrganizationId().equals(values.get("corpId"))) { throw unavailable(); }
+        return new ProviderConfig(provider.getId(), type, Boolean.TRUE.equals(provider.getAutoBindEnabled()), rule,
+            provider.getVersion(), provider.getProviderType(), provider.getAppId(), provider.getAppSecret(),
+            Map.copyOf(values), Map.of(), Boolean.TRUE.equals(provider.getVisible()), flow, directoryPolicy,
+            provider.getOrganizationId(), provider.getOauthRedirectUri(), mapping, capabilities, selectedCapability, mappings);
+    }
+
+    /** 统一使用无敏感信息的配置错误。 */
+    private AuthenticationServiceException unavailable() {
+        return new AuthenticationServiceException("身份源不可用或需重新配置");
+    }
+
+    /**
+     * 已校验的具体来源配置，日志不输出密钥值。
      * @since 6.1.0
      */
-    public record ProviderConfig(String providerType, String appId, String appSecret,
-                                 Map<String, String> values, Map<String, String> secrets) {
-        public ProviderConfig(String providerType, String appId, String appSecret, Map<String, String> values) {
-            this(providerType, appId, appSecret, values, Map.of());
+    public record ProviderConfig(Long registrationId, IdentitySourceType sourceType, boolean autoBindEnabled,
+                                 IdentityBindingRule bindingRule, Long version, String providerType, String appId,
+                                 String appSecret, Map<String, String> values, Map<String, String> secrets, boolean visible,
+                                 dev.macula.cloud.system.enums.IdentitySourceFlow flow,
+                                 dev.macula.cloud.system.enums.IdentityDirectoryPolicy directoryPolicy,
+                                 String organizationId, String oauthRedirectUri, IdentityBindingMapping bindingMapping,
+                                 Map<String, String> capabilities, String loginCapability, java.util.List<IdentityBindingMapping> bindingMappings) {
+        /** 配置视图必须持有完整不可变集合，不能被调用方截断或原地改写。 */
+        public ProviderConfig {
+            bindingMappings = java.util.List.copyOf(bindingMappings);
+            capabilities = Map.copyOf(capabilities);
+            if (!java.util.Objects.equals(bindingMapping, bindingMappings.size() == 1 ? bindingMappings.get(0) : null)) {
+                throw new IllegalArgumentException("单条投影与绑定集合不一致");
+            }
+        }
+        /** 保留原完整构造合同，仅将真实旧单项包装为集合。 */
+        public ProviderConfig(Long registrationId, IdentitySourceType sourceType, boolean autoBindEnabled,
+            IdentityBindingRule bindingRule, Long version, String providerType, String appId,
+            String appSecret, Map<String, String> values, Map<String, String> secrets, boolean visible,
+            dev.macula.cloud.system.enums.IdentitySourceFlow flow,
+            dev.macula.cloud.system.enums.IdentityDirectoryPolicy directoryPolicy, String organizationId,
+            String oauthRedirectUri, IdentityBindingMapping bindingMapping, Map<String, String> capabilities, String loginCapability) {
+            this(registrationId, sourceType, autoBindEnabled, bindingRule, version, providerType, appId, appSecret,
+                values, secrets, visible, flow, directoryPolicy, organizationId, oauthRedirectUri, bindingMapping,
+                capabilities, loginCapability, bindingMapping == null ? java.util.List.of() : java.util.List.of(bindingMapping));
+        }
+        /** 保留原显式映射构造合同，旧来源仅拥有原来已有能力。 */
+        public ProviderConfig(Long registrationId, IdentitySourceType sourceType, boolean autoBindEnabled,
+            IdentityBindingRule bindingRule, Long version, String providerType, String appId,
+            String appSecret, Map<String, String> values, Map<String, String> secrets, boolean visible,
+            dev.macula.cloud.system.enums.IdentitySourceFlow flow,
+            dev.macula.cloud.system.enums.IdentityDirectoryPolicy directoryPolicy, String organizationId,
+            String oauthRedirectUri, IdentityBindingMapping bindingMapping) {
+            this(registrationId, sourceType, autoBindEnabled, bindingRule, version, providerType, appId, appSecret,
+                values, secrets, visible, flow, directoryPolicy, organizationId, oauthRedirectUri, bindingMapping,
+                IdentityLoginCapability.legacy(sourceType, flow == null ? "" : flow.value()),
+                IdentityLoginCapability.legacy(sourceType, flow == null ? "" : flow.value()).keySet().stream().findFirst().orElse(null));
+        }
+        /** 能力视图只复用同一真实注册凭据，拒绝停用或跨注册类型能力。 */
+        public ProviderConfig forCapability(String value) {
+            try {
+                var capability = IdentityLoginCapability.fromValue(value);
+                if (!capabilities.containsKey(value) || capability.credentialType() != IdentityCredentialType.forSource(sourceType)) {
+                    throw new IllegalArgumentException("能力不可用");
+                }
+                var contract = dev.macula.cloud.system.enums.IdentitySourceFlow.resolve(capability.source(), capabilities.get(value));
+                for (var mapping : bindingMappings) { mapping.validateFor(capability.source()); }
+                return new ProviderConfig(registrationId, capability.source(), autoBindEnabled, bindingRule, version,
+                    providerType, appId, appSecret, values, secrets, visible, contract, directoryPolicy,
+                    organizationId, oauthRedirectUri, bindingMapping, capabilities, value, bindingMappings);
+            } catch (IllegalArgumentException ex) { throw new AuthenticationServiceException("身份源未启用该登录能力"); }
+        }
+        /** Code与来源能力一一对应，不能因共享Secret而互换Code。 */
+        public ProviderConfig forCode(dev.macula.cloud.system.enums.ExternalCodeType code) {
+            return forCapability(IdentityLoginCapability.forCode(code).value());
+        }
+        /** 旧入口仍由模式明确选择能力，不能任取同厂商其他注册。 */
+        public ProviderConfig forBrowser(String mode) {
+            return forCapability(IdentityLoginCapability.browser(sourceType, mode).value());
         }
 
+        /** 旧构造合同仅转换三种已知规则，不让旧测试或适配器猜测新组合。 */
+        public ProviderConfig(Long registrationId, IdentitySourceType sourceType, boolean autoBindEnabled,
+            IdentityBindingRule bindingRule, Long version, String providerType, String appId,
+            String appSecret, Map<String, String> values, Map<String, String> secrets, boolean visible,
+            dev.macula.cloud.system.enums.IdentitySourceFlow flow,
+            dev.macula.cloud.system.enums.IdentityDirectoryPolicy directoryPolicy, String organizationId, String oauthRedirectUri) {
+            this(registrationId, sourceType, autoBindEnabled, bindingRule, version, providerType, appId,
+                appSecret, values, secrets, visible, flow, directoryPolicy, organizationId, oauthRedirectUri,
+                IdentityBindingMapping.legacy(bindingRule == null ? null : bindingRule.value()));
+        }
+        /** 读取必填公开字段。 */
         public String require(String key) {
             String value = values.get(key);
             if (!StringUtils.hasText(value)) {
-                throw new AuthenticationServiceException("第三方登录暂不可用");
+                throw new AuthenticationServiceException("身份源配置不完整");
             }
             return value;
         }
-
+        /** 读取独立来源凭据；不借用同厂商其他应用的secret。 */
         public String requireSecret(String key) {
             String value = secrets.get(key);
             if (!StringUtils.hasText(value)) {
-                throw new AuthenticationServiceException("第三方登录暂不可用");
+                throw new AuthenticationServiceException("身份源配置不完整");
             }
             return value;
+        }
+        /** 避免record默认实现输出密钥。 */
+        @Override
+        public String toString() {
+            return "ProviderConfig[registrationId=" + registrationId + ",sourceType=" + sourceType + "]";
         }
     }
 }

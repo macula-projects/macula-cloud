@@ -23,6 +23,8 @@ import com.aliyun.tea.TeaException;
 import com.aliyun.tea.TeaUnretryableException;
 import com.aliyun.teaopenapi.models.Config;
 import dev.macula.cloud.iam.authentication.thirdparty.IdentityProviderConfigService;
+import dev.macula.cloud.iam.authentication.thirdparty.VerifiedExternalIdentity;
+import java.util.Map;
 import dev.macula.cloud.iam.authentication.thirdparty.IdentityProviderConfigService.ProviderConfig;
 import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeInfrastructureException;
 import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeVerification;
@@ -64,6 +66,7 @@ public class AliyunMobileExternalCodeVerifier implements ExternalCodeVerifier {
     public ExternalCodeVerification verify(ExternalCodeType codeType, Long identityProviderId, String code) {
         try {
             ProviderConfig provider = configs.requireEnabledById(identityProviderId, PROVIDER_TYPE);
+            if (!provider.sourceType().supports(codeType)) { throw new IllegalArgumentException("来源不支持此凭证类型"); }
             Config sdkConfig = new Config().setAccessKeyId(provider.require(ACCESS_KEY_ID))
                 .setAccessKeySecret(provider.appSecret()).setEndpoint(ENDPOINT)
                 .setConnectTimeout(CONNECT_TIMEOUT_MILLIS).setReadTimeout(READ_TIMEOUT_MILLIS);
@@ -75,7 +78,11 @@ public class AliyunMobileExternalCodeVerifier implements ExternalCodeVerifier {
                 || !StringUtils.hasText(response.getBody().getGetMobileResultDTO().getMobile())) {
                 throw failed();
             }
-            return ExternalCodeVerification.mobile(response.getBody().getGetMobileResultDTO().getMobile());
+            String mobile = new dev.macula.cloud.system.security.UserIdentifierNormalizer()
+                .mobile(response.getBody().getGetMobileResultDTO().getMobile())
+                .orElseThrow(() -> new IllegalArgumentException("已核验手机号格式无效"));
+            return new ExternalCodeVerification(VerifiedExternalIdentity.of(provider, codeType.name(),
+                VerifiedExternalIdentity.MOBILE_PROOF, mobile, Map.of("verified_mobile", mobile)));
         } catch (AuthenticationServiceException ex) {
             throw ex;
         } catch (TeaException ex) {

@@ -53,10 +53,13 @@ public final class ThirdPartyAuthenticationToken extends AbstractAuthenticationT
             redirectUri, java.util.List.of());
     }
 
+    /** 平台Code已核验后记录认证时间，供SS7签发OIDC auth_time；不代表完成其他MFA因子。 */
     public static ThirdPartyAuthenticationToken authenticated(String providerType, UserDetails user,
         ThirdPartyLoginContext context) {
-        return new ThirdPartyAuthenticationToken(providerType, user, null, context, null,
-            user.getAuthorities());
+        var authorities = new java.util.ArrayList<GrantedAuthority>(user.getAuthorities());
+        authorities.add(org.springframework.security.core.authority.FactorGrantedAuthority.fromAuthority(
+            org.springframework.security.core.authority.FactorGrantedAuthority.AUTHORIZATION_CODE_AUTHORITY));
+        return new ThirdPartyAuthenticationToken(providerType, user, null, context, null, authorities);
     }
 
     @Override

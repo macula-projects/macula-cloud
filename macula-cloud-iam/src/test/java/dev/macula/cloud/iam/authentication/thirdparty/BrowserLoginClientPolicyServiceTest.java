@@ -29,7 +29,6 @@ import org.springframework.security.oauth2.core.endpoint.OAuth2ParameterNames;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
 import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
 
-import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -45,13 +44,14 @@ import static org.mockito.Mockito.when;
 class BrowserLoginClientPolicyServiceTest {
     private static final String CLIENT_ID = "portal";
     private final SysOAuth2ClientService clients = mock(SysOAuth2ClientService.class);
+    private final IdentityProviderConfigService configs = mock(IdentityProviderConfigService.class);
     private BrowserLoginClientPolicyService policies;
 
     @BeforeEach
     void setUp() {
         AuthorizationServerSettings settings = AuthorizationServerSettings.builder()
             .issuer("https://iam.example").build();
-        policies = new BrowserLoginClientPolicyService(clients, settings);
+        policies = new BrowserLoginClientPolicyService(clients, settings, configs);
     }
 
     @Test
@@ -70,6 +70,25 @@ class BrowserLoginClientPolicyServiceTest {
         assertThat(policy.allowedProviders()).containsExactlyInAnyOrder(
             BrowserLoginProviderType.GITHUB, BrowserLoginProviderType.WECOM);
         assertThat(policy.directProvider()).isEqualTo(BrowserLoginProviderType.WECOM);
+    }
+
+    /** 通用与端内网页按能力匹配架构；移动、小程序和机器应用均不接收第三方网页。 */
+    @Test
+    void rejectsBrowserSourcesIncompatibleWithTrustedApplicationType() {
+        var source = IdentitySourceTestFixtures.source(dev.macula.cloud.system.enums.IdentitySourceType.WECHAT_OFFICIAL_ACCOUNT,
+            "WECHAT", "official-app", "fixture-secret", java.util.Map.of("appId", "official-app"));
+        when(configs.requireEnabledById(5L, "WECHAT")).thenReturn(source);
+        for (String type : java.util.List.of("SERVICE", "NATIVE", "MINIAPP", "WEB_SERVER", "SPA")) {
+            var policy = new BrowserLoginClientPolicyService.ClientPolicy("portal", java.util.Set.of(BrowserLoginProviderType.WECHAT),
+                null, java.util.Map.of("WECHAT", 5L), 1L, dev.macula.cloud.iam.enums.UserTypeEnum.EMPLOYEE, type);
+            assertThatThrownBy(() -> policies.requireSource(policy, "WECHAT")).isInstanceOf(AuthenticationServiceException.class);
+        }
+        var web = new BrowserLoginClientPolicyService.ClientPolicy("portal", java.util.Set.of(BrowserLoginProviderType.WECHAT),
+            null, java.util.Map.of("WECHAT", 5L), 1L, dev.macula.cloud.iam.enums.UserTypeEnum.EMPLOYEE, "SPA");
+        assertThatThrownBy(() -> policies.requireSource(web, "WECHAT")).isInstanceOf(AuthenticationServiceException.class);
+        var mini = new BrowserLoginClientPolicyService.ClientPolicy("portal", java.util.Set.of(BrowserLoginProviderType.WECHAT),
+            null, java.util.Map.of("WECHAT", 5L), 1L, dev.macula.cloud.iam.enums.UserTypeEnum.EMPLOYEE, "MINIAPP");
+        assertThatThrownBy(() -> policies.requireSource(mini, "WECHAT")).isInstanceOf(AuthenticationServiceException.class);
     }
 
     @Test
@@ -122,9 +141,17 @@ class BrowserLoginClientPolicyServiceTest {
         client.setClientId(CLIENT_ID);
         client.setAuthorizationGrantTypes("authorization_code,refresh_token");
         client.setRedirectUris("https://app.example/callback");
+        client.setProtocolMode("OIDC");
+        client.setEnabledProtocols("OIDC");
+        client.setDefaultProtocol("OIDC");
+        client.setConfigurationStatus("ENABLED");
+        client.setTenantId(1L);
+        client.setUserType(dev.macula.cloud.iam.enums.UserTypeEnum.EMPLOYEE);
+        client.setBrowserProviderBindings(tools.jackson.databind.json.JsonMapper.builder().build().writeValueAsString(
+            java.util.Arrays.stream(allowedProviders.split(",")).collect(java.util.stream.Collectors.toMap(v -> v, v -> 1L))));
         client.setBrowserLoginProviderTypes(allowedProviders);
         client.setDirectLoginProviderType(directProvider);
-        return client;
+        return dev.macula.cloud.iam.protocol.oauth2.ProtocolTestFixtures.configure(client);
     }
 
     private MockHttpServletRequest loginRequest(MockHttpSession session) {
@@ -145,6 +172,8 @@ class BrowserLoginClientPolicyServiceTest {
         request.setServerPort(443);
         request.setQueryString("response_type=code&client_id=" + String.join("&client_id=", clientIds));
         request.addParameter(OAuth2ParameterNames.RESPONSE_TYPE, "code");
+        request.addParameter(OAuth2ParameterNames.SCOPE, "openid");
+        request.addParameter(OAuth2ParameterNames.REDIRECT_URI, "https://app.example/callback");
         request.addParameter(OAuth2ParameterNames.CLIENT_ID, clientIds);
         new HttpSessionRequestCache().saveRequest(request, new MockHttpServletResponse());
     }

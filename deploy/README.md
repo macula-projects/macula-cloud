@@ -153,8 +153,7 @@ WHERE client_id = '<CLIENT_ID>';
 
 不要从 redirect URI、请求 Host 或旧全局白名单自动推导 Origin，也不要把本机示例值写入共享或生产数据库。
 回滚到旧 IAM 时恢复旧版本所需的部署级白名单；数据库中已审核的 Client Origin 可以保留。
-新版 System 部署后，管理 API/Admin 可在历史 Client 的认证方式和 grant 集合均不变时维护 Origin 等字段；该兼容
-通道不允许新建或扩大非法组合，并用条件更新防止旧表单覆盖并发完成的 public PKCE 整改。
+V16 后旧 Client 默认保持 DRAFT，必须明确完成协议、应用类型、认证租户和用户目录配置才可启用；不再以历史组合维护通道跳过新模型校验。Admin/Gateway 的受控首次配置见“Admin 授权码首次切换”。
 
 ## 常用命令
 
@@ -193,3 +192,34 @@ WHERE client_id = '<CLIENT_ID>';
 - Nacos 启动失败：确认 `nacos.config_info` 存在，并检查 8848、8080、9848 端口。
 - RocketMQ 本机客户端失败：检查 9876、10911 端口及 Broker 公布地址。
 - 应用容器未就绪：先查看对应应用日志；TCP healthcheck 只表示端口是否监听。
+
+### IAM 接入元数据
+
+System通过`IAM_DISCOVERY_URL`懒加载OIDC Discovery，内网抓取地址可与对外`IAM_ISSUER_URI`不同，但响应issuer必须与后者一致。Compose本地默认抓取`http://macula-cloud-iam:9010/.well-known/openid-configuration`，通过`IAM_METADATA_ALLOW_HTTP=true`显式允许本地HTTP。生产配置应使用可信HTTPS来源并关闭HTTP，不能使用管理请求传入的URL；System不等待IAM启动、不因元数据不可用变为不健康。
+
+本轮V14只新增可空应用配置列，不回填历史Client。不应在没有核对迁移历史的其他环境覆盖任何已执行的V14；存在同版本历史时使用追加迁移。仅回滚应用时保留新增列与业务数据。
+
+## Admin 授权码首次切换
+
+V19 后按单协议与资源服务器用途配置。Admin 保持 OIDC / SPA / none / authorization_code / S256，显式 Scope 为 `openid profile system:access`；Gateway 是 RESOURCE_SERVER，使用机密认证调用内省，不配置 client_credentials。不要运行历史双业务 Client 的一次性初始化任务。
+
+升级前备份业务库，并核实已有 Admin/Gateway client_id、Gateway 已知明文 Secret。配置：
+
+```dotenv
+IAM_PLATFORM_CLIENTS_ENABLED=true
+IAM_ADMIN_CLIENT_ID=<既有Admin客户端ID>
+IAM_INTROSPECTION_CLIENT_ID=<既有Gateway客户端ID>
+IAM_INTROSPECTION_CLIENT_SECRET=<已知Gateway明文Secret>
+```
+
+System 受信任初始化保留主键/Secret哈希并认领平台归属，只为指定 Admin 明确设置 `openid profile system:access`；不为其他应用授予资源权限。缺失或冲突会停止初始化，不创建猜测身份。Admin 必须先具备单 OIDC 配置，双协议旧应用需管理员明确重配。
+
+System 和 Gateway 都需要内省凭据；容器内部 URI 使用 `http://macula-cloud-iam:9010/oauth2/introspect`。这些配置不应放进 Admin 浏览器环境。System 启动时只构造验证器，不要求 IAM 先完成启动；实际请求在 IAM 不可用时返回 503。
+
+### 单协议资源边界升级（V19）
+
+顺序为：备份并确认身份配置 → 运行新增迁移 → 核对平台认领 → 使用原版 Boot 依赖构建并协调更新 System、IAM、Gateway 和 Admin → 重新登录验证。迁移保留 client_id/哈希；双协议转为 DRAFT，移除歧义配置；旧授权/缓存不进入新路径。
+
+Gateway/System恢复原Starter安全装配，沿用其内省、缓存、角色/租户授权和内部JWT转发。不再增加Cloud资源拦截、System二次内省或专用网关来源声明。
+
+核验至少包括Admin OIDC登录、资料、菜单、合法API、原有角色/租户拒绝、撤销、内省凭据错误和IAM停止。错误响应按实际Starter行为报告；不要把构建通过当作运行验证。恢复需要数据库备份和配套旧版本，不能单独回退镜像。

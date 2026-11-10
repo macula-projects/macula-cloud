@@ -56,7 +56,7 @@ class SettingsModelJsonTest {
             List.of(new IdentityProviderCatalogVO.Category("social", "社交")),
             List.of(new IdentityProviderCatalogVO.Provider("GITHUB", "GitHub", "social", "/login/github",
                 "https://github.com/settings/developers", "创建应用",
-                List.of(new IdentityProviderCatalogVO.Field("clientId", "Client ID", true, false, false, "填写位置")))));
+                List.of(new IdentityProviderCatalogVO.Field("clientId", "Client ID", true, false, false, "填写位置")))), List.of());
         String catalogJson = json.writeValueAsString(catalog);
         assertTrue(catalogJson.contains("\"callbackUrl\":\"/login/github\""));
         assertTrue(catalogJson.contains("\"required\":true"));
@@ -67,4 +67,49 @@ class SettingsModelJsonTest {
             MailOptions.class).getPort());
         assertEquals("123", json.readValue("{\"smsSdkAppId\":\"123\"}", TencentOptions.class).getSmsSdkAppId());
     }
+    /** 真实Jackson3必须保留省略、显式null与实际值的区别，内部标记不进入响应。 */
+    @Test
+    void mappingFieldsPreserveJsonPresenceWithoutExposingFlags() {
+        var omitted = json.readValue("{}", dev.macula.cloud.system.form.IdentityProviderForm.class);
+        assertFalse(omitted.isBindingSourceFieldPresent());
+        var cleared = json.readValue("{\"bindingSourceField\":null,\"bindingTargetField\":null}", dev.macula.cloud.system.form.IdentityProviderForm.class);
+        assertTrue(cleared.isBindingSourceFieldPresent());
+        assertTrue(cleared.isBindingTargetFieldPresent());
+        assertNull(cleared.getBindingSourceField());
+        var configured = json.readValue("{\"bindingSourceField\":\"email\",\"bindingTargetField\":\"email\"}", dev.macula.cloud.system.form.IdentityProviderForm.class);
+        assertEquals("email", configured.getBindingSourceField());
+        assertFalse(json.writeValueAsString(configured).contains("FieldPresent"));
+        assertThrows(RuntimeException.class, () -> json.readValue("{\"bindingSourceField\":\"email\",\"bindingSourceField\":\"mobile\"}",
+            dev.macula.cloud.system.form.IdentityProviderForm.class));
+        assertThrows(RuntimeException.class, () -> json.readValue("{\"arbitraryColumn\":\"password\"}",
+            dev.macula.cloud.system.form.IdentityProviderForm.class));
+    }
+
+    /** 请求省略与显式清空不同；顶层及嵌套重复键和未知字段都应被拒绝。 */
+    @Test
+    void bindingArrayKeepsPresenceAndRejectsAmbiguousJson() {
+        var omitted = json.readValue("{}", dev.macula.cloud.system.form.IdentityProviderForm.class);
+        assertFalse(omitted.isBindingMappingsPresent());
+        var empty = json.readValue("{\"bindingMappings\":[]}", dev.macula.cloud.system.form.IdentityProviderForm.class);
+        assertTrue(empty.isBindingMappingsPresent());
+        assertTrue(empty.getBindingMappings().isEmpty());
+        for (String value : java.util.List.of("{\"bindingMappings\":[],\"bindingMappings\":[]}",
+            "{\"bindingMappings\":[{\"sourceField\":\"mobile\",\"sourceField\":\"email\",\"targetField\":\"email\"}]}",
+            "{\"bindingMappings\":[{\"sourceField\":\"mobile\",\"targetField\":\"mobile\",\"sql\":\"id\"}]}")) {
+            assertThrows(RuntimeException.class, () -> json.readValue(value, dev.macula.cloud.system.form.IdentityProviderForm.class));
+        }
+    }
+
+    /** 转换标记只接受明确Boolean，不接受字符串、null或重复键。 */
+    @Test
+    void conversionRequiresExplicitBoolean() {
+        var type=dev.macula.cloud.system.form.OAuth2ClientForm.class;
+        assertFalse(json.readValue("{}",type).isConvertToInApp());
+        assertTrue(json.readValue("{\"convertToInApp\":true}",type).isConvertToInApp());
+        assertFalse(json.writeValueAsString(json.readValue("{\"convertToInApp\":true}",type)).contains("convertToInApp"));
+        for(String value:List.of("{\"convertToInApp\":null}","{\"convertToInApp\":\"true\"}","{\"convertToInApp\":true,\"convertToInApp\":false}")) {
+            assertThrows(RuntimeException.class,()->json.readValue(value,type));
+        }
+    }
+
 }

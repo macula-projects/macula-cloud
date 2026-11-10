@@ -50,14 +50,9 @@ import java.util.Map;
 public class FeishuClient {
     private static final Logger LOGGER = LoggerFactory.getLogger(FeishuClient.class);
     private static final String AUTHORIZE = "https://accounts.feishu.cn/open-apis/authen/v1/authorize";
-    private static final String OAUTH_TOKEN = "https://open.feishu.cn/open-apis/authen/v2/oauth/token";
-    private static final String APP_TOKEN = "https://open.feishu.cn/open-apis/auth/v3/app_access_token/internal";
-    private static final String WEBVIEW_TOKEN = "https://open.feishu.cn/open-apis/authen/v1/access_token";
+    private static final String OAUTH_TOKEN = "https://accounts.feishu.cn/oauth/v3/token";
     private static final String USER = "https://open.feishu.cn/open-apis/authen/v1/user_info";
     private static final String APP_ID_CONFIG = "appId";
-    private static final String APP_ID_PARAMETER = "app_id";
-    private static final String APP_SECRET_PARAMETER = "app_secret";
-    private static final String APP_ACCESS_TOKEN = "app_access_token";
     private static final String EMPLOYEE_NO = "employee_no";
     private static final String DATA = "data";
     private static final String ERROR_CODE = "code";
@@ -79,48 +74,77 @@ public class FeishuClient {
             throw failed();
         }
         return UriComponentsBuilder.fromUriString(AUTHORIZE)
-            .queryParam(APP_ID_PARAMETER, config.require(APP_ID_CONFIG))
+            .queryParam(OAuth2ParameterNames.CLIENT_ID, config.require(APP_ID_CONFIG))
             .queryParam(OAuth2ParameterNames.REDIRECT_URI, redirectUri)
             .queryParam(OAuth2ParameterNames.RESPONSE_TYPE, OAuth2AuthorizationResponseType.CODE.getValue())
             .queryParam(OAuth2ParameterNames.STATE, state).build().encode().toUriString();
     }
 
-    public String fetchEmployeeNo(ProviderConfig config, String code, String redirectUri, FeishuLoginMode mode) {
+    public dev.macula.cloud.iam.authentication.thirdparty.VerifiedExternalIdentity fetchIdentity(
+        ProviderConfig config, String code, String redirectUri, FeishuLoginMode mode, String capability) {
+        return fetchIdentity(config, code, redirectUri, mode, capability, null);
+    }
+
+    /** AppLink仅使用本次授权的受控回调及专用证明；不等于IAM授权码PKCE。 */
+    public dev.macula.cloud.iam.authentication.thirdparty.VerifiedExternalIdentity fetchIdentity(
+        ProviderConfig config, String code, String redirectUri, FeishuLoginMode mode, String capability,
+        String providerCodeVerifier) {
+        if (providerCodeVerifier != null && (!config.flow().providerPkce()
+            || !providerCodeVerifier.matches("[A-Za-z0-9._~-]{43,128}"))) { throw failed(); }
+        if (mode == FeishuLoginMode.APP && (!config.flow().providerPkce() || providerCodeVerifier == null
+            || redirectUri == null || redirectUri.isBlank())) { throw failed(); }
         String stage = TOKEN_STAGE;
+        boolean codeConsumed = false;
         try {
             String accessToken;
             if (mode == FeishuLoginMode.APP) {
-                accessToken = oauthAccessToken(config, code, null);
+                accessToken = oauthAccessToken(config, code, config.flow().providerPkce() ? redirectUri : null, providerCodeVerifier);
             } else if (mode == FeishuLoginMode.BROWSER) {
-                accessToken = oauthAccessToken(config, code, redirectUri);
+                accessToken = oauthAccessToken(config, code, redirectUri, null);
             } else if (mode == FeishuLoginMode.WEBVIEW) {
-                accessToken = webviewAccessToken(config, code);
+                // requestAccess链按官方v1→v2→v3迁移说明固定换码，不失败后尝试旧接口。
+                if (config.flow() != dev.macula.cloud.system.enums.IdentitySourceFlow.FEISHU_WEBVIEW_V3
+                    || config.sourceType() != dev.macula.cloud.system.enums.IdentitySourceType.FEISHU_WEBVIEW) { throw failed(); }
+                accessToken = oauthAccessToken(config, code, null, null);
             } else {
                 throw failed();
             }
+            codeConsumed = true;
             stage = USER_STAGE;
             String userBody = restClient.get().uri(USER)
                 .headers(headers -> headers.setBearerAuth(accessToken)).retrieve().body(String.class);
             JsonNode user = successfulData(stage, userBody);
-            String employeeNo = user.path(EMPLOYEE_NO).asText();
-            if (employeeNo.isBlank()) {
-                LOGGER.warn("第三方接口响应无效 provider=FEISHU stage={} failure=missing_employee_no", stage);
+            String openId = user.path("open_id").asText();
+            if (openId.isBlank()) {
+                LOGGER.warn("第三方接口响应无效 provider=FEISHU stage={} failure=missing_open_id", stage);
                 throw failed();
             }
-            return employeeNo;
+            String tenantKey = user.path("tenant_key").asText();
+            if (config.organizationId() != null && !config.organizationId().equals(tenantKey)) { throw failed(); }
+            Map<String, String> attributes = new LinkedHashMap<>();
+            if (!tenantKey.isBlank()) { attributes.put("tenant_key", tenantKey); }
+            String employeeNo = user.path(EMPLOYEE_NO).asText();
+            if (!employeeNo.isBlank()) { attributes.put(EMPLOYEE_NO, employeeNo); }
+            return dev.macula.cloud.iam.authentication.thirdparty.VerifiedExternalIdentity.of(config, capability,
+                dev.macula.cloud.iam.authentication.thirdparty.VerifiedExternalIdentity.OPEN_ID, openId,
+                attributes);
         } catch (AuthenticationServiceException ex) {
             throw ex;
         } catch (RestClientResponseException ex) {
             LOGGER.warn("第三方接口 HTTP 失败 provider=FEISHU stage={} status={}", stage,
                 ex.getStatusCode().value());
             if (ex.getStatusCode().is5xxServerError()) {
-                throw new ExternalCodeInfrastructureException();
+                throw new ExternalCodeInfrastructureException(codeConsumed
+                    ? dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeConsumptionState.CONSUMED
+                    : dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeConsumptionState.UNKNOWN);
             }
             throw failed();
         } catch (RestClientException ex) {
             LOGGER.warn("第三方接口调用失败 provider=FEISHU stage={} failure=transport_error exception={}",
                 stage, ex.getClass().getSimpleName());
-            throw new ExternalCodeInfrastructureException();
+            throw new ExternalCodeInfrastructureException(codeConsumed
+                    ? dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeConsumptionState.CONSUMED
+                    : dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeConsumptionState.UNKNOWN);
         } catch (RuntimeException ex) {
             LOGGER.error("第三方接口响应处理失败 provider=FEISHU stage={} "
                     + "failure=invalid_response exception={}",
@@ -129,7 +153,8 @@ public class FeishuClient {
         }
     }
 
-    private String oauthAccessToken(ProviderConfig config, String code, String redirectUri) {
+    /** 使用固定v3端点，只有明确flow才把平台Verifier提交到该平台校验。 */
+    private String oauthAccessToken(ProviderConfig config, String code, String redirectUri, String providerCodeVerifier) {
         Map<String, String> request = new LinkedHashMap<>();
         request.put(OAuth2ParameterNames.GRANT_TYPE, AuthorizationGrantType.AUTHORIZATION_CODE.getValue());
         request.put(OAuth2ParameterNames.CLIENT_ID, config.require(APP_ID_CONFIG));
@@ -138,29 +163,14 @@ public class FeishuClient {
         if (redirectUri != null) {
             request.put(OAuth2ParameterNames.REDIRECT_URI, redirectUri);
         }
+        if (providerCodeVerifier != null) {
+            request.put(org.springframework.security.oauth2.core.endpoint.PkceParameterNames.CODE_VERIFIER, providerCodeVerifier);
+        }
         String body = restClient.post().uri(OAUTH_TOKEN).contentType(MediaType.APPLICATION_JSON)
             .body(request).retrieve().body(String.class);
         JsonNode response = json.readTree(body);
         requireProviderSuccess(TOKEN_STAGE, response);
         return requireToken(TOKEN_STAGE, response, OAuth2ParameterNames.ACCESS_TOKEN);
-    }
-
-    private String webviewAccessToken(ProviderConfig config, String code) {
-        Map<String, String> appRequest = Map.of(APP_ID_PARAMETER, config.require(APP_ID_CONFIG),
-            APP_SECRET_PARAMETER, config.appSecret());
-        String appBody = restClient.post().uri(APP_TOKEN).contentType(MediaType.APPLICATION_JSON)
-            .body(appRequest).retrieve().body(String.class);
-        JsonNode appResponse = json.readTree(appBody);
-        requireProviderSuccess(TOKEN_STAGE, appResponse);
-        String appToken = requireToken(TOKEN_STAGE, appResponse, APP_ACCESS_TOKEN);
-        Map<String, String> tokenRequest = Map.of(
-            OAuth2ParameterNames.GRANT_TYPE, AuthorizationGrantType.AUTHORIZATION_CODE.getValue(),
-            OAuth2ParameterNames.CODE, code);
-        String tokenBody = restClient.post().uri(WEBVIEW_TOKEN).contentType(MediaType.APPLICATION_JSON)
-            .headers(headers -> headers.setBearerAuth(appToken)).body(tokenRequest).retrieve().body(String.class);
-        JsonNode response = json.readTree(tokenBody);
-        requireProviderSuccess(TOKEN_STAGE, response);
-        return requireToken(TOKEN_STAGE, response.path(DATA), OAuth2ParameterNames.ACCESS_TOKEN);
     }
 
     private JsonNode successfulData(String stage, String body) {

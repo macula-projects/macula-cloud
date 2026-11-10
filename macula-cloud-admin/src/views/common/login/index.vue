@@ -60,48 +60,21 @@
 						<label>{{$CONFIG.APP_NAME}}</label>
 					</div>
 				</div>
-				<el-tabs>
-					<el-tab-pane :label="$t('login.accountLogin')" lazy>
-						<password-form></password-form>
-					</el-tab-pane>
-					<el-tab-pane :label="$t('login.mobileLogin')" lazy>
-						<phone-form></phone-form>
-					</el-tab-pane>
-				</el-tabs>
-				<template v-if="$CONFIG.MY_SHOW_LOGIN_OAUTH">
-					<el-divider>{{ $t('login.signInOther') }}</el-divider>
-					<div class="login-oauth">
-						<el-button type="success" icon="sc-icon-wechat" circle @click="wechatLogin"></el-button>
-					</div>
-				</template>
+                <p class="login-description">{{ $t('login.iamDescription') }}</p>
+                <el-alert v-if="error" :title="$t('login.iamFailed')" type="error" :closable="false" show-icon />
+                <el-button type="primary" size="large" style="width:100%; margin-top:24px" :loading="isStarting" @click="login">
+                    {{ $t('login.iamLogin') }}
+                </el-button>
 			</div>
 		</div>
 	</div>
-	<el-dialog v-model="showWechatLogin" :title="$t('login.wechatLoginTitle')" :width="400" destroy-on-close>
-		<div class="qrCodeLogin">
-			<sc-qr-code class="qrCode" :text="WechatLoginCode" :size="200"></sc-qr-code>
-			<p class="msg">{{$tc('login.wechatLoginMsg', 1)}}<br/>{{$tc('login.wechatLoginMsg', 2)}}</p>
-			<div class="qrCodeLogin-result" v-if="isWechatLoginResult">
-				<el-result icon="success" :title="$tc('login.wechatLoginResult', 1)" :sub-title="$tc('login.wechatLoginResult', 2)"></el-result>
-			</div>
-		</div>
-	</el-dialog>
 </template>
 
 <script>
-	import passwordForm from './components/passwordForm'
-	import phoneForm from './components/phoneForm'
-	import { mapActions } from 'pinia'
-	import { useIframeStore } from '@/stores/iframe'
-	import { useKeepAliveStore } from '@/stores/keepAlive'
-	import { useViewTagsStore } from '@/stores/viewTags'
+	import {startAuthorization} from '@/utils/adminAuthorizationCode'
 
 	export default {
 		name: 'LoginPage',
-		components: {
-			passwordForm,
-			phoneForm
-		},
 		data() {
 			return {
 				config: {
@@ -118,9 +91,8 @@
 						value: 'en',
 					}
 				],
-				WechatLoginCode: "",
-				showWechatLogin: false,
-				isWechatLoginResult: false
+                error: false,
+                isStarting: false
 			}
 		},
 		watch:{
@@ -137,35 +109,20 @@
 				this.$i18n.locale = val
 				this.$TOOL.data.set("APP_LANG", val)
 			}
-		},
-		created: function() {
-			this.$TOOL.cookie.remove("TOKEN")
-			this.$TOOL.data.remove("USER_INFO")
-			this.$TOOL.data.remove("MENU")
-			this.$TOOL.data.remove("PERMISSIONS")
-			this.$TOOL.data.remove("grid")
-			this.clearViewTags()
-			this.clearKeepLive()
-			this.clearIframeList()
-			console.log('%c SCUI %c Gitee: https://gitee.com/lolicode/scui', 'background:#666;color:#fff;border-radius:3px;', '')
-		},
-		methods: {
-			...mapActions(useViewTagsStore, ['clearViewTags']),
-			...mapActions(useIframeStore, ['clearIframeList']),
-			...mapActions(useKeepAliveStore, ['clearKeepLive']),
+		},        methods: {
+            async login() {
+                if (this.isStarting) return
+                this.isStarting = true
+                this.error = false
+                try { await startAuthorization(this.$CONFIG, this.$route.query.returnTo) }
+                catch { this.error = true }
+                finally { this.isStarting = false }
+            },
 			configDark(){
 				this.config.dark = this.config.dark ? false : true
 			},
 			configLang(command){
 				this.config.lang = command.value
-			},
-			wechatLogin(){
-				this.showWechatLogin = true
-				this.WechatLoginCode = "SCUI-823677237287236-" + new Date().getTime()
-				this.isWechatLoginResult = false
-				setTimeout(()=>{
-					this.isWechatLoginResult = true
-				},3000)
 			}
 		}
 	}

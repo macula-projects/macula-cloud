@@ -55,7 +55,7 @@ class CustomOAuth2TokenCustomizerTest {
 
         assertEquals(12L, claims.get(GlobalConstants.TENANT_ID_NAME));
         assertEquals("fixture-client", claims.get("client_id"));
-        assertEquals("Fixture", claims.get(SecurityConstants.JWT_NICKNAME_KEY));
+        assertFalse(claims.containsKey(SecurityConstants.JWT_NICKNAME_KEY));
         assertEquals(8L, claims.get(SecurityConstants.JWT_DEPTID_KEY));
         assertEquals(2, claims.get(SecurityConstants.JWT_DATASCOPE_KEY));
         assertEquals(List.of("ROLE_USER"), claims.get(SecurityConstants.AUTHORITIES_KEY));

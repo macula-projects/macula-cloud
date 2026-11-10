@@ -1,33 +1,12 @@
-import config from "@/config"
-import http from "@/utils/request"
+import config from '@/config'
+import http from '@/utils/request'
 
+const root = `${config.API_URL}/${config.MODEL.system}/api/v1`
+function endpoint(path) {
+    return {url: root + path, get(options = {}) { return http.get(this.url, {}, options) }}
+}
 export default {
-    systemToken: {
-        url: `${config.IAM_URL}/oauth2/token`,
-        name: "macula V5 system提供隐式获取登录token接口",
-        post: async function (data = {}, config = {}) {
-            return await http.post(this.url, new URLSearchParams(data), {
-                showErrorNotification: false,
-                ...config,
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                    ...config.headers
-                }
-            })
-        }
-    },
-    getUserInfo: {
-        url: `${config.API_URL}/${config.MODEL.system}/api/v1/users/me`,
-        name: "macula V5 system提供获取当前登录用户信息接口",
-        get: async function () {
-            return await http.get(this.url)
-        }
-    },
-    getRoutes: {
-        url: `${config.API_URL}/${config.MODEL.system}/api/v1/menus/routes`,
-        name: "macula V5 system提供获取当前菜单接口",
-        get: async function () {
-            return await http.get(this.url)
-        }
-    }
+    getUserInfo: endpoint('/users/me'),
+    getTenantOptions: endpoint('/tenants/options'),
+    getRoutes: endpoint('/menus/routes')
 }

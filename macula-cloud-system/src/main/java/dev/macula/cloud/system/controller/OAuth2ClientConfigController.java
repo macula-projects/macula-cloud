@@ -19,6 +19,8 @@ package dev.macula.cloud.system.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import dev.macula.cloud.system.form.OAuth2ClientForm;
 import dev.macula.cloud.system.service.OAuth2ClientConfigService;
+import dev.macula.cloud.system.service.OAuth2IssuerMetadataService;
+import dev.macula.cloud.system.vo.OAuth2IssuerMetadataVO;
 import dev.macula.cloud.system.vo.OAuth2ClientVO;
 import dev.macula.cloud.system.vo.OAuth2ExternalCodeCatalogVO;
 import jakarta.validation.Valid;
@@ -46,6 +48,22 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class OAuth2ClientConfigController {
     private final OAuth2ClientConfigService service;
+    private final OAuth2IssuerMetadataService metadataService;
+    private final dev.macula.cloud.system.service.OAuth2ClientConfigurationCatalogService configurationCatalog;
+
+    /** 返回与保存校验一致的协议、Scope和具体来源目录。 */
+    @GetMapping("/configuration-catalog")
+    public dev.macula.cloud.system.vo.OAuth2ClientConfigurationCatalogVO configurationCatalog() {
+        return configurationCatalog.catalog();
+    }
+
+
+    /** 复用Client管理权限，只读取服务器配置的可信元数据。 */
+    @GetMapping("/metadata")
+    public OAuth2IssuerMetadataVO metadata(@org.springframework.web.bind.annotation.RequestParam(defaultValue = "OIDC") String protocol) {
+        return metadataService.get(protocol);
+    }
+
 
     @GetMapping
     public IPage<OAuth2ClientVO> page(@RequestParam(defaultValue = "1") int pageNum,
@@ -63,6 +81,12 @@ public class OAuth2ClientConfigController {
         return service.get(id);
     }
 
+    /** 创建草稿，不允许调用方指定认证能力或客户端ID。 */
+    @PostMapping("/drafts")
+    public OAuth2ClientVO createDraft(@Valid @RequestBody dev.macula.cloud.system.form.OAuth2ClientDraftForm form) {
+        return service.createDraft(form);
+    }
+
     @PostMapping
     public OAuth2ClientVO create(@Valid @RequestBody OAuth2ClientForm form) {
         return service.save(null, form);
@@ -75,12 +99,13 @@ public class OAuth2ClientConfigController {
 
     @PutMapping("/{id}/secret")
     public void resetSecret(@PathVariable Long id, @Valid @RequestBody SecretResetForm form) {
-        service.resetSecret(id, form.getSecret());
+        service.resetSecret(id, form.getSecret(), form.getConfigurationVersion());
     }
 
+    /** 删除时校验列表返回的完整配置版本，防止误删并发更新后的应用。 */
     @DeleteMapping("/{id}")
-    public void delete(@PathVariable Long id) {
-        service.delete(id);
+    public void delete(@PathVariable Long id, @RequestParam String configurationVersion) {
+        service.delete(id, configurationVersion);
     }
 
     /**
@@ -92,5 +117,7 @@ public class OAuth2ClientConfigController {
     public static class SecretResetForm {
         @NotBlank
         private String secret;
+        @NotBlank
+        private String configurationVersion;
     }
 }

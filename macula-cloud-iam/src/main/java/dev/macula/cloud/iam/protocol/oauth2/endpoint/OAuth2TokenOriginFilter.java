@@ -64,12 +64,19 @@ public class OAuth2TokenOriginFilter extends OncePerRequestFilter {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (origin == null || !(authentication instanceof OAuth2ClientAuthenticationToken client)
             || !client.isAuthenticated() || client.getRegisteredClient() == null
-            || !clientService.isAllowedOrigin(client.getRegisteredClient().getClientId(), origin)) {
+            || !allowedForProtocol(client, origin)) {
             failureHandler.onAuthenticationFailure(request, response,
                 new OAuth2AuthenticationException(OAuth2ErrorCodes.INVALID_REQUEST));
             return;
         }
         filterChain.doFilter(request, response);
+    }
+
+    /** 预检可以用应用Origin并集，实际Token请求只能使用已认证协议视图。 */
+    private boolean allowedForProtocol(OAuth2ClientAuthenticationToken client, String origin) {
+        Object allowed = client.getRegisteredClient().getClientSettings().getSetting(
+            dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeClientSettings.ALLOWED_ORIGINS);
+        return allowed instanceof java.util.Collection<?> values && values.contains(origin);
     }
 
     private boolean hasOriginHeader(HttpServletRequest request) {

@@ -36,11 +36,28 @@ public class SysIdentityProvider {
     private String name;
     private String remark;
     private String providerType;
+    private String sourceType;
+    private String credentialType;
+    private String capabilitiesJson;
+    private String identityFlow;
+    private String directoryPolicy;
+    private String organizationId;
+    private String oauthRedirectUri;
+    private Boolean autoBindEnabled;
+    @com.baomidou.mybatisplus.annotation.TableField(updateStrategy = com.baomidou.mybatisplus.annotation.FieldStrategy.ALWAYS)
+    private String bindingRule;
+    @com.baomidou.mybatisplus.annotation.TableField(updateStrategy = com.baomidou.mybatisplus.annotation.FieldStrategy.ALWAYS)
+    private String bindingSourceField;
+    @com.baomidou.mybatisplus.annotation.TableField(updateStrategy = com.baomidou.mybatisplus.annotation.FieldStrategy.ALWAYS)
+    private String bindingTargetField;
+    private String bindingMappingsJson;
+    private Long version;
     private String appId;
     @CryptoField
     private String appSecret;
     private String configJson;
     @CryptoField
+    @com.baomidou.mybatisplus.annotation.TableField(updateStrategy = com.baomidou.mybatisplus.annotation.FieldStrategy.ALWAYS)
     private String secretConfigJson;
     private Boolean enabled;
     private Boolean visible;

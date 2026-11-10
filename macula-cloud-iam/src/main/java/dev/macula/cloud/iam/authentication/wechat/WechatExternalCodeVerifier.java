@@ -17,6 +17,8 @@
 package dev.macula.cloud.iam.authentication.wechat;
 
 import dev.macula.cloud.iam.authentication.thirdparty.IdentityProviderConfigService;
+import dev.macula.cloud.iam.authentication.thirdparty.VerifiedExternalIdentity;
+import java.util.Map;
 import dev.macula.cloud.iam.authentication.thirdparty.IdentityProviderConfigService.ProviderConfig;
 import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeVerification;
 import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeVerifier;
@@ -49,15 +51,19 @@ public class WechatExternalCodeVerifier implements ExternalCodeVerifier {
 
     @Override
     public ExternalCodeVerification verify(ExternalCodeType codeType, Long identityProviderId, String code) {
-        ProviderConfig config = configs.requireEnabledById(identityProviderId, PROVIDER_TYPE);
-        return switch (codeType) {
-            case WECHAT_OPEN_APP_CODE -> ExternalCodeVerification.identity(PROVIDER_TYPE,
-                client.fetchOpenAppUnionId(config, code));
-            case WECHAT_MINIAPP_LOGIN_CODE -> ExternalCodeVerification.identity(PROVIDER_TYPE,
-                client.fetchMiniappUnionId(config, code));
-            case WECHAT_MINIAPP_PHONE_CODE -> ExternalCodeVerification.mobile(
-                client.fetchMiniappMobile(config, code));
+        ProviderConfig config = configs.requireEnabledById(identityProviderId, PROVIDER_TYPE).forCode(codeType);
+            if (!config.sourceType().supports(codeType)) { throw new IllegalArgumentException("来源不支持此凭证类型"); }
+        String value = switch (codeType) {
+            case WECHAT_OPEN_APP_CODE -> client.fetchOpenAppOpenId(config, code);
+            case WECHAT_MINIAPP_LOGIN_CODE -> client.fetchMiniappOpenId(config, code);
+            case WECHAT_MINIAPP_PHONE_CODE -> client.fetchMiniappMobile(config, code);
             default -> throw new IllegalArgumentException("Unsupported WeChat external code type");
         };
+        boolean mobile = codeType == ExternalCodeType.WECHAT_MINIAPP_PHONE_CODE;
+        if (mobile) { value = new dev.macula.cloud.system.security.UserIdentifierNormalizer().mobile(value)
+            .orElseThrow(() -> new IllegalArgumentException("已核验手机号格式无效")); }
+        return new ExternalCodeVerification(VerifiedExternalIdentity.of(config, codeType.name(),
+            mobile ? VerifiedExternalIdentity.MOBILE_PROOF : VerifiedExternalIdentity.OPEN_ID, value,
+            mobile ? Map.of("verified_mobile", value) : Map.of()));
     }
 }

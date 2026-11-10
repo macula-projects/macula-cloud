@@ -16,7 +16,6 @@
  */
 package dev.macula.cloud.iam.authentication.thirdparty;
 
-import dev.macula.cloud.iam.pojo.entity.SysUser;
 import dev.macula.cloud.iam.service.support.SysUserService;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.authentication.AuthenticationServiceException;
@@ -29,7 +28,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 /**
- * 验证企微成员 ID 的全局账号优先规则及社交身份待绑定边界。
+ * 验证所有来源统一执行配置策略，企微同名账号不能绕过待绑定流程。
  *
  * @author Rain
  * @since 6.1.0
@@ -38,46 +37,45 @@ class ThirdPartyIdentityResolutionServiceTest {
     private final IdentityProviderConfigService configs = mock(IdentityProviderConfigService.class);
     private final SysUserService users = mock(SysUserService.class);
     private final ThirdPartyUserDetailsService details = mock(ThirdPartyUserDetailsService.class);
-    private final ThirdPartyIdentityResolutionService service = new ThirdPartyIdentityResolutionService(configs, users, details);
-    private final ThirdPartyLoginContext context = new ThirdPartyLoginContext("WECOM", "BROWSER", "test-client",
+    private final IdentitySourceBindingPolicyService policy = mock(IdentitySourceBindingPolicyService.class);
+    private final ThirdPartyIdentityResolutionService service = new ThirdPartyIdentityResolutionService(policy);
+    private final ThirdPartyLoginContext context = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.context("WECOM", "BROWSER", "test-client",
         Instant.now(), "/");
 
     @Test
-    void wecomUserIdMatchesGlobalUsernameBeforeBinding() {
-        SysUser account = new SysUser();
-        account.setUsername("wecom-user-id");
-        when(users.findUniqueByUsername("wecom-user-id")).thenReturn(account);
-        when(configs.findBoundUsername("WECOM", "wecom-user-id")).thenReturn(Optional.empty());
-        when(details.load("wecom-user-id")).thenReturn(User.withUsername("wecom-user-id")
-            .password("n/a").authorities("USER").build());
-        assertEquals("wecom-user-id", service.resolve("WECOM", "wecom-user-id", context).getUsername());
-        var order = inOrder(users, configs);
-        order.verify(users).findUniqueByUsername("wecom-user-id");
-        order.verify(configs).findBoundUsername("WECOM", "wecom-user-id");
+    void wecomUserIdDoesNotImplicitlyMatchGlobalUsername() {
+        var identity = IdentitySourceTestFixtures.browserIdentity(context, "wecom-user-id");
+        when(policy.resolve(context.clientId(), context.tenantId(), context.userType(), identity)).thenReturn(Optional.empty());
+        assertThrows(ThirdPartyIdentityResolutionService.BindingRequiredException.class,
+            () -> service.resolve(identity, context));
+        verifyNoInteractions(users, configs, details);
     }
 
     @Test
     void wecomUsesExistingBindingWhenNoUsernameMatches() {
-        when(configs.findBoundUsername("WECOM", "wecom-user-id")).thenReturn(Optional.of("alice"));
-        when(details.load("alice")).thenReturn(User.withUsername("alice")
-            .password("n/a").authorities("USER").build());
-        assertEquals("alice", service.resolve("WECOM", "wecom-user-id", context).getUsername());
+        var identity = IdentitySourceTestFixtures.browserIdentity(context, "wecom-user-id");
+        var principal = User.withUsername("alice").password("n/a").authorities("USER").build();
+        when(policy.resolve(context.clientId(), context.tenantId(), context.userType(), identity)).thenReturn(Optional.of(principal));
+        assertEquals("alice", service.resolve(identity, context).getUsername());
+        verifyNoInteractions(users, configs, details);
     }
 
     @Test
     void conflictingWecomBindingFailsClosed() {
-        when(users.findUniqueByUsername("wecom-user-id")).thenReturn(new SysUser());
-        when(configs.findBoundUsername("WECOM", "wecom-user-id")).thenReturn(Optional.of("other"));
-        assertThrows(AuthenticationServiceException.class,
-            () -> service.resolve("WECOM", "wecom-user-id", context));
-        verifyNoInteractions(details);
+        var identity = IdentitySourceTestFixtures.browserIdentity(context, "wecom-user-id");
+        when(policy.resolve(context.clientId(), context.tenantId(), context.userType(), identity))
+            .thenThrow(new AuthenticationServiceException("binding conflict"));
+        assertThrows(AuthenticationServiceException.class, () -> service.resolve(identity, context));
+        verifyNoInteractions(users, configs, details);
     }
 
     @Test
     void githubNeverMatchesNicknameOrUsernameWithoutBinding() {
-        when(configs.findBoundUsername("GITHUB", "123")).thenReturn(Optional.empty());
+        var github = IdentitySourceTestFixtures.context("GITHUB", "", "test-client", Instant.now(), "/");
+        var identity = IdentitySourceTestFixtures.browserIdentity(github, "123");
+        when(policy.resolve(github.clientId(), github.tenantId(), github.userType(), identity)).thenReturn(Optional.empty());
         assertThrows(ThirdPartyIdentityResolutionService.BindingRequiredException.class,
-            () -> service.resolve("GITHUB", "123", context));
-        verifyNoInteractions(users, details);
+            () -> service.resolve(identity, github));
+        verifyNoInteractions(users, configs, details);
     }
 }

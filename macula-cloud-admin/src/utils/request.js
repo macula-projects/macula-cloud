@@ -16,33 +16,48 @@
  */
 
 import axios from 'axios';
-import {ElMessageBox, ElNotification} from 'element-plus';
+import {ElNotification} from 'element-plus';
 import sysConfig from "@/config";
 import tool from '@/utils/tool';
-import router from '@/router';
+import {readSession, ownsSession, clearAuth} from './adminAuthSession';
 
 axios.defaults.baseURL = ''
 
 axios.defaults.timeout = sysConfig.TIMEOUT
-let loadQuitMsgBox = false
+export function isTrustedApiUrl(value) {
+    try {
+        const base = new URL(sysConfig.API_URL, location.origin)
+        const target = new URL(value, location.origin)
+        const path = base.pathname.replace(/\/$/, '')
+        return target.origin === base.origin && (target.pathname === path || target.pathname.startsWith(path + '/'))
+    } catch { return false }
+}
 
 // HTTP request 拦截器
 axios.interceptors.request.use(
 	(config) => {
-		let token = tool.cookie.get("TOKEN");
-		if(token){
-			config.headers[sysConfig.TOKEN_NAME] = sysConfig.TOKEN_PREFIX + token
-		}
+        Object.assign(config.headers, sysConfig.HEADERS)
+        const trusted = isTrustedApiUrl(config.url)
+        const session = readSession()
+        if (trusted) {
+            if (!config.headers[sysConfig.TOKEN_NAME] && session) {
+                config.headers[sysConfig.TOKEN_NAME] = sysConfig.TOKEN_PREFIX + session.accessToken
+                config.authContext = {sessionId: session.sessionId, generation: session.generation}
+            }
+        } else {
+            delete config.headers[sysConfig.TOKEN_NAME]
+            delete config.headers[sysConfig.TENANT_ID]
+            delete config.authContext
+        }
 		if (!sysConfig.REQUEST_CACHE && config.method == 'get') {
             config.params = config.params || {};
             config.params['_'] = new Date().getTime();
         }
-		if (config.url && (!config.url.endsWith(import.meta.env.VITE_APP_MENU_PATH)) && tool.data.get(sysConfig.TENANT_ID)) {
+		if (trusted && !config.skipTenant && config.url && (!config.url.endsWith(import.meta.env.VITE_APP_MENU_PATH)) && tool.data.get(sysConfig.TENANT_ID)) {
             // tool.cookie含有tenantId, 则遍历config的参数，如果包含tenantId则不添加，不包含则从tool.cookie中获取并添加到header属下
             config.headers[sysConfig.TENANT_ID] = tool.data.get(sysConfig.TENANT_ID)
         }
 		
-		Object.assign(config.headers, sysConfig.HEADERS)
 		return config;
 	},
 	(error) => {
@@ -70,21 +85,10 @@ axios.interceptors.response.use(
 					title: '请求错误',
 					message: error.response.data.message || "Status:500，服务器发生错误！"
 				});
-			} else if (error.response.status == 401) {
-				if(!loadQuitMsgBox){
-					loadQuitMsgBox = true
-					ElMessageBox.confirm('当前用户已被登出或无权限访问当前资源，请尝试重新登录后再操作。', '无权限访问', {
-						type: 'error',
-						closeOnClickModal: false,
-						center: true,
-						confirmButtonText: '重新登录'
-					}).then(() => {
-						loadQuitMsgBox = false
-						router.replace({path: '/login'});
-					}).catch(() => {
-						loadQuitMsgBox = false
-					})
-				}
+			} else if (error.response.status == 503) {
+                if (error.config?.showErrorNotification !== false) ElNotification.error({title:'认证服务暂不可用',message:'平台认证依赖故障，请稍后重试；当前登录状态已保留。'})
+            } else if (error.response.status == 401) {
+                if (ownsSession(error.config?.authContext)) clearAuth(error.config.authContext.generation)
 			} else if (error.config?.showErrorNotification !== false) {
 				ElNotification.error({
 					title: '请求错误',
@@ -100,7 +104,7 @@ axios.interceptors.response.use(
 			});
 		}
 
-		return Promise.reject(error.response);
+		return Promise.reject(error.response || error);
 	}
 );
 

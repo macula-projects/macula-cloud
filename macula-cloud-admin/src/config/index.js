@@ -36,14 +36,10 @@ const DEFAULT_CONFIG = {
 
     OAUTH_CLIENT_ID: import.meta.env.VITE_APP_OAUTH_CLIENT_ID,
 
-    OAUTH_CLIENT_SECRET: import.meta.env.VITE_APP_OAUTH_CLIENT_SECRET,
+    OAUTH_AUTHORITY: import.meta.env.VITE_APP_OAUTH_AUTHORITY,
+    ADMIN_PUBLIC_URL: import.meta.env.VITE_APP_ADMIN_PUBLIC_URL,
+    OAUTH_SCOPE: import.meta.env.VITE_APP_OAUTH_SCOPE || 'openid profile',
 
-    OAUTH_SCOPE: import.meta.env.VITE_APP_OAUTH_SCOPE,
-
-    DEMO_USERNAME: import.meta.env.VITE_APP_DEMO_USERNAME,
-
-    DEMO_PASSWORD: import.meta.env.VITE_APP_DEMO_PASSWORD,
-    
     //请求超时
     TIMEOUT: 10000,
 

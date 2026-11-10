@@ -35,13 +35,14 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * 在显式隔离 MySQL 中验证 V8 到 V11 的标识预检、Client 默认拒绝与过时配置清理。
+ * 在显式隔离 MySQL 中验证 V8 到 V14 的 Client 升级和应用类型列不回填。
  *
  * @author Rain
  * @since 6.1.0
  */
 @EnabledIfEnvironmentVariable(named = "SYSTEM_EXTERNAL_LOGIN_MIGRATION_IT", matches = "true")
 class ExternalCredentialLoginMigrationIT {
+    /** 验证顺序升级保留原 Client 字段且不猜测历史应用类型。 */
     @Test
     void validatesHistoricalIdentifiersBeforeCreatingExternalLoginSchema() throws Exception {
         String url = System.getenv("SPRING_DATASOURCE_URL");
@@ -132,6 +133,26 @@ class ExternalCredentialLoginMigrationIT {
                 "SELECT COUNT(*) FROM sys_oauth2_client WHERE client_id = "
                     + "'e4da4a32-592b-46f0-ae1d-784310e88423' "
                     + "AND allowed_origins = 'https://admin.example.test'"));
+        }
+
+        flyway(url, username, password, "14").migrate();
+        try (Connection connection = DriverManager.getConnection(url, username, password)) {
+            assertEquals(3L, count(connection,
+                "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = ? "
+                    + "AND table_name = 'sys_oauth2_client' AND column_name IN ('application_type','miniapp_platform','hosted_login_methods') "
+                    + "AND is_nullable = 'YES'", database));
+            assertEquals(0L, count(connection,
+                "SELECT COUNT(*) FROM sys_oauth2_client WHERE application_type IS NOT NULL OR miniapp_platform IS NOT NULL OR hosted_login_methods IS NOT NULL"));
+            assertEquals(adminClientSnapshot, clientSnapshot(connection,
+                "e4da4a32-592b-46f0-ae1d-784310e88423"));
+        }
+
+        try (Connection connection = DriverManager.getConnection(url, username, password);
+             var statement = connection.createStatement()) {
+            statement.executeUpdate("UPDATE sys_oauth2_client SET hosted_login_methods='' WHERE id=1");
+            assertEquals(1L, count(connection, "SELECT COUNT(*) FROM sys_oauth2_client WHERE id=1 AND hosted_login_methods=''"));
+            statement.executeUpdate("UPDATE sys_oauth2_client SET hosted_login_methods=NULL WHERE id=1");
+            assertEquals(1L, count(connection, "SELECT COUNT(*) FROM sys_oauth2_client WHERE id=1 AND hosted_login_methods IS NULL"));
         }
 
         v11.clean();

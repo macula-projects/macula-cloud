@@ -18,6 +18,9 @@
 package dev.macula.cloud.iam.config;
 
 import dev.macula.cloud.iam.authentication.challenge.LoginCaptchaProperties;
+import dev.macula.cloud.iam.authentication.hosted.HostedLoginClientPolicyService;
+import dev.macula.cloud.iam.authentication.hosted.HostedLoginPolicyFilter;
+import org.springframework.security.web.authentication.logout.LogoutFilter;
 import dev.macula.cloud.iam.authentication.dingtalk.DingtalkLoginFilterConfigurer;
 import dev.macula.cloud.iam.authentication.dingtalk.DingtalkLoginMode;
 import dev.macula.cloud.iam.authentication.feishu.FeishuLoginFilterConfigurer;
@@ -69,25 +72,51 @@ import org.springframework.security.web.authentication.SavedRequestAwareAuthenti
  * @since 2023/3/11 22:25
  */
 @EnableWebSecurity
+@org.springframework.context.annotation.Import(MfaExtensionConfiguration.class)
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties({SmsVerificationProperties.class, EmailVerificationProperties.class,
     LoginCaptchaProperties.class})
 public class DefaultSecurityConfiguration {
+    private static final String DEVTOOLS_WORKSPACE_PATH = "/.well-known/appspecific/com.chrome.devtools.json";
+
+    /** 两条链共享缓存；浏览器探测不能覆盖登录续转，其他请求仍执行Spring默认规则。 */
+    @Bean
+    org.springframework.security.web.savedrequest.RequestCache browserRequestCache() {
+        return new org.springframework.security.web.savedrequest.HttpSessionRequestCache() {
+            /** 仅跳过精确探测路径，不放行端点或改变已保存的授权请求。 */
+            @Override
+            public void saveRequest(jakarta.servlet.http.HttpServletRequest request,
+                jakarta.servlet.http.HttpServletResponse response) {
+                if (request.getRequestURI().equals(request.getContextPath() + DEVTOOLS_WORKSPACE_PATH)) {
+                    return;
+                }
+                super.saveRequest(request, response);
+            }
+        };
+    }
+
     @Bean
     @ConditionalOnMissingBean(name = "identifierNormalizer")
     public UserIdentifierNormalizer identifierNormalizer() {
         return new UserIdentifierNormalizer();
     }
 
+    /** 装配托管登录过滤链，CSRF先于Client策略，策略先于密码和SMS认证。 */
     @Bean
     @Order(Ordered.HIGHEST_PRECEDENCE + 2)
     SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http,
         @Qualifier("sysUserDetailsService") UserDetailsService userDetailsService,
-        BrowserAuthenticationFailureHandler authenticationFailureHandler) throws Exception {
+        BrowserAuthenticationFailureHandler authenticationFailureHandler,
+        HostedLoginClientPolicyService hostedPolicy,
+        dev.macula.cloud.iam.authentication.mfa.MfaCompletionService mfaCompletion,
+        org.springframework.security.web.savedrequest.RequestCache browserRequestCache) throws Exception {
+        http.sessionManagement(session -> session.addSessionAuthenticationStrategy(
+            new dev.macula.cloud.iam.authentication.mfa.MfaSessionAuthenticationStrategy(mfaCompletion)));
         // @formatter:off
         SavedRequestAwareAuthenticationSuccessHandler authenticationSuccessHandler =
             new SavedRequestAwareAuthenticationSuccessHandler();
-        http.authorizeHttpRequests(authorize -> authorize
+        http.requestCache(cache -> cache.requestCache(browserRequestCache))
+            .authorizeHttpRequests(authorize -> authorize
                 .requestMatchers("/component/**").permitAll()
                 .requestMatchers("/actuator/health").permitAll()
                 .requestMatchers("/h2-console/**").permitAll()
@@ -105,12 +134,15 @@ public class DefaultSecurityConfiguration {
                     FeishuLoginMode.BROWSER.loginPath(), ThirdPartyProviderType.DINGTALK.loginPath(),
                     DingtalkLoginMode.BROWSER.loginPath(), ThirdPartyProviderType.WECHAT.loginPath(),
                     WechatLoginMode.BROWSER.loginPath(), WechatLoginMode.WEBVIEW.loginPath(),
-                    ThirdPartyBindingController.BINDING_PATH,
+                    ThirdPartyBindingController.BINDING_PATH, "/login/bind/external", "/login/bind/sms-code",
                     ThirdPartyBindingController.BINDING_CANCEL_PATH).permitAll()
                 .requestMatchers("/api/v1/sms-code").permitAll()
                 .anyRequest().authenticated())
             .userDetailsService(userDetailsService)
             .csrf(Customizer.withDefaults());
+
+        // LogoutFilter在CSRF之后、两类表单认证之前，确保拒绝不产生认证或发码副作用。
+        http.addFilterBefore(new HostedLoginPolicyFilter(hostedPolicy, authenticationFailureHandler), LogoutFilter.class);
 
         // FORM登录
         http.formLogin(form -> form
@@ -173,6 +205,16 @@ public class DefaultSecurityConfiguration {
             return new SmsServiceImpl(store, dispatcher, identifierNormalizer);
         }
         return new SmsService() {
+            /** 未配置短信时所有绑定用途同样失败关闭。 */
+            @Override
+            public boolean verifyCode(String phone, String code, String clientId,
+                dev.macula.cloud.iam.authentication.sms.SmsCodePurpose purpose) { return false; }
+
+            /** 禁止绑定页面绕过短信基础设施配置。 */
+            @Override
+            public void sendCode(String phone, String ip, String clientId,
+                dev.macula.cloud.iam.authentication.sms.SmsCodePurpose purpose) { sendCode(phone); }
+
             @Override
             public boolean verifyCode(String phone, String rawCode) {
                 return false;

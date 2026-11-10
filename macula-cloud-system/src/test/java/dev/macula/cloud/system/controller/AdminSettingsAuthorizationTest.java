@@ -17,7 +17,9 @@
 package dev.macula.cloud.system.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import dev.macula.cloud.system.service.*;
+import dev.macula.cloud.system.service.IdentityProviderService;
+import dev.macula.cloud.system.service.MessageSettingsService;
+import dev.macula.cloud.system.service.OAuth2ClientConfigService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -26,7 +28,6 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
-import java.util.List;
 
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -46,7 +47,8 @@ class AdminSettingsAuthorizationTest {
     private final MockMvc mvc = MockMvcBuilders.standaloneSetup(
         new IdentityProviderController(identity),
         new MessageSettingsController(message),
-        new OAuth2ClientConfigController(oauth)).build();
+        new OAuth2ClientConfigController(oauth,
+            mock(dev.macula.cloud.system.service.OAuth2IssuerMetadataService.class), mock(dev.macula.cloud.system.service.OAuth2ClientConfigurationCatalogService.class))).build();
 
     @AfterEach
     void clearContext() {
@@ -73,8 +75,17 @@ class AdminSettingsAuthorizationTest {
     void nonRootCanReachManagementWriteWhenRouteAllows() throws Exception {
         SecurityContextHolder.getContext().setAuthentication(
             new TestingAuthenticationToken("config-manager", "unused", "ROLE_CONFIG_MANAGER"));
-        mvc.perform(delete("/api/v1/oauth2-clients/1")).andExpect(status().isOk());
-        verify(oauth).delete(1L);
+        mvc.perform(delete("/api/v1/oauth2-clients/1").param("configurationVersion", "fixture-version")).andExpect(status().isOk());
+        verify(oauth).delete(1L, "fixture-version");
+    }
+
+    /** 草稿创建不能通过额外字段指定客户端ID或直接启用认证。 */
+    @Test
+    void draftCreationRejectsInjectedAuthenticationConfiguration() throws Exception {
+        mvc.perform(post("/api/v1/oauth2-clients/drafts").contentType(MediaType.APPLICATION_JSON)
+            .content("{\"clientName\":\"App\",\"applicationType\":\"SPA\",\"configurationStatus\":\"ENABLED\"}"))
+            .andExpect(status().isBadRequest());
+        verify(oauth,never()).createDraft(any());
     }
 
     @Test

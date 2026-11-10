@@ -12,21 +12,11 @@ vi.mock("@/utils/request", () => ({
 import identity from "@/api/model/system/identityProvider";
 import message from "@/api/model/system/messageSettings";
 import oauth, {
-  AUTHORIZATION_CODE_GRANT,
-  CLIENT_TERMINALS,
-  COMMON_EXTERNAL_CODE_TYPES,
-  EXTERNAL_CODE_GRANT,
-  TERMINAL_LOGIN_METHODS,
   invalidSelectedBrowserProviders,
-  isLegacyConfidentialVerificationClient,
-  loginCapabilitySummary,
-  normalizeTerminalLoginConfiguration,
   oauthClientErrorMessage,
   reconcileExternalProviderBindings,
-  terminalForClient,
-  unsupportedExternalCodeTypes,
-  updateLoginMethodConfiguration,
 } from "@/api/model/system/oauth2Client";
+import {configurationIssues, grantIssue} from "@/utils/oauthClientConfiguration";
 import identityPage from "@/views/system/identityProvider/index.vue?raw";
 import { Wecom } from "@/assets/icons";
 import messagePage from "@/views/system/messageSettings/index.vue?raw";
@@ -39,7 +29,7 @@ describe("平台身份、消息与接入应用管理", () => {
       await identity.list({ pageNum: 1 }),
       await message.provider("MAIL"),
       await oauth.list({ pageNum: 1 }),
-      await oauth.externalCodeCatalog(),
+      await oauth.configurationCatalog(),
     ])
       expect(result.url).toContain("/system/api/v1/");
   });
@@ -50,26 +40,23 @@ describe("平台身份、消息与接入应用管理", () => {
     expect(result.data).toBeUndefined();
   });
 
-  it("recognizes legacy verification clients and exposes only safe business errors", () => {
+  it("rejects confidential verification grants and exposes only safe business errors", () => {
     expect(
-      isLegacyConfidentialVerificationClient({
+      Boolean(grantIssue({enabledProtocols:["OAUTH2_1"],
         clientAuthenticationMethods: "client_secret_basic,client_secret_post",
         authorizationGrantTypes:
           "authorization_code,client_credentials,refresh_token,password,sms",
-      })
+      }, "sms"))
     ).toBe(true);
     expect(
-      isLegacyConfidentialVerificationClient({
+      Boolean(grantIssue({enabledProtocols:["OAUTH2_1"],
         clientAuthenticationMethods: "none",
         authorizationGrantTypes: "authorization_code,sms",
-      })
+      }, "sms"))
     ).toBe(false);
     expect(
-      isLegacyConfidentialVerificationClient({
-        clientAuthenticationMethods: "",
-        authorizationGrantTypes: "sms",
-      })
-    ).toBe(false);
+      configurationIssues({clientAuthenticationMethods:"", authorizationGrantTypes:"sms"}).join(" ")
+    ).toContain("认证方式");
     expect(
       oauthClientErrorMessage({
         cause: '400 BAD_REQUEST "短信或邮箱验证码 grant 必须由公共客户端使用"',
@@ -115,101 +102,8 @@ describe("平台身份、消息与接入应用管理", () => {
     expect(messagePage).toContain('sandbox=""');
     expect(messagePage).not.toContain("EXCHANGE");
     expect(messagePage).not.toContain('value:"CUSTOM",label:"自定义短信"');
-    expect(oauthPage).toContain("<el-drawer");
-    expect(oauthPage).not.toContain("<el-dialog");
-    expect(oauthPage).toContain('size="min(920px, 100vw)"');
-    expect(oauthPage).toContain('class="form-section basic-fields"');
-    expect(oauthPage).toContain('class="form-section capability-section"');
-    expect(oauthPage).toContain("padding: 0 28px 32px");
-    expect(oauthPage).toContain("grid-template-columns: 1fr");
-    expect(oauthPage).toMatch(/clientSecret:\s*["']{2}/);
-    expect(oauthPage).toContain("所属租户");
-    expect(oauthPage).toContain("先选择终端，再选择该终端允许的登录方式");
-    expect(oauthPage).toContain("终端类型");
-    expect(oauthPage).toContain("允许的登录方式");
-    expect(oauthPage).toContain("externalCodeTypes");
-    expect(oauthPage).toContain("externalProviderBindings");
-    expect(oauthPage).toContain("allowedOriginsText");
-    expect(oauthPage).toContain("浏览器协议允许 Origin");
-    expect(oauthPage).toContain("留空时拒绝该 Client 的全部浏览器跨域协议请求");
-    expect(oauthPage).not.toContain("历史兼容 Code");
-    expect(oauthPage).not.toContain("浏览器兼容凭证");
-    expect(oauthPage).not.toContain("legacy-code-config");
-    expect(oauthPage).toContain("历史验证码客户端兼容模式");
-    expect(oauthPage).toContain("legacyCompatibility");
-    expect(oauthPage).toContain("externalCodeCatalog");
-    expect(oauthPage).toContain("activeTerminal");
-    expect(oauthPage).toContain("activeLoginMethods");
-    expect(oauthPage).toContain("toggleLoginMethod");
-    expect(oauthPage).toContain("高级协议配置");
-    expect(oauthPage).toContain("browserLoginProviderTypes");
-    expect(oauthPage).toContain("directLoginProviderType");
-    expect(oauthPage).toContain("selectedBrowserLoginProviders");
-    expect(oauthPage).toContain("updateLoginMethodConfiguration");
-    expect(oauthPage).toContain("reconcileExternalProviderBindings");
-  });
-
-  it("maps terminal login choices to stable protocol values", () => {
-    expect(CLIENT_TERMINALS.map((terminal) => terminal.value)).toEqual([
-      "BROWSER",
-      "APP",
-      "WECHAT_MINIAPP",
-      "WECOM_MINIAPP",
-      "WEBVIEW",
-    ]);
-    expect(TERMINAL_LOGIN_METHODS.WECHAT_MINIAPP).toEqual([
-      expect.objectContaining({
-        label: "微信身份登录",
-        externalCodeType: "WECHAT_MINIAPP_LOGIN_CODE",
-      }),
-      expect.objectContaining({
-        label: "微信手机号登录",
-        externalCodeType: "WECHAT_MINIAPP_PHONE_CODE",
-      }),
-    ]);
-    expect(TERMINAL_LOGIN_METHODS.WECOM_MINIAPP[0]).toEqual(
-      expect.objectContaining({ externalCodeType: "WECOM_MINIAPP_CODE" })
-    );
-    expect(TERMINAL_LOGIN_METHODS.WEBVIEW).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ externalCodeType: "FEISHU_WEBVIEW_CODE" }),
-        expect.objectContaining({ externalCodeType: "DINGTALK_WEBVIEW_CODE" }),
-        expect.objectContaining({ browserProviderType: "WECOM" }),
-        expect.objectContaining({ browserProviderType: "WECHAT" }),
-      ])
-    );
-    expect(COMMON_EXTERNAL_CODE_TYPES).not.toContain("FEISHU_BROWSER_CODE");
-  });
-
-  it("drops unsupported browser code types and bindings from edited clients", () => {
-    expect(
-      normalizeTerminalLoginConfiguration({
-        authorizationGrantTypes: `authorization_code,${EXTERNAL_CODE_GRANT}`,
-        externalCodeTypes: ["FEISHU_BROWSER_CODE", "WECOM_APP_CODE"],
-        externalProviderBindings: {
-          FEISHU_BROWSER_CODE: 10,
-          WECOM_APP_CODE: 20,
-        },
-      })
-    ).toEqual(
-      expect.objectContaining({
-        externalCodeTypes: ["WECOM_APP_CODE"],
-        externalProviderBindings: { WECOM_APP_CODE: 20 },
-      })
-    );
-    expect(
-      normalizeTerminalLoginConfiguration({
-        authorizationGrantTypes: `authorization_code,${EXTERNAL_CODE_GRANT}`,
-        externalCodeTypes: ["FEISHU_BROWSER_CODE"],
-        externalProviderBindings: { FEISHU_BROWSER_CODE: 10 },
-      })
-    ).toEqual(
-      expect.objectContaining({
-        authorizationGrantTypes: "authorization_code",
-        externalCodeTypes: [],
-        externalProviderBindings: {},
-      })
-    );
+    expect(oauthPage).toContain("ClientApplication");
+    expect(oauthPage).not.toContain("<el-drawer");
   });
 
   it("reconciles edited client bindings against the current provider catalog", () => {
@@ -231,10 +125,10 @@ describe("平台身份、消息与接入应用管理", () => {
           capability: "DEFAULT",
         },
       ],
-      providerRegistrations: [
-        { id: 20, providerType: "WECOM", capabilities: ["DEFAULT"] },
-        { id: 30, providerType: "FEISHU", capabilities: ["DEFAULT"] },
-        { id: 31, providerType: "FEISHU", capabilities: ["DEFAULT"] },
+      sources: [
+        { id:20, providerType:"WECOM", available:true, capabilities:[{codeType:"WECOM_APP_CODE"}] },
+        { id:30, providerType:"FEISHU", available:true, capabilities:[{codeType:"FEISHU_APP_CODE"}] },
+        { id:31, providerType:"FEISHU", available:true, capabilities:[{codeType:"FEISHU_APP_CODE"}] },
       ],
     };
     const client = {
@@ -256,7 +150,6 @@ describe("平台身份、消息与接入应用管理", () => {
     expect(reconcileExternalProviderBindings(client, catalog)).toEqual({
       WECOM_APP_CODE: 20,
       FEISHU_APP_CODE: 30,
-      REMOVED_CODE: 99,
     });
     expect(
       reconcileExternalProviderBindings(
@@ -272,80 +165,16 @@ describe("平台身份、消息与接入应用管理", () => {
     ).not.toHaveProperty("FEISHU_APP_CODE");
   });
 
-  it("updates grants, shared web providers, direct login and bindings together", () => {
-    const appMethod = TERMINAL_LOGIN_METHODS.APP.find(
-      (method) => method.value === "APP_WECOM"
-    );
-    let client = updateLoginMethodConfiguration(
-      {
-        authorizationGrantTypes: AUTHORIZATION_CODE_GRANT,
-        externalCodeTypes: [],
-        externalProviderBindings: {},
-        browserLoginProviderTypes: ["WECOM"],
-        directLoginProviderType: "WECOM",
-      },
-      appMethod,
-      true,
-      [{ id: 20 }]
-    );
-    expect(client.externalCodeTypes).toEqual(["WECOM_APP_CODE"]);
-    expect(client.externalProviderBindings).toEqual({ WECOM_APP_CODE: 20 });
-    expect(client.authorizationGrantTypes).toContain(EXTERNAL_CODE_GRANT);
-
-    const sharedWebMethod = TERMINAL_LOGIN_METHODS.WEBVIEW.find(
-      (method) => method.value === "WEBVIEW_WECOM"
-    );
-    client = updateLoginMethodConfiguration(client, sharedWebMethod, false);
-    expect(client.browserLoginProviderTypes).toEqual([]);
-    expect(client.directLoginProviderType).toBe("");
-
-    client = updateLoginMethodConfiguration(client, appMethod, false);
-    expect(client.externalCodeTypes).toEqual([]);
-    expect(client.externalProviderBindings).toEqual({});
-    expect(client.authorizationGrantTypes).not.toContain(EXTERNAL_CODE_GRANT);
-  });
-
-  it("derives editing terminal, shared summaries and unsupported values", () => {
-    const catalog = {
-      codeTypes: [
-        { value: "WECOM_APP_CODE", scene: "APP" },
-        { value: "FEISHU_WEBVIEW_CODE", scene: "WEBVIEW" },
-      ],
-    };
-    expect(
-      terminalForClient({ externalCodeTypes: ["WECOM_APP_CODE"] }, catalog)
-    ).toBe("APP");
-    expect(
-      loginCapabilitySummary({
-        browserLoginProviderTypes: ["GITHUB", "WECOM", "WECHAT"],
-        externalCodeTypes: ["WECOM_APP_CODE", "REMOVED_CODE"],
-      })
-    ).toBe("浏览器：GitHub；网页（浏览器/端内）：企业微信、微信；企业微信 SDK");
-    expect(
-      unsupportedExternalCodeTypes(
-        { externalCodeTypes: ["WECOM_APP_CODE", "REMOVED_CODE"] },
-        catalog,
-        true
-      )
-    ).toEqual(["REMOVED_CODE"]);
-    expect(
-      unsupportedExternalCodeTypes(
-        { externalCodeTypes: ["REMOVED_CODE"] },
-        catalog,
-        false
-      )
-    ).toEqual([]);
-  });
-
-  it("rejects selected browser providers without exactly one registration", () => {
+  it("requires an explicit compatible source for each selected browser provider", () => {
     const client = {
       browserLoginProviderTypes: ["GITHUB", "WECOM", "FEISHU"],
+      browserProviderBindings: {GITHUB:1},
     };
     const catalog = {
-      providerRegistrations: [
-        { id: 1, providerType: "GITHUB" },
-        { id: 2, providerType: "FEISHU" },
-        { id: 3, providerType: "FEISHU" },
+      sources: [
+        { id:1, providerType:"GITHUB", available:true, browser:true },
+        { id:2, providerType:"FEISHU", available:true, browser:true },
+        { id:3, providerType:"FEISHU", available:true, browser:true },
       ],
     };
 

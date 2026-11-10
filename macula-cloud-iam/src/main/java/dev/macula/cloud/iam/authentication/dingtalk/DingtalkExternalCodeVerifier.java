@@ -17,6 +17,8 @@
 package dev.macula.cloud.iam.authentication.dingtalk;
 
 import dev.macula.cloud.iam.authentication.thirdparty.IdentityProviderConfigService;
+import dev.macula.cloud.iam.authentication.thirdparty.VerifiedExternalIdentity;
+import java.util.Map;
 import dev.macula.cloud.iam.authentication.thirdparty.IdentityProviderConfigService.ProviderConfig;
 import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeVerification;
 import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeVerifier;
@@ -49,12 +51,15 @@ public class DingtalkExternalCodeVerifier implements ExternalCodeVerifier {
 
     @Override
     public ExternalCodeVerification verify(ExternalCodeType codeType, Long identityProviderId, String code) {
-        ProviderConfig config = configs.requireEnabledById(identityProviderId, PROVIDER_TYPE);
+        ProviderConfig config = configs.requireEnabledById(identityProviderId, PROVIDER_TYPE).forCode(codeType);
+            if (!config.sourceType().supports(codeType)) { throw new IllegalArgumentException("来源不支持此凭证类型"); }
         DingtalkLoginMode mode = switch (codeType) {
             case DINGTALK_APP_CODE -> DingtalkLoginMode.APP;
             case DINGTALK_WEBVIEW_CODE -> DingtalkLoginMode.WEBVIEW;
             default -> throw new IllegalArgumentException("Unsupported DingTalk external code type");
         };
-        return ExternalCodeVerification.identity(PROVIDER_TYPE, client.fetchUserId(config, code, mode));
+        String subject = client.fetchUserId(config, code, mode);
+        return new ExternalCodeVerification(VerifiedExternalIdentity.of(config, codeType.name(),
+            VerifiedExternalIdentity.MEMBER_ID, subject, Map.of("member_id", subject)));
     }
 }

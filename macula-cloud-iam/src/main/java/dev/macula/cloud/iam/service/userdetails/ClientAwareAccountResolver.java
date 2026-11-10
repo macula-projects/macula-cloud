@@ -16,20 +16,15 @@
  */
 package dev.macula.cloud.iam.service.userdetails;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import dev.macula.cloud.iam.enums.UserTypeEnum;
-import dev.macula.cloud.iam.mapper.SysUserIdentityBindingMapper;
 import dev.macula.cloud.iam.pojo.entity.SysUser;
-import dev.macula.cloud.iam.pojo.entity.SysUserIdentityBinding;
 import dev.macula.cloud.iam.service.support.SysUserService;
 import dev.macula.cloud.system.security.UserIdentifierNormalizer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.stereotype.Service;
-import org.springframework.util.StringUtils;
 
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -43,7 +38,6 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class ClientAwareAccountResolver {
     private final SysUserService users;
-    private final SysUserIdentityBindingMapper bindings;
     private final UserIdentifierNormalizer normalizer;
 
     /**
@@ -90,36 +84,6 @@ public class ClientAwareAccountResolver {
     public Optional<SysUser> findByEmail(UserTypeEnum userType, String email) {
         requireEmployee(userType);
         return normalizer.email(email).map(users::findUniqueByEmail);
-    }
-
-    /**
-     * 按 provider 和稳定主体读取唯一的外部身份绑定。
-     *
-     * @param userType OAuth Client 用户类型
-     * @param providerType 固定提供商类型
-     * @param subject 已核验的稳定主体
-     * @return 可能存在的唯一账号
-     */
-    public Optional<SysUser> findByExternalIdentity(UserTypeEnum userType, String providerType, String subject) {
-        requireEmployee(userType);
-        if (!StringUtils.hasText(providerType) || !StringUtils.hasText(subject)) {
-            throw denied();
-        }
-        List<SysUserIdentityBinding> matches = bindings.selectList(
-            new LambdaQueryWrapper<SysUserIdentityBinding>()
-                .eq(SysUserIdentityBinding::getProviderType, providerType)
-                .eq(SysUserIdentityBinding::getProviderSubject, subject));
-        if (matches.size() > 1) {
-            throw denied();
-        }
-        if (matches.isEmpty()) {
-            return Optional.empty();
-        }
-        SysUser account = users.findUniqueByUsername(matches.get(0).getUsername());
-        if (account == null) {
-            throw denied();
-        }
-        return Optional.of(account);
     }
 
     private void addCandidate(Map<Long, SysUser> candidates, SysUser user) {

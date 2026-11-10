@@ -49,7 +49,7 @@ class DingtalkLoginModeTest {
     @Test
     void browserUsesOfficialEndpointAndWebviewLoginIsRejected() {
         DingtalkClient client = new DingtalkClient();
-        ProviderConfig config = new ProviderConfig("DINGTALK", "app", "secret", Map.of(
+        ProviderConfig config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(dev.macula.cloud.system.enums.IdentitySourceType.DINGTALK_WEB, "DINGTALK", "app", "secret", Map.of(
             "appKey", "app", "corpId", "corp"));
         String callback = "https://iam.example/login/dingtalk";
         assertTrue(client.authorizationUri(config, "state-value", callback, DingtalkLoginMode.BROWSER)

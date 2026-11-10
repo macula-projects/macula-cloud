@@ -1,677 +1,495 @@
 <template>
-  <div class="client-page" v-loading="loading">
-    <h2>{{ $t("adminSettings.oauth") }}</h2>
-    <el-alert
-      :title="$t('adminSettings.oauthWarning')"
-      type="info"
-      :closable="false"
-    />
-    <div class="toolbar">
-      <el-input
-        v-model="filter.keyword"
-        placeholder="Client ID / 名称"
-        clearable
-        @keyup.enter="load"
-      /><el-button @click="load">查询</el-button
-      ><el-button type="primary" @click="open()">新增接入应用</el-button>
-    </div>
-    <el-table :data="rows" empty-text="暂无接入应用" stripe>
-      <el-table-column prop="clientName" label="应用名称" />
-      <el-table-column
-        prop="clientId"
-        label="Client ID"
-        show-overflow-tooltip
-      />
-      <el-table-column prop="tenantId" label="租户 ID" width="100" />
-      <el-table-column prop="userType" label="用户类型" width="100" />
-      <el-table-column label="登录能力" min-width="260">
-        <template #default="{ row }">{{
-          loginCapabilitySummary(row)
-        }}</template>
-      </el-table-column>
-      <el-table-column label="PKCE" width="80"
-        ><template #default="{ row }">{{
-          row.requireProofKey ? "是" : "否"
-        }}</template></el-table-column
-      >
-      <el-table-column label="密钥" width="90"
-        ><template #default="{ row }">{{
-          row.secretConfigured ? "已配置" : "无"
-        }}</template></el-table-column
-      >
-      <el-table-column label="操作" width="220"
-        ><template #default="{ row }">
-          <el-button link type="primary" @click="open(row)">编辑</el-button>
-          <el-button
-            link
-            type="primary"
-            :disabled="
-              !row.clientAuthenticationMethods.includes('client_secret_')
-            "
-            @click="resetSecret(row)"
-            >重置密钥</el-button
+  <el-container class="client-page" direction="vertical" v-loading="loading">
+    <template v-if="!editing">
+      <el-header>
+        <div class="left-panel">
+          <el-button type="primary" @click="navigate('new')"
+            >创建应用</el-button
           >
-          <el-popconfirm title="确认删除客户端？" @confirm="remove(row)"
-            ><template #reference
-              ><el-button link type="danger">删除</el-button></template
-            ></el-popconfirm
-          >
-        </template></el-table-column
-      >
-    </el-table>
-    <el-pagination
-      v-model:current-page="filter.pageNum"
-      v-model:page-size="filter.pageSize"
-      :total="total"
-      layout="total, prev, pager, next"
-      @current-change="load"
-    />
-    <el-drawer
-      v-model="drawer"
-      class="oauth-client-drawer"
-      :title="form.id ? '编辑接入应用' : '新增接入应用'"
-      size="min(920px, 100vw)"
-      direction="rtl"
-      @closed="reset"
-    >
-      <el-alert
-        v-if="legacyCompatibility"
-        class="legacy-client-warning"
-        title="历史验证码客户端兼容模式"
-        description="可以维护 Origin 等现有配置；认证方式或授权方式只有在完整整改为合法配置时才能修改。"
-        type="warning"
-        :closable="false"
-        show-icon
-      />
-      <el-form
-        ref="formRef"
-        class="client-form"
-        :model="form"
-        label-width="150px"
-        :rules="rules"
-      >
-        <div class="form-section basic-fields">
-          <el-form-item label="应用名称" prop="clientName"
-            ><el-input v-model="form.clientName"
-          /></el-form-item>
-          <el-form-item label="Client ID" prop="clientId"
-            ><el-input v-model="form.clientId" :disabled="!!form.id"
-          /></el-form-item>
-          <el-form-item label="所属租户" prop="tenantId"
-            ><el-select v-model="form.tenantId" filterable style="width: 100%"
-              ><el-option
-                v-for="item in tenants"
-                :key="item.value"
-                :label="item.label"
-                :value="item.value" /></el-select
-          ></el-form-item>
-          <el-form-item label="用户类型" prop="userType"
-            ><el-select v-model="form.userType"
-              ><el-option
-                v-for="item in userTypes"
-                :key="item.value"
-                :label="item.label"
-                :value="item.value" /></el-select
-          ></el-form-item>
         </div>
-        <el-divider class="section-divider" content-position="left"
-          >登录能力</el-divider
-        >
-        <div class="form-section capability-section">
-          <el-alert
-            title="先选择终端，再选择该终端允许的登录方式。底层协议参数由系统自动配置。"
-            type="info"
-            :closable="false"
-            show-icon
-          />
-          <el-form-item label="终端类型">
-            <el-segmented
-              v-model="activeTerminal"
-              :options="terminalOptions"
-              @change="terminalChanged"
-            />
-          </el-form-item>
-          <div class="terminal-description">
-            {{ activeTerminalDefinition.description }}
-          </div>
-          <el-form-item label="允许的登录方式">
-            <div class="login-method-grid">
-              <el-checkbox
-                v-for="method in activeLoginMethods"
-                :key="method.value"
-                :model-value="isLoginMethodSelected(method)"
-                :disabled="loginMethodState(method).disabled"
-                :data-login-method="method.value"
-                border
-                @change="(selected) => toggleLoginMethod(method, selected)"
-              >
-                <span class="login-method-label">{{ method.label }}</span>
-                <small>{{ loginMethodState(method).hint }}</small>
-              </el-checkbox>
-            </div>
-          </el-form-item>
-          <template
-            v-for="method in selectedExternalMethodsForActiveTerminal"
-            :key="method.value"
-          >
-            <el-form-item
-              v-if="providerCandidates(method).length > 1"
-              :label="`${method.label}身份源`"
-            >
-              <el-select
-                v-model="form.externalProviderBindings[method.externalCodeType]"
-                placeholder="请选择身份源"
-                style="width: 100%"
-              >
-                <el-option
-                  v-for="provider in providerCandidates(method)"
-                  :key="provider.id"
-                  :label="provider.name"
-                  :value="provider.id"
-                />
-              </el-select>
-            </el-form-item>
-            <el-form-item
-              v-else-if="providerCandidates(method).length === 1"
-              :label="`${method.label}身份源`"
-            >
-              <span class="auto-binding"
-                >{{ providerCandidates(method)[0]?.name }}（自动绑定）</span
-              >
-            </el-form-item>
-            <el-alert
-              v-else
-              :title="`${method.label}缺少可用身份源，请先完成身份源配置`"
-              type="error"
-              :closable="false"
-              show-icon
-            />
-          </template>
-          <el-form-item
-            v-if="requiresAuthorizationCode"
-            label="重定向 URI"
-            prop="redirectUris"
-          >
+        <div class="right-panel">
+          <div class="right-panel-search">
             <el-input
-              v-model="form.redirectUris"
-              type="textarea"
-              placeholder="多个地址用逗号分隔"
-            />
-          </el-form-item>
-          <el-form-item
-            v-if="selectedBrowserLoginProviders.length"
-            label="进入登录页后"
-          >
-            <el-select
-              v-model="form.directLoginProviderType"
+              v-model="filter.keyword"
+              placeholder="Client ID / 名称"
               clearable
-              placeholder="展示可选登录方式"
-              style="width: 100%"
-            >
-              <el-option
-                v-for="provider in selectedBrowserLoginProviders"
-                :key="provider.value"
-                :label="`直接进入${provider.label}认证`"
-                :value="provider.value"
-              />
-            </el-select>
-          </el-form-item>
-        </div>
-        <el-collapse class="advanced-settings">
-          <el-collapse-item title="高级协议配置" name="protocol">
-            <el-alert
-              title="仅用于兼容特殊接入。通常无需直接修改 grant、code type 或 Token 参数。"
-              type="warning"
-              :closable="false"
-              show-icon
+              @keyup.enter="search"
+              @clear="search"
             />
-            <el-form-item label="认证方式"
-              ><el-select
-                v-model="form.clientAuthenticationMethods"
-                style="width: 100%"
-                @change="authChanged"
-                ><el-option label="公共客户端（none）" value="none" /><el-option
-                  label="client_secret_basic"
-                  value="client_secret_basic" /><el-option
-                  label="client_secret_post"
-                  value="client_secret_post" /><el-option
-                  label="private_key_jwt"
-                  value="private_key_jwt" /></el-select
-            ></el-form-item>
-            <el-form-item
-              v-if="
-                form.clientAuthenticationMethods.startsWith('client_secret_') &&
-                !form.id
+            <el-button type="primary" @click="search">查询</el-button>
+          </div>
+        </div>
+      </el-header>
+      <el-main class="nopadding client-list-main">
+        <el-table :data="rows" height="100%" stripe empty-text="暂无接入应用"
+          ><el-table-column
+            prop="clientName"
+            label="应用名称"
+            min-width="160"
+          /><el-table-column label="应用类型" min-width="130"
+            ><template #default="{ row }">{{
+              loginCapabilitySummary(row)
+            }}</template></el-table-column
+          ><el-table-column
+            prop="clientId"
+            label="Client ID"
+            min-width="200"
+            show-overflow-tooltip
+          /><el-table-column
+            prop="tenantId"
+            label="认证租户"
+            width="110"
+          /><el-table-column label="操作" width="160"
+            ><template #default="{ row }"
+              ><el-button link type="primary" @click="navigate(row.id)"
+                >配置</el-button
+              ><el-popconfirm v-if="!row.managedKey" title="确认删除应用？" @confirm="remove(row)"
+                ><template #reference
+                  ><el-button link type="danger">删除</el-button></template
+                ></el-popconfirm
+              ></template
+            ></el-table-column
+          ></el-table
+        >
+      </el-main>
+      <el-footer class="client-pagination">
+        <el-pagination
+          v-model:current-page="filter.pageNum"
+          :page-size="filter.pageSize"
+          :total="total"
+          layout="total, prev, pager, next"
+          @current-change="load"
+        />
+      </el-footer>
+    </template>
+    <template v-else>
+      <el-header class="detail-header">
+        <el-button @click="navigate()">返回列表</el-button>
+        <div>
+          <h2>{{ creating ? "创建应用" : form.clientName || "应用配置" }}</h2>
+          <p class="page-description">
+            {{
+              creating
+                ? "选择架构类型，系统自动准备适用配置。"
+                : loginCapabilitySummary(form)
+            }}
+          </p>
+        </div>
+        <el-tag class="configuration-status" :type="form.configurationStatus === 'ENABLED' ? 'success' : 'info'" effect="plain">{{ form.configurationStatus === 'ENABLED' ? '已启用' : '草稿' }}</el-tag>
+        <el-tag v-if="dirty" type="warning" effect="plain">未保存</el-tag>
+      </el-header>
+      <nav v-if="!detailError" class="detail-tabs" aria-label="应用设置分区">
+            <el-tabs
+              :model-value="activeTab"
+              @update:model-value="
+                (tab) => router.replace({ query: { ...route.query, tab } })
               "
-              label="客户端密钥"
-              prop="clientSecret"
-              ><el-input
-                v-model="form.clientSecret"
-                type="password"
-                show-password
-                autocomplete="new-password"
-                placeholder="至少 16 个字符，仅创建时传输"
-            /></el-form-item>
-            <el-form-item label="授权方式"
-              ><el-input
-                v-model="form.authorizationGrantTypes"
-                placeholder="authorization_code,refresh_token"
-            /></el-form-item>
-            <el-form-item v-if="!requiresAuthorizationCode" label="重定向 URI">
-              <el-input
-                v-model="form.redirectUris"
-                type="textarea"
-                placeholder="多个地址用逗号分隔"
-              />
-            </el-form-item>
-            <el-form-item label="Scopes"
-              ><el-input v-model="form.scopes" placeholder="openid,profile"
-            /></el-form-item>
-            <el-form-item label="浏览器协议允许 Origin">
-              <el-input
-                v-model="form.allowedOriginsText"
-                type="textarea"
-                :rows="3"
-                placeholder="每行一个精确 Origin，例如 https://app.example.com"
-              />
-              <span class="hint"
-                >留空时拒绝该 Client 的全部浏览器跨域协议请求</span
-              >
-            </el-form-item>
-            <el-form-item label="强制 PKCE"
-              ><el-switch
-                v-model="form.requireProofKey"
-                :disabled="form.clientAuthenticationMethods === 'none'"
-              /><span class="hint">公共客户端必须使用 S256</span></el-form-item
             >
-            <el-form-item label="授权确认"
-              ><el-switch v-model="form.requireAuthorizationConsent"
-            /></el-form-item>
-            <el-form-item label="JWK URL"
-              ><el-input v-model="form.jwkSetUrl"
-            /></el-form-item>
-            <el-form-item label="认证签名算法"
-              ><el-input
-                v-model="form.signingAlgorithm"
-                placeholder="仅 JWT 客户端认证使用"
-            /></el-form-item>
-            <el-form-item label="授权码 TTL（秒）"
-              ><el-input-number
-                v-model="form.authorizationCodeTimeToLive"
-                :min="30"
-                :max="3600"
-            /></el-form-item>
-            <el-form-item label="Access Token TTL（秒）"
-              ><el-input-number
-                v-model="form.accessTokenTimeToLive"
-                :min="60"
-                :max="86400"
-            /></el-form-item>
-            <el-form-item label="Refresh Token TTL（秒）"
-              ><el-input-number
-                v-model="form.refreshTokenTimeToLive"
-                :min="300"
-                :max="31536000"
-            /></el-form-item>
-            <el-form-item label="Token 格式"
-              ><el-select v-model="form.tokenFormat"
-                ><el-option
-                  label="self-contained"
-                  value="self-contained" /><el-option
-                  label="reference"
-                  value="reference" /></el-select
-            ></el-form-item>
-            <el-form-item label="复用 Refresh Token"
-              ><el-switch v-model="form.reuseRefreshTokens"
-            /></el-form-item>
-            <el-form-item label="ID Token 签名算法"
-              ><el-select v-model="form.idTokenSignatureAlgorithm"
-                ><el-option label="RS256" value="RS256" /><el-option
-                  label="RS384"
-                  value="RS384" /><el-option
-                  label="RS512"
-                  value="RS512" /></el-select
-            ></el-form-item>
-          </el-collapse-item>
-        </el-collapse>
-      </el-form>
-      <template #footer
-        ><el-button @click="drawer = false">取消</el-button
-        ><el-button type="primary" :loading="saving" @click="save"
-          >保存</el-button
+              <el-tab-pane v-if="form.purpose!=='RESOURCE_SERVER'" label="快速开始" name="quickstart" />
+              <el-tab-pane label="应用配置" name="application" />
+              <el-tab-pane v-if="form.purpose!=='RESOURCE_SERVER'" label="协议配置" name="protocol" />
+              <el-tab-pane v-if="form.purpose!=='RESOURCE_SERVER' && form.applicationType!=='SERVICE'" label="登录控制" name="login" />
+              <el-tab-pane v-if="form.purpose!=='RESOURCE_SERVER' && form.applicationType!=='SERVICE'" label="访问授权" name="access" />
+            </el-tabs>
+      </nav>
+      <el-main class="client-detail-main">
+        <el-alert
+          v-if="detailError"
+          :title="detailError"
+          type="error"
+          :closable="false"
+        /><el-button v-if="detailError" @click="loadDetail">重新加载</el-button>
+        <el-alert v-if="form.configurationStatus !== 'ENABLED' && !detailError" title="应用尚未完成配置，暂不可用于认证。" type="info" :closable="false" />
+        <el-form
+          v-if="!detailError"
+          ref="formRef"
+          :disabled="saving"
+          :model="form"
+          :rules="rules"
+          label-position="top"
+          class="configuration-form"
+          @submit.prevent="save(form.configurationStatus)"
+        >
+
+            <template v-if="form.purpose==='RESOURCE_SERVER'"><ResourceServerSettings v-model:client="draft" @copy="copyText" /></template>
+            <template v-else-if="activeTab === 'application'"
+              ><ClientApplication
+                v-model:client="draft"
+                :tenants="tenants"
+                :original-type="original?.applicationType" :catalog="catalog" :catalog-loaded="catalogLoaded"
+                @copy="copyText"
+            /></template>
+            <template v-else-if="activeTab === 'protocol'"
+              ><ClientProtocol
+                v-model:client="draft"
+                :original="original" :catalog="catalog" :catalog-loaded="catalogLoaded"
+                :catalog-loading="catalogLoading" :catalog-error="catalogError" @reload="loadCatalog"
+                :metadata="metadata" :metadata-loading="metadataLoading" @reload-metadata="loadMetadata" @copy="copyText" @manage-sources="router.replace({query:{...route.query,tab:'login'}})" /></template>
+            <ClientLoginControl
+              v-else-if="activeTab === 'login'"
+              v-model:client="draft"
+              :catalog="catalog"
+              :catalog-loaded="catalogLoaded"
+              :catalog-loading="catalogLoading"
+              :catalog-error="catalogError"
+              @reload="loadCatalog"
+            />
+            <ClientAccessAuthorization v-else-if="activeTab === 'access' && form.applicationType !== 'SERVICE'" v-model:client="draft" />
+            <ClientGuide
+              v-else
+              :client="form"
+              :catalog="catalog"
+              :metadata="metadata"
+              @copy="copyText"
+            />
+
+        </el-form>
+      </el-main>
+          <el-footer v-if="!detailError && !creating" class="save-bar" height="auto">
+            <span class="hint">{{
+              creating
+                ? "保存后应用类型不可修改"
+                : "修改将在保存后生效"
+            }}</span
+            ><el-button
+              v-if="!creating"
+              :disabled="!dirty || saving"
+              @click="discard"
+              >放弃更改</el-button
+            ><el-button :loading="saving" :disabled="!!form.managedKey" @click="save('DRAFT')">保存草稿并停用</el-button>
+            <el-button type="primary" :loading="saving" @click="save('ENABLED')">保存并启用</el-button>
+          </el-footer>
+    </template>
+    <el-dialog class="application-settings-dialog" top="5vh" :model-value="creating" title="创建应用" width="min(1080px, 94vw)" destroy-on-close @update:model-value="value => { if (!value && creating) navigate(); }">
+      <ClientCreate :client="form" @change="replaceDraft" />
+      <template #footer><el-button :disabled="saving" @click="navigate()">取消</el-button>
+        <el-button type="primary" :loading="saving" @click="createDraft">创建</el-button></template>
+    </el-dialog>
+    <el-dialog class="application-settings-dialog" top="5vh"
+      v-model="issuedOpen"
+      destroy-on-close
+      title="请保存本次客户端密钥"
+      width="min(560px, 94vw)"
+      @closed="issuedSecret = ''"
+    >
+      <p>密钥只在本次操作展示。关闭后无法读取，可通过重置生成新密钥。</p>
+      <el-input
+        :model-value="issuedSecret"
+        type="password"
+        show-password
+        readonly
+      /><el-button @click="copyText(issuedSecret)">复制密钥</el-button
+      ><template #footer
+        ><el-button @click="issuedOpen = false"
+          >已保存，关闭</el-button
         ></template
       >
-    </el-drawer>
-  </div>
+    </el-dialog>
+  </el-container>
 </template>
-
 <script>
-export default { name: "OAuth2ClientPage" };
+export default { name: "oauth2Client" };
 </script>
 <script setup>
-import { computed, onMounted, reactive, ref } from "vue";
+import { ensureProtocol, protocolDefaults } from "@/utils/applicationProtocolRegistry";
+import {
+  reactive,
+  ref,
+  computed,
+  watch,
+  onBeforeUnmount,
+  onDeactivated,
+} from "vue";
+import {
+  useRoute,
+  useRouter,
+  onBeforeRouteLeave,
+  onBeforeRouteUpdate,
+} from "vue-router";
 import { ElMessage, ElMessageBox } from "element-plus";
 import api, {
-  AUTHORIZATION_CODE_GRANT,
-  BROWSER_LOGIN_PROVIDERS,
-  CLIENT_TERMINALS,
-  TERMINAL_LOGIN_METHODS,
-  invalidSelectedBrowserProviders,
-  isLegacyConfidentialVerificationClient,
-  loginCapabilitySummary,
-  normalizeTerminalLoginConfiguration,
   oauthClientErrorMessage,
+  invalidSelectedBrowserProviders,
+  loginCapabilitySummary,
   providerCandidatesForCodeType,
-  reconcileExternalProviderBindings,
-  terminalForClient,
-  unsupportedExternalCodeTypes as findUnsupportedExternalCodeTypes,
-  updateLoginMethodConfiguration,
 } from "@/api/model/system/oauth2Client";
 import tenantApi from "@/api/model/system/tenant";
-
-const userTypes = [
-  { value: "member", label: "会员" },
-  { value: "employee", label: "行政员工" },
-  { value: "odc", label: "外包人员" },
-  { value: "supplier", label: "供应商" },
-];
-const blank = () => ({
-  id: null,
-  clientId: "",
-  clientName: "",
-  clientSecret: "",
-  clientAuthenticationMethods: "none",
-  authorizationGrantTypes: "authorization_code,refresh_token",
-  redirectUris: "",
-  scopes: "openid",
-  externalCodeTypes: [],
-  externalProviderBindings: {},
-  allowedOrigins: [],
-  allowedOriginsText: "",
-  browserLoginProviderTypes: [],
-  directLoginProviderType: "",
-  requireProofKey: true,
-  requireAuthorizationConsent: false,
-  jwkSetUrl: "",
-  signingAlgorithm: "",
-  authorizationCodeTimeToLive: 300,
-  accessTokenTimeToLive: 3600,
-  tokenFormat: "self-contained",
-  reuseRefreshTokens: true,
-  refreshTokenTimeToLive: 2592000,
-  idTokenSignatureAlgorithm: "RS256",
-  userType: "employee",
-  tenantId: null,
-});
-const form = reactive(blank()),
-  filter = reactive({ keyword: "", pageNum: 1, pageSize: 20 });
+import {
+  applicationTemplate,
+  clientPayload,
+  configurationIssues,
+} from "@/utils/oauthClientConfiguration";
+import ResourceServerSettings from "./components/ResourceServerSettings.vue";
+import ClientCreate from "./components/ClientCreate.vue";
+import ClientApplication from "./components/ClientApplication.vue";
+import ClientProtocol from "./components/ClientProtocol.vue";
+import ClientLoginControl from "./components/ClientLoginControl.vue";
+import ClientGuide from "./components/ClientGuide.vue";
+import ClientAccessAuthorization from "./components/ClientAccessAuthorization.vue";
+const route = useRoute(),
+  router = useRouter();
+const form = reactive({}),
+  original = ref(null),
+  snapshot = ref("");
 const rows = ref([]),
   total = ref(0),
   tenants = ref([]),
   loading = ref(false),
   saving = ref(false),
-  drawer = ref(false),
-  formRef = ref(),
-  activeTerminal = ref("BROWSER"),
-  terminalAutoSelected = ref(true),
+  detailError = ref("");
+const filter = reactive({ keyword: "", pageNum: 1, pageSize: 20 });
+const catalog = ref({ protocols: [], scopes: [], sources: [] }),
   catalogLoaded = ref(false),
-  legacyCompatibility = ref(false);
-const externalCatalog = ref({ codeTypes: [], providerRegistrations: [] });
-const browserLoginProviders = BROWSER_LOGIN_PROVIDERS;
-const terminalOptions = CLIENT_TERMINALS.map((terminal) => ({
-  value: terminal.value,
-  label: terminal.label,
-}));
-const activeTerminalDefinition = computed(() =>
-  CLIENT_TERMINALS.find((terminal) => terminal.value === activeTerminal.value)
+  catalogLoading = ref(false),
+  catalogError = ref("");
+const metadata = ref({}),
+  metadataLoading = ref({}),
+  issuedSecret = ref(""),
+  issuedOpen = ref(false),
+  formRef = ref();
+const editing = computed(() => !!route.query.id && route.query.id !== "new"),
+  creating = computed(() => route.query.id === "new");
+const activeTab = computed(() =>
+  ["quickstart", "application", "protocol", "login", "access"].includes(route.query.tab)
+    ? route.query.tab
+    : "quickstart"
 );
-const activeLoginMethods = computed(
-  () => TERMINAL_LOGIN_METHODS[activeTerminal.value] || []
+const dirty = computed(
+  () =>
+    editing.value &&
+    !!snapshot.value &&
+    JSON.stringify(clientPayload(form)) !== snapshot.value
 );
-const selectedBrowserLoginProviders = computed(() =>
-  browserLoginProviders.filter((provider) =>
-    form.browserLoginProviderTypes.includes(provider.value)
-  )
-);
-const requiresAuthorizationCode = computed(() =>
-  grantTypes().has(AUTHORIZATION_CODE_GRANT)
-);
-const selectedExternalMethodsForActiveTerminal = computed(() =>
-  activeLoginMethods.value.filter(
-    (method) => method.externalCodeType && isLoginMethodSelected(method)
-  )
-);
-const unsupportedExternalCodeTypes = computed(() => {
-  return findUnsupportedExternalCodeTypes(
-    form,
-    externalCatalog.value,
-    catalogLoaded.value
-  );
-});
-const invalidBrowserProviders = computed(() =>
-  invalidSelectedBrowserProviders(form, externalCatalog.value)
-);
+const draft = computed({ get: () => form, set: replaceDraft });
 const rules = {
   clientName: [{ required: true, message: "请输入应用名称" }],
-  clientId: [{ required: true, message: "请输入 Client ID" }],
-  tenantId: [{ required: true, message: "请选择租户" }],
-  userType: [{ required: true, message: "请选择用户类型" }],
-  clientSecret: [{ required: true, message: "请输入密钥" }],
-  redirectUris: [
-    {
-      validator: (_rule, value, callback) => {
-        if (requiresAuthorizationCode.value && !value?.trim()) {
-          callback(new Error("使用 IAM 授权登录时必须配置重定向 URI"));
-          return;
-        }
-        callback();
-      },
-      trigger: "blur",
-    },
-  ],
+  tenantId: [{ required: true, message: "请选择认证租户" }],
 };
-const unwrap = (res) => {
-  if (!res?.success) throw new Error(oauthClientErrorMessage(res));
-  return res.data;
+let requestVersion = 0,
+  disposed = false;
+const unwrap = (response) => {
+  if (!response?.success) throw new Error(oauthClientErrorMessage(response));
+  return response.data;
 };
+function replaceDraft(value) {
+  for (const key of Object.keys(form)) delete form[key];
+  Object.assign(form, value);
+}
+function markSaved() {
+  if(form.purpose!=='RESOURCE_SERVER' && form.protocol)ensureProtocol(form,form.protocol);
+  snapshot.value = JSON.stringify(clientPayload(form));
+}
+function search() {
+  filter.pageNum = 1;
+  load();
+}
 async function load() {
   loading.value = true;
   try {
-    const data = unwrap(await api.list({ ...filter }));
-    rows.value = data.records || [];
-    total.value = Number(data.total || 0);
+    const result = unwrap(await api.list({ ...filter }));
+    if (!disposed) {
+      rows.value = result.records || [];
+      total.value = Number(result.total || 0);
+    }
   } catch (error) {
-    rows.value = [];
     ElMessage.error(error.message);
   } finally {
     loading.value = false;
   }
 }
-async function loadTenants() {
+async function loadCatalog() {
+  catalogLoading.value = true;
+  catalogError.value = "";
   try {
-    tenants.value =
-      unwrap(await tenantApi.tenant.options.get({ filterMe: 0 })) || [];
-  } catch (error) {
-    ElMessage.error(error.message);
-  }
-}
-async function loadExternalCatalog() {
-  try {
-    externalCatalog.value = unwrap(await api.externalCodeCatalog()) || {
-      codeTypes: [],
-      providerRegistrations: [],
-    };
-    catalogLoaded.value = true;
-    reconcileBindings();
-    if (drawer.value && terminalAutoSelected.value) {
-      activeTerminal.value = terminalForClient(form, externalCatalog.value);
+    const value = unwrap(await api.configurationCatalog());
+    if (!disposed) {
+      catalog.value = value;
+      catalogLoaded.value = true;
     }
   } catch (error) {
     catalogLoaded.value = false;
-    ElMessage.error(error.message);
+    catalogError.value = "身份源目录加载失败，请重试：" + error.message;
+  } finally {
+    catalogLoading.value = false;
   }
 }
-function reset() {
-  Object.assign(form, blank());
-  activeTerminal.value = "BROWSER";
-  terminalAutoSelected.value = true;
-  legacyCompatibility.value = false;
-  formRef.value?.clearValidate();
-}
-function authChanged(value) {
-  if (value === "none") form.requireProofKey = true;
-  if (!value.startsWith("client_secret_")) form.clientSecret = "";
-}
-function open(row) {
-  const value = row || blank();
-  const normalizedValue = normalizeTerminalLoginConfiguration(value);
-  legacyCompatibility.value = isLegacyConfidentialVerificationClient(value);
-  Object.assign(form, blank(), normalizedValue, {
-    clientSecret: "",
-    externalCodeTypes: [...normalizedValue.externalCodeTypes],
-    externalProviderBindings: {
-      ...normalizedValue.externalProviderBindings,
-    },
-    allowedOrigins: [...(value.allowedOrigins || [])],
-    allowedOriginsText: (value.allowedOrigins || []).join("\n"),
-    browserLoginProviderTypes: [...(value.browserLoginProviderTypes || [])],
-    directLoginProviderType: value.directLoginProviderType || "",
-  });
-  reconcileBindings();
-  terminalAutoSelected.value = true;
-  activeTerminal.value = terminalForClient(
-    normalizedValue,
-    externalCatalog.value
-  );
-  drawer.value = true;
-}
-function terminalChanged() {
-  terminalAutoSelected.value = false;
-}
-function grantTypes() {
-  return new Set(
-    form.authorizationGrantTypes
-      .split(",")
-      .map((item) => item.trim())
-      .filter(Boolean)
-  );
-}
-function providerCandidates(method) {
-  return providerCandidatesForCodeType(
-    method.externalCodeType,
-    externalCatalog.value
-  );
-}
-function browserProviderCandidates(providerType) {
-  return (externalCatalog.value.providerRegistrations || []).filter(
-    (provider) => provider.providerType === providerType
-  );
-}
-function isLoginMethodSelected(method) {
-  if (method.authorizationCode) {
-    return grantTypes().has(AUTHORIZATION_CODE_GRANT);
+async function loadMetadata(protocol) {
+  if (!protocol) return Promise.all(['OIDC','OAUTH2_1'].map(value=>loadMetadata(value)));
+  metadataLoading.value={...metadataLoading.value,[protocol]:true};
+  try {
+    const value=unwrap(await api.metadata(protocol));
+    if(!disposed)metadata.value={...metadata.value,[protocol]:value};
+  } catch(error) {
+    if(!disposed)metadata.value={...metadata.value,[protocol]:{available:false,message:'接入地址获取失败：'+error.message}};
+  } finally {
+    if(!disposed)metadataLoading.value={...metadataLoading.value,[protocol]:false};
   }
-  if (method.browserProviderType) {
-    return form.browserLoginProviderTypes.includes(method.browserProviderType);
-  }
-  return form.externalCodeTypes.includes(method.externalCodeType);
 }
-function loginMethodState(method) {
-  if (method.authorizationCode) {
-    const requiredByWebLogin = form.browserLoginProviderTypes.length > 0;
-    return {
-      disabled: requiredByWebLogin,
-      hint: requiredByWebLogin
-        ? "当前网页登录方式依赖 IAM 授权"
-        : "由 IAM 展示登录页并完成授权",
-    };
+
+async function loadDetail() {
+  const version = ++requestVersion;
+  issuedSecret.value = "";
+  issuedOpen.value = false;
+  detailError.value = "";
+  snapshot.value = "";
+  replaceDraft({});
+  original.value = null;
+  if (!route.query.id) {
+    await load();
+    return;
   }
-  if (method.browserProviderType) {
-    const count = browserProviderCandidates(method.browserProviderType).length;
-    if (count !== 1) {
-      return {
-        disabled: !isLoginMethodSelected(method),
-        hint: count ? "存在多个启用身份源，请先整改" : "请先配置并启用身份源",
-      };
+  if (creating.value) {
+    try {
+      replaceDraft(
+        applicationTemplate(
+          {
+
+            clientName: "",
+            tenantId: null,
+            userType: "employee",
+            allowedOrigins: [],
+            scopes: "openid",
+            authorizationCodeTimeToLive: 300,
+            accessTokenTimeToLive: 3600,
+            tokenFormat: "self-contained",
+            reuseRefreshTokens: false,
+            refreshTokenTimeToLive: 2592000,
+            idTokenSignatureAlgorithm: "RS256",
+            requireAuthorizationConsent: false,
+          },
+          "WEB_SERVER"
+        )
+      );
+      markSaved();
+    } catch (error) {
+      detailError.value = error.message;
     }
-    return {
-      disabled: false,
-      hint: method.sharedWebCapability
-        ? "与普通浏览器共享网页认证能力"
-        : "由 IAM 完成网页认证",
-    };
+  } else {
+    loading.value = true;
+    try {
+      const value = unwrap(await api.get(route.query.id));
+      if (disposed || version !== requestVersion) return;
+      original.value = structuredClone(value);
+      const prepared = {...value};
+      if(value.purpose==='RESOURCE_SERVER') {
+        prepared.settings={kind:'oauth2',clientAuthenticationMethods:'client_secret_basic',authorizationGrantTypes:'',scopes:'',signingAlgorithm:'RS256',...value.settings};
+      } else if(value.protocol && value.settings && !value.settings.clientAuthenticationMethods) {
+        prepared.settings={...protocolDefaults(value,value.protocol),...Object.fromEntries(Object.entries(value.settings).filter(([,item])=>item!=null))};
+      }
+      replaceDraft({ ...prepared, clientSecret: "" });
+      markSaved();
+    } catch (error) {
+      if (version === requestVersion) detailError.value = error.message;
+    } finally {
+      if (version === requestVersion) loading.value = false;
+    }
+    loadMetadata();
   }
-  const count = providerCandidates(method).length;
-  if (!count) {
-    return {
-      disabled: !isLoginMethodSelected(method),
-      hint: "请先配置匹配的身份源",
-    };
+}
+async function confirmLeave() {
+  if (saving.value) return false;
+  if (!dirty.value) return true;
+  try {
+    await ElMessageBox.confirm(
+      "存在未保存的配置，离开将丢弃更改。",
+      "未保存更改",
+      { type: "warning" }
+    );
+    return true;
+  } catch {
+    return false;
   }
-  return {
-    disabled: false,
-    hint: count === 1 ? "身份源将自动绑定" : "选择后需指定身份源",
-  };
 }
-function toggleLoginMethod(method, selected) {
-  Object.assign(
-    form,
-    updateLoginMethodConfiguration(
-      form,
-      method,
-      selected,
-      method.externalCodeType ? providerCandidates(method) : []
-    )
-  );
+onBeforeRouteLeave(confirmLeave);
+onBeforeRouteUpdate((to, from) =>
+  String(to.query.id || "") !== String(from.query.id || "")
+    ? confirmLeave()
+    : true
+);
+function navigate(id) {
+  router.push({ query: id ? { id: String(id), tab: "application" } : {} });
 }
-function reconcileBindings() {
-  form.externalProviderBindings = reconcileExternalProviderBindings(
-    form,
-    externalCatalog.value
-  );
+async function discard() {
+  if (await confirmLeave()) {
+    replaceDraft({ ...structuredClone(original.value), clientSecret: "" });
+    markSaved();
+  }
 }
-async function save() {
-  if (saving.value) return;
+async function copyText(value) {
+  try {
+    if (!navigator.clipboard?.writeText)
+      throw new Error("当前环境无法复制，请在 HTTPS 或 localhost 下操作");
+    await navigator.clipboard.writeText(value);
+    ElMessage.success("已复制");
+  } catch (error) {
+    ElMessage.error(error.message || "复制失败，请手动复制");
+  }
+}
+async function createDraft() {
+  if (saving.value || !form.clientName?.trim()) return ElMessage.warning('请输入应用名称');
   saving.value = true;
   try {
+    const value = unwrap(await api.createDraft({clientName:form.clientName.trim(),applicationType:form.applicationType,miniappPlatform:form.miniappPlatform,purpose:form.purpose}));
+    // 创建请求已提交完成，允许现有离开守卫进入新详情。
+    saving.value = false;
+    await router.replace({query:{id:String(value.id),tab:'quickstart'}});
+  } catch (error) { ElMessage.error(oauthClientErrorMessage(error?.data,error?.message || '创建失败')); }
+  finally { saving.value = false; }
+}
+async function save(status = form.configurationStatus) {
+  if (saving.value) return;
+  if (!form.clientName?.trim()) return ElMessage.error('请输入应用名称');
+  if (status === 'ENABLED') {
     if (!(await formRef.value.validate().catch(() => false))) return;
-    if (form.clientAuthenticationMethods === "none" && !form.requireProofKey)
-      return ElMessage.error("公共客户端必须启用 PKCE");
-    if (requiresAuthorizationCode.value && !form.redirectUris.trim())
-      return ElMessage.error("使用 IAM 授权登录时必须配置重定向 URI");
-    if (invalidBrowserProviders.value.length) {
-      const labels = BROWSER_LOGIN_PROVIDERS.filter((provider) =>
-        invalidBrowserProviders.value.includes(provider.value)
-      ).map((provider) => provider.label);
-      return ElMessage.error(
-        `网页登录方式必须且只能有一个启用身份源：${labels.join("、")}`
-      );
-    }
-    if (unsupportedExternalCodeTypes.value.length)
-      return ElMessage.error(
-        `存在不受支持的凭证类型：${unsupportedExternalCodeTypes.value.join(
-          "、"
-        )}，请重新选择登录方式`
-      );
-    if (form.externalCodeTypes.length && !catalogLoaded.value)
-      return ElMessage.error("外部凭证目录加载失败，请刷新后重试");
-    if (
+    const issue = configurationIssues(form, original.value)[0];
+    if (issue) return ElMessage.error(issue);
+    if (form.purpose!=='RESOURCE_SERVER' && form.applicationType!=='SERVICE' && !form.userType) return ElMessage.error('请在访问授权中选择用户类型');
+  }
+  if (
+    form.externalCodeTypes?.length &&
+    (!catalogLoaded.value ||
       form.externalCodeTypes.some(
-        (codeType) => !form.externalProviderBindings[codeType]
-      )
-    )
-      return ElMessage.error("每个外部 code type 都必须选择身份源配置");
-    const data = { ...form };
-    delete data.id;
-    delete data.allowedOriginsText;
-    data.allowedOrigins = form.allowedOriginsText
-      .split(/\r?\n|,/)
-      .map((item) => item.trim())
-      .filter(Boolean);
-    unwrap(await (form.id ? api.update(form.id, data) : api.create(data)));
+        (code) =>
+          !providerCandidatesForCodeType(code, catalog.value).some(
+            (provider) =>
+              String(provider.id) ===
+              String(form.externalProviderBindings?.[code])
+          )
+      ))
+  )
+    return ElMessage.error("请为每种外部凭证选择启用的兼容身份源");
+  if (
+    form.browserLoginProviderTypes?.length &&
+    (!catalogLoaded.value ||
+      invalidSelectedBrowserProviders(form, catalog.value).length)
+  )
+    return ElMessage.error(
+      "请为每个网页登录方式选择具体的启用身份源"
+    );
+  saving.value = true;
+  try {
+    const wasCreating = creating.value,
+      secret = form.clientSecret || "";
+    const value = unwrap(
+      await (wasCreating
+        ? api.create(clientPayload(form))
+        : api.update(form.id, clientPayload({...form,configurationStatus:status})))
+    );
+    original.value = structuredClone(value);
+    replaceDraft({ ...value, clientSecret: "" });
+    markSaved();
     ElMessage.success("保存成功");
-    drawer.value = false;
-    await load();
+    saving.value = false;
+    if (wasCreating) {
+      await router.replace({
+        query: { id: String(value.id), tab: "application" },
+      });
+      // 路由加载完成后一次性展示本次生成的原文；普通详情始终无法读取。
+    }
+    if (secret && value.secretConfigured) {
+      issuedSecret.value = secret;
+      issuedOpen.value = true;
+    }
   } catch (error) {
     ElMessage.error(
       oauthClientErrorMessage(error?.data, error?.message || "保存失败")
@@ -680,187 +498,190 @@ async function save() {
     saving.value = false;
   }
 }
-async function resetSecret(row) {
-  try {
-    const result = await ElMessageBox.prompt(
-      "输入新密钥（至少 16 个字符）",
-      "重置密钥",
-      {
-        inputType: "password",
-        inputValidator: (value) => value?.length >= 16 || "密钥至少 16 个字符",
-      }
-    );
-    unwrap(await api.resetSecret(row.id, result.value));
-    ElMessage.success("密钥已重置");
-    await load();
-  } catch (error) {
-    if (error !== "cancel" && error !== "close") ElMessage.error(error.message);
-  }
-}
 async function remove(row) {
   try {
-    unwrap(await api.remove(row.id));
+    unwrap(await api.remove(row.id, row.configurationVersion));
     ElMessage.success("删除成功");
     await load();
   } catch (error) {
     ElMessage.error(error.message);
   }
 }
-onMounted(() => {
-  load();
-  loadTenants();
-  loadExternalCatalog();
+function beforeUnload(event) {
+  if (dirty.value) {
+    event.preventDefault();
+    event.returnValue = "";
+  }
+}
+window.addEventListener("beforeunload", beforeUnload);
+onDeactivated(() => {
+  issuedSecret.value = "";
+  issuedOpen.value = false;
+  form.clientSecret = "";
 });
+onBeforeUnmount(() => {
+  disposed = true;
+  requestVersion++;
+  issuedSecret.value = "";
+  form.clientSecret = "";
+  window.removeEventListener("beforeunload", beforeUnload);
+});
+watch(() => route.query.id, loadDetail, { immediate: true });
+loadCatalog();
+tenantApi.tenant.options
+  .get({ filterMe: 0 })
+  .then((response) => {
+    const value = unwrap(response);
+    if (!disposed) tenants.value = value || [];
+  })
+  .catch((error) => ElMessage.error("租户目录加载失败：" + error.message));
 </script>
-
 <style scoped>
-.client-page {
-  padding: 24px;
-}
-.toolbar {
+:global(.application-settings-dialog) { display: flex; flex-direction: column; max-height: 90dvh; }
+:global(.application-settings-dialog > .el-dialog__header),
+:global(.application-settings-dialog > .el-dialog__footer) { flex: 0 0 auto; }
+:global(.application-settings-dialog > .el-dialog__body) { min-height: 0; overflow-y: auto; }
+
+.client-page.el-container {
   display: flex;
-  gap: 12px;
-  margin: 20px 0;
-}
-.toolbar .el-input {
-  width: 270px;
-}
-.legacy-client-warning {
-  margin-bottom: 20px;
-}
-.form-section {
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 10px;
-}
-.basic-fields {
-  padding: 22px 22px 2px;
-}
-.capability-section {
-  padding: 20px 22px 4px;
-  background: var(--el-fill-color-extra-light);
-}
-.capability-section > .el-alert {
-  margin-bottom: 20px;
-}
-.section-divider {
-  margin: 30px 0 22px;
-}
-.hint {
-  display: block;
+  flex-direction: column;
+  max-width: 100%;
   width: 100%;
-  margin: 6px 0 0;
-  color: #999;
-  line-height: 1.5;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--el-bg-color);
 }
-.terminal-description {
-  margin: -8px 0 18px 150px;
+.client-list-main {
+  min-height: 0;
+  overflow: hidden;
+}
+.client-pagination {
+  display: flex;
+  align-items: center;
+  flex: none;
+}
+.client-page > .detail-header {
+  height: auto;
+  min-height: 80px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 32px;
+  flex: none;
+}
+.detail-tabs { flex: none; padding: 0 32px; border-bottom: 1px solid var(--el-border-color-lighter); min-width: 0; }
+.detail-tabs :deep(.el-tabs__header) { margin: 0; }
+.detail-tabs :deep(.el-tabs__nav-wrap::after) { display: none; }
+.detail-tabs :deep(.el-tabs__item) { height: 48px; padding: 0 20px; font-size: 14px; font-weight: 500; }
+.detail-tabs :deep(.el-tabs__item:nth-child(2)) { padding-left: 0; }
+.detail-header > div {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+h2 {
+  margin: 0 0 4px;
+  font-size: 18px;
+}
+.page-description,
+.hint {
   color: var(--el-text-color-secondary);
+  font-size: 13px;
   line-height: 1.6;
 }
-.login-method-grid {
-  display: grid;
-  width: 100%;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-.login-method-grid .el-checkbox {
-  width: 100%;
-  height: auto;
-  min-height: 58px;
-  margin: 0;
-  padding: 10px 14px;
-  align-items: flex-start;
-}
-.login-method-grid .el-checkbox :deep(.el-checkbox__label) {
-  display: flex;
+.client-detail-main {
+  flex: 1 1 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0;
   min-width: 0;
+  min-height: 0;
+  background: var(--el-bg-color);
+}
+.configuration-form {
+  min-width: 0;
+  padding: 24px 32px 40px;
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
   flex-direction: column;
-  white-space: normal;
 }
-.login-method-label {
-  color: var(--el-text-color-primary);
-  font-weight: 600;
+:deep(.el-form-item__content) {
+  min-width: 0;
+  gap: 8px;
 }
-.login-method-grid small,
-.auto-binding {
+:deep(.el-select) {
+  min-width: 0;
+  width: 100%;
+  max-width: 640px;
+}
+:deep(.el-form-item__label) {
+  font-weight: 500;
+}
+:deep(.el-alert) {
+  margin-bottom: 16px;
+}
+:deep(.el-collapse) {
+  margin: 16px 0 24px;
+}
+.client-page > .save-bar {
+  margin-top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  border-top: 1px solid var(--el-border-color-light);
+  flex: 0 0 auto;
+  padding: 14px 32px;
+  box-shadow: 0 -2px 8px rgb(0 0 0 / 3%);
+  z-index: 2;
+  background: var(--el-bg-color);
+}
+.save-bar .hint {
+  margin: 0 auto 0 0;
+  font-size: 13px;
   color: var(--el-text-color-secondary);
 }
-.login-method-grid small {
-  margin-top: 3px;
-  line-height: 1.45;
+:deep(.el-tabs), :deep(.el-tabs__content), :deep(.el-tab-pane) { min-width: 0; max-width: 100%; }
+:deep(.el-form-item) { margin-bottom: 20px; }
+:deep(.el-form-item__content > p.hint) { flex-basis: 100%; margin: 8px 0 0; }
+:deep(.configuration-panel) { min-width: 0; padding: 0; }
+.configuration-form > * { width: 100%; max-width: 1120px; box-sizing: border-box; }
+:deep(.el-form-item__label) { font-size: 13px; line-height: 20px; color: var(--el-text-color-regular); padding-bottom: 8px; }
+:deep(.configuration-panel > .el-form-item > .el-form-item__content > .el-input) { max-width: 640px; }
+:deep(.el-input-number) { width: 180px; max-width: 100%; }
+:deep(.token-policy .el-form-item) { align-self: start; }
+:deep(.form-grid) { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 32px; }
+:deep(.form-grid > *) { min-width: 0; }
+:deep(.section-heading) { margin: 0 0 20px; }
+:deep(.section-heading h3) { margin: 0 0 6px; font-size: 15px; font-weight: 600; line-height: 24px; }
+:deep(.section-heading p) { max-width: 760px; margin: 0; font-size: 12px; color: var(--el-text-color-secondary); line-height: 1.7; }
+:deep(.el-radio-group), :deep(.el-checkbox-group) { gap: 8px 24px; }
+@media (max-width: 1000px) {
+ :deep(.form-grid) { grid-template-columns: minmax(0, 1fr); }
 }
-.advanced-settings {
-  margin-top: 28px;
-  overflow: hidden;
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 10px;
-}
-.advanced-settings :deep(.el-collapse-item__header) {
-  height: 52px;
-  padding: 0 20px;
-  border-bottom: 0;
-  font-weight: 600;
-}
-.advanced-settings :deep(.el-collapse-item__wrap) {
-  border-top: 1px solid var(--el-border-color-lighter);
-  border-bottom: 0;
-}
-.advanced-settings :deep(.el-collapse-item__content) {
-  padding: 20px 22px 8px;
-}
-.advanced-settings .el-alert {
-  margin-bottom: 20px;
-}
-:deep(.oauth-client-drawer .el-drawer__body) {
-  padding: 0 28px 32px;
-}
-:deep(.oauth-client-drawer .el-drawer__footer) {
-  padding: 16px 28px;
-  border-top: 1px solid var(--el-border-color-lighter);
-}
-:deep(.oauth-client-drawer .el-drawer__header) {
-  margin-bottom: 20px;
-  padding: 24px 28px 0;
-}
-@media (max-width: 720px) {
-  .basic-fields,
-  .capability-section,
-  .advanced-settings :deep(.el-collapse-item__content) {
-    padding-right: 16px;
-    padding-left: 16px;
+@media (max-width: 600px) {
+  .configuration-form { padding: 20px 16px 28px; }
+  .detail-tabs { padding: 0 16px; }
+  .client-page > .detail-header { padding: 16px; gap: 12px; }
+  .detail-header > div { flex-basis: 50%; }
+  .detail-header .el-tag { margin-left: 0; }
+  .client-page > .save-bar { padding: 12px 16px; gap: 8px; display: grid; grid-template-columns: auto auto auto; }
+  .save-bar .hint { grid-column: 1 / -1; margin: 0; }
+  .client-page > .save-bar > .el-button { margin: 0; padding: 8px 10px; min-width: 0; }
+  .detail-header,
+  .save-bar {
+    flex-wrap: wrap;
   }
-  .client-form :deep(.el-form-item) {
-    display: block;
+  :deep(.el-form-item__content > .el-input),
+  :deep(.el-select) {
+    width: 100%;
+    min-width: 0;
   }
-  .client-form :deep(.el-form-item__label) {
-    width: 100% !important;
-    height: auto;
-    margin-bottom: 8px;
-    justify-content: flex-start;
+  :deep(.el-tabs__item) {
+    padding: 0 12px;
   }
-  .client-form :deep(.el-form-item__content) {
-    margin-left: 0 !important;
-  }
-  .login-method-grid {
-    grid-template-columns: 1fr;
-  }
-  .terminal-description {
-    margin-left: 0;
-  }
-  :deep(.oauth-client-drawer .el-drawer__header) {
-    padding-right: 16px;
-    padding-left: 16px;
-  }
-  :deep(.oauth-client-drawer .el-drawer__footer) {
-    padding-right: 16px;
-    padding-left: 16px;
-  }
-  :deep(.oauth-client-drawer .el-drawer__body) {
-    padding: 0 16px 24px;
-  }
-}
-.el-pagination {
-  margin-top: 20px;
-  justify-content: flex-end;
 }
 </style>

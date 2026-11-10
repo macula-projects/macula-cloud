@@ -5,6 +5,7 @@ const storageVersionKey = 'MACULA_CLOUD_ADMIN_STORAGE_VERSION'
 beforeEach(() => {
     window.history.replaceState({}, '', '/')
     localStorage.clear()
+    sessionStorage.clear()
     document.cookie = 'TOKEN=; Max-Age=0; Path=/'
     vi.resetModules()
 })
@@ -26,10 +27,10 @@ describe('admin local storage migration', () => {
         expect(tool.data.get('PERMISSIONS')).toBeNull()
         expect(localStorage.getItem('tenantId')).toBeNull()
         expect(localStorage.getItem('other-app-setting')).toBe('keep-me')
-        expect(localStorage.getItem(storageVersionKey)).toBe('2')
+        expect(localStorage.getItem(storageVersionKey)).toBe('3')
     })
 
-    it('does not clear data or the token again after migration', async () => {
+    it('retains preferences but always invalidates legacy token cookies', async () => {
         const {default: tool, migrateLegacyStorage} = await import('@/utils/tool')
         tool.data.set('APP_LANG', 'en')
         document.cookie = 'TOKEN=new-access-token; Path=/'
@@ -37,7 +38,7 @@ describe('admin local storage migration', () => {
         migrateLegacyStorage()
 
         expect(tool.data.get('APP_LANG')).toBe('en')
-        expect(document.cookie).toContain('TOKEN=new-access-token')
+        expect(document.cookie).not.toContain('TOKEN=')
     })
 
     it('clears a token scoped to the admin route as well as the root route', async () => {

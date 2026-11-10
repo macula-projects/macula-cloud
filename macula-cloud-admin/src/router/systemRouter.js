@@ -33,20 +33,9 @@ const routes = [
 			title: "登录"
 		}
 	},
-	{
-		path: "/user_register",
-		component: () => import(/* webpackChunkName: "userRegister" */ '@/views/common/login/userRegister'),
-		meta: {
-			title: "注册"
-		}
-	},
-	{
-		path: "/reset_password",
-		component: () => import(/* webpackChunkName: "resetPassword" */ '@/views/common/login/resetPassword'),
-		meta: {
-			title: "重置密码"
-		}
-	}
+    {path: '/auth/callback', component: () => import('@/views/common/login/callback.vue'), meta: {title: '登录'}},
+    {path: '/user_register', redirect: '/login'},
+    {path: '/reset_password', redirect: '/login'}
 ]
 
 export default routes;

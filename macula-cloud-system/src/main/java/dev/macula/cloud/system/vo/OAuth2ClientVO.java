@@ -17,6 +17,7 @@
 package dev.macula.cloud.system.vo;
 
 import lombok.AllArgsConstructor;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -34,28 +35,66 @@ import java.util.Set;
 @NoArgsConstructor
 @AllArgsConstructor
 public class OAuth2ClientVO {
+    private String purpose;
+    private String protocol;
+    private dev.macula.cloud.system.protocol.OAuth2ProtocolSettings settings;
+
+    private String managedKey;
+    private Long authorizationVersion;
+    @JsonIgnore
+    private java.util.List<dev.macula.cloud.system.protocol.ApplicationProtocolConfiguration> protocolConfigurations = java.util.List.of();
+    private String configurationVersion;
+    @JsonIgnore
+    private String managementAuthenticationProtocol;
     private Long id;
     private String clientId;
     private String clientName;
+    @JsonIgnore
+    private String protocolMode;
+    @JsonIgnore
+    private Set<String> enabledProtocols;
+    @JsonIgnore
+    private String defaultProtocol;
+    private String configurationStatus;
+    private Map<String, Long> browserProviderBindings = Map.of();
+    private Map<String, Long> browserCapabilityBindings;
+    private String applicationType;
+    private String miniappPlatform;
+    private Set<String> hostedLoginMethods;
     private Date clientIdIssuedAt;
+    @JsonIgnore
     private String clientAuthenticationMethods;
+    @JsonIgnore
     private String authorizationGrantTypes;
+    @JsonIgnore
     private String redirectUris;
+    @JsonIgnore
     private String scopes;
     private Set<String> externalCodeTypes;
+    @JsonIgnore
     private Set<String> allowedOrigins;
     private Map<String, Long> externalProviderBindings;
     private Set<String> browserLoginProviderTypes;
     private String directLoginProviderType;
+    @JsonIgnore
     private boolean requireProofKey;
+    @JsonIgnore
     private boolean requireAuthorizationConsent;
+    @JsonIgnore
     private String jwkSetUrl;
+    @JsonIgnore
     private String signingAlgorithm;
+    @JsonIgnore
     private Long authorizationCodeTimeToLive;
+    @JsonIgnore
     private Long accessTokenTimeToLive;
+    @JsonIgnore
     private String tokenFormat;
+    @JsonIgnore
     private boolean reuseRefreshTokens;
+    @JsonIgnore
     private Long refreshTokenTimeToLive;
+    @JsonIgnore
     private String idTokenSignatureAlgorithm;
     private String userType;
     private Long tenantId;

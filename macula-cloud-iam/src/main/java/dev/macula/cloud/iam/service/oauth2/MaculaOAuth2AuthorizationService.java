@@ -74,6 +74,15 @@ import java.util.function.Consumer;
  * @since 2023/4/11 08:14
  */
 public class MaculaOAuth2AuthorizationService implements OAuth2AuthorizationService {
+    private dev.macula.cloud.iam.authentication.mfa.MfaCompletionService mfaCompletion =
+        dev.macula.cloud.iam.authentication.mfa.MfaCompletionService.noOp();
+
+    /** Spring生产装配必须注入统一策略；显式构造的存储/生成器单测保留默认行为。 */
+    @org.springframework.beans.factory.annotation.Autowired
+    public void setMfaCompletion(dev.macula.cloud.iam.authentication.mfa.MfaCompletionService completion) {
+        this.mfaCompletion = java.util.Objects.requireNonNull(completion);
+    }
+
 
     private static final String VERSION = "macula.authorization.version";
     private static final String STATE_EXPIRY = "macula.authorization.stateExpiresAt";
@@ -105,12 +114,20 @@ public class MaculaOAuth2AuthorizationService implements OAuth2AuthorizationServ
         """, Long.class);
     private final StringRedisTemplate strings;
     private final ObjectMapper recordMapper = JsonMapper.builder().build();
-    private static final String AUTHORIZATION = CacheConstants.OAUTH2_TOKEN_KEY;
+    private static final String AUTHORIZATION = CacheConstants.OAUTH2_TOKEN_KEY + ":resource-v3";
 
     private final RedisTemplate<String, Object> redisTemplate;
 
     private final RegisteredClientRepository registeredClientRepository;
     private final ObjectMapper objectMapper;
+    private dev.macula.cloud.iam.service.support.SysOAuth2ClientService clients;
+
+    /** 生产装配绑定权威Client读取，测试用两参构造仅验证存储协议。 */
+    public MaculaOAuth2AuthorizationService(RedisTemplate<String, Object> redisTemplate,
+        RegisteredClientRepository repository, dev.macula.cloud.iam.service.support.SysOAuth2ClientService clients) {
+        this(redisTemplate, repository);
+        this.clients = java.util.Objects.requireNonNull(clients);
+    }
 
     public MaculaOAuth2AuthorizationService(RedisTemplate<String, Object> redisTemplate,
         RegisteredClientRepository registeredClientRepository) {
@@ -125,6 +142,16 @@ public class MaculaOAuth2AuthorizationService implements OAuth2AuthorizationServ
         this.objectMapper =
             JsonMapper.builder().addModules(SecurityJacksonModules.getModules(classLoader, allowedTypes))
                 .addModule(new MaculaIamJacksonModule()).build();
+    }
+
+    /** 只拦截新发布的可用凭据；撤销、清理和匿名state保存不要求额外认证。 */
+    private static <T extends OAuth2Token> boolean newUsableToken(OAuth2Authorization next,
+        OAuth2Authorization before, Class<T> type) {
+        OAuth2Authorization.Token<T> token = next.getToken(type);
+        if (token == null || !token.isActive()) { return false; }
+        OAuth2Authorization.Token<T> old = before == null ? null : before.getToken(type);
+        return old == null || !old.isActive()
+            || !old.getToken().getTokenValue().equals(token.getToken().getTokenValue());
     }
 
     private static AuthorizationGrantType resolveAuthorizationGrantType(String authorizationGrantType) {
@@ -159,13 +186,91 @@ public class MaculaOAuth2AuthorizationService implements OAuth2AuthorizationServ
     public OAuth2Authorization findById(String id) {
         Assert.hasText(id, "id cannot be empty");
         Authorization record = readRecord(id);
-        return record == null || record.isDeleted() ? null : toObject(record);
+        if (record == null || record.isDeleted() || clients != null && clients.getClientByClientId(record.getRegisteredClientId()) == null) {
+            return null;
+        }
+        return current(toObject(record));
     }
 
     @Override
     public void save(OAuth2Authorization authorization) {
         Assert.notNull(authorization, "authorization cannot be null");
+        org.springframework.security.core.Authentication verifiedPrincipal = authorization.getAttribute(
+            java.security.Principal.class.getName());
+        if (verifiedPrincipal instanceof dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyAuthenticationToken) {
+            var proof = dev.macula.cloud.iam.authentication.mfa.MfaCompletionService.proof(verifiedPrincipal);
+            var canonical = org.springframework.security.authentication.UsernamePasswordAuthenticationToken.authenticated(
+                verifiedPrincipal.getPrincipal(), null, verifiedPrincipal.getAuthorities());
+            canonical.setDetails(new HashMap<>(Map.of(
+                dev.macula.cloud.iam.authentication.mfa.MfaCompletionService.SOURCE_PROOF, proof)));
+            authorization = OAuth2Authorization.from(authorization).attribute(java.security.Principal.class.getName(), canonical)
+                .attribute(dev.macula.cloud.iam.authentication.mfa.MfaCompletionService.SOURCE_PROOF, proof).build();
+        }
+        if (authorization.getAttribute(dev.macula.cloud.iam.protocol.oauth2.ApplicationProtocolResolver.PROTOCOL_ATTRIBUTE) == null
+            && authorization.getAttribute(VERSION) == null) {
+            org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest request = authorization.getAttribute(
+                org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest.class.getName());
+            java.util.Set<String> scopes = request == null ? authorization.getAuthorizedScopes() : request.getScopes();
+            authorization = OAuth2Authorization.from(authorization)
+                .attribute(dev.macula.cloud.iam.protocol.oauth2.ApplicationProtocolResolver.PROTOCOL_ATTRIBUTE,
+                    dev.macula.cloud.iam.protocol.oauth2.ApplicationProtocolResolver.requested(scopes))
+                .attribute(dev.macula.cloud.iam.protocol.oauth2.ApplicationProtocolResolver.SCHEMA_ATTRIBUTE, 1).build();
+        }
+
+        if (clients != null) {
+            var client = clients.getClientByClientId(authorization.getRegisteredClientId());
+            if (authorization.getAttribute(dev.macula.cloud.system.security.OAuth2ResourcePolicy.AUTHORIZATION_VERSION) == null) {
+                if (client == null || !"APPLICATION".equals(client.getPurpose())) {
+                    throw new org.springframework.security.oauth2.core.OAuth2AuthenticationException("unauthorized_client");
+                }
+                // 直接grant可能在凭据验证后发生配置变更，必须保留签发快照而非绑定新版本。
+                Object issued = authorization.getAccessToken() == null || authorization.getAccessToken().getClaims() == null ? null
+                    : authorization.getAccessToken().getClaims().get(dev.macula.cloud.system.security.OAuth2ResourcePolicy.AUTHORIZATION_VERSION);
+                long snapshot = issued instanceof Number number ? number.longValue() : client.getAuthorizationVersion();
+                if (snapshot != client.getAuthorizationVersion()) {
+                    throw new org.springframework.security.oauth2.core.OAuth2AuthenticationException("invalid_grant");
+                }
+                authorization = OAuth2Authorization.from(authorization).attribute(
+                    dev.macula.cloud.system.security.OAuth2ResourcePolicy.AUTHORIZATION_VERSION, snapshot).build();
+            } else if (!dev.macula.cloud.iam.protocol.oauth2.ResourceAuthorizationPolicy.current(authorization, client)) {
+                throw new org.springframework.security.oauth2.core.OAuth2AuthenticationException("invalid_grant");
+            }
+        }
         Authorization previous = readRecord(authorization.getId());
+        OAuth2Authorization before = previous == null ? null : toObject(previous);
+        boolean newCode = newUsableToken(authorization, before, OAuth2AuthorizationCode.class);
+        boolean newUserToken = newUsableToken(authorization, before, OAuth2AccessToken.class)
+            || newUsableToken(authorization, before, OAuth2RefreshToken.class)
+            || newUsableToken(authorization, before, OidcIdToken.class);
+        if ((newCode || newUserToken) && !AuthorizationGrantType.CLIENT_CREDENTIALS.equals(
+            authorization.getAuthorizationGrantType())) {
+            org.springframework.security.core.Authentication principal = authorization.getAttribute(
+                java.security.Principal.class.getName());
+            Map<String, Object> proof = authorization.getAttribute(
+                dev.macula.cloud.iam.authentication.mfa.MfaCompletionService.SOURCE_PROOF);
+            if (proof == null) {
+                proof = dev.macula.cloud.iam.authentication.mfa.MfaCompletionService.proof(principal);
+                if (!proof.isEmpty()) {
+                    authorization = OAuth2Authorization.from(authorization).attribute(
+                        dev.macula.cloud.iam.authentication.mfa.MfaCompletionService.SOURCE_PROOF, proof).build();
+                }
+            }
+            try {
+                mfaCompletion.checkToken(principal, registeredClientRepository.findById(authorization.getRegisteredClientId()),
+                    newCode ? dev.macula.cloud.iam.authentication.mfa.AuthenticationCheckpoint.AUTHORIZATION_CODE
+                        : AuthorizationGrantType.REFRESH_TOKEN.equals(authorization.getAuthorizationGrantType())
+                            ? dev.macula.cloud.iam.authentication.mfa.AuthenticationCheckpoint.REFRESH_TOKEN
+                            : dev.macula.cloud.iam.authentication.mfa.AuthenticationCheckpoint.USER_TOKEN,
+                    authorization.getAuthorizationGrantType().getValue(), proof);
+            } catch (OAuth2AuthenticationException ex) {
+                // 授权端点要求专用异常；无安全续转上下文时返回400 server_error。
+                if (newCode) {
+                    throw new org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationCodeRequestAuthenticationException(
+                        ex.getError(), null);
+                }
+                throw ex;
+            }
+        }
         Number expected = authorization.getAttribute(VERSION);
         long version = expected == null ? 0 : expected.longValue();
         Authorization record = toEntity(authorization);
@@ -257,6 +362,12 @@ public class MaculaOAuth2AuthorizationService implements OAuth2AuthorizationServ
         return null;
     }
 
+    /** 生产读取拒绝旧版本，不能通过旧授权索引绕过配置变化。 */
+    private OAuth2Authorization current(OAuth2Authorization authorization) {
+        return clients == null || dev.macula.cloud.iam.protocol.oauth2.ResourceAuthorizationPolicy.current(authorization,
+            clients.getClientByClientId(authorization.getRegisteredClientId())) ? authorization : null;
+    }
+
     private OAuth2Authorization findByType(String value, String type) {
         String id = strings.opsForValue().get(indexKey(type, value));
         Authorization record;
@@ -287,7 +398,9 @@ public class MaculaOAuth2AuthorizationService implements OAuth2AuthorizationServ
         if (record == null || record.isDeleted()) {
             return null;
         }
-        OAuth2Authorization result = toObject(record);
+        if (clients != null && clients.getClientByClientId(record.getRegisteredClientId()) == null) { return null; }
+        OAuth2Authorization result = current(toObject(record));
+        if (result == null) { return null; }
         if ("state".equals(type)) {
             return value.equals(record.getState()) && record.getStateExpiresAt() != null && record.getStateExpiresAt()
                 .isAfter(Instant.now()) ? result : null;
@@ -319,11 +432,11 @@ public class MaculaOAuth2AuthorizationService implements OAuth2AuthorizationServ
     }
 
     private String recordKey(String id) {
-        return AUTHORIZATION + ":{iam-oauth2}:v2:authorization:" + digest(id);
+        return AUTHORIZATION + ":{iam-oauth2}:v3:authorization:" + digest(id);
     }
 
     private String indexKey(String type, String value) {
-        return AUTHORIZATION + ":{iam-oauth2}:v2:" + type + ":" + digest(value);
+        return AUTHORIZATION + ":{iam-oauth2}:v3:" + type + ":" + digest(value);
     }
 
     private String digest(String value) {

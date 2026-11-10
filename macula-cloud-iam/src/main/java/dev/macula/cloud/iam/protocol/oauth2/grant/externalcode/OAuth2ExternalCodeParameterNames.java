@@ -24,6 +24,8 @@ package dev.macula.cloud.iam.protocol.oauth2.grant.externalcode;
  */
 public final class OAuth2ExternalCodeParameterNames {
     public static final String CODE_TYPE = "code_type";
+    public static final String PROVIDER_CODE_VERIFIER = "provider_code_verifier";
+    public static final String PROVIDER_REDIRECT_URI = "provider_redirect_uri";
 
     private OAuth2ExternalCodeParameterNames() {
     }

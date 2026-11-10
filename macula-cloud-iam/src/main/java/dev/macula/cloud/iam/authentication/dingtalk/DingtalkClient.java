@@ -53,9 +53,12 @@ public class DingtalkClient {
     private static final String USER_TOKEN = "https://api.dingtalk.com/v1.0/oauth2/userAccessToken";
     private static final String CURRENT_USER = "https://api.dingtalk.com/v1.0/contact/users/me";
     private static final String APP_TOKEN = "https://api.dingtalk.com/v1.0/oauth2/accessToken";
+    static final String MEMBER_DETAILS = "https://oapi.dingtalk.com/topapi/v2/user/get";
     private static final String USER_BY_UNION_ID = "https://oapi.dingtalk.com/topapi/user/getbyunionid";
     private static final String WEBVIEW_USER = "https://oapi.dingtalk.com/topapi/v2/user/getuserinfo";
     private static final String APP_KEY_CONFIG = "appKey";
+    private static final String APP_SECRET_CONFIG = "appSecret";
+    private static final String USER_GRANT_TYPE = "grantType";
     private static final String CORP_ID_CONFIG = "corpId";
     private static final String CLIENT_ID = "clientId";
     private static final String CLIENT_SECRET = "clientSecret";
@@ -73,14 +76,28 @@ public class DingtalkClient {
     private static final String USER_STAGE = "user";
     private static final String MEMBER_STAGE = "member";
     private final RestClient restClient;
+    private final boolean httpContractTest;
     private final JsonMapper json = JsonMapper.builder().build();
+    private dev.macula.cloud.iam.authentication.thirdparty.ProviderApplicationTokenCache applicationTokens;
+
+    /** 生产装配来源隔离缓存；显式HTTP测试构造器仍可仅验证平台合同。 */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void applicationTokenCache(dev.macula.cloud.iam.authentication.thirdparty.ProviderApplicationTokenCache cache) { this.applicationTokens = cache; }
+
 
     public DingtalkClient() {
-        this(RestClient.builder().requestFactory(noRedirectRequestFactory()).build());
+        this(RestClient.builder().requestFactory(noRedirectRequestFactory()).build(), false);
     }
 
+    /** 显式HTTP合同测试可跳过Redis，仅此包内构造方式允许。 */
     DingtalkClient(RestClient restClient) {
+        this(restClient, true);
+    }
+
+    /** 默认生产构造不能在缓存缺失时直接返回未经过owner栅栏的结果。 */
+    private DingtalkClient(RestClient restClient, boolean httpContractTest) {
         this.restClient = restClient;
+        this.httpContractTest = httpContractTest;
     }
 
     public String authorizationUri(ProviderConfig config, String state, String redirectUri, DingtalkLoginMode mode) {
@@ -98,6 +115,7 @@ public class DingtalkClient {
 
     public String fetchUserId(ProviderConfig config, String code, DingtalkLoginMode mode) {
         String stage = TOKEN_STAGE;
+        boolean codeConsumed = false;
         try {
             config.require(CORP_ID_CONFIG);
             if (mode != DingtalkLoginMode.APP && mode != DingtalkLoginMode.BROWSER
@@ -117,6 +135,7 @@ public class DingtalkClient {
                 return requireUserId(stage, response.path(RESULT));
             }
             String userToken = userAccessToken(config, code);
+            codeConsumed = true;
             stage = USER_STAGE;
             String currentUserBody = restClient.get().uri(CURRENT_USER)
                 .header(ACCESS_TOKEN_HEADER, userToken).retrieve().body(String.class);
@@ -133,20 +152,26 @@ public class DingtalkClient {
                 .retrieve().body(String.class);
             JsonNode memberResponse = json.readTree(memberBody);
             requireSuccess(stage, memberResponse);
-            return requireUserId(stage, memberResponse.path(RESULT));
+            String memberId = requireUserId(stage, memberResponse.path(RESULT));
+            requireOrganizationMember(appToken, memberId);
+            return memberId;
         } catch (AuthenticationServiceException ex) {
             throw ex;
         } catch (RestClientResponseException ex) {
             LOGGER.warn("第三方接口 HTTP 失败 provider=DINGTALK stage={} status={}", stage,
                 ex.getStatusCode().value());
             if (ex.getStatusCode().is5xxServerError()) {
-                throw new ExternalCodeInfrastructureException();
+                throw new ExternalCodeInfrastructureException(codeConsumed
+                    ? dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeConsumptionState.CONSUMED
+                    : dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeConsumptionState.UNKNOWN);
             }
             throw failed();
         } catch (RestClientException ex) {
             LOGGER.warn("第三方接口调用失败 provider=DINGTALK stage={} failure=transport_error exception={}",
                 stage, ex.getClass().getSimpleName());
-            throw new ExternalCodeInfrastructureException();
+            throw new ExternalCodeInfrastructureException(codeConsumed
+                    ? dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeConsumptionState.CONSUMED
+                    : dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeConsumptionState.UNKNOWN);
         } catch (RuntimeException ex) {
             LOGGER.error("第三方接口响应处理失败 provider=DINGTALK stage={} "
                     + "failure=invalid_response exception={}",
@@ -155,22 +180,56 @@ public class DingtalkClient {
         }
     }
 
+    /** 个人unionId转换后仍核对目标应用域成员；不把个人OAuth成功当企业准入成功。 */
+    private void requireOrganizationMember(String appToken, String memberId) {
+        String uri = UriComponentsBuilder.fromUriString(MEMBER_DETAILS)
+            .queryParam(OAuth2ParameterNames.ACCESS_TOKEN, appToken).build().encode().toUriString();
+        String body = restClient.post().uri(uri).contentType(MediaType.APPLICATION_JSON)
+            .body(Map.of(USER_ID, memberId)).retrieve().body(String.class);
+        JsonNode response = json.readTree(body);
+        requireSuccess(MEMBER_STAGE, response);
+        JsonNode member = response.path(RESULT);
+        if (!memberId.equals(requireUserId(MEMBER_STAGE, member))
+            || member.has("active") && !member.path("active").asBoolean()) { throw failed(); }
+    }
+
     private String userAccessToken(ProviderConfig config, String code) {
         Map<String, String> request = new LinkedHashMap<>();
         request.put(CLIENT_ID, config.require(APP_KEY_CONFIG));
         request.put(CLIENT_SECRET, config.appSecret());
         request.put(OAuth2ParameterNames.CODE, code);
-        request.put(OAuth2ParameterNames.GRANT_TYPE, AuthorizationGrantType.AUTHORIZATION_CODE.getValue());
+        request.put(USER_GRANT_TYPE, AuthorizationGrantType.AUTHORIZATION_CODE.getValue());
         String body = restClient.post().uri(USER_TOKEN).contentType(MediaType.APPLICATION_JSON)
             .body(request).retrieve().body(String.class);
         return requireToken(TOKEN_STAGE, json.readTree(body));
     }
 
-    private String appAccessToken(ProviderConfig config) {
+    /** 使用当前来源版本的应用Token，不混用用户Token或其他企业凭据。 */
+    String appAccessToken(ProviderConfig config) {
+        if (applicationTokens == null && !httpContractTest) {
+            throw new ExternalCodeInfrastructureException(
+                dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeConsumptionState.NOT_SUBMITTED);
+        }
+        return applicationTokens == null ? loadApplicationToken(config).token()
+            : applicationTokens.get(config, dev.macula.cloud.iam.authentication.thirdparty.ProviderApplicationTokenCache.APPLICATION_TOKEN, () -> loadApplicationToken(config));
+    }
+
+    /** 该HTTP阶段尚未提交用户Code，明确的网络故障可安全释放占用。 */
+    private dev.macula.cloud.iam.authentication.thirdparty.ProviderApplicationTokenCache.TokenValue loadApplicationToken(ProviderConfig config) {
+        try {
         String body = restClient.post().uri(APP_TOKEN).contentType(MediaType.APPLICATION_JSON)
-            .body(Map.of(CLIENT_ID, config.require(APP_KEY_CONFIG), CLIENT_SECRET, config.appSecret()))
+            .body(Map.of(APP_KEY_CONFIG, config.require(APP_KEY_CONFIG), APP_SECRET_CONFIG, config.appSecret()))
             .retrieve().body(String.class);
-        return requireToken(TOKEN_STAGE, json.readTree(body));
+        JsonNode token = json.readTree(body);
+        return new dev.macula.cloud.iam.authentication.thirdparty.ProviderApplicationTokenCache.TokenValue(requireToken(TOKEN_STAGE, token), Duration.ofSeconds(token.path("expireIn").asLong()));
+        } catch (RestClientResponseException ex) {
+            if (ex.getStatusCode().is5xxServerError()) {
+                throw new ExternalCodeInfrastructureException(dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeConsumptionState.NOT_SUBMITTED);
+            }
+            throw failed();
+        } catch (RestClientException ex) {
+            throw new ExternalCodeInfrastructureException(dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeConsumptionState.NOT_SUBMITTED);
+        }
     }
 
     private String requireToken(String stage, JsonNode response) {

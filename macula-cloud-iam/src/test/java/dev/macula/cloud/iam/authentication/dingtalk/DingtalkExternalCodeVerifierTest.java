@@ -37,14 +37,20 @@ import static org.mockito.Mockito.when;
  * @since 6.1.0
  */
 class DingtalkExternalCodeVerifierTest {
+    /** 同一应用从网页锚点选择SDK能力，保留具体registration及企业身份。 */
     @Test
     void appCodeUsesNativeSdkExchange() {
         IdentityProviderConfigService configs = mock(IdentityProviderConfigService.class);
         DingtalkClient client = mock(DingtalkClient.class);
-        ProviderConfig config = new ProviderConfig("DINGTALK", "app", "secret",
-            Map.of("appKey", "app", "corpId", "corp"));
+        var base = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(
+            dev.macula.cloud.system.enums.IdentitySourceType.DINGTALK_WEB, "DINGTALK", "app", "secret", Map.of("appKey", "app", "corpId", "corp"));
+        ProviderConfig config = new ProviderConfig(9L, base.sourceType(), false, null, base.version(), base.providerType(),
+            base.appId(), base.appSecret(), base.values(), base.secrets(), true, base.flow(), base.directoryPolicy(),
+            base.organizationId(), null, null, Map.of("DINGTALK_WEB", "DINGTALK_OAUTH_V1", "DINGTALK_SDK", "DINGTALK_OAUTH_V1",
+                "DINGTALK_WEBVIEW", "DINGTALK_CORP_H5_V1"), "DINGTALK_WEB");
+        var sdk = config.forCode(ExternalCodeType.DINGTALK_APP_CODE);
         when(configs.requireEnabledById(9L, "DINGTALK")).thenReturn(config);
-        when(client.fetchUserId(config, "app-code", DingtalkLoginMode.APP)).thenReturn("manager01");
+        when(client.fetchUserId(sdk, "app-code", DingtalkLoginMode.APP)).thenReturn("manager01");
         DingtalkExternalCodeVerifier verifier = new DingtalkExternalCodeVerifier(configs, client);
 
         ExternalCodeVerification verification = verifier.verify(
@@ -52,7 +58,9 @@ class DingtalkExternalCodeVerifierTest {
 
         assertEquals("DINGTALK", verification.providerType());
         assertEquals("manager01", verification.subject());
+        assertEquals(9L, verification.identity().registrationId());
+        assertEquals("DINGTALK_SDK", verification.identity().loginCapability());
         assertTrue(verifier.supportedTypes().contains(ExternalCodeType.DINGTALK_APP_CODE));
-        verify(client).fetchUserId(config, "app-code", DingtalkLoginMode.APP);
+        verify(client).fetchUserId(sdk, "app-code", DingtalkLoginMode.APP);
     }
 }

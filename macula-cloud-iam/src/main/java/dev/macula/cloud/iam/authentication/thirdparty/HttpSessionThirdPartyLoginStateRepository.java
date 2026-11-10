@@ -75,6 +75,11 @@ public class HttpSessionThirdPartyLoginStateRepository implements ThirdPartyLogi
             || stored.context().createdAt().plus(MAX_AGE).isBefore(now)) {
             throw new BadCredentialsException("第三方登录状态已过期");
         }
+        if (stored.context().registrationId() == null || stored.context().sourceType() == null
+            || stored.context().sourceVersion() == null || stored.context().flow() == null || stored.context().loginCapability() == null
+            || stored.context().upstreamRedirectUri() == null || stored.context().tenantId() == null || stored.context().userType() == null) {
+            throw new BadCredentialsException("请重新发起第三方登录");
+        }
         return stored.context();
     }
 

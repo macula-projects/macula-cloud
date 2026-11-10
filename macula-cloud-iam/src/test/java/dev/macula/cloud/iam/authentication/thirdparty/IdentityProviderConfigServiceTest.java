@@ -19,7 +19,6 @@ package dev.macula.cloud.iam.authentication.thirdparty;
 import dev.macula.cloud.iam.mapper.SysIdentityProviderMapper;
 import dev.macula.cloud.iam.mapper.SysUserIdentityBindingMapper;
 import dev.macula.cloud.iam.pojo.entity.SysIdentityProvider;
-import dev.macula.cloud.iam.pojo.entity.SysUserIdentityBinding;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.authentication.AuthenticationServiceException;
 
@@ -42,65 +41,73 @@ import static org.mockito.Mockito.when;
 class IdentityProviderConfigServiceTest {
     private final SysIdentityProviderMapper providers = mock(SysIdentityProviderMapper.class);
     private final SysUserIdentityBindingMapper bindings = mock(SysUserIdentityBindingMapper.class);
-    private final IdentityProviderConfigService service = new IdentityProviderConfigService(providers, bindings);
+    private final IdentityProviderConfigService service = new IdentityProviderConfigService(providers);
 
     @Test
     void loadsExactlyOneEnabledProviderWithoutExposingFallbacks() {
         SysIdentityProvider provider = new SysIdentityProvider();
+        provider.setId(1L);
+        provider.setEnabled(true);
+        provider.setVersion(0L);
+        provider.setSourceType("GITHUB_OAUTH");
         provider.setProviderType("GITHUB");
-        provider.setAppId("legacy-id");
+        provider.setAppId("client-id");
         provider.setAppSecret("decrypted-secret");
         provider.setConfigJson("{\"clientId\":\"client-id\"}");
-        when(providers.selectList(any())).thenReturn(List.of(provider));
+        when(providers.selectById(1L)).thenReturn(provider);
 
-        IdentityProviderConfigService.ProviderConfig config = service.requireEnabled("GITHUB");
+        IdentityProviderConfigService.ProviderConfig config = service.requireEnabledById(1L, "GITHUB");
 
         assertEquals("client-id", config.require("clientId"));
         assertEquals("decrypted-secret", config.appSecret());
     }
 
     @Test
-    void loadsAdditionalSecretsWithoutMixingThemIntoPublicValues() {
-        SysIdentityProvider provider = new SysIdentityProvider();
+    void miniappDoesNotBorrowWebsiteOrOfficialCredentials() {
+        SysIdentityProvider provider = provider("mini-secret", "{\"appId\":\"mini-id\"}");
         provider.setProviderType("WECHAT");
-        provider.setAppId("website-id");
-        provider.setAppSecret("website-secret");
-        provider.setConfigJson("{\"appId\":\"website-id\",\"officialAccountAppId\":\"official-id\"}");
-        provider.setSecretConfigJson("{\"officialAccountAppSecret\":\"official-secret\"}");
-        when(providers.selectList(any())).thenReturn(List.of(provider));
-
-        IdentityProviderConfigService.ProviderConfig config = service.requireEnabled("WECHAT");
-
-        assertEquals("official-id", config.require("officialAccountAppId"));
-        assertEquals("official-secret", config.requireSecret("officialAccountAppSecret"));
-        assertFalse(config.values().containsKey("officialAccountAppSecret"));
+        provider.setSourceType("WECHAT_MINIAPP");
+        when(providers.selectById(1L)).thenReturn(provider);
+        var config = service.requireEnabledById(1L, "WECHAT");
+        assertEquals("mini-id", config.require("appId"));
+        assertEquals("mini-secret", config.appSecret());
+        assertFalse(config.values().containsKey("appSecret"));
+        assertThrows(AuthenticationServiceException.class, () -> config.requireSecret("officialAccountAppSecret"));
     }
 
     @Test
-    void rejectsMissingDuplicateAndMalformedEnabledProviders() {
-        when(providers.selectList(any())).thenReturn(List.of());
-        assertThrows(AuthenticationServiceException.class, () -> service.requireEnabled("GITHUB"));
+    void rejectsMissingDisabledAndMalformedFixedSources() {
+        when(providers.selectById(1L)).thenReturn(null);
+        assertThrows(AuthenticationServiceException.class, () -> service.requireEnabledById(1L, "GITHUB"));
+        SysIdentityProvider disabled = provider("secret", "{\"clientId\":\"one\"}");
+        disabled.setEnabled(false);
+        SysIdentityProvider malformed = provider("secret", "not-json");
+        when(providers.selectById(1L)).thenReturn(disabled, malformed);
+        assertThrows(AuthenticationServiceException.class, () -> service.requireEnabledById(1L, "GITHUB"));
+        assertThrows(AuthenticationServiceException.class, () -> service.requireEnabledById(1L, "GITHUB"));
+    }
 
-        SysIdentityProvider first = provider("secret", "{\"clientId\":\"one\"}");
-        SysIdentityProvider second = provider("secret", "{\"clientId\":\"two\"}");
-        when(providers.selectList(any())).thenReturn(List.of(first, second), List.of(provider("secret", "not-json")));
-        assertThrows(AuthenticationServiceException.class, () -> service.requireEnabled("GITHUB"));
-        assertThrows(AuthenticationServiceException.class, () -> service.requireEnabled("GITHUB"));
+    /** 兼容无附加凭据的历史加密null及新空对象，不影响独立来源主密钥。 */
+    @Test
+    void acceptsEmptyAdditionalSecretsWithoutBorrowingCredentials() {
+        SysIdentityProvider source = provider("secret", "{\"clientId\":\"one\"}");
+        when(providers.selectById(1L)).thenReturn(source);
+        for (String empty : new String[] {null, "null", "{}"}) {
+            source.setSecretConfigJson(empty);
+            assertEquals("secret", service.requireEnabledById(1L, "GITHUB").appSecret());
+        }
     }
 
     @Test
     void rejectsMalformedAdditionalSecrets() {
-        SysIdentityProvider malformed = provider("secret", "{\"appId\":\"id\"}");
-        malformed.setSecretConfigJson("not-json");
-        SysIdentityProvider nonObject = provider("secret", "{\"appId\":\"id\"}");
-        nonObject.setSecretConfigJson("[]");
-        SysIdentityProvider unknown = provider("secret", "{\"appId\":\"id\"}");
-        unknown.setSecretConfigJson("{\"unknownSecret\":\"value\"}");
-        when(providers.selectList(any())).thenReturn(List.of(malformed), List.of(nonObject), List.of(unknown));
-
-        assertThrows(AuthenticationServiceException.class, () -> service.requireEnabled("WECHAT"));
-        assertThrows(AuthenticationServiceException.class, () -> service.requireEnabled("WECHAT"));
-        assertThrows(AuthenticationServiceException.class, () -> service.requireEnabled("WECHAT"));
+        for (String secretJson : List.of("not-json", "[]", "{\"unknownSecret\":\"value\"}")) {
+            SysIdentityProvider provider = provider("secret", "{\"appId\":\"id\"}");
+            provider.setProviderType("WECHAT");
+            provider.setSourceType("WECHAT_WEBSITE");
+            provider.setSecretConfigJson(secretJson);
+            when(providers.selectById(1L)).thenReturn(provider);
+            assertThrows(AuthenticationServiceException.class, () -> service.requireEnabledById(1L, "WECHAT"));
+        }
     }
 
     @Test
@@ -110,39 +117,117 @@ class IdentityProviderConfigServiceTest {
         legacyWechat.setAppId("website-id");
         legacyWechat.setAppSecret("website-secret");
         legacyWechat.setConfigJson("{\"appId\":\"website-id\"}");
-        when(providers.selectList(any())).thenReturn(List.of(legacyWechat));
+        when(providers.selectById(1L)).thenReturn(legacyWechat);
 
-        assertThrows(AuthenticationServiceException.class, () -> service.requireEnabled("WECHAT"));
+        assertThrows(AuthenticationServiceException.class, () -> service.requireEnabledById(1L, "WECHAT"));
     }
 
     @Test
     void visibilityFailuresAreClosed() {
-        when(providers.selectCount(any())).thenReturn(1L, 0L).thenThrow(new IllegalStateException("db unavailable"));
-
-        assertTrue(service.isVisible("GITHUB"));
-        assertFalse(service.isVisible("GITHUB"));
-        assertFalse(service.isVisible("GITHUB"));
+        SysIdentityProvider source = provider("secret", "{\"clientId\":\"one\"}");
+        source.setVisible(true);
+        when(providers.selectById(1L)).thenReturn(source, null).thenThrow(new IllegalStateException("db unavailable"));
+        assertTrue(service.requireEnabledById(1L, "GITHUB").visible());
+        assertThrows(AuthenticationServiceException.class, () -> service.requireEnabledById(1L, "GITHUB"));
+        assertThrows(IllegalStateException.class, () -> service.requireEnabledById(1L, "GITHUB"));
     }
 
     @Test
-    void requiresOneGlobalUsernameBinding() {
-        SysUserIdentityBinding binding = new SysUserIdentityBinding();
-        binding.setProviderType("GITHUB");
-        binding.setProviderSubject("12345");
-        binding.setUsername("alice");
-        when(bindings.selectList(any())).thenReturn(List.of(binding), List.of(), List.of(binding, binding));
-
-        assertEquals("alice", service.requireBoundUsername("GITHUB", "12345"));
-        assertThrows(AuthenticationServiceException.class,
-            () -> service.requireBoundUsername("GITHUB", "12345"));
-        assertThrows(AuthenticationServiceException.class,
-            () -> service.requireBoundUsername("GITHUB", "12345"));
+    void doesNotReadGlobalUsernameBindingOrSelectByProvider() {
+        SysIdentityProvider source = provider("secret", "{\"clientId\":\"one\"}");
+        when(providers.selectById(1L)).thenReturn(source);
+        assertEquals(1L, service.requireEnabledById(1L, "GITHUB").registrationId());
+        org.mockito.Mockito.verifyNoInteractions(bindings);
+        org.mockito.Mockito.verify(providers, org.mockito.Mockito.never()).selectList(any());
     }
 
     private SysIdentityProvider provider(String secret, String json) {
         SysIdentityProvider provider = new SysIdentityProvider();
+        provider.setId(1L);
+        provider.setProviderType("GITHUB");
+        provider.setSourceType("GITHUB_OAUTH");
+        provider.setAppId("id");
+        if (json.contains("clientId")) {
+            provider.setAppId(tools.jackson.databind.json.JsonMapper.builder().build().readTree(json).path("clientId").asText());
+        } else if (json.contains("appId")) {
+            provider.setAppId(tools.jackson.databind.json.JsonMapper.builder().build().readTree(json).path("appId").asText());
+        }
+        provider.setEnabled(true);
+        provider.setVersion(0L);
         provider.setAppSecret(secret);
         provider.setConfigJson(json);
         return provider;
     }
+    /** 新映射可在无旧规则投影时加载，不能被旧枚举判定为来源不可用。 */
+    @Test
+    void loadsExplicitEnterpriseEmailMappingWithoutLegacyRule() {
+        var source = provider("secret", "{\"appId\":\"id\"}");
+        source.setProviderType("FEISHU");
+        source.setSourceType("FEISHU_WEB");
+        source.setIdentityFlow("FEISHU_OAUTH_V3");
+        source.setOrganizationId("fixed-tenant");
+        source.setAutoBindEnabled(true);
+        source.setBindingSourceField("email");
+        source.setBindingTargetField("username");
+        when(providers.selectById(1L)).thenReturn(source);
+        var result = service.requireEnabledById(1L,"FEISHU");
+        assertEquals("email",result.bindingMapping().source().value());
+        assertEquals("username",result.bindingMapping().target().value());
+        org.junit.jupiter.api.Assertions.assertNull(result.bindingRule());
+    }
+
+    /** 非旧锚点的小程序能力复用同一企微应用，停用后不得继续换码。 */
+    @Test
+    void resolvesIndependentWecomCapabilitiesAndRejectsRevokedCapability() {
+        var row = new SysIdentityProvider();
+        row.setId(8L);
+         row.setEnabled(true);
+         row.setVersion(2L);
+         row.setProviderType("WECOM");
+        row.setSourceType("WECOM_WEB");
+         row.setCredentialType("WECOM_APPLICATION");
+        row.setIdentityFlow("WECOM_WEB_V1");
+         row.setAppId("corp");
+         row.setAppSecret("fixture-secret");
+        row.setConfigJson("{\"corpId\":\"corp\",\"agentId\":\"1001\"}");
+        row.setCapabilitiesJson("{\"WECOM_BROWSER\":\"WECOM_WEB_V1\",\"WECOM_MINIAPP\":\"WECOM_MINIAPP_V1\"}");
+        when(providers.selectById(8L)).thenReturn(row);
+        var mini = service.requireEnabledById(8L,"WECOM").forCode(dev.macula.cloud.system.enums.ExternalCodeType.WECOM_MINIAPP_CODE);
+        assertEquals("WECOM_MINIAPP", mini.sourceType().value());
+        assertEquals("WECOM_MINIAPP_V1", mini.flow().value());
+        assertEquals(8L, mini.registrationId());
+         assertEquals("fixture-secret", mini.appSecret());
+        assertThrows(AuthenticationServiceException.class, () -> mini.forCapability("WECHAT_MINIAPP_LOGIN"));
+        row.setCapabilitiesJson("{\"WECOM_BROWSER\":\"WECOM_WEB_V1\"}");
+         row.setVersion(3L);
+        assertThrows(AuthenticationServiceException.class, () -> service.requireEnabledById(8L,"WECOM").forCapability(mini.loginCapability()));
+    }
+
+    /** IAM读取System稳定JSON并在网页/AppLink/JSAPI视图中保留完整集合，无来源回调要求。 */
+    @Test
+    void preservesMultipleMappingsAcrossCapabilityViewsWithoutSourceCallback() {
+        var row = new SysIdentityProvider();
+        row.setId(8L);
+        row.setEnabled(true);
+        row.setVersion(2L);
+        row.setProviderType("FEISHU");
+        row.setSourceType("FEISHU_WEB");
+        row.setAppId("fixture-app");
+        row.setAppSecret("fixture-secret");
+        row.setOrganizationId("tenant-fixed");
+        row.setConfigJson("{\"appId\":\"fixture-app\"}");
+        row.setCapabilitiesJson("{\"FEISHU_WEB\":\"FEISHU_OAUTH_V3\",\"FEISHU_APPLINK\":\"FEISHU_APPLINK_V3\",\"FEISHU_WEBVIEW\":\"FEISHU_WEBVIEW_V3\"}");
+        row.setAutoBindEnabled(true);
+        row.setBindingMappingsJson("[{\"sourceField\":\"mobile\",\"targetField\":\"mobile\"},{\"sourceField\":\"email\",\"targetField\":\"email\"}]");
+        when(providers.selectById(8L)).thenReturn(row);
+        var config = service.requireEnabledById(8L, "FEISHU");
+        assertEquals(2, config.bindingMappings().size());
+        assertEquals(config.bindingMappings(), config.forCapability("FEISHU_APPLINK").bindingMappings());
+        assertEquals(config.bindingMappings(), config.forCapability("FEISHU_WEBVIEW").bindingMappings());
+        org.junit.jupiter.api.Assertions.assertNull(config.bindingMapping());
+        assertThrows(UnsupportedOperationException.class, () -> config.bindingMappings().clear());
+        row.setBindingMappingsJson("[]");
+        assertThrows(AuthenticationServiceException.class, () -> service.requireEnabledById(8L, "FEISHU"));
+    }
+
 }

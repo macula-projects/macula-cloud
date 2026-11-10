@@ -16,69 +16,48 @@
  */
 package dev.macula.cloud.iam.authentication.thirdparty;
 
-import dev.macula.cloud.iam.service.support.SysUserService;
-import dev.macula.cloud.iam.enums.ThirdPartyProviderType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationServiceException;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
-import java.util.Optional;
-
 /**
- * 将已核验的外部 subject 解析为全局本地账号，未绑定时只发出待绑定信号。
- *
+ * 浏览器核验结果交给统一来源策略；不包含任何企业自动绑定特例。
  * @author Rain
  * @since 6.1.0
  */
 @Service
 @RequiredArgsConstructor
 public class ThirdPartyIdentityResolutionService {
-    private final IdentityProviderConfigService configs;
-    private final SysUserService users;
-    private final ThirdPartyUserDetailsService details;
-
-    public UserDetails resolve(String providerType, String subject, ThirdPartyLoginContext context) {
-        boolean directMatch = ThirdPartyProviderType.WECOM.providerType().equals(providerType)
-            && users.findUniqueByUsername(subject) != null;
-        Optional<String> bound = configs.findBoundUsername(providerType, subject);
-        if (directMatch && bound.isPresent() && !subject.equals(bound.get())) {
-            throw new AuthenticationServiceException("第三方账号绑定冲突");
+    private final IdentitySourceBindingPolicyService policy;
+    /** 首次无合法绑定或匹配结果时进入账号归属证明页面。 */
+    public UserDetails resolve(VerifiedExternalIdentity identity, ThirdPartyLoginContext context) {
+        if (!java.util.Objects.equals(identity.sourceVersion(), context.sourceVersion()) || !identity.flow().equals(context.flow())
+            || !identity.registrationId().equals(context.registrationId()) || !identity.sourceType().equals(context.sourceType())
+            || !identity.loginCapability().equals(context.loginCapability())) {
+            throw new AuthenticationServiceException("身份源上下文不一致");
         }
-        String username = directMatch ? subject : bound.orElse(null);
-        if (username == null) {
-            throw new BindingRequiredException(providerType, subject, context);
-        }
-        return details.load(username);
+        var resolved = context.clientAuthorizationVersion() == null
+            ? policy.resolve(context.clientId(), context.tenantId(), context.userType(), identity)
+            : policy.resolve(context.clientId(), context.tenantId(), context.userType(), identity, context.clientAuthorizationVersion());
+        return resolved.orElseThrow(() -> new BindingRequiredException(identity, context));
     }
-
     /**
-     * 表示外部身份已验证，但尚未授予本地权限。
-     *
+     * 仅保存已核验外部身份，不代表获得本地权限。
      * @since 6.1.0
      */
     public static final class BindingRequiredException extends AuthenticationServiceException {
-        private final String providerType;
-        private final String subject;
+        private final VerifiedExternalIdentity identity;
         private final ThirdPartyLoginContext context;
-
-        public BindingRequiredException(String providerType, String subject, ThirdPartyLoginContext context) {
+        /** 保存来源固定的核验材料。 */
+        public BindingRequiredException(VerifiedExternalIdentity identity, ThirdPartyLoginContext context) {
             super("第三方账号待绑定");
-            this.providerType = providerType;
-            this.subject = subject;
+            this.identity = identity;
             this.context = context;
         }
-
-        public String providerType() {
-            return providerType;
-        }
-
-        public String subject() {
-            return subject;
-        }
-
-        public ThirdPartyLoginContext context() {
-            return context;
-        }
+        /** 返回服务端核验身份。 */
+        public VerifiedExternalIdentity identity() { return identity; }
+        /** 返回浏览器路由快照。 */
+        public ThirdPartyLoginContext context() { return context; }
     }
 }

@@ -58,7 +58,7 @@
 				<div class="adminui-main" id="adminui-main">
 					<router-view v-slot="{ Component }">
 					    <keep-alive :include="cacheComponentNames">
-					        <component :is="Component" :key="$route.fullPath" v-if="routeShow"/>
+					        <component :is="Component" :key="$route.meta.reuseQueryView ? $route.path : $route.fullPath" v-if="routeShow"/>
 					    </keep-alive>
 					</router-view>
 					<iframe-view></iframe-view>
@@ -100,7 +100,7 @@
 				<div class="adminui-main" id="adminui-main">
 					<router-view v-slot="{ Component }">
 					    <keep-alive :include="cacheComponentNames">
-					        <component :is="Component" :key="$route.fullPath" v-if="routeShow"/>
+					        <component :is="Component" :key="$route.meta.reuseQueryView ? $route.path : $route.fullPath" v-if="routeShow"/>
 					    </keep-alive>
 					</router-view>
 					<iframe-view></iframe-view>
@@ -134,7 +134,7 @@
 				<div class="adminui-main" id="adminui-main">
 					<router-view v-slot="{ Component }">
 					    <keep-alive :include="cacheComponentNames">
-					        <component :is="Component" :key="$route.fullPath" v-if="routeShow"/>
+					        <component :is="Component" :key="$route.meta.reuseQueryView ? $route.path : $route.fullPath" v-if="routeShow"/>
 					    </keep-alive>
 					</router-view>
 					<iframe-view></iframe-view>
@@ -188,7 +188,7 @@
 				<div class="adminui-main" id="adminui-main">
 					<router-view v-slot="{ Component }">
 					    <keep-alive :include="cacheComponentNames">
-					        <component :is="Component" :key="$route.fullPath" v-if="routeShow"/>
+					        <component :is="Component" :key="$route.meta.reuseQueryView ? $route.path : $route.fullPath" v-if="routeShow"/>
 					    </keep-alive>
 					</router-view>
 					<iframe-view></iframe-view>

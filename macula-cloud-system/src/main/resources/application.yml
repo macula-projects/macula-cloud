@@ -37,6 +37,18 @@ mybatis-plus:
   type-handlers-package: dev.macula.boot.starter.mp.handler
 
 macula:
+  iam:
+    platform-clients:
+      enabled: ${IAM_PLATFORM_CLIENTS_ENABLED:false}
+      admin-client-id: ${IAM_ADMIN_CLIENT_ID:}
+      gateway-client-id: ${IAM_INTROSPECTION_CLIENT_ID:}
+    scopes:
+      # 仅登记资源服务实际支持的业务Scope；接入应用不能手填。
+      business: []
+    metadata:
+      discovery-url: ${IAM_DISCOVERY_URL:}
+      expected-issuer: ${IAM_ISSUER_URI:}
+      allow-http: ${IAM_METADATA_ALLOW_HTTP:false}
   jackson:
     long-to-string: true
     null-to-empty: false
