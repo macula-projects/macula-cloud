@@ -28,11 +28,16 @@
 			</el-form-item>
 			<el-form-item label="可访问路径" prop="accessPath">
 				<!-- 网关按 HTTP 方法和路径匹配；单独填写 /path 无法匹配 METHOD:/path。 -->
-                <el-input v-model="form.accessPath" type="textarea" :rows="3"
-                    placeholder="GET:/service/api/**,POST:/service/api/orders" />
-                <div class="el-form-item-msg">格式为 HTTP方法:/路径，支持 Ant 通配符（*、**），多个规则以英文逗号分隔。</div>
+                <el-input v-model="form.accessPath" type="textarea" :rows="3" maxlength="2000"
+                    :placeholder="'GET:/service/api/**\nPOST:/service/api/orders'" />
+                <div class="el-form-item-msg">格式为 HTTP方法:/路径，支持 Ant 通配符（*、**），每行一条，兼容原英文逗号分隔。</div>
                 <div class="el-form-item-msg">留空表示不限制应用访问路径；API Key 未单独配置时使用此处规则。</div>
 			</el-form-item>
+            <el-form-item label="允许 IP" prop="allowIps">
+                <el-input v-model="form.allowIps" type="textarea" :rows="3" maxlength="2000"
+                    :placeholder="'192.0.2.10\n192.0.2.0/24\n2001:db8::/32'" />
+                <div class="el-form-item-msg">每行一个 IPv4、IPv6 或 CIDR 网段；留空不限，API Key 未单独配置时继承。</div>
+            </el-form-item>
 			<el-form-item label="负责人" prop="manager">
 				<sc-table-select v-model="form.manager" :apiObj="apiObj" :table-width="450" multiple clearable collapse-tags
 					collapse-tags-tooltip :props="props">
@@ -72,6 +77,7 @@
 
 <script>
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { normalizeUrlRules, normalizeIpRules } from '@/utils/applicationAccessRules'
 export default {
 	name: 'SystemApplicationSave',
 	emits: ['success', 'closed'],
@@ -105,6 +111,7 @@ export default {
 				manager: [],
 				mobile: "",
 				accessPath: "",
+                allowIps: "",
 				useAttrs: false,
 				allowedAttrs: ""
 			},
@@ -163,39 +170,40 @@ export default {
             }
         },
 		//表单提交方法
-		submit() {
-			this.$refs.dialogForm.validate(async (valid) => {
-				if (valid) {
-					this.isSaveing = true;
-					this.form.manager = this.form.manager.map(item => item.username).join(',')
+        submit() {
+            if (this.isSaveing) return;
+            this.$refs.dialogForm.validate(async (valid) => {
+                if (!valid || this.isSaveing) return;
+                this.isSaveing = true;
+                try {
                     const payload = {
                         ...this.form,
+                        manager: this.form.manager.map(item => item.username).join(','),
+                        accessPath: normalizeUrlRules(this.form.accessPath),
+                        allowIps: normalizeIpRules(this.form.allowIps),
                         authTenantId: this.form.authTenantId == null || this.form.authTenantId === ''
                             ? null : String(this.form.authTenantId)
                     };
                     if (this.mode !== 'add' && payload.authTenantId === this.originalAuthTenantId) {
                         delete payload.authTenantId;
                     }
-					let res;
-					if (this.mode == 'add') {
-						// 调用相关接口
-						res = await this.$API.system_application.application.add.post(payload);
-					} else {
-						res = await this.$API.system_application.application.edit.put(payload, this.form.id);
-					}
-					this.isSaveing = false;
-					if (res.success) {
-						this.$emit('success', this.form, this.mode)
-						this.visible = false;
-						ElMessage.success("操作成功")
-					} else {
-						ElMessageBox.alert(res.msg || res.cause, "提示", { type: 'error' })
-					}
-				} else {
-					return false;
-				}
-			})
-		},
+                    const res = this.mode === 'add'
+                        ? await this.$API.system_application.application.add.post(payload)
+                        : await this.$API.system_application.application.edit.put(payload, this.form.id);
+                    if (res.success) {
+                        this.$emit('success', payload, this.mode);
+                        this.visible = false;
+                        ElMessage.success('操作成功');
+                    } else {
+                        ElMessageBox.alert(res.msg || res.cause, '提示', { type: 'error' });
+                    }
+                } catch (error) {
+                    ElMessage.error(error.message || '保存失败，请刷新后确认状态');
+                } finally {
+                    this.isSaveing = false;
+                }
+            });
+        },
 		refreshSk() {
 			this.form.sk = this.generateAkSK()
 		},
@@ -218,7 +226,8 @@ export default {
 			this.form.homepage = data.homepage
 			this.form.code = data.code
 			this.getUsersByUsernames(data.manager)
-			this.form.accessPath = data.accessPath
+			this.form.accessPath = normalizeUrlRules(data.accessPath)
+            this.form.allowIps = normalizeIpRules(data.allowIps)
 			this.form.mobile = data.mobile
 			this.form.sk = data.sk
 			this.form.useAttrs = data.useAttrs

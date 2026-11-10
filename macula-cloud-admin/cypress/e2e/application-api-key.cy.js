@@ -81,14 +81,15 @@ describe('应用 API Key 管理', () => {
 
   it('creates and edits independent paths, then revokes the Key', () => {
     cy.intercept('POST', '**/system/api/v1/app/34/api-keys', request => {
-      expect(request.body).to.deep.equal({ remark: '外部系统', accessPath: 'POST:/orders/**' })
+      expect(request.body).to.deep.equal({ remark: '外部系统', accessPath: 'POST:/orders/**\nGET:/orders/**', allowIps: '192.0.2.0/24\n2001:db8::/32' })
       keys.unshift({ id: '10', maskedKey: 'sk-new****5678', ...request.body, createTime: '2026-11-04T22:00:00Z' })
       request.reply(ok({ id: '10', apiKey: 'sk-synthetic-created-fixture-5678' }))
     }).as('create')
     cy.contains('.el-drawer button', '创建 API Key').click()
     cy.get('.el-dialog').filter(':visible').within(() => {
       cy.get('input').type('外部系统')
-      cy.get('textarea').type('POST:/orders/**')
+      cy.get('textarea').eq(0).type('POST:/orders/**{enter}GET:/orders/**')
+      cy.get('textarea').eq(1).type('192.0.2.0/24{enter}2001:db8::/32')
       cy.contains('button', /^创建$/).click()
     })
     cy.wait('@create')
@@ -98,12 +99,14 @@ describe('应用 API Key 管理', () => {
     cy.contains('.el-table__row', 'sk-new****5678').should('be.visible')
     cy.intercept('PUT', '**/system/api/v1/app/34/api-keys/10', request => {
       expect(request.body.accessPath).to.equal('')
+      expect(request.body.allowIps).to.equal('')
       Object.assign(keys[0], request.body)
       request.reply(ok(null))
     }).as('update')
     cy.contains('.el-table__row', 'sk-new****5678').contains('button', '编辑').click()
     cy.get('.el-dialog').filter(':visible').within(() => {
-      cy.get('textarea').clear()
+      cy.get('textarea').eq(0).clear()
+      cy.get('textarea').eq(1).clear()
       cy.contains('button', '保存').click()
     })
     cy.wait('@update')
@@ -128,7 +131,8 @@ describe('应用 API Key 管理', () => {
     cy.get('.el-dialog:visible').within(() => {
       cy.contains('HTTP方法:/路径').should('be.visible')
       cy.contains('留空表示不限制应用访问路径').should('be.visible')
-      cy.get('textarea[placeholder="GET:/service/api/**,POST:/service/api/orders"]').should('be.visible')
+      cy.get('textarea').eq(0).should('have.attr', 'placeholder', 'GET:/service/api/**\nPOST:/service/api/orders')
+      cy.contains('每行一个 IPv4、IPv6 或 CIDR 网段').should('be.visible')
       cy.get('input[placeholder="请输入11位手机号"]').type('1222').blur()
       cy.contains('.el-form-item__error', '请输入有效的11位手机号').should('be.visible')
       cy.contains('button', '保 存').click()

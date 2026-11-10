@@ -94,9 +94,28 @@ class SysApplicationApiKeyControllerTest {
             var form = new ApplicationApiKeyForm();
             form.setRemark("x".repeat(256));
             form.setAccessPath("x".repeat(2001));
-            assertThat(factory.getValidator().validate(form)).hasSize(2);
+            assertThat(factory.getValidator().validate(form)).hasSize(3);
             assertThat(ApplicationApiKeyForm.class.getDeclaredFields()).extracting("name")
-                .containsExactlyInAnyOrder("remark", "accessPath");
+                .containsExactlyInAnyOrder("remark", "accessPath", "allowIps", "allowIpsProvided");
         }
     }
+    /** HTTP 校验拒绝错误 IP，合法的 IPv6/CIDR 配置才能进入服务层。 */
+    @Test
+    void httpRejectsMalformedIpAndAcceptsCidr() throws Exception {
+        var service = mock(SysApplicationApiKeyService.class);
+        var mvc = org.springframework.test.web.servlet.setup.MockMvcBuilders
+            .standaloneSetup(new SysApplicationApiKeyController(service)).build();
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+            .put("/api/v1/app/34/api-keys/9").contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+            .content("{\"allowIps\":\"hostname.invalid\"}"))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isBadRequest());
+        org.mockito.Mockito.verifyNoInteractions(service);
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+            .put("/api/v1/app/34/api-keys/9").contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+            .content("{\"allowIps\":\"2001:db8::/32\"}"))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk());
+        org.mockito.Mockito.verify(service).update(org.mockito.ArgumentMatchers.eq(34L), org.mockito.ArgumentMatchers.eq(9L),
+            org.mockito.ArgumentMatchers.argThat(form -> form.isAllowIpsProvided() && "2001:db8::/32".equals(form.getAllowIps())));
+    }
+
 }

@@ -78,6 +78,9 @@ public class ApplicationBO {
      */
     private String accessPath;
 
+    /** 每行一个来源 IP/CIDR，空白表示未单独限制。 */
+    private String allowIps;
+
     /**
      * 创建时间
      */

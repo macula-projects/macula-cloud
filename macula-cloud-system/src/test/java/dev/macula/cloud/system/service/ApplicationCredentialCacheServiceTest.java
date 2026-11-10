@@ -185,4 +185,39 @@ class ApplicationCredentialCacheServiceTest {
         verify(lock).unlock();
         assertThat(TenantContextHolder.getCurrentTenantId()).isEqualTo(99L);
     }
+    /** URL 与 IP 分别继承，不能因一个维度覆盖而意外覆盖另一个维度。 */
+    @Test
+    void independentlyInheritsAndNormalizesUrlsAndIps() {
+        app.setAccessPath("GET:/app/**,POST:/app/orders");
+        app.setAllowIps("192.0.2.0/24\r\n2001:db8::/32");
+        key.setAccessPath("POST:/key/**");
+        assertThat(ApplicationCredentialCacheService.apiKeyFields(app, key))
+            .containsEntry("permitUrls", "POST:/key/**")
+            .containsEntry("permitIps", "192.0.2.0/24\n2001:db8::/32");
+        key.setAccessPath("  ");
+        key.setAllowIps("203.0.113.7");
+        assertThat(ApplicationCredentialCacheService.apiKeyFields(app, key))
+            .containsEntry("permitUrls", "GET:/app/**\nPOST:/app/orders").containsEntry("permitIps", "203.0.113.7");
+        key.setAllowIps(" ");
+        app.setAllowIps(null);
+        assertThat(ApplicationCredentialCacheService.apiKeyFields(app, key)).containsEntry("permitIps", "");
+    }
+
+    /** 清空后发布空值覆盖两类凭据的旧 IP，应用变更同时刷新关联 Key。 */
+    @Test
+    void refreshPublishesAndClearsIpForBothCredentialTypes() {
+        app.setAllowIps("192.0.2.0/24");
+        cache.refresh(12L, 34L, null);
+        verify(hashes).putAll(eq(CacheConstants.SECURITY_SYSTEM_APPS + "sample"),
+            org.mockito.ArgumentMatchers.<Map<String, String>>argThat(fields -> "192.0.2.0/24".equals(fields.get("permitIps"))));
+        verify(hashes).putAll(eq(CacheConstants.APIKEY_CACHE_PREFIX + key.getApiKey()),
+            org.mockito.ArgumentMatchers.<Map<String, String>>argThat(fields -> "192.0.2.0/24".equals(fields.get("permitIps"))));
+        app.setAllowIps(null);
+        cache.refresh(12L, 34L, null);
+        verify(hashes).putAll(eq(CacheConstants.SECURITY_SYSTEM_APPS + "sample"),
+            org.mockito.ArgumentMatchers.<Map<String, String>>argThat(fields -> "".equals(fields.get("permitIps"))));
+        verify(hashes).putAll(eq(CacheConstants.APIKEY_CACHE_PREFIX + key.getApiKey()),
+            org.mockito.ArgumentMatchers.<Map<String, String>>argThat(fields -> "".equals(fields.get("permitIps"))));
+    }
+
 }

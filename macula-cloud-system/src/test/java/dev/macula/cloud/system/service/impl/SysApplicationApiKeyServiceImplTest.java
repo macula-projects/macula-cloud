@@ -240,4 +240,42 @@ class SysApplicationApiKeyServiceImplTest {
         service.delete(34L, 99L);
         verify(cache).afterCommit(12L, 34L, null);
     }
+    /** 更新 IP 省略保留，显式 null 则写空值，不受 MyBatis 非空更新策略影响。 */
+    @Test
+    void omittedIpPreservesAndExplicitNullClears() {
+        when(keys.selectOne(any(Wrapper.class))).thenReturn(new SysApplicationApiKey());
+        when(keys.update(any(), any(Wrapper.class))).thenAnswer(call -> {
+            var update = (com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<?>) call.getArgument(1);
+            assertThat(update.getSqlSet()).doesNotContain("allow_ips");
+            return 1;
+        });
+        service.update(34L, 99L, new ApplicationApiKeyForm());
+        var clear = new ApplicationApiKeyForm();
+        clear.setAllowIps(null);
+        when(keys.update(any(), any(Wrapper.class))).thenAnswer(call -> {
+            var update = (com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<?>) call.getArgument(1);
+            assertThat(update.getSqlSet()).contains("allow_ips");
+            assertThat(update.getParamNameValuePairs()).containsValue("");
+            return 1;
+        });
+        service.update(34L, 99L, clear);
+    }
+
+    /** 非 HTTP 创建仍校验 IP；有效值按多行存储。 */
+    @Test
+    void createValidatesAndNormalizesBothRuleTypes() {
+        var invalid = new ApplicationApiKeyForm();
+        invalid.setAllowIps("hostname.invalid");
+        assertThatThrownBy(() -> service.create(34L, invalid)).isInstanceOf(ResponseStatusException.class);
+        verify(keys, never()).insert(any(SysApplicationApiKey.class));
+        var valid = new ApplicationApiKeyForm();
+        valid.setAccessPath(" GET:/a, POST:/b ");
+        valid.setAllowIps(" 192.0.2.7\r\n2001:db8::/32 ");
+        service.create(34L, valid);
+        ArgumentCaptor<SysApplicationApiKey> captor = ArgumentCaptor.forClass(SysApplicationApiKey.class);
+        verify(keys).insert(captor.capture());
+        assertThat(captor.getValue().getAccessPath()).isEqualTo("GET:/a\nPOST:/b");
+        assertThat(captor.getValue().getAllowIps()).isEqualTo("192.0.2.7\n2001:db8::/32");
+    }
+
 }

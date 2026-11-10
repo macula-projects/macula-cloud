@@ -86,3 +86,25 @@ describe("application mobile validation", () => {
     }
   );
 });
+
+describe('application multiline URL/IP', () => {
+  it('converts legacy URL when loading an application', () => {
+    const vm = { form: {}, getUsersByUsernames: vi.fn() }
+    ApplicationSave.methods.setData.call(vm, { accessPath: 'GET:/a, POST:/b', allowIps: '192.0.2.0/24\r\n::1' })
+    expect(vm.form.accessPath).toBe('GET:/a\nPOST:/b')
+    expect(vm.form.allowIps).toBe('192.0.2.0/24\n::1')
+  })
+  it('submits multiline rules and explicit empty IP without mutating manager selections', async () => {
+    const put = vi.fn().mockResolvedValue({ success: true })
+    let submitted
+    const vm = { mode: 'edit', form: { id: '34', manager: [{ username: 'admin' }],
+      accessPath: ' GET:/a,POST:/b ', allowIps: ' \n ' }, $emit: vi.fn(),
+      $refs: { dialogForm: { validate: fn => { submitted = fn(true) } } },
+      $API: { system_application: { application: { edit: { put } } } } }
+    ApplicationSave.methods.submit.call(vm)
+    await submitted
+    expect(put).toHaveBeenCalledWith(expect.objectContaining({ accessPath: 'GET:/a\nPOST:/b', allowIps: '' }), '34')
+    expect(vm.form.manager).toEqual([{ username: 'admin' }])
+    expect(vm.isSaveing).toBe(false)
+  })
+})

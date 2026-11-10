@@ -29,7 +29,10 @@
       </el-table-column>
       <el-table-column prop="remark" label="备注" min-width="100" show-overflow-tooltip />
       <el-table-column label="可访问路径" min-width="150" show-overflow-tooltip>
-        <template #default="{ row }">{{ row.accessPath || '未配置，缓存使用应用 URL' }}</template>
+        <template #default="{ row }"><span class="access-rules">{{ displayUrls(row.accessPath) || '未配置，缓存使用应用 URL' }}</span></template>
+      </el-table-column>
+      <el-table-column label="允许 IP" min-width="150">
+        <template #default="{ row }"><span class="access-rules">{{ row.allowIps || '未配置，使用应用 IP；应用为空则不限' }}</span></template>
       </el-table-column>
       <el-table-column label="创建时间（当地）" width="175">
         <template #default="{ row }">{{ formatCreateTime(row.createTime) }}</template>
@@ -52,9 +55,14 @@
         <el-form-item label="备注"><el-input v-model="form.remark" maxlength="255" show-word-limit /></el-form-item>
         <el-form-item label="可访问路径">
           <el-input v-model="form.accessPath" type="textarea" :rows="3" maxlength="2000"
-            placeholder="GET:/service/api/**,POST:/service/api/orders" />
-          <div class="key-hint">格式为 HTTP方法:/路径，支持 Ant 通配符（*、**），多个规则以英文逗号分隔。</div>
+            :placeholder="'GET:/service/api/**\nPOST:/service/api/orders'" />
+          <div class="key-hint">格式为 HTTP方法:/路径，支持 Ant 通配符（*、**），每行一条，兼容原英文逗号分隔。</div>
           <div class="key-hint">留空使用应用的可访问路径；应用也未配置时不限制访问路径。</div>
+        </el-form-item>
+        <el-form-item label="允许 IP">
+          <el-input v-model="form.allowIps" type="textarea" :rows="3" maxlength="2000"
+            :placeholder="'192.0.2.10\n192.0.2.0/24\n2001:db8::/32'" />
+          <div class="key-hint">每行一个 IPv4、IPv6 或 CIDR 网段；留空继承应用，应用也为空时不限。</div>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -76,6 +84,7 @@
 <script>
 import { ElMessage, ElMessageBox } from 'element-plus'
 import tool from '@/utils/tool'
+import { normalizeUrlRules, normalizeIpRules } from '@/utils/applicationAccessRules'
 
 /** 应用 API Key 管理；完整凭据仅保留在当前打开的抽屉状态中。 */
 export default {
@@ -85,12 +94,13 @@ export default {
     return {
       visible: false, application: {}, rows: [], total: 0, pageNum: 1, pageSize: 20,
       loading: false, error: '', revealed: {}, busy: {}, generation: 0, requestId: 0,
-      editing: false, saving: false, form: { id: null, remark: '', accessPath: '' },
+      editing: false, saving: false, form: { id: null, remark: '', accessPath: '', allowIps: '' },
       createdVisible: false, createdKey: ''
     }
   },
   beforeUnmount() { this.clearSecrets() },
   methods: {
+    displayUrls: normalizeUrlRules,
     /** 接口携带时区偏移，复用日期工具按浏览器当地时间展示，避免硬编码时差。 */
     formatCreateTime(value) {
       return tool.formatDateTime(value)
@@ -140,8 +150,8 @@ export default {
       }
     },
     edit(row) {
-      this.form = row ? { id: row.id, remark: row.remark || '', accessPath: row.accessPath || '' }
-        : { id: null, remark: '', accessPath: '' }
+      this.form = row ? { id: row.id, remark: row.remark || '', accessPath: normalizeUrlRules(row.accessPath), allowIps: normalizeIpRules(row.allowIps) }
+        : { id: null, remark: '', accessPath: '', allowIps: '' }
       this.editing = true
     },
     /** 创建和更新只提交配置，不提交已有完整凭据。 */
@@ -150,13 +160,14 @@ export default {
       this.saving = true
       const generation = this.generation
       const appId = this.application.id
-      const payload = { remark: this.form.remark.trim(), accessPath: this.form.accessPath.trim() }
       try {
+        const payload = { remark: this.form.remark.trim(), accessPath: normalizeUrlRules(this.form.accessPath),
+          allowIps: normalizeIpRules(this.form.allowIps) }
         const result = this.form.id
           ? await this.api().update(appId, this.form.id, payload)
           : await this.api().create(appId, payload)
         if (generation !== this.generation) return
-        if (!result.success) throw new Error('保存失败')
+        if (!result.success) throw new Error(result.msg || '保存失败')
         this.editing = false
         if (!this.form.id) {
           this.createdKey = result.data.apiKey
@@ -164,7 +175,7 @@ export default {
         } else ElMessage.success('保存成功')
         await this.load()
       } catch (error) {
-        if (generation === this.generation) ElMessage.error('保存失败，请刷新列表确认后重试')
+        if (generation === this.generation) ElMessage.error(error.message || '保存失败，请刷新列表确认后重试')
       } finally {
         if (generation === this.generation) this.saving = false
       }
@@ -232,6 +243,7 @@ export default {
 .key-toolbar { margin-bottom: 20px; }
 .key-error, .key-table { margin-bottom: 16px; }
 .key-value { flex: 1; min-width: 0; font-family: monospace; white-space: nowrap; overflow-x: auto; user-select: all; }
+.access-rules { white-space: pre-line; overflow-wrap: anywhere; }
 .key-hint { color: var(--el-text-color-secondary); font-size: 12px; line-height: 1.6; margin-top: 6px; }
 .created-key { margin-top: 20px; }
 </style>

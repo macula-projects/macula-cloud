@@ -45,13 +45,20 @@ http://127.0.0.1:9000/system/api/v1/menus
 
 应用管理支持一个应用创建多把 API Key，在操作栏点击 **APIKEY** 管理。列表默认脱敏，可按需显示、复制、编辑备注/允许访问的 URL，或删除。创建成功弹窗可以复制完整 Key；关闭页面会清除前端保存的明文状态。
 
-Key 的 `accessPath` 与应用 `accessPath` 独立保存。新增、更新、重建 API Key 缓存统一优先使用非空 `accessPath`，否则使用应用的可访问路径；不合并、不取交集。例如 `GET:/service/api/**,POST:/service/api/orders`。两处均为空时沿用网关既有的不限制应用 URL 行为。
+Key 的 `accessPath` 与应用 `accessPath` 独立保存。新增、更新、重建 API Key 缓存统一优先使用非空 `accessPath`，否则使用应用的可访问路径；不合并、不取交集。多个 URL 使用换行，兼容旧英文逗号分隔：
+
+```text
+GET:/service/api/**
+POST:/service/api/orders
+```
+
+两处均为空时沿用网关既有的不限制应用 URL 行为。
 
 接口位于 `/api/v1/app/{appId}/api-keys`：GET 分页、POST 创建；`/{keyId}` 支持 PUT 配置和 DELETE 撤销；`/{keyId}/secret` 支持授权查看。分页大小为1至100。接口校验当前租户应用管理权限及应用/Key归属，完整凭据仅由创建/查看响应提供，设置 `Cache-Control: no-store` 且不记录响应审计。
 
 先执行 Flyway `V13__application_apikey.sql`，再启动新版 System。数据库保留撤销记录用于恢复时清理缓存，不重用已撤销 Key。凭据以可恢复形式保存以支持再次显示，数据库与 Redis 访问必须受控，不能将完整值写入日志。
 
-缓存使用 Boot `APIKEY_CACHE_PREFIX + Key` 的 Redis Hash，包含 `applicationCode`、`applicationId`、`tenantId`、`authTenantId`、`permitUrls`。应用和 Key 的写操作提交成功后同步缓存；撤销删除认证 Hash，旧 Key 无法依赖 JWT 缓存继续访问。System 启动重建应用和 Key 缓存，原 `refreshApplicationCache()` 运维入口也重建两类凭据。新增/撤销与应用删除使用共同应用行锁，缓存发布使用分布式锁并重读已提交状态。
+缓存使用 Boot `APIKEY_CACHE_PREFIX + Key` 的 Redis Hash，包含 `applicationCode`、`applicationId`、`tenantId`、`authTenantId`、`permitUrls`、`permitIps`。应用和 Key 的写操作提交成功后同步缓存；撤销删除认证 Hash，旧 Key 无法依赖 JWT 缓存继续访问。System 启动重建应用和 Key 缓存，原 `refreshApplicationCache()` 运维入口也重建两类凭据。新增/撤销与应用删除使用共同应用行锁，缓存发布使用分布式锁并重读已提交状态。
 
 数据库与 Redis 没有跨资源原子事务。若接口报告“凭据缓存同步失败”，数据库可能已经提交；先刷新管理列表确认结果，再重试或调用既有刷新入口（也可在受控维护时重启 System 重建）。缓存失败时旧权限可能暂时有效，不能将接口报错视为已成功撤销。本轮不提供有效期、启停或自动轮换。
 
@@ -281,3 +288,22 @@ V23只新增nullable `binding_mappings_json`。NULL按旧单条合同读取；�
 普通IAM会话不能直接签端内授权码：仅本次授权请求临时隔离缺失或陈旧的平台证明，不清空其他应用SSO。证明绑定当前Client及授权版本、注册/能力/来源版本/Flow和已认证用户；授权、绑定、MFA及Token发布点复核。新旧state/pending不可跨转换继续使用。未在真实平台设备联调前，本地Mock和安全链测试不代表厂商端到端验收。
 
 后端服务无需选择用户目录，不提供访问授权中的用户类型分区；认证租户和业务Scope仍必需。原列已允许空值，无额外Schema变更，也不填入虚构的员工目录。
+
+## 应用和 APIKEY 的允许 IP
+
+应用与 APIKEY 接口新增可编辑字符串 `allowIps`，数据库列为 `allow_ips`；每行一个 IPv4、IPv6 或 CIDR，URL `accessPath` 也统一每行一条，历史英文逗号规则在读取/编辑和校验时继续兼容。两项各最多 2000 字符，LF/CRLF/CR 均可，保存为 LF，空行和首尾空白忽略。
+
+```json
+{
+  "accessPath": "GET:/service/api/**\nPOST:/service/api/orders",
+  "allowIps": "192.0.2.10\n192.0.2.0/24\n2001:db8::/32"
+}
+```
+
+应用 IP 留空不限；APIKEY 非空 IP 优先使用自身配置，留空继承应用，应用也为空则不限。URL 和 IP 各自独立继承，不合并、不取交集。更新接口省略 `allowIps` 保留旧值，显式 `null` 或空白清空。非空但非法的 IP/CIDR 整体拒绝，不支持域名、端口、通配符和 scope；不执行 DNS 查询。mapped IPv6 按 IPv4 处理，mapped CIDR 前缀须为 96–128。
+
+缓存新增 `permitIps`，保存、清空和重建统一发布有效配置；清空显式写空字符串覆盖旧限制。认证端统一在 Boot `TenantUtils.checkTenantAndUrls` 检查租户、URL 与 IP，HMAC 和 APIKEY 共用此入口。
+
+升级顺序：先升级全部相关网关；执行新增 Flyway `V24__application_url_ip_allowlist.sql`，再启用新版 System/Admin 写入口并重建缓存。迁移仅新增两张表的可空 IP 列、将应用 URL 扩为 2000 字符，历史值不改写，不改旧迁移。启用新配置后不可直接回退旧网关；回退不自动删列/缩列。
+
+网关默认使用直连对端地址，不直接信任调用者的转发头；代理场景可能匹配代理 IP，部署需保证服务器转发头处理不会让调用方伪造匹配地址。数据库提交后缓存发布仍可能失败，错误响应不代表新限制已经生效，应刷新确认并按既有机制重试/重建。

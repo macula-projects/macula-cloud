@@ -36,5 +36,8 @@ public class SysApplicationApiKey extends BaseEntity {
     private String apiKey;
     private String remark;
     private String accessPath;
+
+    /** 每行一个来源 IP/CIDR，空白表示未单独限制。 */
+    private String allowIps;
     private Boolean deleted;
 }

@@ -63,4 +63,29 @@ class ApplicationFormTest {
         view.setAuthTenantId(9007199254740993L);
         assertThat(json.writeValueAsString(view)).contains("\"authTenantId\":\"9007199254740993\"");
     }
+    /** 运行时 JSON 栈区分 IP 缺省与清空，内部标记不接受请求覆盖。 */
+    @Test
+    void distinguishesIpPresenceAndNormalizesLegacyUrls() {
+        ApplicationForm omitted = json.readValue("{}", ApplicationForm.class);
+        assertThat(omitted.isAllowIpsProvided()).isFalse();
+        ApplicationForm cleared = json.readValue("{\"allowIps\":null,\"allowIpsProvided\":false}", ApplicationForm.class);
+        assertThat(cleared.isAllowIpsProvided()).isTrue();
+        cleared.normalizeAccessRules();
+        assertThat(cleared.getAllowIps()).isEmpty();
+        ApplicationForm configured = json.readValue(
+            "{\"accessPath\":\"GET:/a, POST:/b\",\"allowIps\":\"192.0.2.0/24\\r\\n2001:db8::/32\"}", ApplicationForm.class);
+        assertThat(configured.isAccessRulesValid()).isTrue();
+        configured.normalizeAccessRules();
+        assertThat(configured.getAccessPath()).isEqualTo("GET:/a\nPOST:/b");
+        assertThat(configured.getAllowIps()).isEqualTo("192.0.2.0/24\n2001:db8::/32");
+        assertThat(json.writeValueAsString(configured)).doesNotContain("allowIpsProvided", "accessRulesValid");
+        ApplicationForm forged = json.readValue("{\"allowIpsProvided\":true}", ApplicationForm.class);
+        assertThat(forged.isAllowIpsProvided()).isFalse();
+        configured.setAllowIps("example.invalid");
+        assertThat(configured.isAccessRulesValid()).isFalse();
+        configured.setAllowIps(null);
+        configured.setAccessPath("x".repeat(2001));
+        assertThat(configured.isAccessRulesValid()).isFalse();
+    }
+
 }

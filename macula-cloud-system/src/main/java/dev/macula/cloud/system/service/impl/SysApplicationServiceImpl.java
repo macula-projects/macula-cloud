@@ -76,11 +76,17 @@ public class SysApplicationServiceImpl extends ServiceImpl<SysApplicationMapper,
         return applicationConverter.bo2Vo(bo);
     }
 
+    /** 校验并规范化应用访问规则，提交成功后发布应用及关联 Key 缓存。 */
     @Override
     @Transactional
     public boolean saveApplication(ApplicationForm appForm) {
         Long ownerTenantId = currentTenantId();
         validateAuthTenant(appForm, ownerTenantId);
+        try {
+            appForm.normalizeAccessRules();
+        } catch (IllegalArgumentException exception) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "URL/IP 规则不合法或超过 2000 字符");
+        }
         SysApplication sysApplication = applicationConverter.form2Entity(appForm);
         boolean saved = this.save(sysApplication);
         if (saved) {
@@ -89,6 +95,7 @@ public class SysApplicationServiceImpl extends ServiceImpl<SysApplicationMapper,
         return saved;
     }
 
+    /** 在应用行锁内更新规则，IP 省略保留、显式空值清空，提交后统一刷新凭据。 */
     @Override
     @Transactional
     public boolean updateApplication(Long appId, ApplicationForm appForm) {
@@ -97,6 +104,11 @@ public class SysApplicationServiceImpl extends ServiceImpl<SysApplicationMapper,
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "应用不存在或无权访问");
         }
         validateAuthTenant(appForm, existing.getTenantId());
+        try {
+            appForm.normalizeAccessRules();
+        } catch (IllegalArgumentException exception) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "URL/IP 规则不合法或超过 2000 字符");
+        }
         SysApplication sysApplication = applicationConverter.form2Entity(appForm);
         sysApplication.setId(appId);
         LambdaUpdateWrapper<SysApplication> update = new LambdaUpdateWrapper<SysApplication>()
@@ -105,6 +117,8 @@ public class SysApplicationServiceImpl extends ServiceImpl<SysApplicationMapper,
             update.set(SysApplication::getAuthTenantId, appForm.getAuthTenantId());
         }
         update.set(SysApplication::getAccessPath, appForm.getAccessPath());
+        // 不能让旧客户端省略字段时清空配置；显式空值必须覆盖旧限制。
+        update.set(appForm.isAllowIpsProvided(), SysApplication::getAllowIps, appForm.getAllowIps());
         boolean updated = this.update(sysApplication, update);
         if (updated) {
             credentialCache.afterCommit(existing.getTenantId(), appId, existing.getCode());

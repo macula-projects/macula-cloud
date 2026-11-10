@@ -18,6 +18,7 @@
 package dev.macula.cloud.system.service;
 
 import cn.hutool.core.util.StrUtil;
+import dev.macula.boot.security.AccessRuleUtils;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import dev.macula.boot.constants.CacheConstants;
 import dev.macula.boot.constants.GlobalConstants;
@@ -134,7 +135,8 @@ public class ApplicationCredentialCacheService {
         if (app != null) {
             Map<String, String> fields = tenantFields(app);
             fields.put(CacheConstants.SECURITY_SYSTEM_APPS_SECRIT_KEY, app.getSk());
-            fields.put(CacheConstants.SECURITY_SYSTEM_APPS_PERMIT_URLS, StrUtil.nullToEmpty(app.getAccessPath()));
+            fields.put(CacheConstants.SECURITY_SYSTEM_APPS_PERMIT_URLS, AccessRuleUtils.normalizeUrls(app.getAccessPath()));
+            fields.put(CacheConstants.SECURITY_SYSTEM_APPS_PERMIT_IPS, AccessRuleUtils.normalizeIps(app.getAllowIps()));
             redis.opsForHash().putAll(CacheConstants.SECURITY_SYSTEM_APPS + app.getCode(), fields);
         }
         for (SysApplicationApiKey key : keys.cacheKeys(appId, tenantId)) {
@@ -147,13 +149,16 @@ public class ApplicationCredentialCacheService {
         }
     }
 
-    /** 新增、更新和重建共用 Key URL 优先、应用 URL 兜底规则。 */
+    /** 新增、更新和重建共用 URL/IP 各自 Key 优先、应用兜底规则。 */
     public static Map<String, String> apiKeyFields(SysApplication app, SysApplicationApiKey key) {
         Map<String, String> fields = tenantFields(app);
         fields.put(CacheConstants.APIKEY_APPLICATION_CODE_ATTRIBUTE, app.getCode());
         fields.put(CacheConstants.APIKEY_APPLICATION_ID_ATTRIBUTE, app.getId().toString());
         fields.put(CacheConstants.SECURITY_SYSTEM_APPS_PERMIT_URLS,
-            StrUtil.isNotBlank(key.getAccessPath()) ? key.getAccessPath() : StrUtil.nullToEmpty(app.getAccessPath()));
+            AccessRuleUtils.normalizeUrls(StrUtil.isNotBlank(key.getAccessPath()) ? key.getAccessPath() : app.getAccessPath()));
+        // 两个维度独立继承；显式发布空字符串，清空后不能残留旧缓存字段。
+        fields.put(CacheConstants.SECURITY_SYSTEM_APPS_PERMIT_IPS,
+            AccessRuleUtils.normalizeIps(StrUtil.isNotBlank(key.getAllowIps()) ? key.getAllowIps() : app.getAllowIps()));
         return fields;
     }
 

@@ -58,7 +58,7 @@ describe('application API Key management', () => {
     const { vm, api } = createVm()
     vm.form = { id: null, remark: ' Integration ', accessPath: ' POST:/key/** ' }
     await vm.save()
-    expect(api.create).toHaveBeenCalledWith('34', { remark: 'Integration', accessPath: 'POST:/key/**' })
+    expect(api.create).toHaveBeenCalledWith('34', { remark: 'Integration', accessPath: 'POST:/key/**', allowIps: '' })
     expect(vm.createdVisible).toBe(true)
     expect(vm.createdKey).toBe('sk-synthetic-new')
     expect(vm.saving).toBe(false)
@@ -68,7 +68,7 @@ describe('application API Key management', () => {
     const { vm, api } = createVm()
     vm.form = { id: '9', remark: 'Note', accessPath: '' }
     await vm.save()
-    expect(api.update).toHaveBeenCalledWith('34', '9', { remark: 'Note', accessPath: '' })
+    expect(api.update).toHaveBeenCalledWith('34', '9', { remark: 'Note', accessPath: '', allowIps: '' })
     expect(api.create).not.toHaveBeenCalled()
     expect(vm.createdVisible).toBe(false)
   })
@@ -150,3 +150,33 @@ describe('API Key creation time', () => {
     expect(format('invalid')).toBe('—');
   });
 });
+
+describe('API Key multiline URL/IP configuration', () => {
+  it('normalizes legacy URL on edit and submits IP independently', async () => {
+    const { vm, api } = createVm()
+    vm.edit({ id: '9', accessPath: 'GET:/a, POST:/b', allowIps: '192.0.2.7\r\n2001:db8::/32' })
+    expect(vm.form.accessPath).toBe('GET:/a\nPOST:/b')
+    expect(vm.form.allowIps).toBe('192.0.2.7\n2001:db8::/32')
+    await vm.save()
+    expect(api.update).toHaveBeenCalledWith('34', '9', {
+      remark: '', accessPath: 'GET:/a\nPOST:/b', allowIps: '192.0.2.7\n2001:db8::/32'
+    })
+  })
+  it('explicitly clears both rules to restore application inheritance', async () => {
+    const { vm, api } = createVm()
+    vm.edit({ id: '9', accessPath: 'GET:/a', allowIps: '192.0.2.7' })
+    vm.form.accessPath = ' '
+    vm.form.allowIps = ' \n '
+    await vm.save()
+    expect(api.update).toHaveBeenCalledWith('34', '9', { remark: '', accessPath: '', allowIps: '' })
+  })
+  it('rejects separator-only URL before sending and keeps editor available', async () => {
+    const { vm, api } = createVm({ editing: true })
+    vm.form.accessPath = ',,,'
+    await vm.save()
+    expect(api.create).not.toHaveBeenCalled()
+    expect(vm.editing).toBe(true)
+    expect(vm.saving).toBe(false)
+    expect(messages.error).toHaveBeenCalled()
+  })
+})
