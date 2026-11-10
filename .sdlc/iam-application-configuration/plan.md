@@ -460,3 +460,5 @@ Service简化落实：现有V16已允许user_type为空，无需Schema变更。S
 2026-11-10 Rain回复“YES，更新镜像”，确认Build实现并授权本地System/IAM/Admin镜像刷新。正式Stage4首跑转换IT的旧素材断言cache.clear，但现有生产清理使用立即invalidate；更新两处断言为invalidate，仍要求提交一次、冲突/回滚零额外失效，不修改生产清理策略。修正后重跑正式验证。
 
 正式Stage4完成且Verification is green；按Rain同条镜像更新授权已刷新System/IAM/Admin，三服务健康，现有配置摘要不变，其余11容器未重建。完整正式证据及部署记录见verification.md对应本轮节；未自批PR/合并、未提交或推送。
+
+2026-11-10 Rain明确授权“可以推送合并PR”。本批421文件已整理至独立分支，Stage5第1轮独立Bugs/Security/Compliance审阅及fresh-context verify均0发现；PR准备和正常合并授权取自用户，不自批，不绕过分支保护。审阅SHA及正式证据见review-findings.md与verification.md。

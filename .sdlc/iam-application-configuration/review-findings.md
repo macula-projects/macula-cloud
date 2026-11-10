@@ -52,3 +52,17 @@ Reviewer：sdlc-reviewer；仅复核第1轮两项修正及直接影响。结果N
 ## Plan — 2026-11-10 应用类型排他边界 Round 1
 
 Reviewer：sdlc-reviewer（REVIEW未配Stage3，默认codex-plan-review未安装，按sdlc-build回退）；仅本增量Plan pass，预算最多3轮，实际第1轮。结果NO_FINDINGS。已核对能力模式级白名单、Native/Miniapp注册数量、IN_APP请求级上下文隔离与当前来源证明、授权/同意/兑换复查、转换CAS和密钥保留受限例外。现有MaculaOAuth2AuthorizationService.save在授权Code持久化和用户Token发布前已有MfaCompletionService.checkToken接点，可承接计划中的证明复核；未修改源代码，未批准人工计划门。
+
+
+## Stage 5 — Round 1 — 2026-11-10 全批IAM迭代
+
+- Reviewed SHA：`a34d1b406fb53fb4e840ff301d8a29af0f37c1f1`；base/merge-base：`3142653c0b371d6c62a1e7a42467c20a375813f4`（origin/main）。完整PR为421文件，包含本会话尚未提交的协议/Scope、Admin授权码、身份源多能力与多字段绑定、六类业务应用登录能力及直接依赖；不包含私有deploy/.env或生成物。
+- REVIEW.md存在；Standard深度；本次Code Review第1轮，预算最多3轮。旧报告中的Plan轮次不充作本次源码审阅。本轮未额外扩大审阅轮次。
+- Reviewer：独立`iam_pr_reviewer`，只读执行Bugs、Security、Compliance三个pass。Bugs核对协议和当前Client视图、矩阵/数量、转换CAS/凭据保留、授权版本、绑定锁、前端事务和退出竞态、迁移/部署依赖；Security核对IN_APP证明/SSO、当前版本与凭据、Scope资源、来源缓存owner/用途/版本、PKCE/state/nonce/at_hash、管理URL权限。Compliance按声明的资料暴露、凭据、日志/缓存、绑定不改用户资料要求核对，未引入未声明监管标准。
+- Result：NO_FINDINGS。Important 0、Minor 0、Nit 0、Pre-existing 0；重复抑制0；发布发现0。没有未解决的Important或Minor。
+- 独立fresh-context verifier `iam_pr_verifier`仅收到空发现列表及指定diff，确认两SHA、merge-base和421文件范围存在；输入0、排除0、无逐项待复核发现。该复核不冒充重新审阅整个源码。
+- 不将Mock/SAS/隔离数据库验证或本轮审阅视为真实厂商/设备验收；未由agent自批PR。Rain已明确授权“可以推送合并PR”，后续正常合并以该人类指令为依据，不使用自己的评审替代批准，不绕过分支保护。
+
+### Recurring
+
+已扫描`.sdlc/*/review-findings.md`的历史记录。本轮没有新增发现类别，因此没有本轮新出现于两个及以上变更的重复缺陷或待编码条目；不把既有Plan已修主题重复发布为本轮发现。

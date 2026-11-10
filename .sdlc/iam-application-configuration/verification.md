@@ -525,3 +525,12 @@ docker compose --env-file deploy/.env -f deploy/docker-compose.yml --profile app
 数据库仍V23，无新Schema迁移。部署前、System重启后、三服务全部重启后的身份源、Client（含类型/版本/凭据摘要）、用户绑定、协议配置及关联表指纹完全一致；没有自动转换历史Client或旋转凭据。
 
 证据目录`/private/tmp/app-boundary-deployment/`：build.log、up-system.log、up-iam-admin.log、runtime-result.json、containers-before.json、snapshot-before.json、snapshot-after-system.json、snapshot-after.json。此前本轮“未更新镜像”是授权前历史状态，当前已部署上述新镜像。真实厂商及设备联调仍未执行。
+
+
+## 2026-11-10 PR提交与合并前证据
+
+Rain明确授权推送、创建并合并PR。独立Code Review与fresh-context verify见review-findings.md的Stage5 Round1：完整421文件，0发现；不是仅审最后一次应用类型增量。对整批272个变更Java路径执行项目Checkstyle（同名匹配实际扫描273文件），XML0错误，日志`/private/tmp/iam-pr-checkstyle.log`及`iam-pr-checkstyle.xml`。已去除5个文件的历史行尾空白/多余EOF空行，`git diff --check`通过；仅空白变化，不改变已部署和测试的行为。
+
+主分支远端基线为3142653，工作区整理为独立feat/iam-application-identity-login分支。GitHub API实际核对：Actions工作流0、当前提交check-runs0、main的required_status_checks及required_pull_request_reviews均null。无可声称通过的远端CI；质量证据为本报告已执行的全后端611、用户名补跑1、隔离IT24、Admin213/构建、全Cypress75和独立审阅。合并使用正常GitHub PR merge并指定预期head SHA，不使用admin/强推或绕过保护。
+
+凭据签名扫描无命中；私有部署配置和生成物未入暂存。版本化前端.env文件的变更是移除旧浏览器明文凭据、登记空的公共Client ID及公开开发地址，包含在PR；实际运行部署.env始终忽略且未写入Git。
