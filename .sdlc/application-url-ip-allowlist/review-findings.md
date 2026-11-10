@@ -12,3 +12,13 @@ Budget: 仅 Plan pass，最多三轮；首轮后仅评审变更，不重复已�
 
 ### Round 2
 独立复查两仓完整路径清单与 Order 1 修订：第 1 轮两项 Important 均已修正，未发现新增问题。实际共执行 2 轮 Plan 评审，未执行代码审查或业务测试。计划仍为 draft，等待用户明确批准。
+
+## Code Round 1 — 98a91086760f09e71a6021213e6cd65090d56f0b
+Reviewer: cloud_code_review. Depth: Standard. Code round cap: 3.
+Passes run: Bugs, Security, Compliance. Scope: origin/main...98a91086760f09e71a6021213e6cd65090d56f0b.
+
+No findings. 已核对字段省略/null、Service 校验、Mapper 清空、URL/IP 独立继承、迁移及管理端保存链路；租户和凭据边界保留。无额外适用的监管、保留或同意要求。
+Findings posted: 0. Suppressed duplicates: 0. Verifier rejected: 0. Pre-existing: 0.
+
+## Recurring
+已扫描两仓其他 review-findings.md。本轮无新发现类别，无新出现于多个变更且缺少编码的类别。
