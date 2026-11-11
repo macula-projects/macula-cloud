@@ -8,6 +8,8 @@ REVIEW.md未指定Stage3审查器，工具检索未发现codex-plan-review；按
 
 ## Files that change
 
+- `.sdlc/iam-architecture-simplification/verification.md`
+
 - `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/mapper/SysRoleMapper.java`
 - `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/pojo/entity/SysUser.java`
 - `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/protocol/oauth2/grant/CustomeOAuth2AccessTokenGenerator.java`
@@ -231,3 +233,5 @@ REVIEW.md未指定Stage3审查器，工具检索未发现codex-plan-review；按
 - 推送前可复现性检查：真实模板夹具改写模块target并携带静态资源，删除JUnit对个人临时路径的依赖；Cypress预览地址改为显式IAM_PREVIEW_URL，无环境时清楚跳过，完整验证显式开启；README补充可复现命令。
 
 - 实施偏差：对实际暂存的完整Java差异执行Checkstyle，补充现有排版变动类型缺失的职责Javadoc及since；只补文档，不改变运行行为。
+
+- 实施偏差：两项接受计划共同交付，正式Test报告同步架构和邮箱两个slug，仅补工程证据。

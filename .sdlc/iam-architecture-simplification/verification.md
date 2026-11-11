@@ -86,3 +86,30 @@ IAM生产Java：216文件/19,633行 → 216文件/18,052行，净减1,581行（�
 ## 配置归类后的补充验证
 
 `mvn -pl macula-cloud-iam -am clean verify -Plocal -Dit.test=MfaProtocolIT,ProviderApplicationTokenCacheIT -Dfailsafe.failIfNoSpecifiedTests=false`通过，IAM单元/安全链369项、MFA及缓存IT16项均无失败/错误/跳过，且完成Boot可执行包构建。日志：`config-verify.log`。Checkstyle207文件通过，计划文件范围及`git diff --check`通过。本轮仅配置/CORS类与测试搬包，没有再修改绑定或数据库算法，因此不重复独立数据库迁移测试。
+
+
+## Stage 4 正式复验（2026-11-11，推送前最终代码）
+
+用户已用YES确认Build完成，并明确授权推送合并。已重新执行验证，不将之前的Build运行冒充本轮结果。
+
+Verification is green。
+
+| 本轮命令/证据 | 实际结果 |
+| --- | --- |
+| `mvn clean test -Plocal`，`pr-backend-tests3.log` | `BUILD SUCCESS`，643项，0失败/错误，1项既有环境门控跳过；642项实际通过。 |
+| 补类型职责注释后的`mvn test -Plocal`，`pr-backend-final.log` | `BUILD SUCCESS`；同一完整reactor通过。 |
+| `npm run test:unit -- --run`，`pr-admin-final-unit.log` | `Test Files 23 passed (23)` / `Tests 213 passed (213)`。 |
+| `npm run build`，`pr-admin-build.log` | `built in 5.78s`；既有chunk大小提示保留。 |
+| `npx start-server-and-test preview http://localhost:4173 'cypress run --expose IAM_PREVIEW_URL=http://127.0.0.1:4176/login.html --config screenshotsFolder=/private/tmp/macula-iam-review-20261111/pr-final-screenshots,video=false'` | `All specs passed!`，83项，0失败/待执行/跳过，含5项真实Thymeleaf页面场景；`pr-admin-browser-final.log`。 |
+| IdentityBindingMappingsMigrationIT + IdentitySourceBindingIT | 1+17项通过，新建隔离MySQL/Redis；`pr-binding-run.log`及isolated相关日志。 |
+| HostedEmailLoginMigrationIT | 1项通过，新建隔离MySQL从V24到V25；`pr-migration-run.log`及`email-migration-it.log`。 |
+| OAuth2ClientApplicationConcurrencyIT | 1项通过，新建隔离MySQL内EMAIL/PASSWORD竞争，409及唯一缓存失效；`pr-concurrency-run.log`。 |
+| MfaProtocolIT + ProviderApplicationTokenCacheIT | `Tests run: 16, Failures: 0, Errors: 0, Skipped: 0`，`BUILD SUCCESS`；`pr-mfa-cache.log`。 |
+| 实际全部暂存Java差异Checkstyle（包含重命名目的文件） | `Java files: 311 Checkstyle exit: 0`；`checkstyle-final.log`。 |
+| 其他 | `git diff --cached --check`通过。暂存无target/dist/node_modules/.env；未变更CLAUDE.md、AGENTS.md、技能、hooks或REVIEW.md，无适用配置eval变更。 |
+
+唯一后端跳过项为既有SysUserUsernameUniqueMigrationTest的独立数据库环境门；本次不修改用户名唯一性迁移，相关账号歧义拒绝由本次账号回归及真实绑定IT覆盖。不能把该跳过项计为通过。真实厂商、设备及邮件送达仍是单独验收范围。
+
+本轮初始失败及修复：JSON夹具被排版后，拒绝测试的紧凑字符串替换没有修改样本，改为结构化JSON变异；不削弱生产兼容读取器。真实模板输出改为模块target，Cypress16使用expose公开预览配置，未启用时显式跳过，最终完整运行已启用并通过。Checkstyle按暂存+重命名完整集合扫描，补既有排版类型的Javadoc及since；未修改校验规则。所有最终命令退出码均0。
+
+完整原始日志仅保存在本地临时目录，不提交日志或私有库备份。本节证明本地测试，不代替第三方联调或人工PR风险接受。
