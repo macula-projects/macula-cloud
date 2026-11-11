@@ -17,6 +17,7 @@
 
 package dev.macula.cloud.iam.service.userdetails;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.stream.Collectors;
 
@@ -24,6 +25,7 @@ import cn.hutool.core.collection.CollectionUtil;
 import dev.macula.boot.enums.StatusEnum;
 import dev.macula.cloud.iam.pojo.dto.UserAuthInfo;
 import lombok.Data;
+import org.springframework.security.core.CredentialsContainer;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -37,7 +39,7 @@ import tools.jackson.databind.annotation.JsonDeserialize;
  */
 @Data
 @JsonDeserialize
-public class SysUserDetails implements UserDetails, org.springframework.security.core.CredentialsContainer {
+public class SysUserDetails implements UserDetails, CredentialsContainer {
     private Long userId;
     private Long tenantId;
 
@@ -61,7 +63,7 @@ public class SysUserDetails implements UserDetails, org.springframework.security
     private String mobile;
     private String openId;
     private String unionId;
-    private Collection<SimpleGrantedAuthority> authorities = new java.util.ArrayList<>();
+    private Collection<SimpleGrantedAuthority> authorities = new ArrayList<>();
     private boolean accountNonExpired = true;
     private boolean accountNonLocked = true;
     private boolean credentialsNonExpired = true;
@@ -88,7 +90,7 @@ public class SysUserDetails implements UserDetails, org.springframework.security
 
     public void setAuthorities(Collection<SimpleGrantedAuthority> authorities) {
         // Use a supported concrete collection in the Security serialization allowlist.
-        this.authorities = authorities == null ? new java.util.ArrayList<>() : new java.util.ArrayList<>(authorities);
+        this.authorities = authorities == null ? new ArrayList<>() : new ArrayList<>(authorities);
     }
 
     @Override

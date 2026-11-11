@@ -17,12 +17,15 @@
 package dev.macula.cloud.iam.service.identity;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 import dev.macula.cloud.iam.authentication.thirdparty.VerifiedExternalIdentity;
+import dev.macula.cloud.iam.enums.UserTypeEnum;
 import dev.macula.cloud.iam.mapper.SysUserMapper;
 import dev.macula.cloud.iam.pojo.entity.SysUser;
 import dev.macula.cloud.iam.service.identity.directory.IdentityDirectoryService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
@@ -42,20 +45,20 @@ public class IdentitySourceBindingPolicyService {
     /**
      * 生产统一准入必须覆盖已有绑定。
      */
-    @org.springframework.beans.factory.annotation.Autowired
+    @Autowired
     public IdentitySourceBindingPolicyService(RegistrationIdentityBindingService bindings,
             IdentityProviderConfigService configs, SysUserMapper users, IdentityDirectoryService directory) {
         this.bindings = bindings;
         this.configs = configs;
         this.users = users;
-        this.directory = java.util.Objects.requireNonNull(directory);
+        this.directory = Objects.requireNonNull(directory);
     }
 
     /**
      * 有效已绑定身份优先；否则执行该来源完整映射集合并要求命中一致。
      */
     public Optional<UserDetails> resolve(String clientId, Long tenantId,
-            dev.macula.cloud.iam.enums.UserTypeEnum userType, VerifiedExternalIdentity identity) {
+            UserTypeEnum userType, VerifiedExternalIdentity identity) {
         return resolve(clientId, tenantId, userType, identity, null);
     }
 
@@ -63,7 +66,7 @@ public class IdentitySourceBindingPolicyService {
      * 浏览器携带服务端发起版本；直接Code继续由认证Client及Token版本边界约束。
      */
     public Optional<UserDetails> resolve(String clientId, Long tenantId,
-            dev.macula.cloud.iam.enums.UserTypeEnum userType,
+            UserTypeEnum userType,
             VerifiedExternalIdentity identity, Long expectedClientVersion) {
         var admission = directory.check(identity);
         VerifiedExternalIdentity verified = directory.enrich(identity, admission);

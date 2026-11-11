@@ -16,34 +16,49 @@
  */
 package dev.macula.cloud.iam.service.identity;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import dev.macula.cloud.iam.authentication.thirdparty.VerifiedExternalIdentity;
 import dev.macula.cloud.iam.enums.UserTypeEnum;
+import dev.macula.cloud.iam.mapper.SysApplicationProtocolConfigMapper;
 import dev.macula.cloud.iam.mapper.SysIdentityProviderMapper;
 import dev.macula.cloud.iam.mapper.SysOAuth2ClientExternalProviderMapper;
 import dev.macula.cloud.iam.mapper.SysOAuth2ClientMapper;
 import dev.macula.cloud.iam.mapper.SysRegistrationIdentityBindingMapper;
 import dev.macula.cloud.iam.mapper.SysUserMapper;
+import dev.macula.cloud.iam.pojo.entity.SysApplicationProtocolConfig;
 import dev.macula.cloud.iam.pojo.entity.SysIdentityProvider;
 import dev.macula.cloud.iam.pojo.entity.SysOAuth2Client;
 import dev.macula.cloud.iam.pojo.entity.SysOAuth2ClientExternalProvider;
 import dev.macula.cloud.iam.pojo.entity.SysRegistrationIdentityBinding;
 import dev.macula.cloud.iam.pojo.entity.SysUser;
+import dev.macula.cloud.iam.protocol.oauth2.OAuth2ClientProtocolPolicy;
 import dev.macula.cloud.iam.service.account.ClientAccountDetailsService;
 import dev.macula.cloud.iam.service.identity.directory.IdentityDirectoryService;
 import dev.macula.cloud.iam.service.userdetails.SysUserDetails;
 import dev.macula.cloud.system.enums.ExternalCodeType;
+import dev.macula.cloud.system.enums.IdentityDirectoryPolicy;
+import dev.macula.cloud.system.enums.IdentityLoginCapability;
+import dev.macula.cloud.system.enums.OAuth2ClientApplicationType;
+import dev.macula.cloud.system.protocol.ApplicationProtocolConfiguration;
+import dev.macula.cloud.system.protocol.ApplicationProtocolRegistry;
+import dev.macula.cloud.system.protocol.OAuth2ProtocolConfiguration;
+import dev.macula.cloud.system.protocol.OAuth2ProtocolSettings;
+import dev.macula.cloud.system.security.OAuth2ApplicationLoginPolicy;
 import dev.macula.cloud.system.security.UserIdentifierNormalizer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -57,7 +72,7 @@ import tools.jackson.databind.json.JsonMapper;
 @RequiredArgsConstructor
 public class RegistrationIdentityBindingService {
     private final SysOAuth2ClientMapper clients;
-    private final dev.macula.cloud.iam.mapper.SysApplicationProtocolConfigMapper protocols;
+    private final SysApplicationProtocolConfigMapper protocols;
     private final SysIdentityProviderMapper sources;
     private final SysOAuth2ClientExternalProviderMapper externalSources;
     private final SysUserMapper users;
@@ -82,27 +97,27 @@ public class RegistrationIdentityBindingService {
                 || !Objects.equals(client.getTenantId(), expectedTenant) || client.getUserType() != expectedUserType) {
             throw denied();
         }
-        var protocolQuery = new LambdaQueryWrapper<dev.macula.cloud.iam.pojo.entity.SysApplicationProtocolConfig>()
-                .eq(dev.macula.cloud.iam.pojo.entity.SysApplicationProtocolConfig::getApplicationId, client.getId());
+        var protocolQuery = new LambdaQueryWrapper<SysApplicationProtocolConfig>()
+                .eq(SysApplicationProtocolConfig::getApplicationId, client.getId());
         if (lock) {
             protocolQuery.last("FOR UPDATE");
         }
         try {
             client.setProtocolConfigurations(protocols.selectList(protocolQuery).stream().map(row -> {
                 if (row.getConfiguration() == null ||
-                        row.getConfiguration().getBytes(java.nio.charset.StandardCharsets.UTF_8).length
-                                > dev.macula.cloud.system.protocol.ApplicationProtocolRegistry.MAX_CONFIG_BYTES) {
+                        row.getConfiguration().getBytes(StandardCharsets.UTF_8).length
+                                > ApplicationProtocolRegistry.MAX_CONFIG_BYTES) {
                     throw denied();
                 }
-                return new dev.macula.cloud.system.protocol.ApplicationProtocolConfiguration(row.getProtocol(),
+                return new ApplicationProtocolConfiguration(row.getProtocol(),
                         row.getSchemaVersion(),
                         Boolean.TRUE.equals(row.getEnabled()), json.readValue(row.getConfiguration(),
-                        dev.macula.cloud.system.protocol.OAuth2ProtocolSettings.class));
+                        OAuth2ProtocolSettings.class));
             }).toList());
         } catch (RuntimeException ex) {
             throw denied();
         }
-        if (!dev.macula.cloud.iam.protocol.oauth2.OAuth2ClientProtocolPolicy.enabled(client)) {
+        if (!OAuth2ClientProtocolPolicy.enabled(client)) {
             throw denied();
         }
         IdentityProviderConfigService.ProviderConfig source;
@@ -134,8 +149,8 @@ public class RegistrationIdentityBindingService {
             if (!source.sourceType().browser() || !identity.registrationId().equals(fixed.get(bindingKey))
                     || !csv(client.getBrowserLoginProviderTypes()).contains(identity.providerType())
                     || !client.getProtocolConfigurations().stream()
-                    .filter(dev.macula.cloud.system.protocol.ApplicationProtocolConfiguration::enabled)
-                    .map(dev.macula.cloud.system.protocol.OAuth2ProtocolConfiguration::settings)
+                    .filter(ApplicationProtocolConfiguration::enabled)
+                    .map(OAuth2ProtocolConfiguration::settings)
                     .anyMatch(settings -> csv(settings.getAuthorizationGrantTypes()).contains("authorization_code"))) {
                 throw denied();
             }
@@ -144,8 +159,8 @@ public class RegistrationIdentityBindingService {
             String protocol = client.getProtocolConfigurations().get(0).protocol();
             ExternalCodeType type = ExternalCodeType.fromValue(identity.capability());
             if (!source.sourceType().supports(type) || !csv(client.getExternalCodeTypes()).contains(type.name())
-                    || !csv(dev.macula.cloud.system.protocol.OAuth2ProtocolConfiguration.settings(
-                            dev.macula.cloud.iam.protocol.oauth2.OAuth2ClientProtocolPolicy.configuration(client,
+                    || !csv(OAuth2ProtocolConfiguration.settings(
+                            OAuth2ClientProtocolPolicy.configuration(client,
                                     protocol))
                     .getAuthorizationGrantTypes()).contains(ExternalCodeType.GRANT_TYPE)) {
                 throw denied();
@@ -160,20 +175,20 @@ public class RegistrationIdentityBindingService {
             }
         }
         // 绑定锁内重查整个注册集合；仅验证当前Code会漏掉跨来源SDK和小程序双Code。
-        var type = dev.macula.cloud.system.enums.OAuth2ClientApplicationType.valueOf(client.getApplicationType());
+        var type = OAuth2ClientApplicationType.valueOf(client.getApplicationType());
         Map<String, Long> browser = client.getBrowserCapabilityBindings() == null ? Map.of()
                 : json.readValue(client.getBrowserCapabilityBindings(), new TypeReference<>() {
         });
         Map<String, Long> allExternal = externalSources.selectList(
                         new LambdaQueryWrapper<SysOAuth2ClientExternalProvider>()
                                 .eq(SysOAuth2ClientExternalProvider::getClientId, clientId).last(lock, "FOR UPDATE")).stream()
-                .collect(java.util.stream.Collectors.toMap(
+                .collect(Collectors.toMap(
                         SysOAuth2ClientExternalProvider::getCodeType,
                         SysOAuth2ClientExternalProvider::getIdentityProviderId));
         try {
-            dev.macula.cloud.system.security.OAuth2ApplicationLoginPolicy.validate(type, client.getMiniappPlatform(),
+            OAuth2ApplicationLoginPolicy.validate(type, client.getMiniappPlatform(),
                     browser, allExternal, true);
-            var capability = dev.macula.cloud.system.enums.IdentityLoginCapability.fromValue(
+            var capability = IdentityLoginCapability.fromValue(
                     identity.loginCapability());
             if (VerifiedExternalIdentity.BROWSER.equals(identity.capability()) ?
                     !type.supportsBrowserCapability(capability)
@@ -261,11 +276,11 @@ public class RegistrationIdentityBindingService {
                 .eq(SysIdentityProvider::getId, identity.registrationId()).last("FOR UPDATE"));
         IdentityProviderConfigService.ProviderConfig source = configs.requireLoaded(lockedSource,
                 identity.registrationId(), identity.providerType()).forCapability(identity.loginCapability());
-        if (!java.util.Objects.equals(source.version(), identity.sourceVersion())
+        if (!Objects.equals(source.version(), identity.sourceVersion())
                 || !source.flow().value().equals(identity.flow())) {
             throw denied();
         }
-        if (source.directoryPolicy() != dev.macula.cloud.system.enums.IdentityDirectoryPolicy.IDENTITY_ONLY) {
+        if (source.directoryPolicy() != IdentityDirectoryPolicy.IDENTITY_ONLY) {
             if (admission == null) {
                 throw denied();
             }
@@ -324,8 +339,8 @@ public class RegistrationIdentityBindingService {
     /**
      * 读取明确列表。
      */
-    private java.util.Set<String> csv(String value) {
-        return value == null ? java.util.Set.of() : org.springframework.util.StringUtils.commaDelimitedListToSet(value);
+    private Set<String> csv(String value) {
+        return value == null ? Set.of() : StringUtils.commaDelimitedListToSet(value);
     }
 
     /**

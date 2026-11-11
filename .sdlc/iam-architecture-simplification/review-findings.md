@@ -40,3 +40,14 @@ Plan review 状态：完成，等待工程师批准 plan.md；未自行批准工
 ### Remote publication checkpoint
 
 用户已要求“推送合并”。本地提交和完整审查已完成，`git push`尚未执行成功：自动审批判定目标macula-projects/macula-cloud为公开仓库，要求明确确认将本次源码/配置/文档公开披露。未换接口绕过拒绝、未创建远端PR、未合并。待公开发布授权后，推送并发布包含上述证据和发现计数的PR，按实际分支保护执行。
+
+
+## Stage 5 — Standard — Round 2：显式import增量
+
+- Base `78624af241091d543eb121b09fd5f94537feb333`（PR #33已合并）；reviewed SHA `e4666f4099ee60fa768c055dbce1f4d2c22a5430`，8个IAM Java及计划/验证记录共10文件。后续仅补此审查记录，不改变已审源代码。
+- Reviewer `iam_imports_review`，fresh context、只读实际固定SHA差异。REVIEW.md适用，Bugs、Security、Compliance均NO_FINDINGS：类型/泛型/方法引用/异常/接口/事务及注入注解解析相同，字符串及序列化标识不变，未改变权限、身份来源、事务隔离、凭据清除或审计行为。
+- Important 0 / Minor 0 / Nit 0 / Pre-existing 0，发布0，重复发现抑制0；历史Plan邮箱兼容问题沿用原闭环，不重复计入本轮。
+- Verifier `iam_imports_verify`，独立fresh-context verify mode：空发现输入，逐项核验0，驳回0，未新增发现或重新review。
+- 本次实际1轮增量审查，Stage5累计2轮，未超过3轮；未由代理接受风险或批准合并。
+- Recurring：本轮无发现类别，没有新增跨change重复缺陷；既有编码及测试保持。
+- 人工授权：用户已明确YES同意向公开仓库macula-projects/macula-cloud发布，本轮再次明确要求“提交合并”。前轮公开披露检查点已解除；按实际分支保护合并，不绕过检查。不包含部署或分支删除。

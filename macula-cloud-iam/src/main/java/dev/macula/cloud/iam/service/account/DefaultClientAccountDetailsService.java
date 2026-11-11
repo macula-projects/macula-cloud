@@ -17,10 +17,14 @@
 
 package dev.macula.cloud.iam.service.account;
 
+import java.util.Objects;
+
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import dev.macula.boot.enums.StatusEnum;
 import dev.macula.cloud.iam.enums.UserTypeEnum;
 import dev.macula.cloud.iam.pojo.dto.UserAuthInfo;
 import dev.macula.cloud.iam.pojo.entity.SysOAuth2Client;
+import dev.macula.cloud.iam.pojo.entity.SysUser;
 import dev.macula.cloud.iam.service.client.SysOAuth2ClientService;
 import dev.macula.cloud.iam.service.userdetails.SysUserDetails;
 import org.jspecify.annotations.Nullable;
@@ -95,7 +99,7 @@ public final class DefaultClientAccountDetailsService implements ClientAccountDe
             return details(sysUserService.getUserAuthInfo(1L, identifier, null), 1L);
         }
         SysOAuth2Client client = sysOAuth2ClientService.getClientByClientId(clientId);
-        if (client == null || !java.util.Objects.equals(tenantId, client.getTenantId()) ||
+        if (client == null || !Objects.equals(tenantId, client.getTenantId()) ||
                 userType != client.getUserType()) {
             throw new BadCredentialsException("Client路由已变化");
         }
@@ -115,8 +119,8 @@ public final class DefaultClientAccountDetailsService implements ClientAccountDe
                 () -> new UsernameNotFoundException("用户不存在"));
         UserDetails loaded = loadUserByClient(clientId, tenantId, userType, account.getUsername());
         if (!(loaded instanceof SysUserDetails principal) ||
-                !java.util.Objects.equals(account.getId(), principal.getUserId())
-                || !java.util.Objects.equals(tenantId, principal.getTenantId())) {
+                !Objects.equals(account.getId(), principal.getUserId())
+                || !Objects.equals(tenantId, principal.getTenantId())) {
             throw new BadCredentialsException("账号目录不一致");
         }
         if (kind == IdentifierType.MOBILE) {
@@ -131,9 +135,9 @@ public final class DefaultClientAccountDetailsService implements ClientAccountDe
     @Override
     public UserDetails updatePassword(UserDetails user, String encodedPassword) {
         boolean changed = sysUserService.update(
-                new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<dev.macula.cloud.iam.pojo.entity.SysUser>()
-                        .eq(dev.macula.cloud.iam.pojo.entity.SysUser::getUsername, user.getUsername())
-                        .set(dev.macula.cloud.iam.pojo.entity.SysUser::getPassword, encodedPassword));
+                new LambdaUpdateWrapper<SysUser>()
+                        .eq(SysUser::getUsername, user.getUsername())
+                        .set(SysUser::getPassword, encodedPassword));
         if (changed && user instanceof SysUserDetails principal) {
             principal.setPassword(encodedPassword);
         }

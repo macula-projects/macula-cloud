@@ -6,6 +6,8 @@ Status: accepted。Plan review: completed（2 rounds，最终 NO_FINDINGS；工�
 
 ## Files that change
 
+- `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/service/userdetails/SysUserDetails.java`
+
 - `macula-cloud-iam/docs/architecture.md`
 
 - `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/config/authentication/DefaultSecurityConfiguration.java`
@@ -512,3 +514,7 @@ Status: accepted。Plan review: completed（2 rounds，最终 NO_FINDINGS；工�
 - 用户继续要求config分类：协议专属装配统一归config.oauth2，登录安全链归config.authentication，跨链MFA及PasswordEncoder配置留根包。ProtocolLoginCorsConfigurationSource属于协议行为而非Bean装配，移至protocol.oauth2.endpoint并命名OAuth2CorsConfigurationSource；同步测试与引用，不改变Bean名、链顺序、端点或CORS规则。补包说明，clean IAM verify验证旧类无残留。
 
 - 用户要求整理类图及整体逻辑：新增面向维护者的docs/architecture.md，按实际类型/调用核对装配、网页登录、external_code、公共身份规则与Token/存储五组类图，并说明绑定、发布和兼容边界；README增加入口。仅文档，无运行代码变化。
+
+- 用户后续明确要求少用全限定类名、使用import：本轮只整理IAM service下8个已有实现/端口的类型引用与显式导入，不改变字符串、注释、序列化标识、注解含义或业务逻辑；保留已有未提交工作，写入前校验源文件摘要。仅本地修改，未授权自动提交推送。
+
+- import整理完成后，用户明确要求“提交合并”；沿用前文对公开仓库macula-projects/macula-cloud的明确YES授权，仅提交这8个服务文件及工程证据，不部署或删除分支。
