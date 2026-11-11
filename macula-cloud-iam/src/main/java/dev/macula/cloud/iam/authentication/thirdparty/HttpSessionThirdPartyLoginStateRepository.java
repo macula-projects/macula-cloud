@@ -16,17 +16,18 @@
  */
 package dev.macula.cloud.iam.authentication.thirdparty;
 
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Base64;
+
+import dev.macula.cloud.iam.authentication.thirdparty.browser.ThirdPartyLoginStateRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.keygen.Base64StringKeyGenerator;
 import org.springframework.security.crypto.keygen.StringKeyGenerator;
 import org.springframework.stereotype.Component;
-
-import java.time.Clock;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.Base64;
 
 /**
  * 每个会话、每个 provider 仅保存一个五分钟有效的一次性 state。
@@ -72,12 +73,14 @@ public class HttpSessionThirdPartyLoginStateRepository implements ThirdPartyLogi
         }
         Instant now = clock.instant();
         if (stored.context().createdAt().isAfter(now)
-            || stored.context().createdAt().plus(MAX_AGE).isBefore(now)) {
+                || stored.context().createdAt().plus(MAX_AGE).isBefore(now)) {
             throw new BadCredentialsException("第三方登录状态已过期");
         }
         if (stored.context().registrationId() == null || stored.context().sourceType() == null
-            || stored.context().sourceVersion() == null || stored.context().flow() == null || stored.context().loginCapability() == null
-            || stored.context().upstreamRedirectUri() == null || stored.context().tenantId() == null || stored.context().userType() == null) {
+                || stored.context().sourceVersion() == null || stored.context().flow() == null ||
+                stored.context().loginCapability() == null
+                || stored.context().upstreamRedirectUri() == null || stored.context().tenantId() == null ||
+                stored.context().userType() == null) {
             throw new BadCredentialsException("请重新发起第三方登录");
         }
         return stored.context();

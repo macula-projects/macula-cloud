@@ -20,10 +20,12 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
  * 基础资料响应白名单，不暴露角色、菜单或内部鉴权声明。
+ *
  * @param sub 稳定用户标识
  * @param preferredUsername 用户名
  * @param nickname 昵称
  * @author Rain
  * @since 6.1.0
  */
-public record ProfileVO(String sub, @JsonProperty("preferred_username") String preferredUsername, String nickname) { }
+public record ProfileVO(String sub, @JsonProperty("preferred_username") String preferredUsername, String nickname) {
+}

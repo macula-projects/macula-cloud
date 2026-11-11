@@ -16,7 +16,7 @@
  */
 package dev.macula.cloud.iam.protocol.oauth2.endpoint;
 
-import dev.macula.cloud.iam.service.support.SysOAuth2ClientService;
+import dev.macula.cloud.iam.service.client.SysOAuth2ClientService;
 import jakarta.servlet.FilterChain;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -54,9 +54,10 @@ class OAuth2TokenOriginFilterTest {
     void allowsOriginOwnedByAuthenticatedClient() throws Exception {
         authenticate(client());
         authenticate(RegisteredClient.from(client()).clientSettings(
-            org.springframework.security.oauth2.server.authorization.settings.ClientSettings.builder()
-                .setting(dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeClientSettings.ALLOWED_ORIGINS,
-                    java.util.Set.of(ORIGIN)).build()).build());
+                org.springframework.security.oauth2.server.authorization.settings.ClientSettings.builder()
+                        .setting(
+                                dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeClientSettings.ALLOWED_ORIGINS,
+                                java.util.Set.of(ORIGIN)).build()).build());
         MockHttpServletRequest request = tokenRequest();
         MockHttpServletResponse response = new MockHttpServletResponse();
         FilterChain chain = mock(FilterChain.class);
@@ -127,14 +128,14 @@ class OAuth2TokenOriginFilterTest {
 
     private void authenticate(RegisteredClient client) {
         SecurityContextHolder.getContext().setAuthentication(new OAuth2ClientAuthenticationToken(
-            client, ClientAuthenticationMethod.CLIENT_SECRET_POST, "credential"));
+                client, ClientAuthenticationMethod.CLIENT_SECRET_POST, "credential"));
     }
 
     private RegisteredClient client() {
         return RegisteredClient.withId("client-a").clientId("client-a")
-            .clientSecret("{noop}secret")
-            .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_POST)
-            .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
-            .scope("profile").build();
+                .clientSecret("{noop}secret")
+                .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_POST)
+                .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
+                .scope("profile").build();
     }
 }

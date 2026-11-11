@@ -16,10 +16,15 @@
  */
 package dev.macula.cloud.iam.protocol.oauth2.grant.base;
 
-import dev.macula.cloud.system.enums.ExternalCodeType;
+import java.security.Principal;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+
 import dev.macula.cloud.iam.protocol.oauth2.ApplicationProtocolResolver;
 import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeClientSettings;
 import dev.macula.cloud.iam.service.userdetails.SysUserDetails;
+import dev.macula.cloud.system.enums.ExternalCodeType;
 import dev.macula.cloud.system.protocol.ApplicationProtocolRegistry;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
@@ -45,11 +50,6 @@ import org.springframework.security.oauth2.server.authorization.token.OAuth2Toke
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenGenerator;
 import org.springframework.util.Assert;
 
-import java.security.Principal;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
-
 /**
  * 使用真实 grant type 签发用户令牌；OIDC第三方Code同时持久化ID Token。
  *
@@ -57,65 +57,70 @@ import java.util.Set;
  * @since 6.1.0
  */
 public class OAuth2UserGrantTokenIssuer {
-    private dev.macula.cloud.iam.authentication.mfa.MfaCompletionService mfaCompletion =
-        dev.macula.cloud.iam.authentication.mfa.MfaCompletionService.noOp();
-
-    /** Spring生产装配必须注入统一策略；显式构造的存储/生成器单测保留默认行为。 */
-    @org.springframework.beans.factory.annotation.Autowired
-    public void setMfaCompletion(dev.macula.cloud.iam.authentication.mfa.MfaCompletionService completion) {
-        this.mfaCompletion = java.util.Objects.requireNonNull(completion);
-    }
-
     private static final String ERROR_URI = "https://datatracker.ietf.org/doc/html/rfc6749#section-5.2";
-
     private final OAuth2AuthorizationService authorizationService;
     private final OAuth2TokenGenerator<? extends OAuth2Token> tokenGenerator;
-
+    private dev.macula.cloud.iam.authentication.mfa.MfaCompletionService mfaCompletion =
+            dev.macula.cloud.iam.authentication.mfa.MfaCompletionService.noOp();
     public OAuth2UserGrantTokenIssuer(OAuth2AuthorizationService authorizationService,
-        OAuth2TokenGenerator<? extends OAuth2Token> tokenGenerator) {
+            OAuth2TokenGenerator<? extends OAuth2Token> tokenGenerator) {
         Assert.notNull(authorizationService, "authorizationService cannot be null");
         Assert.notNull(tokenGenerator, "tokenGenerator cannot be null");
         this.authorizationService = authorizationService;
         this.tokenGenerator = tokenGenerator;
     }
 
-    /** 手动创建的扩展grant同样使用Spring中的统一完成策略。 */
+    /**
+     * 手动创建的扩展grant同样使用Spring中的统一完成策略。
+     */
     public OAuth2UserGrantTokenIssuer(OAuth2AuthorizationService authorizationService,
-        OAuth2TokenGenerator<? extends OAuth2Token> tokenGenerator,
-        dev.macula.cloud.iam.authentication.mfa.MfaCompletionService completion) {
+            OAuth2TokenGenerator<? extends OAuth2Token> tokenGenerator,
+            dev.macula.cloud.iam.authentication.mfa.MfaCompletionService completion) {
         this(authorizationService, tokenGenerator);
         setMfaCompletion(completion);
     }
 
-    /** 仅OIDC第三方Code扩展额外签发ID Token；全部令牌生成成功后才保存授权。 */
+    /**
+     * Spring生产装配必须注入统一策略；显式构造的存储/生成器单测保留默认行为。
+     */
+    @org.springframework.beans.factory.annotation.Autowired
+    public void setMfaCompletion(dev.macula.cloud.iam.authentication.mfa.MfaCompletionService completion) {
+        this.mfaCompletion = java.util.Objects.requireNonNull(completion);
+    }
+
+    /**
+     * 仅OIDC第三方Code扩展额外签发ID Token；全部令牌生成成功后才保存授权。
+     */
     public OAuth2AccessTokenAuthenticationToken issue(RegisteredClient registeredClient,
-        OAuth2ClientAuthenticationToken clientPrincipal, Authentication userPrincipal,
-        Authentication authorizationGrant, AuthorizationGrantType grantType, Set<String> authorizedScopes,
-        boolean allowRefreshToken) {
+            OAuth2ClientAuthenticationToken clientPrincipal, Authentication userPrincipal,
+            Authentication authorizationGrant, AuthorizationGrantType grantType, Set<String> authorizedScopes,
+            boolean allowRefreshToken) {
         var sourceProof = dev.macula.cloud.iam.authentication.mfa.MfaCompletionService.proof(userPrincipal);
         mfaCompletion.checkToken(userPrincipal, registeredClient,
-            dev.macula.cloud.iam.authentication.mfa.AuthenticationCheckpoint.USER_TOKEN, grantType.getValue(), sourceProof);
+                dev.macula.cloud.iam.authentication.mfa.AuthenticationCheckpoint.USER_TOKEN, grantType.getValue(),
+                sourceProof);
         boolean oidcExternal = ExternalCodeType.GRANT_TYPE.equals(grantType.getValue())
-            && ApplicationProtocolRegistry.OIDC.equals(registeredClient.getClientSettings().getSetting(
+                && ApplicationProtocolRegistry.OIDC.equals(registeredClient.getClientSettings().getSetting(
                 ApplicationProtocolResolver.EFFECTIVE_PROTOCOL))
-            && authorizedScopes.contains(OidcScopes.OPENID);
+                && authorizedScopes.contains(OidcScopes.OPENID);
         if (oidcExternal) {
             requireCanonicalUser(registeredClient, userPrincipal);
         }
         DefaultOAuth2TokenContext.Builder tokenContextBuilder = DefaultOAuth2TokenContext.builder()
-            .registeredClient(registeredClient)
-            .principal(userPrincipal)
-            .authorizationServerContext(AuthorizationServerContextHolder.getContext())
-            .authorizedScopes(authorizedScopes)
-            .authorizationGrantType(grantType)
-            .authorizationGrant(authorizationGrant);
+                .registeredClient(registeredClient)
+                .principal(userPrincipal)
+                .authorizationServerContext(AuthorizationServerContextHolder.getContext())
+                .authorizedScopes(authorizedScopes)
+                .authorizationGrantType(grantType)
+                .authorizationGrant(authorizationGrant);
 
         OAuth2Authorization.Builder authorizationBuilder = OAuth2Authorization.withRegisteredClient(registeredClient)
-            .principalName(userPrincipal.getName())
-            .authorizationGrantType(grantType)
-            .authorizedScopes(authorizedScopes);
+                .principalName(userPrincipal.getName())
+                .authorizationGrantType(grantType)
+                .authorizedScopes(authorizedScopes);
         if (!sourceProof.isEmpty()) {
-            authorizationBuilder.attribute(dev.macula.cloud.iam.authentication.mfa.MfaCompletionService.SOURCE_PROOF, sourceProof);
+            authorizationBuilder.attribute(dev.macula.cloud.iam.authentication.mfa.MfaCompletionService.SOURCE_PROOF,
+                    sourceProof);
         }
 
         OAuth2TokenContext tokenContext = tokenContextBuilder.tokenType(OAuth2TokenType.ACCESS_TOKEN).build();
@@ -124,19 +129,20 @@ public class OAuth2UserGrantTokenIssuer {
             throw serverError("The token generator failed to generate the access token.");
         }
         OAuth2AccessToken accessToken = new OAuth2AccessToken(OAuth2AccessToken.TokenType.BEARER,
-            generatedAccessToken.getTokenValue(), generatedAccessToken.getIssuedAt(),
-            generatedAccessToken.getExpiresAt(), tokenContext.getAuthorizedScopes());
+                generatedAccessToken.getTokenValue(), generatedAccessToken.getIssuedAt(),
+                generatedAccessToken.getExpiresAt(), tokenContext.getAuthorizedScopes());
         if (generatedAccessToken instanceof ClaimAccessor claims) {
             authorizationBuilder.id(accessToken.getTokenValue()).token(accessToken,
-                    metadata -> metadata.put(OAuth2Authorization.Token.CLAIMS_METADATA_NAME, claims.getClaims()))
-                .attribute(Principal.class.getName(), userPrincipal);
+                            metadata -> metadata.put(OAuth2Authorization.Token.CLAIMS_METADATA_NAME,
+                                    claims.getClaims()))
+                    .attribute(Principal.class.getName(), userPrincipal);
         } else {
             authorizationBuilder.id(accessToken.getTokenValue()).accessToken(accessToken);
         }
 
         OAuth2RefreshToken refreshToken = null;
         if (allowRefreshToken && registeredClient.getAuthorizationGrantTypes().contains(
-            AuthorizationGrantType.REFRESH_TOKEN)) {
+                AuthorizationGrantType.REFRESH_TOKEN)) {
             tokenContext = tokenContextBuilder.tokenType(OAuth2TokenType.REFRESH_TOKEN).build();
             OAuth2Token generatedRefreshToken = tokenGenerator.generate(tokenContext);
             if (!(generatedRefreshToken instanceof OAuth2RefreshToken generated)) {
@@ -150,15 +156,15 @@ public class OAuth2UserGrantTokenIssuer {
         if (oidcExternal) {
             // 先有完整用户和Access Token上下文，但不能在ID Token失败前发布半份授权。
             tokenContext = tokenContextBuilder.authorization(authorizationBuilder.build())
-                .tokenType(new OAuth2TokenType(OidcParameterNames.ID_TOKEN)).build();
+                    .tokenType(new OAuth2TokenType(OidcParameterNames.ID_TOKEN)).build();
             OAuth2Token generatedIdToken = tokenGenerator.generate(tokenContext);
             if (!(generatedIdToken instanceof ClaimAccessor idClaims)) {
                 throw serverError("The token generator failed to generate the ID token.");
             }
             idToken = new OidcIdToken(generatedIdToken.getTokenValue(), generatedIdToken.getIssuedAt(),
-                generatedIdToken.getExpiresAt(), idClaims.getClaims());
+                    generatedIdToken.getExpiresAt(), idClaims.getClaims());
             authorizationBuilder.token(idToken, metadata ->
-                metadata.put(OAuth2Authorization.Token.CLAIMS_METADATA_NAME, idClaims.getClaims()));
+                    metadata.put(OAuth2Authorization.Token.CLAIMS_METADATA_NAME, idClaims.getClaims()));
             if (idClaims.getClaims().get(OidcParameterNames.NONCE) instanceof String nonce) {
                 authorizationBuilder.attribute(OidcParameterNames.NONCE, nonce);
             }
@@ -166,29 +172,34 @@ public class OAuth2UserGrantTokenIssuer {
         OAuth2Authorization authorization = authorizationBuilder.build();
         authorizationService.save(authorization);
         Map<String, Object> claims = authorization.getAccessToken().getClaims() == null
-            ? Map.of() : authorization.getAccessToken().getClaims();
+                ? Map.of() : authorization.getAccessToken().getClaims();
         Map<String, Object> additional = new HashMap<>(claims);
         if (idToken != null) {
             additional.put(OidcParameterNames.ID_TOKEN, idToken.getTokenValue());
         }
         return new OAuth2AccessTokenAuthenticationToken(registeredClient, clientPrincipal, accessToken,
-            refreshToken, additional);
+                refreshToken, additional);
     }
 
-    /** 不允许将缺少稳定本地身份的厂商结果退化成用户名subject。 */
+    /**
+     * 不允许将缺少稳定本地身份的厂商结果退化成用户名subject。
+     */
     private void requireCanonicalUser(RegisteredClient client, Authentication principal) {
         Object tenant = client.getClientSettings().getSetting(
-            ExternalCodeClientSettings.TENANT_ID);
+                ExternalCodeClientSettings.TENANT_ID);
         if (!(principal.getPrincipal() instanceof SysUserDetails user)
-            || user.getUserId() == null || user.getUserId() <= 0 || user.getTenantId() == null
-            || !(tenant instanceof Number number) || number.longValue() <= 0 || number.longValue() != user.getTenantId()) {
+                || user.getUserId() == null || user.getUserId() <= 0 || user.getTenantId() == null
+                || !(tenant instanceof Number number) || number.longValue() <= 0 ||
+                number.longValue() != user.getTenantId()) {
             throw new OAuth2AuthenticationException(new OAuth2Error(OAuth2ErrorCodes.INVALID_GRANT));
         }
     }
 
-    /** 生成器失败不包含Token或上游凭证。 */
+    /**
+     * 生成器失败不包含Token或上游凭证。
+     */
     private OAuth2AuthenticationException serverError(String description) {
         return new OAuth2AuthenticationException(new OAuth2Error(OAuth2ErrorCodes.SERVER_ERROR,
-            description, ERROR_URI));
+                description, ERROR_URI));
     }
 }

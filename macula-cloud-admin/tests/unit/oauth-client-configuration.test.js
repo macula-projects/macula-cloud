@@ -80,7 +80,7 @@ describe("OAuth Client configuration", () => {
       clientAuthenticationMethods: "client_secret_post,client_secret_basic",
       authorizationGrantTypes: "refresh_token,sms,authorization_code",
     };
-    expect(configurationIssues(reordered, original).join(" ")).toContain("短信");
+    expect(configurationIssues(reordered, original).join(" ")).toContain("退役");
     expect(grantIssue(reordered, "email", original)).not.toBe("");
     expect(grantIssue(reordered, "sms", original)).not.toBe("");
     for (const changed of [
@@ -165,8 +165,6 @@ describe("OAuth Client configuration", () => {
     expect(code).toContain("code_verifier=");
     expect(code).not.toContain("client_secret");
     for (const [grant, required] of [
-      ["sms", "phone="],
-      ["email", "email="],
       ["refresh_token", "refresh_token="],
       [externalGrant, "code_type=WECHAT_MINIAPP_LOGIN_CODE"],
     ])
@@ -180,8 +178,8 @@ describe("OAuth Client configuration", () => {
         secret: "unit-only-secret",
       })
     ).toContain(basicAuthorization("test-client", "unit-only-secret"));
-    expect(requestExample(c, { grant: "unknown" })).toContain("先选择");
-    expect(requestExample(c, { grant: "password" })).toContain("先选择");
+    expect(requestExample(c, { grant: "unknown" })).toContain("不受支持");
+    expect(requestExample(c, { grant: "password" })).toContain("不受支持");
   });
   it.each(["RS256", "RS384", "RS512"])(
     "produces a valid short-lived %s client assertion",
@@ -398,4 +396,12 @@ it('转换预览保留Client身份和密钥状态，提交显式标记和唯一�
  expect(next.hostedLoginMethods).toEqual([]);expect(next.externalProviderBindings).toEqual({FEISHU_WEBVIEW_CODE:7});
  expect(clientPayload(next).convertToInApp).toBe(true);expect(original.applicationType).toBe('WEB_SERVER');
  expect(()=>inAppConversion({...original,managedKey:'platform-admin'},source,'FEISHU_WEBVIEW_CODE')).toThrow();
+});
+
+// EMAIL是托管认证方式；显式取消不能在序列化时被默认值补回。
+it("keeps email defaults separate from explicit disabled choices", () => {
+  expect(applicationTemplate({}, "SPA").hostedLoginMethods).toEqual(["PASSWORD", "SMS", "EMAIL"]);
+  expect(clientPayload({...client(), hostedLoginMethods:["PASSWORD", "EMAIL"]}).hostedLoginMethods).toEqual(["PASSWORD", "EMAIL"]);
+  expect(clientPayload({...client(), hostedLoginMethods:["PASSWORD"]}).hostedLoginMethods).toEqual(["PASSWORD"]);
+  expect(clientPayload({...client(), hostedLoginMethods:[]}).hostedLoginMethods).toEqual([]);
 });

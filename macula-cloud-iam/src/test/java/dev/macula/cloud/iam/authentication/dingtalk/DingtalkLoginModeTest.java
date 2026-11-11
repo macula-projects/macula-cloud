@@ -16,12 +16,12 @@
  */
 package dev.macula.cloud.iam.authentication.dingtalk;
 
-import dev.macula.cloud.iam.authentication.thirdparty.IdentityProviderConfigService.ProviderConfig;
+import java.util.Map;
+
+import dev.macula.cloud.iam.service.identity.IdentityProviderConfigService.ProviderConfig;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.authentication.AuthenticationServiceException;
-
-import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -43,18 +43,19 @@ class DingtalkLoginModeTest {
         internal.addHeader("User-Agent", "Mozilla/5.0 DingTalk/7.0 Safari/537.36");
         assertEquals(DingtalkLoginMode.BROWSER, DingtalkLoginMode.from(internal));
         assertEquals(DingtalkLoginMode.UNKNOWN,
-            DingtalkLoginMode.from(new MockHttpServletRequest("GET", "/login/dingtalk")));
+                DingtalkLoginMode.from(new MockHttpServletRequest("GET", "/login/dingtalk")));
     }
 
     @Test
     void browserUsesOfficialEndpointAndWebviewLoginIsRejected() {
         DingtalkClient client = new DingtalkClient();
-        ProviderConfig config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(dev.macula.cloud.system.enums.IdentitySourceType.DINGTALK_WEB, "DINGTALK", "app", "secret", Map.of(
-            "appKey", "app", "corpId", "corp"));
+        ProviderConfig config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(
+                dev.macula.cloud.system.enums.IdentitySourceType.DINGTALK_WEB, "DINGTALK", "app", "secret", Map.of(
+                        "appKey", "app", "corpId", "corp"));
         String callback = "https://iam.example/login/dingtalk";
         assertTrue(client.authorizationUri(config, "state-value", callback, DingtalkLoginMode.BROWSER)
-            .startsWith("https://login.dingtalk.com/oauth2/auth?"));
+                .startsWith("https://login.dingtalk.com/oauth2/auth?"));
         assertThrows(AuthenticationServiceException.class,
-            () -> client.authorizationUri(config, "state-value", callback, DingtalkLoginMode.WEBVIEW));
+                () -> client.authorizationUri(config, "state-value", callback, DingtalkLoginMode.WEBVIEW));
     }
 }

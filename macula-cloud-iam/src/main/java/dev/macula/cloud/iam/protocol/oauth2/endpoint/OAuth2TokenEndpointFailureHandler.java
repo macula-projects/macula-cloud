@@ -16,6 +16,8 @@
  */
 package dev.macula.cloud.iam.protocol.oauth2.endpoint;
 
+import java.io.IOException;
+
 import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalBindingRequiredException;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -26,8 +28,6 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.oauth2.server.authorization.web.authentication.OAuth2ErrorAuthenticationFailureHandler;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
 
-import java.io.IOException;
-
 /**
  * 只为 binding_required 增加 opaque ticket，其余 Token 错误保持框架原生输出。
  *
@@ -36,19 +36,22 @@ import java.io.IOException;
  */
 public class OAuth2TokenEndpointFailureHandler implements AuthenticationFailureHandler {
     private static final String BINDING_REQUIRED_RESPONSE = "{\"error\":\"binding_required\","
-        + "\"error_description\":\"The verified identity must be bound to an existing account.\","
-        + "\"binding_ticket\":\"%s\"}";
+            + "\"error_description\":\"The verified identity must be bound to an existing account.\","
+            + "\"binding_ticket\":\"%s\"}";
 
     private final String issuer;
-
-    /** 使用服务器配置的issuer，不读取请求Host或Forwarded头。 */
-    public OAuth2TokenEndpointFailureHandler(String issuer) { this.issuer = issuer; }
-
     private final AuthenticationFailureHandler delegate = new OAuth2ErrorAuthenticationFailureHandler();
+
+    /**
+     * 使用服务器配置的issuer，不读取请求Host或Forwarded头。
+     */
+    public OAuth2TokenEndpointFailureHandler(String issuer) {
+        this.issuer = issuer;
+    }
 
     @Override
     public void onAuthenticationFailure(HttpServletRequest request, HttpServletResponse response,
-        AuthenticationException exception) throws IOException, ServletException {
+            AuthenticationException exception) throws IOException, ServletException {
         if (!(exception instanceof ExternalBindingRequiredException bindingRequired)) {
             delegate.onAuthenticationFailure(request, response, exception);
             return;
@@ -60,15 +63,17 @@ public class OAuth2TokenEndpointFailureHandler implements AuthenticationFailureH
         response.setHeader(HttpHeaders.PRAGMA, "no-cache");
         java.net.URI base = java.net.URI.create(issuer);
         if (!base.isAbsolute() || base.getHost() == null || base.getUserInfo() != null || base.getQuery() != null
-            || base.getFragment() != null || !("https".equals(base.getScheme()) || "http".equals(base.getScheme())
+                || base.getFragment() != null || !("https".equals(base.getScheme()) || "http".equals(base.getScheme())
                 && java.util.Set.of("localhost", "127.0.0.1").contains(base.getHost()))) {
             throw new IllegalStateException("绑定入口需要可信issuer配置");
         }
-        String bindingUri = org.springframework.web.util.UriComponentsBuilder.fromUriString(issuer.replaceAll("/+$", ""))
-            .path("/login/bind/external").queryParam("ticket", "{ticket}").encode().buildAndExpand(bindingRequired.getBindingTicket()).toUriString();
+        String bindingUri = org.springframework.web.util.UriComponentsBuilder.fromUriString(
+                        issuer.replaceAll("/+$", ""))
+                .path("/login/bind/external").queryParam("ticket", "{ticket}").encode()
+                .buildAndExpand(bindingRequired.getBindingTicket()).toUriString();
         response.setHeader("Referrer-Policy", "no-referrer");
         response.getWriter().write(tools.jackson.databind.json.JsonMapper.builder().build().writeValueAsString(
-            java.util.Map.of("error", "binding_required", "error_description", "请打开绑定页面确认已有账号。",
-                "binding_ticket", bindingRequired.getBindingTicket(), "binding_uri", bindingUri)));
+                java.util.Map.of("error", "binding_required", "error_description", "请打开绑定页面确认已有账号。",
+                        "binding_ticket", bindingRequired.getBindingTicket(), "binding_uri", bindingUri)));
     }
 }

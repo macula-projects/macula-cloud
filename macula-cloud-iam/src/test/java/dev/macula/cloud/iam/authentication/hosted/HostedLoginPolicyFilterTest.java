@@ -16,13 +16,15 @@
  */
 package dev.macula.cloud.iam.authentication.hosted;
 
-import dev.macula.cloud.system.enums.OAuth2HostedLoginMethod;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
+
+import dev.macula.cloud.system.enums.OAuth2HostedLoginMethod;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -37,7 +39,9 @@ import static org.mockito.Mockito.when;
  * @since 6.1.0
  */
 class HostedLoginPolicyFilterTest {
-    /** 发码返回403、表单走失败处理，不调用后续链；Token路径保持独立。 */
+    /**
+     * 发码返回403、表单走失败处理，不调用后续链；Token路径保持独立。
+     */
     @Test
     void rejectsBeforeSideEffectsAndSkipsToken() throws Exception {
         HostedLoginClientPolicyService policy = mock(HostedLoginClientPolicyService.class);
@@ -51,12 +55,15 @@ class HostedLoginPolicyFilterTest {
             assertFalse(called.get());
             assertEquals(path.contains("sms-code") ? 403 : 302, response.getStatus());
         }
-        when(policy.resolve(any(), any())).thenReturn(new HostedLoginClientPolicyService.Context(null, Set.of(OAuth2HostedLoginMethod.SMS)));
+        when(policy.resolve(any(), any())).thenReturn(
+                new HostedLoginClientPolicyService.Context(null, Set.of(OAuth2HostedLoginMethod.SMS)));
         AtomicBoolean called = new AtomicBoolean();
-        filter.doFilter(new MockHttpServletRequest("POST", "/login/sms"), new MockHttpServletResponse(), (req, res) -> called.set(true));
+        filter.doFilter(new MockHttpServletRequest("POST", "/login/sms"), new MockHttpServletResponse(),
+                (req, res) -> called.set(true));
         assertTrue(called.get());
         called.set(false);
-        filter.doFilter(new MockHttpServletRequest("POST", "/oauth2/token"), new MockHttpServletResponse(), (req, res) -> called.set(true));
+        filter.doFilter(new MockHttpServletRequest("POST", "/oauth2/token"), new MockHttpServletResponse(),
+                (req, res) -> called.set(true));
         assertTrue(called.get());
     }
 }

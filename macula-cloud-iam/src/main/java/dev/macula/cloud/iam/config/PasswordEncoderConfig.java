@@ -17,6 +17,10 @@
 
 package dev.macula.cloud.iam.config;
 
+import java.security.MessageDigest;
+import java.util.HashMap;
+import java.util.Map;
+
 import cn.hutool.crypto.SmUtil;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -25,10 +29,6 @@ import org.springframework.security.crypto.password.DelegatingPasswordEncoder;
 import org.springframework.security.crypto.password.MessageDigestPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.util.Assert;
-
-import java.security.MessageDigest;
-import java.util.HashMap;
-import java.util.Map;
 
 /**
  * 密码编码器
@@ -111,12 +111,15 @@ public class PasswordEncoderConfig {
         encoders.put("MD4", new org.springframework.security.crypto.password.Md4PasswordEncoder());
         encoders.put("MD5", new MessageDigestPasswordEncoder("MD5"));
         encoders.put("noop", org.springframework.security.crypto.password.NoOpPasswordEncoder.getInstance());
-        encoders.put("pbkdf2", org.springframework.security.crypto.password.Pbkdf2PasswordEncoder.defaultsForSpringSecurity_v5_8());
-        encoders.put("scrypt", org.springframework.security.crypto.scrypt.SCryptPasswordEncoder.defaultsForSpringSecurity_v5_8());
+        encoders.put("pbkdf2",
+                org.springframework.security.crypto.password.Pbkdf2PasswordEncoder.defaultsForSpringSecurity_v5_8());
+        encoders.put("scrypt",
+                org.springframework.security.crypto.scrypt.SCryptPasswordEncoder.defaultsForSpringSecurity_v5_8());
         encoders.put("SHA-1", new MessageDigestPasswordEncoder("SHA-1"));
         encoders.put("SHA-256", new MessageDigestPasswordEncoder("SHA-256"));
         encoders.put("sha256", new org.springframework.security.crypto.password.StandardPasswordEncoder());
-        encoders.put("argon2", org.springframework.security.crypto.argon2.Argon2PasswordEncoder.defaultsForSpringSecurity_v5_8());
+        encoders.put("argon2",
+                org.springframework.security.crypto.argon2.Argon2PasswordEncoder.defaultsForSpringSecurity_v5_8());
         encoders.put("SM3", sm3PasswordEncoder);
 
         Assert.isTrue(encoders.containsKey(encodingId), encodingId + " is not found in idToPasswordEncoder");

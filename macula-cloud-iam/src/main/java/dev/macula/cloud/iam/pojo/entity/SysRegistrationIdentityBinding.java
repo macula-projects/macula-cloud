@@ -23,6 +23,7 @@ import lombok.EqualsAndHashCode;
 
 /**
  * 具体身份源的稳定身份键到本地不可变用户ID关系。
+ *
  * @author Rain
  * @since 6.1.0
  */

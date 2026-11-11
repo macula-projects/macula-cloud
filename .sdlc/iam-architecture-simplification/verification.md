@@ -1,0 +1,88 @@
+# IAM 架构精简本地验证记录
+
+日期：2026-11-11。状态：Build内已实际执行的验证证据；等待工程师确认实施完整性，未自行批准正式Test/PR/部署阶段。
+
+## 结果
+
+| 验证 | 实际结果 | 范围 |
+| --- | --- | --- |
+| 全仓 `mvn clean test -Plocal` | BUILD SUCCESS；625用例，0失败/错误，1跳过 | 最终包整理、共享账号和目录端口后执行；清除旧class，11模块构建成功 |
+| IAM安全链与单元 | 369通过 | 包含登录/协议链分离、五家网页登录、PKCE/OIDC、external_code、旧grant拒绝、绑定、Claims、签名/JWK、序列化兼容等 |
+| MFA与平台缓存IT | 16通过 | MfaProtocolIT 12、ProviderApplicationTokenCacheIT 4；真实隔离Redis缓存/owner和发布拒绝 |
+| 身份绑定IT | 17通过 | IdentitySourceBindingIT，独立MySQL8.4与Redis，真实事务/锁/并发与来源/目录约束 |
+| 身份映射迁移IT | 1通过 | IdentityBindingMappingsMigrationIT，在独立新库执行原迁移并验证V23；没有改写迁移SQL |
+| Admin单元 | 23文件、212通过 | 当前协议目录、保存校验、示例、退役值显式处置 |
+| Admin生产构建 | 成功 | 存在原有大于500KB chunk提示；未在本轮开展无关分包 |
+| Admin Cypress | 43通过 | OAuth配置35、身份策略8；含桌面与390px历史grant保留/显式移除 |
+| Checkstyle | 207个现存变更Java文件通过 | 使用仓库`.config/checkstyle.xml`和实际header；CLI Checkstyle9.3，无项目依赖变更 |
+| 范围/文档 | `git diff --check`通过；实际文件均在计划清单内 | README本地链接与PNG/SVG检查；无schema、业务配置或凭据改动 |
+
+全仓唯一跳过项为既有SysUserUsernameUniqueMigrationTest，其`SYSTEM_MIGRATION_IT=true`环境门控未开启。这不等于本轮身份绑定/映射IT跳过：后两项已在单独的新建隔离环境中明确开启并通过。
+
+## 实际命令
+
+在仓库根执行：
+
+```bash
+mvn clean test -Plocal
+mvn -pl macula-cloud-iam -am verify -Plocal \
+  -Dit.test=MfaProtocolIT,ProviderApplicationTokenCacheIT \
+  -Dfailsafe.failIfNoSpecifiedTests=false
+```
+
+隔离执行器初始化独立MySQL数据目录与随机回环端口，创建专用`macula_identity_binding_it_*`库，启动独立Redis并设置测试标记。只给该子进程注入`IAM_SOURCE_IT_URL/USER/PASSWORD/REDIS_PORT/RUN_ID`，开启`IDENTITY_BINDING_MAPPINGS_IT`、`IAM_SOURCE_BINDING_IT`后顺序运行：
+
+```bash
+mvn -pl macula-cloud-system -am verify -Plocal \
+  -Dit.test=IdentityBindingMappingsMigrationIT \
+  -Dfailsafe.failIfNoSpecifiedTests=false
+mvn -pl macula-cloud-iam -am verify -Plocal \
+  -Dit.test=IdentitySourceBindingIT \
+  -Dfailsafe.failIfNoSpecifiedTests=false
+```
+
+两个进程在执行器finally中关闭，仅保留临时诊断文件。没有连接业务库、复用业务Redis或使用真实平台凭据。
+
+Admin执行：
+
+```bash
+npm run test:unit -- --run
+npm run build
+./node_modules/.bin/start-server-and-test preview http://localhost:4173/ \
+  './node_modules/.bin/cypress run --e2e --spec cypress/e2e/oauth-client-configuration.cy.js,cypress/e2e/identity-provider-policy.cy.js'
+```
+
+## 关键证据边界
+
+- 原email认证主体的Jackson2/3合成夹具来自删除前的实际序列化器。用当前安全读取器恢复完整授权，证明有效Access Token可读、不写回历史记录、撤销后不可读；非法结构、错误位置、未认证或带凭据的主体拒绝。到期、版本和原子撤销另由原存储/协议回归覆盖；未宣称已扫描所有线上历史格式。
+- 最终安全链检查登录链有五家入口、没有Token端点Filter，协议链有Token端点Filter、没有网页登录Filter，且无全局网页登录/external_code Provider Bean。
+- 所有旧grant和标准流程的结果均经过当前实际安全链；厂商HTTP与身份材料为Mock，不能当成真实第三方Code验收。
+- 目录端口、账号加载拆分及搬包后的clean构建通过，原序列化身份/状态类型保留全限定名。根包保留兼容模型不是遗漏搬迁。
+
+## 修正与记录
+
+实施中曾修正组合Configurer同类覆盖、绑定测试事务生命周期及显式可空Mockito参数；拆分共享账号服务后给隔离Test App补齐Import，并补足合成用户必需dataScope。MFA合成Client补齐实际平台/能力关联以到达原拒绝边界。所有对应拒绝断言保留，未通过放宽生产校验取得绿色结果。
+
+初期全量tests未清理旧target，后续已执行最终clean全仓回归，排除了已删除类残留掩盖引用的可能。统计使用当前运行日志，未将过期Surefire XML累计为本次用例数。
+
+## 交付规模与未执行项
+
+IAM生产Java：216文件/19,633行 → 216文件/18,052行，净减1,581行（约8.1%，含注释/版权头）。剔除package-info后的功能类型文件：211 → 199，净减12个；新增包说明用于解释职责和兼容边界。
+
+未执行真实厂商/真机/业务小程序回跳验证、业务库升级、配置整改、提交推送、镜像更新、部署及SLO观测。正式Test阶段及后续审查按SDLC门继续，不以本地结果代替人工批准。
+
+## 本地日志索引
+
+临时证据目录：`/private/tmp/macula-iam-review-20261111/`。
+
+- `architecture-clean-tests.log`：最终全仓clean回归。
+- `architecture-verify.log`：最终MFA和平台缓存IT。
+- `isolated-run-final.log`、`isolated-migration-it.log`、`isolated-binding-it.log`：最终隔离迁移和绑定。
+- `admin-tests-final.log`、`admin-build-final.log`、`cypress-final.log`：Admin结果。
+- `checkstyle-final.log`：源码规范检查。
+
+日志保存在本地临时目录，未提交生成物、业务数据或秘密。
+
+## 配置归类后的补充验证
+
+`mvn -pl macula-cloud-iam -am clean verify -Plocal -Dit.test=MfaProtocolIT,ProviderApplicationTokenCacheIT -Dfailsafe.failIfNoSpecifiedTests=false`通过，IAM单元/安全链369项、MFA及缓存IT16项均无失败/错误/跳过，且完成Boot可执行包构建。日志：`config-verify.log`。Checkstyle207文件通过，计划文件范围及`git diff --check`通过。本轮仅配置/CORS类与测试搬包，没有再修改绑定或数据库算法，因此不重复独立数据库迁移测试。

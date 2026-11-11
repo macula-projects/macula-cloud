@@ -16,13 +16,14 @@
  */
 package dev.macula.cloud.iam.authentication.dingtalk;
 
-import dev.macula.cloud.iam.authentication.thirdparty.IdentityProviderConfigService.ProviderConfig;
-import dev.macula.cloud.iam.authentication.thirdparty.ProviderDirectoryAdapter;
-import dev.macula.cloud.iam.authentication.thirdparty.ProviderDirectoryResult;
-import dev.macula.cloud.iam.authentication.thirdparty.VerifiedExternalIdentity;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
+
+import dev.macula.cloud.iam.authentication.thirdparty.VerifiedExternalIdentity;
+import dev.macula.cloud.iam.authentication.thirdparty.directory.ProviderDirectoryAdapter;
+import dev.macula.cloud.iam.authentication.thirdparty.directory.ProviderDirectoryResult;
+import dev.macula.cloud.iam.service.identity.IdentityProviderConfigService.ProviderConfig;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -35,6 +36,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 /**
  * DINGTALK固定企业成员查询，复用具体来源的应用Token，不查询全企业或写本地用户。
+ *
  * @author Rain
  * @since 6.1.0
  */
@@ -44,39 +46,57 @@ public class DingtalkDirectoryClient implements ProviderDirectoryAdapter {
     private final RestClient rest;
     private final DingtalkClient tokens;
     private final JsonMapper json = JsonMapper.builder().build();
-    /** 固定超时并禁止重定向，不能将应用Token转发至未知地址。 */
+
+    /**
+     * 固定超时并禁止重定向，不能将应用Token转发至未知地址。
+     */
     @Autowired
     public DingtalkDirectoryClient(DingtalkClient tokens) {
         this(RestClient.builder().requestFactory(DingtalkClient.noRedirectRequestFactory()).build(), tokens);
     }
-    /** HTTP合同测试使用同一映射。 */
+
+    /**
+     * HTTP合同测试使用同一映射。
+     */
     DingtalkDirectoryClient(RestClient rest, DingtalkClient tokens) {
         this.rest = rest;
         this.tokens = tokens;
     }
-    /** 返回稳定厂商协议值。 */
+
+    /**
+     * 返回稳定厂商协议值。
+     */
     @Override
-    public String providerType() { return "DINGTALK"; }
-    /** 身份与应用必须属于固定来源，普通caller corpId不能切换目标企业。 */
+    public String providerType() {
+        return "DINGTALK";
+    }
+
+    /**
+     * 身份与应用必须属于固定来源，普通caller corpId不能切换目标企业。
+     */
     @Override
     public ProviderDirectoryResult lookup(ProviderConfig source, VerifiedExternalIdentity identity) {
         if (!providerType().equals(source.providerType()) || !identity.registrationId().equals(source.registrationId())
-            || !VerifiedExternalIdentity.MEMBER_ID.equals(identity.identityKind())
-            || source.organizationId() == null || !source.organizationId().equals(source.require("corpId"))) {
+                || !VerifiedExternalIdentity.MEMBER_ID.equals(identity.identityKind())
+                || source.organizationId() == null || !source.organizationId().equals(source.require("corpId"))) {
             return ProviderDirectoryResult.unavailable(false);
         }
         try {
             String token = tokens.appAccessToken(source);
             String uri = UriComponentsBuilder.fromUriString(ENDPOINT).queryParam("access_token", token)
-                .build().encode().toUriString();
+                    .build().encode().toUriString();
             String body = rest.post().uri(uri).contentType(MediaType.APPLICATION_JSON)
-                .body(Map.of("userid", identity.identityValue())).retrieve().body(String.class);
+                    .body(Map.of("userid", identity.identityValue())).retrieve().body(String.class);
             JsonNode response = json.readTree(body);
             // 未核实的业务拒绝不作为OPTIONAL可忽略故障，避免非成员被误放行。
-            if (response.path("errcode").asInt(-1) != 0) { return ProviderDirectoryResult.unavailable(false); }
+            if (response.path("errcode").asInt(-1) != 0) {
+                return ProviderDirectoryResult.unavailable(false);
+            }
             JsonNode member = response.path("result");
             String memberId = member.path("userid").asText();
-            if (memberId.isBlank()) { return ProviderDirectoryResult.unavailable(true); }
+            if (memberId.isBlank()) {
+                return ProviderDirectoryResult.unavailable(true);
+            }
             if (!identity.identityValue().equals(memberId)) {
                 return result(ProviderDirectoryResult.Status.NOT_MEMBER, source, Map.of(), false);
             }
@@ -86,24 +106,34 @@ public class DingtalkDirectoryClient implements ProviderDirectoryAdapter {
             Map<String, String> profile = new HashMap<>();
             var normalizer = new dev.macula.cloud.system.security.UserIdentifierNormalizer();
             String directoryMember = member.path("userid").asText();
-            if (!directoryMember.isBlank() && directoryMember.length() <= 255) { profile.put("member_id", directoryMember); }
+            if (!directoryMember.isBlank() && directoryMember.length() <= 255) {
+                profile.put("member_id", directoryMember);
+            }
             String employee = member.path("job_number").asText();
-            if (!employee.isBlank() && employee.length() <= 255) { profile.put("employee_no", employee); }
+            if (!employee.isBlank() && employee.length() <= 255) {
+                profile.put("employee_no", employee);
+            }
             normalizer.mobile(member.path("mobile").asText()).ifPresent(value -> profile.put("mobile", value));
             normalizer.email(member.path("email").asText()).ifPresent(value -> profile.put("email", value));
             return result(ProviderDirectoryResult.Status.MEMBER, source, profile, false);
         } catch (RestClientResponseException ex) {
             return ex.getStatusCode().value() == 403
-                ? result(ProviderDirectoryResult.Status.PERMISSION_DENIED, source, Map.of(), true)
-                : ProviderDirectoryResult.unavailable(ex.getStatusCode().is5xxServerError());
+                    ? result(ProviderDirectoryResult.Status.PERMISSION_DENIED, source, Map.of(), true)
+                    : ProviderDirectoryResult.unavailable(ex.getStatusCode().is5xxServerError());
         } catch (dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeInfrastructureException ex) {
             return ProviderDirectoryResult.unavailable(true);
-        } catch (RestClientException ex) { return ProviderDirectoryResult.unavailable(true); }
-        catch (RuntimeException ex) { return ProviderDirectoryResult.unavailable(false); }
+        } catch (RestClientException ex) {
+            return ProviderDirectoryResult.unavailable(true);
+        } catch (RuntimeException ex) {
+            return ProviderDirectoryResult.unavailable(false);
+        }
     }
-    /** 组织来自已核对的应用凭据，结果不公开资料到错误日志。 */
+
+    /**
+     * 组织来自已核对的应用凭据，结果不公开资料到错误日志。
+     */
     private ProviderDirectoryResult result(ProviderDirectoryResult.Status status, ProviderConfig source,
-        Map<String, String> profile, boolean tolerable) {
+            Map<String, String> profile, boolean tolerable) {
         return new ProviderDirectoryResult(status, source.organizationId(), profile, Instant.now(), tolerable);
     }
 }

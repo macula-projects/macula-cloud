@@ -16,12 +16,12 @@
  */
 package dev.macula.cloud.iam.authentication.feishu;
 
-import dev.macula.cloud.iam.authentication.thirdparty.IdentityProviderConfigService.ProviderConfig;
+import java.util.Map;
+
+import dev.macula.cloud.iam.service.identity.IdentityProviderConfigService.ProviderConfig;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.authentication.AuthenticationServiceException;
-
-import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -43,17 +43,19 @@ class FeishuLoginModeTest {
         internal.addHeader("User-Agent", "Mozilla/5.0 Feishu/7.0 Safari/537.36");
         assertEquals(FeishuLoginMode.BROWSER, FeishuLoginMode.from(internal));
         assertEquals(FeishuLoginMode.UNKNOWN,
-            FeishuLoginMode.from(new MockHttpServletRequest("GET", "/login/feishu")));
+                FeishuLoginMode.from(new MockHttpServletRequest("GET", "/login/feishu")));
     }
 
     @Test
     void browserUsesOfficialEndpointAndWebviewLoginIsRejected() {
         FeishuClient client = new FeishuClient();
-        ProviderConfig config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(dev.macula.cloud.system.enums.IdentitySourceType.FEISHU_WEB, "FEISHU", "app", "secret", Map.of("appId", "app"));
+        ProviderConfig config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(
+                dev.macula.cloud.system.enums.IdentitySourceType.FEISHU_WEB, "FEISHU", "app", "secret",
+                Map.of("appId", "app"));
         String callback = "https://iam.example/login/feishu";
         assertTrue(client.authorizationUri(config, "state-value", callback, FeishuLoginMode.BROWSER)
-            .startsWith("https://accounts.feishu.cn/open-apis/authen/v1/authorize?"));
+                .startsWith("https://accounts.feishu.cn/open-apis/authen/v1/authorize?"));
         assertThrows(AuthenticationServiceException.class,
-            () -> client.authorizationUri(config, "state-value", callback, FeishuLoginMode.WEBVIEW));
+                () -> client.authorizationUri(config, "state-value", callback, FeishuLoginMode.WEBVIEW));
     }
 }

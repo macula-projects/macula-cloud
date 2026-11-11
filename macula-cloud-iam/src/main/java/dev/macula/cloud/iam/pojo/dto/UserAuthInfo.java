@@ -17,9 +17,9 @@
 
 package dev.macula.cloud.iam.pojo.dto;
 
-import lombok.Data;
-
 import java.util.Set;
+
+import lombok.Data;
 
 /**
  * 用户认证信息传输层对象
@@ -30,28 +30,44 @@ import java.util.Set;
 @Data
 public class UserAuthInfo {
 
-    /** 用户ID */
+    /**
+     * 用户ID
+     */
     private Long userId;
 
-    /** 用户名 */
+    /**
+     * 用户名
+     */
     private String username;
 
-    /** 别名，真实姓名 */
+    /**
+     * 别名，真实姓名
+     */
     private String nickname;
 
-    /** 用户密码 */
+    /**
+     * 用户密码
+     */
     private String password;
 
-    /** 用户状态(1:正常;0:禁用) */
+    /**
+     * 用户状态(1:正常;0:禁用)
+     */
     private Integer status;
 
-    /** 用户角色编码集合 ["ROOT","ADMIN"] */
+    /**
+     * 用户角色编码集合 ["ROOT","ADMIN"]
+     */
     private Set<String> roles;
 
-    /** 部门ID */
+    /**
+     * 部门ID
+     */
     private Long deptId;
 
-    /** 数据权限范围 */
+    /**
+     * 数据权限范围
+     */
     private Integer dataScope;
 
 }

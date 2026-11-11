@@ -16,8 +16,13 @@
  */
 package dev.macula.cloud.iam.authentication.wechat;
 
-import dev.macula.cloud.iam.authentication.thirdparty.IdentityProviderConfigService.ProviderConfig;
+import java.io.IOException;
+import java.net.HttpURLConnection;
+import java.time.Duration;
+import java.util.Map;
+
 import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeInfrastructureException;
+import dev.macula.cloud.iam.service.identity.IdentityProviderConfigService.ProviderConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
@@ -33,11 +38,6 @@ import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.util.UriComponentsBuilder;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
-
-import java.io.IOException;
-import java.net.HttpURLConnection;
-import java.time.Duration;
-import java.util.Map;
 
 /**
  * 使用微信固定 HTTPS 端点交换授权码并提取开放平台 unionid。
@@ -76,26 +76,47 @@ public class WechatClient {
     private final RestClient restClient;
     private final boolean httpContractTest;
     private final JsonMapper json = JsonMapper.builder().build();
-    private dev.macula.cloud.iam.authentication.thirdparty.ProviderApplicationTokenCache applicationTokens;
-
-    /** 为固定小程序应用Token装配安全缓存。 */
-    @org.springframework.beans.factory.annotation.Autowired(required = false)
-    void applicationTokenCache(dev.macula.cloud.iam.authentication.thirdparty.ProviderApplicationTokenCache cache) { this.applicationTokens = cache; }
-
+    private dev.macula.cloud.iam.authentication.thirdparty.cache.ProviderApplicationTokenCache applicationTokens;
 
     public WechatClient() {
         this(RestClient.builder().requestFactory(noRedirectRequestFactory()).build(), false);
     }
 
-    /** 显式HTTP合同测试可跳过Redis，仅此包内构造方式允许。 */
+    /**
+     * 显式HTTP合同测试可跳过Redis，仅此包内构造方式允许。
+     */
     WechatClient(RestClient restClient) {
         this(restClient, true);
     }
 
-    /** 默认生产构造不能在缓存缺失时直接返回未经过owner栅栏的结果。 */
+    /**
+     * 默认生产构造不能在缓存缺失时直接返回未经过owner栅栏的结果。
+     */
     private WechatClient(RestClient restClient, boolean httpContractTest) {
         this.restClient = restClient;
         this.httpContractTest = httpContractTest;
+    }
+
+    static SimpleClientHttpRequestFactory noRedirectRequestFactory() {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory() {
+            @Override
+            protected void prepareConnection(HttpURLConnection connection, String httpMethod) throws IOException {
+                super.prepareConnection(connection, httpMethod);
+                connection.setInstanceFollowRedirects(false);
+            }
+        };
+        factory.setConnectTimeout(Duration.ofSeconds(5));
+        factory.setReadTimeout(Duration.ofSeconds(8));
+        return factory;
+    }
+
+    /**
+     * 为固定小程序应用Token装配安全缓存。
+     */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void applicationTokenCache(
+            dev.macula.cloud.iam.authentication.thirdparty.cache.ProviderApplicationTokenCache cache) {
+        this.applicationTokens = cache;
     }
 
     public String authorizationUri(ProviderConfig config, String state, String redirectUri, WechatLoginMode mode) {
@@ -114,12 +135,12 @@ public class WechatClient {
             throw failed();
         }
         return UriComponentsBuilder.fromUriString(endpoint)
-            .queryParam(APP_ID_PARAMETER, appId)
-            .queryParam(OAuth2ParameterNames.REDIRECT_URI, redirectUri)
-            .queryParam(OAuth2ParameterNames.RESPONSE_TYPE, OAuth2AuthorizationResponseType.CODE.getValue())
-            .queryParam(OAuth2ParameterNames.SCOPE, scope)
-            .queryParam(OAuth2ParameterNames.STATE, state)
-            .fragment(WECHAT_REDIRECT_FRAGMENT).build().encode().toUriString();
+                .queryParam(APP_ID_PARAMETER, appId)
+                .queryParam(OAuth2ParameterNames.REDIRECT_URI, redirectUri)
+                .queryParam(OAuth2ParameterNames.RESPONSE_TYPE, OAuth2AuthorizationResponseType.CODE.getValue())
+                .queryParam(OAuth2ParameterNames.SCOPE, scope)
+                .queryParam(OAuth2ParameterNames.STATE, state)
+                .fragment(WECHAT_REDIRECT_FRAGMENT).build().encode().toUriString();
     }
 
     public String fetchOpenId(ProviderConfig config, String code, WechatLoginMode mode) {
@@ -136,21 +157,21 @@ public class WechatClient {
                 throw failed();
             }
             String body = restClient.get().uri(UriComponentsBuilder.fromUriString(TOKEN)
-                .queryParam(APP_ID_PARAMETER, appId)
-                .queryParam(SECRET_PARAMETER, secret)
-                .queryParam(OAuth2ParameterNames.CODE, code)
-                .queryParam(OAuth2ParameterNames.GRANT_TYPE, AuthorizationGrantType.AUTHORIZATION_CODE.getValue())
-                .build().encode().toUri()).retrieve().body(String.class);
+                    .queryParam(APP_ID_PARAMETER, appId)
+                    .queryParam(SECRET_PARAMETER, secret)
+                    .queryParam(OAuth2ParameterNames.CODE, code)
+                    .queryParam(OAuth2ParameterNames.GRANT_TYPE, AuthorizationGrantType.AUTHORIZATION_CODE.getValue())
+                    .build().encode().toUri()).retrieve().body(String.class);
             JsonNode response = json.readTree(body);
             if (response.has(ERROR_CODE)) {
                 LOGGER.warn("第三方接口返回错误 provider=WECHAT stage={} failure=provider_error errcode={}",
-                    TOKEN_STAGE, response.path(ERROR_CODE).asInt());
+                        TOKEN_STAGE, response.path(ERROR_CODE).asInt());
                 throw failed();
             }
             String unionId = response.path("openid").asText();
             if (unionId.isBlank()) {
                 LOGGER.warn("第三方接口响应无效 provider=WECHAT stage={} failure=missing_openid",
-                    TOKEN_STAGE);
+                        TOKEN_STAGE);
                 throw failed();
             }
             return unionId;
@@ -158,36 +179,36 @@ public class WechatClient {
             throw ex;
         } catch (RestClientResponseException ex) {
             LOGGER.warn("第三方接口 HTTP 失败 provider=WECHAT stage={} status={}", TOKEN_STAGE,
-                ex.getStatusCode().value());
+                    ex.getStatusCode().value());
             if (ex.getStatusCode().is5xxServerError()) {
                 throw new ExternalCodeInfrastructureException();
             }
             throw failed();
         } catch (RestClientException ex) {
             LOGGER.warn("第三方接口调用失败 provider=WECHAT stage={} failure=transport_error exception={}",
-                TOKEN_STAGE, ex.getClass().getSimpleName());
+                    TOKEN_STAGE, ex.getClass().getSimpleName());
             throw new ExternalCodeInfrastructureException();
         } catch (RuntimeException ex) {
             LOGGER.error("第三方接口响应处理失败 provider=WECHAT stage={} "
-                    + "failure=invalid_response exception={}",
-                TOKEN_STAGE, ex.getClass().getSimpleName());
+                            + "failure=invalid_response exception={}",
+                    TOKEN_STAGE, ex.getClass().getSimpleName());
             throw failed();
         }
     }
 
     public String fetchOpenAppOpenId(ProviderConfig config, String code) {
         return exchangeOpenId(config.require(APP_ID_CONFIG), config.appSecret(),
-            code);
+                code);
     }
 
     public String fetchMiniappOpenId(ProviderConfig config, String code) {
         try {
             String body = restClient.get().uri(UriComponentsBuilder.fromUriString(MINIAPP_SESSION)
-                .queryParam(APP_ID_PARAMETER, config.require(APP_ID_CONFIG))
-                .queryParam(SECRET_PARAMETER, config.appSecret())
-                .queryParam(JS_CODE_PARAMETER, code)
-                .queryParam(OAuth2ParameterNames.GRANT_TYPE, AuthorizationGrantType.AUTHORIZATION_CODE.getValue())
-                .build().encode().toUri()).retrieve().body(String.class);
+                    .queryParam(APP_ID_PARAMETER, config.require(APP_ID_CONFIG))
+                    .queryParam(SECRET_PARAMETER, config.appSecret())
+                    .queryParam(JS_CODE_PARAMETER, code)
+                    .queryParam(OAuth2ParameterNames.GRANT_TYPE, AuthorizationGrantType.AUTHORIZATION_CODE.getValue())
+                    .build().encode().toUri()).retrieve().body(String.class);
             return requireOpenId(json.readTree(body));
         } catch (AuthenticationServiceException ex) {
             throw ex;
@@ -210,14 +231,16 @@ public class WechatClient {
         try {
             if (applicationTokens == null && !httpContractTest) {
                 throw new ExternalCodeInfrastructureException(
-                    dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeConsumptionState.NOT_SUBMITTED);
+                        dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeConsumptionState.NOT_SUBMITTED);
             }
             String accessToken = applicationTokens == null ? loadMiniappApplicationToken(config).token()
-                : applicationTokens.get(config, dev.macula.cloud.iam.authentication.thirdparty.ProviderApplicationTokenCache.APPLICATION_TOKEN, () -> loadMiniappApplicationToken(config));
+                    : applicationTokens.get(config,
+                    dev.macula.cloud.iam.authentication.thirdparty.cache.ProviderApplicationTokenCache.APPLICATION_TOKEN,
+                    () -> loadMiniappApplicationToken(config));
             String phoneBody = restClient.post().uri(UriComponentsBuilder.fromUriString(MINIAPP_PHONE)
-                .queryParam(OAuth2ParameterNames.ACCESS_TOKEN, accessToken).build().encode().toUri())
-                .contentType(MediaType.APPLICATION_JSON).body(Map.of(OAuth2ParameterNames.CODE, code))
-                .retrieve().body(String.class);
+                            .queryParam(OAuth2ParameterNames.ACCESS_TOKEN, accessToken).build().encode().toUri())
+                    .contentType(MediaType.APPLICATION_JSON).body(Map.of(OAuth2ParameterNames.CODE, code))
+                    .retrieve().body(String.class);
             JsonNode phoneResponse = json.readTree(phoneBody);
             requireSuccess(phoneResponse);
             String mobile = phoneResponse.path(PHONE_INFO).path(PHONE_NUMBER).asText();
@@ -243,42 +266,48 @@ public class WechatClient {
         }
     }
 
-    /** 仅取得应用Token，未向手机号接口提交用户Code。 */
-    private dev.macula.cloud.iam.authentication.thirdparty.ProviderApplicationTokenCache.TokenValue loadMiniappApplicationToken(ProviderConfig config) {
+    /**
+     * 仅取得应用Token，未向手机号接口提交用户Code。
+     */
+    private dev.macula.cloud.iam.authentication.thirdparty.cache.ProviderApplicationTokenCache.TokenValue loadMiniappApplicationToken(
+            ProviderConfig config) {
         try {
             String appId = config.require(APP_ID_CONFIG);
             String secret = config.appSecret();
             String tokenBody = restClient.post().uri(STABLE_TOKEN).contentType(MediaType.APPLICATION_JSON)
-                .body(Map.of(OAuth2ParameterNames.GRANT_TYPE, CLIENT_CREDENTIAL,
-                    APP_ID_PARAMETER, appId, SECRET_PARAMETER, secret))
-                .retrieve().body(String.class);
+                    .body(Map.of(OAuth2ParameterNames.GRANT_TYPE, CLIENT_CREDENTIAL,
+                            APP_ID_PARAMETER, appId, SECRET_PARAMETER, secret))
+                    .retrieve().body(String.class);
             JsonNode tokenResponse = json.readTree(tokenBody);
             requireSuccess(tokenResponse);
             String accessToken = tokenResponse.path(OAuth2ParameterNames.ACCESS_TOKEN).asText();
             if (accessToken.isBlank()) {
                 LOGGER.warn("第三方接口响应无效 provider=WECHAT stage={} failure=missing_access_token",
-                    TOKEN_STAGE);
+                        TOKEN_STAGE);
                 throw failed();
             }
-            return new dev.macula.cloud.iam.authentication.thirdparty.ProviderApplicationTokenCache.TokenValue(accessToken, Duration.ofSeconds(tokenResponse.path("expires_in").asLong()));
+            return new dev.macula.cloud.iam.authentication.thirdparty.cache.ProviderApplicationTokenCache.TokenValue(
+                    accessToken, Duration.ofSeconds(tokenResponse.path("expires_in").asLong()));
         } catch (RestClientResponseException ex) {
             if (ex.getStatusCode().is5xxServerError()) {
-                throw new ExternalCodeInfrastructureException(dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeConsumptionState.NOT_SUBMITTED);
+                throw new ExternalCodeInfrastructureException(
+                        dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeConsumptionState.NOT_SUBMITTED);
             }
             throw failed();
         } catch (RestClientException ex) {
-            throw new ExternalCodeInfrastructureException(dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeConsumptionState.NOT_SUBMITTED);
+            throw new ExternalCodeInfrastructureException(
+                    dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeConsumptionState.NOT_SUBMITTED);
         }
     }
 
     private String exchangeOpenId(String appId, String secret, String code) {
         try {
             String body = restClient.get().uri(UriComponentsBuilder.fromUriString(TOKEN)
-                .queryParam(APP_ID_PARAMETER, appId)
-                .queryParam(SECRET_PARAMETER, secret)
-                .queryParam(OAuth2ParameterNames.CODE, code)
-                .queryParam(OAuth2ParameterNames.GRANT_TYPE, AuthorizationGrantType.AUTHORIZATION_CODE.getValue())
-                .build().encode().toUri()).retrieve().body(String.class);
+                    .queryParam(APP_ID_PARAMETER, appId)
+                    .queryParam(SECRET_PARAMETER, secret)
+                    .queryParam(OAuth2ParameterNames.CODE, code)
+                    .queryParam(OAuth2ParameterNames.GRANT_TYPE, AuthorizationGrantType.AUTHORIZATION_CODE.getValue())
+                    .build().encode().toUri()).retrieve().body(String.class);
             return requireOpenId(json.readTree(body));
         } catch (AuthenticationServiceException ex) {
             throw ex;
@@ -310,40 +339,27 @@ public class WechatClient {
     private void requireSuccess(JsonNode response) {
         if (response.has(ERROR_CODE) && response.path(ERROR_CODE).asInt() != 0) {
             LOGGER.warn("第三方接口返回错误 provider=WECHAT stage={} failure=provider_error errcode={}",
-                TOKEN_STAGE, response.path(ERROR_CODE).asInt());
+                    TOKEN_STAGE, response.path(ERROR_CODE).asInt());
             throw failed();
         }
     }
 
     private void logHttpFailure(RestClientResponseException ex) {
         LOGGER.warn("第三方接口 HTTP 失败 provider=WECHAT stage={} status={}", TOKEN_STAGE,
-            ex.getStatusCode().value());
+                ex.getStatusCode().value());
     }
 
     private void logTransportFailure(RestClientException ex) {
         LOGGER.warn("第三方接口调用失败 provider=WECHAT stage={} failure=transport_error exception={}",
-            TOKEN_STAGE, ex.getClass().getSimpleName());
+                TOKEN_STAGE, ex.getClass().getSimpleName());
     }
 
     private void logResponseFailure(RuntimeException ex) {
         LOGGER.error("第三方接口响应处理失败 provider=WECHAT stage={} failure=invalid_response exception={}",
-            TOKEN_STAGE, ex.getClass().getSimpleName());
+                TOKEN_STAGE, ex.getClass().getSimpleName());
     }
 
     private AuthenticationServiceException failed() {
         return new AuthenticationServiceException("微信身份校验失败");
-    }
-
-    static SimpleClientHttpRequestFactory noRedirectRequestFactory() {
-        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory() {
-            @Override
-            protected void prepareConnection(HttpURLConnection connection, String httpMethod) throws IOException {
-                super.prepareConnection(connection, httpMethod);
-                connection.setInstanceFollowRedirects(false);
-            }
-        };
-        factory.setConnectTimeout(Duration.ofSeconds(5));
-        factory.setReadTimeout(Duration.ofSeconds(8));
-        return factory;
     }
 }

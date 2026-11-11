@@ -16,10 +16,11 @@
  */
 package dev.macula.cloud.iam.protocol.oauth2.client;
 
-import dev.macula.boot.constants.SecurityConstants;
-import dev.macula.cloud.iam.protocol.oauth2.grant.email.OAuth2ResourceOwnerEmailAuthenticationToken;
+import java.util.Map;
+import java.util.Set;
+
+import dev.macula.cloud.iam.protocol.oauth2.endpoint.OAuth2EndpointUtils;
 import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.OAuth2ExternalCodeAuthenticationToken;
-import dev.macula.cloud.iam.utils.OAuth2EndpointUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.core.Authentication;
@@ -35,9 +36,6 @@ import org.springframework.util.Assert;
 import org.springframework.util.MultiValueMap;
 import org.springframework.util.StringUtils;
 
-import java.util.Map;
-import java.util.Set;
-
 /**
  * 为无密钥 Token grant 提取受限的 public Client 身份。
  *
@@ -45,15 +43,18 @@ import java.util.Set;
  * @since 6.1.0
  */
 public final class PublicTokenClientAuthenticationConverter implements AuthenticationConverter {
-    private static final String PASSWORD_GRANT = "password";
-    private static final Set<String> SUPPORTED_GRANTS = Set.of(PASSWORD_GRANT,
-        SecurityConstants.GRANT_TYPE_SMS, OAuth2ResourceOwnerEmailAuthenticationToken.GRANT_TYPE_VALUE,
-        OAuth2ExternalCodeAuthenticationToken.GRANT_TYPE.getValue(), AuthorizationGrantType.REFRESH_TOKEN.getValue());
+    private static final Set<String> SUPPORTED_GRANTS = Set.of(
+            OAuth2ExternalCodeAuthenticationToken.GRANT_TYPE.getValue(),
+            AuthorizationGrantType.REFRESH_TOKEN.getValue());
     private final RequestMatcher tokenEndpointMatcher;
 
     public PublicTokenClientAuthenticationConverter(RequestMatcher tokenEndpointMatcher) {
         Assert.notNull(tokenEndpointMatcher, "tokenEndpointMatcher cannot be null");
         this.tokenEndpointMatcher = tokenEndpointMatcher;
+    }
+
+    static boolean supportsGrant(String grantType) {
+        return SUPPORTED_GRANTS.contains(grantType);
     }
 
     @Override
@@ -74,22 +75,18 @@ public final class PublicTokenClientAuthenticationConverter implements Authentic
         }
         String clientId = parameters.getFirst(OAuth2ParameterNames.CLIENT_ID);
         if (!StringUtils.hasText(clientId) || parameters.get(OAuth2ParameterNames.CLIENT_ID) == null
-            || parameters.get(OAuth2ParameterNames.CLIENT_ID).size() != 1) {
+                || parameters.get(OAuth2ParameterNames.CLIENT_ID).size() != 1) {
             throw new OAuth2AuthenticationException(OAuth2ErrorCodes.INVALID_REQUEST);
         }
         return new OAuth2ClientAuthenticationToken(clientId, ClientAuthenticationMethod.NONE, null,
-            Map.of(OAuth2ParameterNames.GRANT_TYPE, grantType));
-    }
-
-    static boolean supportsGrant(String grantType) {
-        return SUPPORTED_GRANTS.contains(grantType);
+                Map.of(OAuth2ParameterNames.GRANT_TYPE, grantType));
     }
 
     private boolean hasConfidentialCredentials(HttpServletRequest request,
-        MultiValueMap<String, String> parameters) {
+            MultiValueMap<String, String> parameters) {
         return StringUtils.hasText(request.getHeader(HttpHeaders.AUTHORIZATION))
-            || parameters.containsKey(OAuth2ParameterNames.CLIENT_SECRET)
-            || parameters.containsKey(OAuth2ParameterNames.CLIENT_ASSERTION)
-            || parameters.containsKey(OAuth2ParameterNames.CLIENT_ASSERTION_TYPE);
+                || parameters.containsKey(OAuth2ParameterNames.CLIENT_SECRET)
+                || parameters.containsKey(OAuth2ParameterNames.CLIENT_ASSERTION)
+                || parameters.containsKey(OAuth2ParameterNames.CLIENT_ASSERTION_TYPE);
     }
 }

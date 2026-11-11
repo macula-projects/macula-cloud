@@ -22,8 +22,10 @@ import org.apache.ibatis.annotations.Mapper;
 
 /**
  * 来源隔离账号绑定的持久化接口。
+ *
  * @author Rain
  * @since 6.1.0
  */
 @Mapper
-public interface SysRegistrationIdentityBindingMapper extends BaseMapper<SysRegistrationIdentityBinding> { }
+public interface SysRegistrationIdentityBindingMapper extends BaseMapper<SysRegistrationIdentityBinding> {
+}

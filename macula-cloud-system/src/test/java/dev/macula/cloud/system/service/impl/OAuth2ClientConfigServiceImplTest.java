@@ -236,8 +236,11 @@ class OAuth2ClientConfigServiceImplTest {
         }
     }
 
+    /** 公共和机密Client都不能重新写入已退役短信/邮箱grant。 */
     @Test
-    void protocolOriginsAreIndependentFromGrantWhileVerificationRequiresPublicClient() {
+    void rejectsRetiredVerificationGrantsForPublicAndConfidentialClients() {
+        when(tenantMapper.selectById(1L)).thenReturn(new SysTenantInfo());
+        stubCaches();
         OAuth2ClientForm form = valid();
         form.setAuthorizationGrantTypes("sms");
         form.setRedirectUris(null);
@@ -246,16 +249,8 @@ class OAuth2ClientConfigServiceImplTest {
         form.setDefaultProtocol("OAUTH2_1");
         form.setConfigurationStatus("ENABLED");
         form.setScopes("message.read");
-        when(tenantMapper.selectById(1L)).thenReturn(new SysTenantInfo());
-        stubCaches();
-        TransactionSynchronizationManager.initSynchronization();
-        try {
-            assertDoesNotThrow(() -> saveFixture(null, form));
-            verify(protocolMapper).insert(argThat((dev.macula.cloud.system.pojo.entity.SysApplicationProtocolConfig row) ->
-                row.getConfiguration().contains("\"allowedOrigins\":[]")));
-        } finally {
-            TransactionSynchronizationManager.clearSynchronization();
-        }
+        assertThrows(ResponseStatusException.class, () -> saveFixture(null, form));
+        verify(protocolMapper, never()).insert(any(dev.macula.cloud.system.pojo.entity.SysApplicationProtocolConfig.class));
 
         OAuth2ClientForm confidentialSms = valid();
         confidentialSms.setClientAuthenticationMethods("client_secret_post");
@@ -658,7 +653,7 @@ class OAuth2ClientConfigServiceImplTest {
         }
     }
 
-    /** 旧PUT省略类型保留现值；策略null恢复继承，空集合关闭。 */
+    /** 旧PUT保留类型；EMAIL可以保存与取消，null继承、空集合关闭。 */
     @Test
     void explicitHostedPolicyDistinguishesDefaultAndDisabled() {
         SysOAuth2ClientConfig existing = legacyVerificationClient();
@@ -674,6 +669,9 @@ class OAuth2ClientConfigServiceImplTest {
         stubCaches();
         TransactionSynchronizationManager.initSynchronization();
         try {
+            form.setHostedLoginMethods(Set.of("PASSWORD", "EMAIL"));
+            assertEquals(Set.of("PASSWORD", "EMAIL"), saveFixture(2L, form).getHostedLoginMethods());
+            form.setHostedLoginMethods(Set.of("PASSWORD"));
             assertEquals(Set.of("PASSWORD"), saveFixture(2L, form).getHostedLoginMethods());
             form.setHostedLoginMethods(Set.of());
             assertTrue(saveFixture(2L, form).getHostedLoginMethods().isEmpty());

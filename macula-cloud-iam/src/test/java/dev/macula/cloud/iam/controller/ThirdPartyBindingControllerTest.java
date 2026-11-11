@@ -16,8 +16,10 @@
  */
 package dev.macula.cloud.iam.controller;
 
+import java.time.Instant;
+
 import dev.macula.cloud.iam.authentication.thirdparty.PendingThirdPartyBindingRepository;
-import dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyBindingService;
+import dev.macula.cloud.iam.authentication.thirdparty.binding.ThirdPartyBindingService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -28,11 +30,16 @@ import org.springframework.security.core.userdetails.User;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.ui.ExtendedModelMap;
 
-import java.time.Instant;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * 验证绑定控制器在本地账号证明成功前不建立认证会话。
@@ -43,7 +50,8 @@ import static org.mockito.Mockito.*;
 class ThirdPartyBindingControllerTest {
     private final PendingThirdPartyBindingRepository pending = new PendingThirdPartyBindingRepository();
     private final ThirdPartyBindingService service = mock(ThirdPartyBindingService.class);
-    private final ThirdPartyBindingController controller = new ThirdPartyBindingController(pending, service, mock(dev.macula.cloud.iam.authentication.thirdparty.ExternalBindingTicketStore.class));
+    private final ThirdPartyBindingController controller = new ThirdPartyBindingController(pending, service,
+            mock(dev.macula.cloud.iam.authentication.thirdparty.ExternalBindingTicketStore.class));
     private final MockHttpServletRequest request = new MockHttpServletRequest();
     private final MockHttpServletResponse response = new MockHttpServletResponse();
 
@@ -55,16 +63,17 @@ class ThirdPartyBindingControllerTest {
     @Test
     void missingPendingIdentityCannotOpenBindingPage() {
         assertEquals("redirect:/login?error=authentication_rejected",
-            controller.page(new ExtendedModelMap(), request, new org.springframework.mock.web.MockHttpServletResponse(), null));
+                controller.page(new ExtendedModelMap(), request,
+                        new org.springframework.mock.web.MockHttpServletResponse(), null));
     }
 
     @Test
     void failedProofNeverEstablishesSession() {
         savePending();
         when(service.bind(eq(request), eq("alice"), eq("password"), any(), any(), any(), isNull()))
-            .thenThrow(new BadCredentialsException("wrong"));
+                .thenThrow(new BadCredentialsException("wrong"));
         assertEquals("third-party-bind", controller.bind("alice", "password", "wrong", null, null,
-            request, response, new ExtendedModelMap(), null, null));
+                request, response, new ExtendedModelMap(), null, null));
         assertNull(SecurityContextHolder.getContext().getAuthentication());
         assertNull(request.getSession().getAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY));
     }
@@ -74,11 +83,12 @@ class ThirdPartyBindingControllerTest {
         savePending();
         var user = User.withUsername("alice").password("n/a").authorities("USER").build();
         when(service.bind(eq(request), eq("alice"), eq("password"), any(), any(), any(), isNull()))
-            .thenReturn(new ThirdPartyBindingService.BoundAccount(user, "/", false));
+                .thenReturn(new ThirdPartyBindingService.BoundAccount(user, "/", false));
         assertEquals("redirect:/", controller.bind("alice", "password", "correct", null, null,
-            request, response, new ExtendedModelMap(), null, null));
+                request, response, new ExtendedModelMap(), null, null));
         assertEquals("alice", SecurityContextHolder.getContext().getAuthentication().getName());
-        assertNotNull(request.getSession().getAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY));
+        assertNotNull(
+                request.getSession().getAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY));
     }
 
     @Test
@@ -88,19 +98,22 @@ class ThirdPartyBindingControllerTest {
         assertEquals("redirect:/login", controller.cancel(request));
         assertThrows(BadCredentialsException.class, () -> pending.current(request));
         assertEquals("redirect:/login?error=authentication_rejected",
-            controller.page(new ExtendedModelMap(), request, new org.springframework.mock.web.MockHttpServletResponse(), null));
+                controller.page(new ExtendedModelMap(), request,
+                        new org.springframework.mock.web.MockHttpServletResponse(), null));
     }
 
-    /** SDK完成证明不能建立SSO，也不能使用任何返回URL。 */
+    /**
+     * SDK完成证明不能建立SSO，也不能使用任何返回URL。
+     */
     @Test
     void sdkCompletionNeverEstablishesReusableSession() {
         savePending();
         var user = User.withUsername("alice").password("n/a").authorities("USER").build();
         when(service.bind(eq(request), eq("alice"), eq("password"), any(), any(), any(), isNull()))
-            .thenReturn(new ThirdPartyBindingService.BoundAccount(user, "https://untrusted.example", true));
+                .thenReturn(new ThirdPartyBindingService.BoundAccount(user, "https://untrusted.example", true));
         var model = new ExtendedModelMap();
         assertEquals("third-party-bind", controller.bind("alice", "password", "correct", null, null,
-            request, response, model, null, null));
+                request, response, model, null, null));
         assertEquals(true, model.get("bindingComplete"));
         assertNull(SecurityContextHolder.getContext().getAuthentication());
         assertNull(request.getSession().getAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY));
@@ -108,17 +121,21 @@ class ThirdPartyBindingControllerTest {
         assertEquals("no-referrer", response.getHeader("Referrer-Policy"));
     }
 
-    /** 基础设施失败必须向上传播，不能伪装成可重试的账号证明错误。 */
+    /**
+     * 基础设施失败必须向上传播，不能伪装成可重试的账号证明错误。
+     */
     @Test
     void infrastructureFailureIsNotAuthenticationMismatch() {
         when(service.bind(eq(request), any(), any(), any(), any(), any(), any()))
-            .thenThrow(new org.springframework.dao.DataAccessResourceFailureException("unavailable"));
+                .thenThrow(new org.springframework.dao.DataAccessResourceFailureException("unavailable"));
         assertThrows(org.springframework.dao.DataAccessResourceFailureException.class, () ->
-            controller.bind("alice", "password", "proof", null, null, request, response, new ExtendedModelMap(), null, null));
+                controller.bind("alice", "password", "proof", null, null, request, response, new ExtendedModelMap(),
+                        null, null));
     }
 
-
-    /** 绑定后的普通会话须同时保留外部来源证明和SS7认证时间。 */
+    /**
+     * 绑定后的普通会话须同时保留外部来源证明和SS7认证时间。
+     */
     @Test
     void boundSessionPreservesSourceProofAndAuthenticationTime() {
         savePending();
@@ -127,24 +144,35 @@ class ThirdPartyBindingControllerTest {
         user.setUserId(9L);
         user.setTenantId(1L);
         user.setEnabled(true);
-        var sourceContext=dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.context("GITHUB","","test-client",Instant.now(),"/");
-        var sources=mock(dev.macula.cloud.iam.authentication.thirdparty.IdentityProviderConfigService.class);
-        when(sources.requireEnabledById(1L,"GITHUB")).thenReturn(dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(
-            dev.macula.cloud.system.enums.IdentitySourceType.GITHUB_OAUTH,"GITHUB","fixture-app","fixture-secret",java.util.Map.of()));
-        controller.setMfaCompletion(new dev.macula.cloud.iam.authentication.mfa.MfaCompletionService(context->{},sources));
-        when(service.bind(eq(request),eq("alice"),eq("password"),any(),any(),any(),isNull()))
-            .thenReturn(new ThirdPartyBindingService.BoundAccount(user,"/",false,sourceContext,"password"));
-        assertEquals("redirect:/",controller.bind("alice","password","correct",null,null,request,response,new ExtendedModelMap(),null,null));
-        var authentication=SecurityContextHolder.getContext().getAuthentication();
-        assertTrue(authentication.getAuthorities().stream().anyMatch(value->value instanceof org.springframework.security.core.authority.FactorGrantedAuthority
-            && value.getAuthority().equals(org.springframework.security.core.authority.FactorGrantedAuthority.AUTHORIZATION_CODE_AUTHORITY)));
-        var proof=dev.macula.cloud.iam.authentication.mfa.MfaCompletionService.proof(authentication);
-        assertEquals("test-client",proof.get("clientId"));
-        assertEquals(9L,proof.get("userId"));
+        var sourceContext = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.context("GITHUB",
+                "", "test-client", Instant.now(), "/");
+        var sources = mock(dev.macula.cloud.iam.service.identity.IdentityProviderConfigService.class);
+        when(sources.requireEnabledById(1L, "GITHUB")).thenReturn(
+                dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(
+                        dev.macula.cloud.system.enums.IdentitySourceType.GITHUB_OAUTH, "GITHUB", "fixture-app",
+                        "fixture-secret", java.util.Map.of()));
+        controller.setMfaCompletion(new dev.macula.cloud.iam.authentication.mfa.MfaCompletionService(context -> {
+        }, sources));
+        when(service.bind(eq(request), eq("alice"), eq("password"), any(), any(), any(), isNull()))
+                .thenReturn(new ThirdPartyBindingService.BoundAccount(user, "/", false, sourceContext, "password"));
+        assertEquals("redirect:/",
+                controller.bind("alice", "password", "correct", null, null, request, response, new ExtendedModelMap(),
+                        null, null));
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        assertTrue(authentication.getAuthorities().stream()
+                .anyMatch(value -> value instanceof org.springframework.security.core.authority.FactorGrantedAuthority
+                        && value.getAuthority()
+                        .equals(org.springframework.security.core.authority.FactorGrantedAuthority.AUTHORIZATION_CODE_AUTHORITY)));
+        var proof = dev.macula.cloud.iam.authentication.mfa.MfaCompletionService.proof(authentication);
+        assertEquals("test-client", proof.get("clientId"));
+        assertEquals(9L, proof.get("userId"));
     }
 
     private void savePending() {
-        pending.save(request, dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.bindingRequired("GITHUB", "123",
-            dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.context("GITHUB", "", "test-client", Instant.now(), "/")));
+        pending.save(request,
+                dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.bindingRequired("GITHUB",
+                        "123",
+                        dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.context("GITHUB", "",
+                                "test-client", Instant.now(), "/")));
     }
 }

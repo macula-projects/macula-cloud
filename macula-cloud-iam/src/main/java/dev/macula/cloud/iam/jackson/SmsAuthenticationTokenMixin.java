@@ -29,7 +29,7 @@ import tools.jackson.databind.annotation.JsonDeserialize;
  */
 @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, property = "@class")
 @JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY, getterVisibility = JsonAutoDetect.Visibility.NONE,
-    isGetterVisibility = JsonAutoDetect.Visibility.NONE)
+        isGetterVisibility = JsonAutoDetect.Visibility.NONE)
 @JsonDeserialize(using = SmsAuthenticationTokenDeserializer.class)
 public abstract class SmsAuthenticationTokenMixin {
 }

@@ -53,12 +53,6 @@ macula:
         max-ip-sends-per-interval: 20
         max-attempts: 5
         digest-key: ${IAM_EMAIL_DIGEST_KEY:${MACULA_CRYPTO_PASSWORD}}
-      login-captcha:
-        ttl: 2m
-        rate-window: 60s
-        max-client-issues-per-window: 200
-        max-issues-per-window: 20
-        digest-key: ${IAM_LOGIN_CAPTCHA_DIGEST_KEY:${MACULA_CRYPTO_PASSWORD}}
       external-code:
         replay-ttl: 10m
         digest-key: ${IAM_EXTERNAL_CODE_DIGEST_KEY:${MACULA_CRYPTO_PASSWORD}}

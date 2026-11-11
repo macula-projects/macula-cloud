@@ -47,6 +47,12 @@ public final class OAuth2ProtocolConfiguration {
         validate(configuration, applicationType, true);
     }
 
+    /** 对新配置执行严格校验；历史运行读取和Flyway仍使用各自原合同。 */
+    public static void validateWritable(ApplicationProtocolConfiguration configuration, String applicationType) {
+        dev.macula.cloud.system.security.OAuth2GrantPolicy.requireSupported(csv(settings(configuration).getAuthorizationGrantTypes()));
+        validateRuntime(configuration, applicationType);
+    }
+
     /** 明确隔离迁移与当前能力，避免修改历史迁移的可重复执行语义。 */
     private static void validate(ApplicationProtocolConfiguration configuration, String applicationType, boolean currentRuntime) {
         var settings = settings(configuration);

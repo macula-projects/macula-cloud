@@ -16,17 +16,17 @@
  */
 package dev.macula.cloud.iam.authentication.dingtalk;
 
-import dev.macula.cloud.iam.authentication.thirdparty.IdentityProviderConfigService;
-import dev.macula.cloud.iam.authentication.thirdparty.VerifiedExternalIdentity;
 import java.util.Map;
-import dev.macula.cloud.iam.authentication.thirdparty.IdentityProviderConfigService.ProviderConfig;
+import java.util.Set;
+
+import dev.macula.cloud.iam.authentication.thirdparty.VerifiedExternalIdentity;
 import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeVerification;
 import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeVerifier;
+import dev.macula.cloud.iam.service.identity.IdentityProviderConfigService;
+import dev.macula.cloud.iam.service.identity.IdentityProviderConfigService.ProviderConfig;
 import dev.macula.cloud.system.enums.ExternalCodeType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
-
-import java.util.Set;
 
 /**
  * 使用 Client 固定钉钉 registration 将各场景 code 核验为组织成员 userId。
@@ -39,7 +39,7 @@ import java.util.Set;
 public class DingtalkExternalCodeVerifier implements ExternalCodeVerifier {
     private static final String PROVIDER_TYPE = "DINGTALK";
     private static final Set<ExternalCodeType> TYPES = Set.of(ExternalCodeType.DINGTALK_APP_CODE,
-        ExternalCodeType.DINGTALK_WEBVIEW_CODE);
+            ExternalCodeType.DINGTALK_WEBVIEW_CODE);
 
     private final IdentityProviderConfigService configs;
     private final DingtalkClient client;
@@ -52,7 +52,9 @@ public class DingtalkExternalCodeVerifier implements ExternalCodeVerifier {
     @Override
     public ExternalCodeVerification verify(ExternalCodeType codeType, Long identityProviderId, String code) {
         ProviderConfig config = configs.requireEnabledById(identityProviderId, PROVIDER_TYPE).forCode(codeType);
-            if (!config.sourceType().supports(codeType)) { throw new IllegalArgumentException("来源不支持此凭证类型"); }
+        if (!config.sourceType().supports(codeType)) {
+            throw new IllegalArgumentException("来源不支持此凭证类型");
+        }
         DingtalkLoginMode mode = switch (codeType) {
             case DINGTALK_APP_CODE -> DingtalkLoginMode.APP;
             case DINGTALK_WEBVIEW_CODE -> DingtalkLoginMode.WEBVIEW;
@@ -60,6 +62,6 @@ public class DingtalkExternalCodeVerifier implements ExternalCodeVerifier {
         };
         String subject = client.fetchUserId(config, code, mode);
         return new ExternalCodeVerification(VerifiedExternalIdentity.of(config, codeType.name(),
-            VerifiedExternalIdentity.MEMBER_ID, subject, Map.of("member_id", subject)));
+                VerifiedExternalIdentity.MEMBER_ID, subject, Map.of("member_id", subject)));
     }
 }

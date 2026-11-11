@@ -1,29 +1,40 @@
 <!DOCTYPE html>
 <html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="color-scheme" content="light"><meta name="referrer" content="same-origin">
-  <title>已登录 · Macula</title>
-  <link rel="stylesheet" th:href="@{/iam/auth.css}" href="/iam/auth.css">
-  <script th:src="@{/iam/auth.js}" src="/iam/auth.js" defer></script>
+    <meta charset="utf-8">
+    <meta content="width=device-width, initial-scale=1, viewport-fit=cover" name="viewport">
+    <meta content="light" name="color-scheme">
+    <meta content="same-origin" name="referrer">
+    <title>已登录 · Macula</title>
+    <link href="/iam/auth.css" rel="stylesheet" th:href="@{/iam/auth.css}">
+    <script defer src="/iam/auth.js" th:src="@{/iam/auth.js}"></script>
 </head>
 <body>
 <main class="shell">
-  <aside class="brand-panel" aria-label="Macula 统一身份平台">
-    <div class="brand"><span class="brand-mark" aria-hidden="true">M</span>Macula</div>
-    <div class="brand-content"><div class="eyebrow">ONE IDENTITY. CONNECTED WORK.</div>
-      <h1>一个身份，<br>连接你的工作。</h1><p>以统一、安全的身份访问企业应用，<br>让每一次连接都简单可信。</p></div>
-    <div class="orbit" aria-hidden="true"></div><div class="brand-meta">MACULA CLOUD · 统一身份平台</div>
-  </aside>
-  <section class="content-panel">
-    <div class="brand mobile-brand"><span class="brand-mark" aria-hidden="true">M</span>Macula</div>
-    <div class="card">
-      <div class="success-mark" aria-hidden="true">✓</div><h1>你已成功登录</h1>
-      <p class="subtitle">当前账号：<strong class="account-name" th:text="${principal}">账号</strong><br>请从需要访问的应用继续操作。</p>
-      <form method="post" th:action="@{/logout}"><input th:if="${_csrf != null}" type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"><button class="secondary" type="submit">退出当前账号</button></form>
-    </div>
-    <footer class="footer">Macula Cloud · 统一身份认证</footer>
-  </section>
+    <aside aria-label="Macula 统一身份平台" class="brand-panel">
+        <div class="brand"><span aria-hidden="true" class="brand-mark">M</span>Macula</div>
+        <div class="brand-content">
+            <div class="eyebrow">ONE IDENTITY. CONNECTED WORK.</div>
+            <h1>一个身份，<br>连接你的工作。</h1>
+            <p>以统一、安全的身份访问企业应用，<br>让每一次连接都简单可信。</p></div>
+        <div aria-hidden="true" class="orbit"></div>
+        <div class="brand-meta">MACULA CLOUD · 统一身份平台</div>
+    </aside>
+    <section class="content-panel">
+        <div class="brand mobile-brand"><span aria-hidden="true" class="brand-mark">M</span>Macula</div>
+        <div class="card">
+            <div aria-hidden="true" class="success-mark">✓</div>
+            <h1>你已成功登录</h1>
+            <p class="subtitle">当前账号：<strong class="account-name" th:text="${principal}">账号</strong><br>请从需要访问的应用继续操作。
+            </p>
+            <form method="post" th:action="@{/logout}"><input th:if="${_csrf != null}" th:name="${_csrf.parameterName}"
+                                                              th:value="${_csrf.token}"
+                                                              type="hidden">
+                <button class="secondary" type="submit">退出当前账号</button>
+            </form>
+        </div>
+        <footer class="footer">Macula Cloud · 统一身份认证</footer>
+    </section>
 </main>
 </body>
 </html>

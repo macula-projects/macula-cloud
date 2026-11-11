@@ -23,5 +23,5 @@ package dev.macula.cloud.system.enums;
  * @since 6.1.0
  */
 public enum OAuth2HostedLoginMethod {
-    PASSWORD, SMS
+    PASSWORD, SMS, EMAIL
 }

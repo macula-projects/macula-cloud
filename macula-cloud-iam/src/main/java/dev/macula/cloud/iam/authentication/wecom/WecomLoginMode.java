@@ -16,9 +16,9 @@
  */
 package dev.macula.cloud.iam.authentication.wecom;
 
-import jakarta.servlet.http.HttpServletRequest;
-
 import java.util.Locale;
+
+import jakarta.servlet.http.HttpServletRequest;
 
 /**
  * 选择企业微信系统浏览器登录或内置 WebView 授权；识别结果不作为安全凭据。
@@ -54,7 +54,7 @@ public enum WecomLoginMode {
             return WEBVIEW;
         }
         if (value.contains("chrome/") || value.contains("firefox/") || value.contains("safari/")
-            || value.contains("edg/")) {
+                || value.contains("edg/")) {
             return BROWSER;
         }
         return UNKNOWN;

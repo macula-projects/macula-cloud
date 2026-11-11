@@ -16,11 +16,11 @@
  */
 package dev.macula.cloud.iam.authentication.sms;
 
-import org.springframework.security.authentication.AbstractAuthenticationToken;
-import org.springframework.security.core.GrantedAuthority;
-
 import java.io.Serial;
 import java.util.Collection;
+
+import org.springframework.security.authentication.AbstractAuthenticationToken;
+import org.springframework.security.core.GrantedAuthority;
 
 /**
  * 承载手机号和短信验证码的认证令牌。
@@ -41,10 +41,10 @@ public class SmsAuthenticationToken extends AbstractAuthenticationToken {
      * 此构造函数用来初始化未授信凭据.
      *
      * @param principal the principal
-     * @param code      the code
+     * @param code the code
      */
     public SmsAuthenticationToken(Object principal, String code) {
-        this(principal, code, (String)null);
+        this(principal, code, (String) null);
     }
 
     /**
@@ -55,7 +55,7 @@ public class SmsAuthenticationToken extends AbstractAuthenticationToken {
      * @param clientId OAuth Client ID
      */
     public SmsAuthenticationToken(Object principal, String code, String clientId) {
-        super((Collection<? extends GrantedAuthority>)null);
+        super((Collection<? extends GrantedAuthority>) null);
         this.principal = principal;
         this.code = code;
         this.clientId = clientId;
@@ -65,8 +65,8 @@ public class SmsAuthenticationToken extends AbstractAuthenticationToken {
     /**
      * 此构造函数用来初始化授信凭据.
      *
-     * @param principal   the principal
-     * @param code        the code
+     * @param principal the principal
+     * @param code the code
      * @param authorities the authorities
      */
     public SmsAuthenticationToken(Object principal, String code, Collection<? extends GrantedAuthority> authorities) {
@@ -101,7 +101,7 @@ public class SmsAuthenticationToken extends AbstractAuthenticationToken {
     public void setAuthenticated(boolean isAuthenticated) throws IllegalArgumentException {
         if (isAuthenticated) {
             throw new IllegalArgumentException(
-                "Cannot set this token to trusted - use constructor which takes a GrantedAuthority list instead");
+                    "Cannot set this token to trusted - use constructor which takes a GrantedAuthority list instead");
         }
 
         super.setAuthenticated(false);

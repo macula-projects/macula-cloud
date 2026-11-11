@@ -42,3 +42,10 @@ System/TinyID 保留 Jackson 的标准 ISO 日期格式，仅设置 `spring.jack
 运行本次改动需要包含 `GlobalMapperConfig`、`DateTimeConverter` 和自动配置的新版本 `macula-boot-starter-mapstruct`；仅在本地验证时，应先安装对应 Boot Parent 和 Starter。本轮不修改 IAM 协议、授权 Redis 记录或数据库表结构。
 
 JSON时间点同样可以使用 `Instant`：Jackson原生支持带时区ISO读写。`Date`保留毫秒，`Instant`可保留纳秒，转换为Date时超出毫秒的精度会丢弃；不使用固定 `SSS` 的 `spring.jackson.date-format` 作为通用ISO解析器，避免纳秒输入被错误解析。接口调用约定仍要求时间点携带Z或偏移。公共实体映射转换器同时支持Date/Instant与LocalDateTime双向映射，两种接口类型均遵循同一存储时区配置；Instant映射不经过Date，保留纳秒。
+
+## OAuth 授权规则
+
+`OAuth2GrantPolicy` 提供当前授权白名单与已退役标识识别；当前仅允许标准授权码、刷新、服务凭据及 external_code 扩展。System 新写入使用 `OAuth2ProtocolConfiguration.validateWritable()` 拒绝 password/sms/email；`validateRuntime()` 只保留已知旧配置读取，历史 Flyway 的 `validate()` 合同不变。可读历史数据不代表可重新签发授权。此处 `email` grant 与标准 email Scope、用户资料字段不同。
+
+
+`OAuth2HostedLoginMethod` 定义 PASSWORD、SMS、EMAIL。它们控制托管认证页面、认证 POST 和发码，不作为 Token grant；null 继承平台，空集合关闭，显式列表按管理员选择执行。

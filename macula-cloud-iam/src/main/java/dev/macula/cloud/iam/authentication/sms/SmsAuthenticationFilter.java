@@ -17,6 +17,8 @@
 package dev.macula.cloud.iam.authentication.sms;
 
 import dev.macula.cloud.iam.authentication.hosted.HostedLoginClientPolicyService;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.jspecify.annotations.NonNull;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.http.HttpMethod;
@@ -26,9 +28,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.authentication.AbstractAuthenticationProcessingFilter;
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
-
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 
 /**
  * 将短信登录请求转换为 {@link SmsAuthenticationToken}。
@@ -42,7 +41,7 @@ public class SmsAuthenticationFilter extends AbstractAuthenticationProcessingFil
     public static final String SPRING_SECURITY_FORM_CODE_KEY = "code";
 
     private static final PathPatternRequestMatcher DEFAULT_REQUEST_MATCHER =
-        PathPatternRequestMatcher.pathPattern(HttpMethod.POST, "/login/sms");
+            PathPatternRequestMatcher.pathPattern(HttpMethod.POST, "/login/sms");
 
     private final String phoneParameter = SPRING_SECURITY_FORM_PHONE_KEY;
 
@@ -62,7 +61,7 @@ public class SmsAuthenticationFilter extends AbstractAuthenticationProcessingFil
 
     @Override
     public Authentication attemptAuthentication(HttpServletRequest request, @NonNull HttpServletResponse response)
-        throws AuthenticationException {
+            throws AuthenticationException {
         if (!HttpMethod.POST.matches(request.getMethod())) {
             throw new AuthenticationServiceException("Authentication method not supported: " + request.getMethod());
         }
@@ -73,7 +72,9 @@ public class SmsAuthenticationFilter extends AbstractAuthenticationProcessingFil
         return this.getAuthenticationManager().authenticate(authRequest);
     }
 
-    /** 验证码消费绑定到发码时的可信Client，门户路径为空。 */
+    /**
+     * 验证码消费绑定到发码时的可信Client，门户路径为空。
+     */
     private Converter<HttpServletRequest, SmsAuthenticationToken> defaultConverter() {
         return request -> {
             String phone = request.getParameter(this.phoneParameter);

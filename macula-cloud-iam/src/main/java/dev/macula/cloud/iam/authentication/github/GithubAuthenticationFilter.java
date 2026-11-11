@@ -16,9 +16,7 @@
  */
 package dev.macula.cloud.iam.authentication.github;
 
-import dev.macula.cloud.iam.authentication.thirdparty.AbstractThirdPartyAuthenticationFilter;
-import dev.macula.cloud.iam.authentication.thirdparty.IdentityProviderConfigService.ProviderConfig;
-import dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyLoginContext;
+import dev.macula.cloud.iam.authentication.thirdparty.browser.AbstractThirdPartyAuthenticationFilter;
 import dev.macula.cloud.iam.enums.ThirdPartyProviderType;
 
 /**
@@ -28,19 +26,12 @@ import dev.macula.cloud.iam.enums.ThirdPartyProviderType;
  * @since 6.1.0
  */
 public class GithubAuthenticationFilter extends AbstractThirdPartyAuthenticationFilter {
-    private GithubClient client;
 
+    /**
+     * 仅接受该厂商已登记入口。
+     */
     public GithubAuthenticationFilter() {
         super(ThirdPartyProviderType.GITHUB.providerType(), ThirdPartyProviderType.GITHUB.loginPath());
     }
 
-    void githubClient(GithubClient client) {
-        this.client = client;
-    }
-
-    @Override
-    protected String authorizationUri(ProviderConfig config, String state, String redirectUri,
-        ThirdPartyLoginContext context) {
-        return client.authorizationUri(config, state, redirectUri);
-    }
 }

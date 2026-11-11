@@ -16,13 +16,13 @@
  */
 package dev.macula.cloud.iam.authentication.feishu;
 
-import dev.macula.cloud.iam.authentication.thirdparty.IdentityProviderConfigService;
-import dev.macula.cloud.iam.authentication.thirdparty.IdentityProviderConfigService.ProviderConfig;
+import java.util.Map;
+
 import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeVerification;
+import dev.macula.cloud.iam.service.identity.IdentityProviderConfigService;
+import dev.macula.cloud.iam.service.identity.IdentityProviderConfigService.ProviderConfig;
 import dev.macula.cloud.system.enums.ExternalCodeType;
 import org.junit.jupiter.api.Test;
-
-import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
@@ -36,27 +36,34 @@ import static org.mockito.Mockito.when;
  * @since 6.1.0
  */
 class FeishuExternalCodeVerifierTest {
-    /** AppLink必须传本次授权回调及专用PKCE，来源中的历史回调不作兜底。 */
+    /**
+     * AppLink必须传本次授权回调及专用PKCE，来源中的历史回调不作兜底。
+     */
     @Test
     void appLinkUsesRuntimeCallbackAndRejectsLegacyCalls() {
         IdentityProviderConfigService configs = mock(IdentityProviderConfigService.class);
         FeishuClient client = mock(FeishuClient.class);
         ProviderConfig config = new ProviderConfig(7L, dev.macula.cloud.system.enums.IdentitySourceType.FEISHU_APPLINK,
-            false, null, 1L, "FEISHU", "app", "fixture-secret", Map.of("appId", "app"), Map.of(), true,
-            dev.macula.cloud.system.enums.IdentitySourceFlow.FEISHU_APPLINK_V3,
-            dev.macula.cloud.system.enums.IdentityDirectoryPolicy.IDENTITY_ONLY, null, "https://old.example/callback");
+                false, null, 1L, "FEISHU", "app", "fixture-secret", Map.of("appId", "app"), Map.of(), true,
+                dev.macula.cloud.system.enums.IdentitySourceFlow.FEISHU_APPLINK_V3,
+                dev.macula.cloud.system.enums.IdentityDirectoryPolicy.IDENTITY_ONLY, null,
+                "https://old.example/callback");
         when(configs.requireEnabledById(7L, "FEISHU")).thenReturn(config);
         String proof = "p".repeat(43);
-        when(client.fetchIdentity(config, "app-code", "https://app.example/callback", FeishuLoginMode.APP, "FEISHU_APP_CODE", proof))
-            .thenReturn(dev.macula.cloud.iam.authentication.thirdparty.VerifiedExternalIdentity.of(config, "FEISHU_APP_CODE",
-                "OPEN_ID", "fixture-open-id", Map.of()));
+        when(client.fetchIdentity(config, "app-code", "https://app.example/callback", FeishuLoginMode.APP,
+                "FEISHU_APP_CODE", proof))
+                .thenReturn(dev.macula.cloud.iam.authentication.thirdparty.VerifiedExternalIdentity.of(config,
+                        "FEISHU_APP_CODE",
+                        "OPEN_ID", "fixture-open-id", Map.of()));
         FeishuExternalCodeVerifier verifier = new FeishuExternalCodeVerifier(configs, client);
         org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
-            () -> verifier.verify(ExternalCodeType.FEISHU_APP_CODE, 7L, "app-code"));
+                () -> verifier.verify(ExternalCodeType.FEISHU_APP_CODE, 7L, "app-code"));
         org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
-            () -> verifier.verify(ExternalCodeType.FEISHU_APP_CODE, 7L, "app-code", proof));
-        ExternalCodeVerification result = verifier.verify(ExternalCodeType.FEISHU_APP_CODE, 7L, "app-code", proof, "https://app.example/callback");
+                () -> verifier.verify(ExternalCodeType.FEISHU_APP_CODE, 7L, "app-code", proof));
+        ExternalCodeVerification result = verifier.verify(ExternalCodeType.FEISHU_APP_CODE, 7L, "app-code", proof,
+                "https://app.example/callback");
         assertEquals("fixture-open-id", result.subject());
-        verify(client).fetchIdentity(config, "app-code", "https://app.example/callback", FeishuLoginMode.APP, "FEISHU_APP_CODE", proof);
+        verify(client).fetchIdentity(config, "app-code", "https://app.example/callback", FeishuLoginMode.APP,
+                "FEISHU_APP_CODE", proof);
     }
 }

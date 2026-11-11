@@ -16,8 +16,14 @@
  */
 package dev.macula.cloud.iam.authentication.dingtalk;
 
-import dev.macula.cloud.iam.authentication.thirdparty.IdentityProviderConfigService.ProviderConfig;
+import java.io.IOException;
+import java.net.HttpURLConnection;
+import java.time.Duration;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeInfrastructureException;
+import dev.macula.cloud.iam.service.identity.IdentityProviderConfigService.ProviderConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
@@ -34,12 +40,6 @@ import org.springframework.web.util.UriComponentsBuilder;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
-import java.io.IOException;
-import java.net.HttpURLConnection;
-import java.time.Duration;
-import java.util.LinkedHashMap;
-import java.util.Map;
-
 /**
  * 使用钉钉固定 HTTPS 端点将 APP、网页或端内授权码解析为组织成员 userId。
  *
@@ -48,12 +48,12 @@ import java.util.Map;
  */
 @Component
 public class DingtalkClient {
+    static final String MEMBER_DETAILS = "https://oapi.dingtalk.com/topapi/v2/user/get";
     private static final Logger LOGGER = LoggerFactory.getLogger(DingtalkClient.class);
     private static final String AUTHORIZE = "https://login.dingtalk.com/oauth2/auth";
     private static final String USER_TOKEN = "https://api.dingtalk.com/v1.0/oauth2/userAccessToken";
     private static final String CURRENT_USER = "https://api.dingtalk.com/v1.0/contact/users/me";
     private static final String APP_TOKEN = "https://api.dingtalk.com/v1.0/oauth2/accessToken";
-    static final String MEMBER_DETAILS = "https://oapi.dingtalk.com/topapi/v2/user/get";
     private static final String USER_BY_UNION_ID = "https://oapi.dingtalk.com/topapi/user/getbyunionid";
     private static final String WEBVIEW_USER = "https://oapi.dingtalk.com/topapi/v2/user/getuserinfo";
     private static final String APP_KEY_CONFIG = "appKey";
@@ -78,26 +78,47 @@ public class DingtalkClient {
     private final RestClient restClient;
     private final boolean httpContractTest;
     private final JsonMapper json = JsonMapper.builder().build();
-    private dev.macula.cloud.iam.authentication.thirdparty.ProviderApplicationTokenCache applicationTokens;
-
-    /** 生产装配来源隔离缓存；显式HTTP测试构造器仍可仅验证平台合同。 */
-    @org.springframework.beans.factory.annotation.Autowired(required = false)
-    void applicationTokenCache(dev.macula.cloud.iam.authentication.thirdparty.ProviderApplicationTokenCache cache) { this.applicationTokens = cache; }
-
+    private dev.macula.cloud.iam.authentication.thirdparty.cache.ProviderApplicationTokenCache applicationTokens;
 
     public DingtalkClient() {
         this(RestClient.builder().requestFactory(noRedirectRequestFactory()).build(), false);
     }
 
-    /** 显式HTTP合同测试可跳过Redis，仅此包内构造方式允许。 */
+    /**
+     * 显式HTTP合同测试可跳过Redis，仅此包内构造方式允许。
+     */
     DingtalkClient(RestClient restClient) {
         this(restClient, true);
     }
 
-    /** 默认生产构造不能在缓存缺失时直接返回未经过owner栅栏的结果。 */
+    /**
+     * 默认生产构造不能在缓存缺失时直接返回未经过owner栅栏的结果。
+     */
     private DingtalkClient(RestClient restClient, boolean httpContractTest) {
         this.restClient = restClient;
         this.httpContractTest = httpContractTest;
+    }
+
+    static SimpleClientHttpRequestFactory noRedirectRequestFactory() {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory() {
+            @Override
+            protected void prepareConnection(HttpURLConnection connection, String httpMethod) throws IOException {
+                super.prepareConnection(connection, httpMethod);
+                connection.setInstanceFollowRedirects(false);
+            }
+        };
+        factory.setConnectTimeout(Duration.ofSeconds(5));
+        factory.setReadTimeout(Duration.ofSeconds(8));
+        return factory;
+    }
+
+    /**
+     * 生产装配来源隔离缓存；显式HTTP测试构造器仍可仅验证平台合同。
+     */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void applicationTokenCache(
+            dev.macula.cloud.iam.authentication.thirdparty.cache.ProviderApplicationTokenCache cache) {
+        this.applicationTokens = cache;
     }
 
     public String authorizationUri(ProviderConfig config, String state, String redirectUri, DingtalkLoginMode mode) {
@@ -105,12 +126,12 @@ public class DingtalkClient {
             throw failed();
         }
         return UriComponentsBuilder.fromUriString(AUTHORIZE)
-            .queryParam(OAuth2ParameterNames.CLIENT_ID, config.require(APP_KEY_CONFIG))
-            .queryParam(OAuth2ParameterNames.REDIRECT_URI, redirectUri)
-            .queryParam(OAuth2ParameterNames.RESPONSE_TYPE, OAuth2AuthorizationResponseType.CODE.getValue())
-            .queryParam(OAuth2ParameterNames.SCOPE, OPENID_SCOPE)
-            .queryParam(OAuth2ParameterNames.STATE, state)
-            .queryParam(PROMPT_PARAMETER, CONSENT).build().encode().toUriString();
+                .queryParam(OAuth2ParameterNames.CLIENT_ID, config.require(APP_KEY_CONFIG))
+                .queryParam(OAuth2ParameterNames.REDIRECT_URI, redirectUri)
+                .queryParam(OAuth2ParameterNames.RESPONSE_TYPE, OAuth2AuthorizationResponseType.CODE.getValue())
+                .queryParam(OAuth2ParameterNames.SCOPE, OPENID_SCOPE)
+                .queryParam(OAuth2ParameterNames.STATE, state)
+                .queryParam(PROMPT_PARAMETER, CONSENT).build().encode().toUriString();
     }
 
     public String fetchUserId(ProviderConfig config, String code, DingtalkLoginMode mode) {
@@ -119,17 +140,17 @@ public class DingtalkClient {
         try {
             config.require(CORP_ID_CONFIG);
             if (mode != DingtalkLoginMode.APP && mode != DingtalkLoginMode.BROWSER
-                && mode != DingtalkLoginMode.WEBVIEW) {
+                    && mode != DingtalkLoginMode.WEBVIEW) {
                 throw failed();
             }
             String appToken = appAccessToken(config);
             if (mode == DingtalkLoginMode.WEBVIEW) {
                 stage = MEMBER_STAGE;
                 String uri = UriComponentsBuilder.fromUriString(WEBVIEW_USER)
-                    .queryParam(OAuth2ParameterNames.ACCESS_TOKEN, appToken).build().encode().toUriString();
+                        .queryParam(OAuth2ParameterNames.ACCESS_TOKEN, appToken).build().encode().toUriString();
                 String body = restClient.post().uri(uri).contentType(MediaType.APPLICATION_JSON)
-                    .body(Map.of(OAuth2ParameterNames.CODE, code))
-                    .retrieve().body(String.class);
+                        .body(Map.of(OAuth2ParameterNames.CODE, code))
+                        .retrieve().body(String.class);
                 JsonNode response = json.readTree(body);
                 requireSuccess(stage, response);
                 return requireUserId(stage, response.path(RESULT));
@@ -138,7 +159,7 @@ public class DingtalkClient {
             codeConsumed = true;
             stage = USER_STAGE;
             String currentUserBody = restClient.get().uri(CURRENT_USER)
-                .header(ACCESS_TOKEN_HEADER, userToken).retrieve().body(String.class);
+                    .header(ACCESS_TOKEN_HEADER, userToken).retrieve().body(String.class);
             String unionId = json.readTree(currentUserBody).path(UNION_ID).asText();
             if (unionId.isBlank()) {
                 LOGGER.warn("第三方接口响应无效 provider=DINGTALK stage={} failure=missing_union_id", stage);
@@ -146,10 +167,10 @@ public class DingtalkClient {
             }
             stage = MEMBER_STAGE;
             String memberUri = UriComponentsBuilder.fromUriString(USER_BY_UNION_ID)
-                .queryParam(OAuth2ParameterNames.ACCESS_TOKEN, appToken).build().encode().toUriString();
+                    .queryParam(OAuth2ParameterNames.ACCESS_TOKEN, appToken).build().encode().toUriString();
             String memberBody = restClient.post().uri(memberUri).contentType(MediaType.APPLICATION_JSON)
-                .body(Map.of(LEGACY_UNION_ID, unionId))
-                .retrieve().body(String.class);
+                    .body(Map.of(LEGACY_UNION_ID, unionId))
+                    .retrieve().body(String.class);
             JsonNode memberResponse = json.readTree(memberBody);
             requireSuccess(stage, memberResponse);
             String memberId = requireUserId(stage, memberResponse.path(RESULT));
@@ -159,38 +180,42 @@ public class DingtalkClient {
             throw ex;
         } catch (RestClientResponseException ex) {
             LOGGER.warn("第三方接口 HTTP 失败 provider=DINGTALK stage={} status={}", stage,
-                ex.getStatusCode().value());
+                    ex.getStatusCode().value());
             if (ex.getStatusCode().is5xxServerError()) {
                 throw new ExternalCodeInfrastructureException(codeConsumed
-                    ? dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeConsumptionState.CONSUMED
-                    : dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeConsumptionState.UNKNOWN);
+                        ? dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeConsumptionState.CONSUMED
+                        : dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeConsumptionState.UNKNOWN);
             }
             throw failed();
         } catch (RestClientException ex) {
             LOGGER.warn("第三方接口调用失败 provider=DINGTALK stage={} failure=transport_error exception={}",
-                stage, ex.getClass().getSimpleName());
+                    stage, ex.getClass().getSimpleName());
             throw new ExternalCodeInfrastructureException(codeConsumed
                     ? dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeConsumptionState.CONSUMED
                     : dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeConsumptionState.UNKNOWN);
         } catch (RuntimeException ex) {
             LOGGER.error("第三方接口响应处理失败 provider=DINGTALK stage={} "
-                    + "failure=invalid_response exception={}",
-                stage, ex.getClass().getSimpleName());
+                            + "failure=invalid_response exception={}",
+                    stage, ex.getClass().getSimpleName());
             throw failed();
         }
     }
 
-    /** 个人unionId转换后仍核对目标应用域成员；不把个人OAuth成功当企业准入成功。 */
+    /**
+     * 个人unionId转换后仍核对目标应用域成员；不把个人OAuth成功当企业准入成功。
+     */
     private void requireOrganizationMember(String appToken, String memberId) {
         String uri = UriComponentsBuilder.fromUriString(MEMBER_DETAILS)
-            .queryParam(OAuth2ParameterNames.ACCESS_TOKEN, appToken).build().encode().toUriString();
+                .queryParam(OAuth2ParameterNames.ACCESS_TOKEN, appToken).build().encode().toUriString();
         String body = restClient.post().uri(uri).contentType(MediaType.APPLICATION_JSON)
-            .body(Map.of(USER_ID, memberId)).retrieve().body(String.class);
+                .body(Map.of(USER_ID, memberId)).retrieve().body(String.class);
         JsonNode response = json.readTree(body);
         requireSuccess(MEMBER_STAGE, response);
         JsonNode member = response.path(RESULT);
         if (!memberId.equals(requireUserId(MEMBER_STAGE, member))
-            || member.has("active") && !member.path("active").asBoolean()) { throw failed(); }
+                || member.has("active") && !member.path("active").asBoolean()) {
+            throw failed();
+        }
     }
 
     private String userAccessToken(ProviderConfig config, String code) {
@@ -200,35 +225,45 @@ public class DingtalkClient {
         request.put(OAuth2ParameterNames.CODE, code);
         request.put(USER_GRANT_TYPE, AuthorizationGrantType.AUTHORIZATION_CODE.getValue());
         String body = restClient.post().uri(USER_TOKEN).contentType(MediaType.APPLICATION_JSON)
-            .body(request).retrieve().body(String.class);
+                .body(request).retrieve().body(String.class);
         return requireToken(TOKEN_STAGE, json.readTree(body));
     }
 
-    /** 使用当前来源版本的应用Token，不混用用户Token或其他企业凭据。 */
+    /**
+     * 使用当前来源版本的应用Token，不混用用户Token或其他企业凭据。
+     */
     String appAccessToken(ProviderConfig config) {
         if (applicationTokens == null && !httpContractTest) {
             throw new ExternalCodeInfrastructureException(
-                dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeConsumptionState.NOT_SUBMITTED);
+                    dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeConsumptionState.NOT_SUBMITTED);
         }
         return applicationTokens == null ? loadApplicationToken(config).token()
-            : applicationTokens.get(config, dev.macula.cloud.iam.authentication.thirdparty.ProviderApplicationTokenCache.APPLICATION_TOKEN, () -> loadApplicationToken(config));
+                : applicationTokens.get(config,
+                dev.macula.cloud.iam.authentication.thirdparty.cache.ProviderApplicationTokenCache.APPLICATION_TOKEN,
+                () -> loadApplicationToken(config));
     }
 
-    /** 该HTTP阶段尚未提交用户Code，明确的网络故障可安全释放占用。 */
-    private dev.macula.cloud.iam.authentication.thirdparty.ProviderApplicationTokenCache.TokenValue loadApplicationToken(ProviderConfig config) {
+    /**
+     * 该HTTP阶段尚未提交用户Code，明确的网络故障可安全释放占用。
+     */
+    private dev.macula.cloud.iam.authentication.thirdparty.cache.ProviderApplicationTokenCache.TokenValue loadApplicationToken(
+            ProviderConfig config) {
         try {
-        String body = restClient.post().uri(APP_TOKEN).contentType(MediaType.APPLICATION_JSON)
-            .body(Map.of(APP_KEY_CONFIG, config.require(APP_KEY_CONFIG), APP_SECRET_CONFIG, config.appSecret()))
-            .retrieve().body(String.class);
-        JsonNode token = json.readTree(body);
-        return new dev.macula.cloud.iam.authentication.thirdparty.ProviderApplicationTokenCache.TokenValue(requireToken(TOKEN_STAGE, token), Duration.ofSeconds(token.path("expireIn").asLong()));
+            String body = restClient.post().uri(APP_TOKEN).contentType(MediaType.APPLICATION_JSON)
+                    .body(Map.of(APP_KEY_CONFIG, config.require(APP_KEY_CONFIG), APP_SECRET_CONFIG, config.appSecret()))
+                    .retrieve().body(String.class);
+            JsonNode token = json.readTree(body);
+            return new dev.macula.cloud.iam.authentication.thirdparty.cache.ProviderApplicationTokenCache.TokenValue(
+                    requireToken(TOKEN_STAGE, token), Duration.ofSeconds(token.path("expireIn").asLong()));
         } catch (RestClientResponseException ex) {
             if (ex.getStatusCode().is5xxServerError()) {
-                throw new ExternalCodeInfrastructureException(dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeConsumptionState.NOT_SUBMITTED);
+                throw new ExternalCodeInfrastructureException(
+                        dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeConsumptionState.NOT_SUBMITTED);
             }
             throw failed();
         } catch (RestClientException ex) {
-            throw new ExternalCodeInfrastructureException(dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeConsumptionState.NOT_SUBMITTED);
+            throw new ExternalCodeInfrastructureException(
+                    dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeConsumptionState.NOT_SUBMITTED);
         }
     }
 
@@ -245,7 +280,7 @@ public class DingtalkClient {
         String userId = response.path(USER_ID).asText();
         if (userId.isBlank()) {
             LOGGER.warn("第三方接口响应无效 provider=DINGTALK stage={} "
-                + "failure=not_organization_member", stage);
+                    + "failure=not_organization_member", stage);
             throw failed();
         }
         return userId;
@@ -261,18 +296,5 @@ public class DingtalkClient {
 
     private AuthenticationServiceException failed() {
         return new AuthenticationServiceException("钉钉身份校验失败");
-    }
-
-    static SimpleClientHttpRequestFactory noRedirectRequestFactory() {
-        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory() {
-            @Override
-            protected void prepareConnection(HttpURLConnection connection, String httpMethod) throws IOException {
-                super.prepareConnection(connection, httpMethod);
-                connection.setInstanceFollowRedirects(false);
-            }
-        };
-        factory.setConnectTimeout(Duration.ofSeconds(5));
-        factory.setReadTimeout(Duration.ofSeconds(8));
-        return factory;
     }
 }

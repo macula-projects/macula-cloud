@@ -76,7 +76,7 @@ public class ApplicationProtocolConfigurationService {
             if (!seen.add(configuration.protocol()) || json.writeValueAsBytes(configuration.settings()).length > ApplicationProtocolRegistry.MAX_CONFIG_BYTES) {
                 throw new IllegalArgumentException("重复协议或载荷超出限制");
             }
-            OAuth2ProtocolConfiguration.validateRuntime(applicationEnabled ? configuration : new ApplicationProtocolConfiguration(
+            OAuth2ProtocolConfiguration.validateWritable(applicationEnabled ? configuration : new ApplicationProtocolConfiguration(
                 configuration.protocol(), configuration.schemaVersion(), false, configuration.settings()), applicationType);
         }
     }

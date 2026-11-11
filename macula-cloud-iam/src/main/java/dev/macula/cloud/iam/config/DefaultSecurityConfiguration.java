@@ -17,44 +17,46 @@
 
 package dev.macula.cloud.iam.config;
 
-import dev.macula.cloud.iam.authentication.challenge.LoginCaptchaProperties;
+import dev.macula.cloud.iam.authentication.dingtalk.DingtalkAuthenticationFilter;
+import dev.macula.cloud.iam.authentication.dingtalk.DingtalkLoginMode;
+import dev.macula.cloud.iam.authentication.email.EmailCodeService;
+import dev.macula.cloud.iam.authentication.email.EmailLoginFilterConfigurer;
+import dev.macula.cloud.iam.authentication.feishu.FeishuAuthenticationFilter;
+import dev.macula.cloud.iam.authentication.feishu.FeishuLoginMode;
+import dev.macula.cloud.iam.authentication.github.GithubAuthenticationFilter;
 import dev.macula.cloud.iam.authentication.hosted.HostedLoginClientPolicyService;
 import dev.macula.cloud.iam.authentication.hosted.HostedLoginPolicyFilter;
-import org.springframework.security.web.authentication.logout.LogoutFilter;
-import dev.macula.cloud.iam.authentication.dingtalk.DingtalkLoginFilterConfigurer;
-import dev.macula.cloud.iam.authentication.dingtalk.DingtalkLoginMode;
-import dev.macula.cloud.iam.authentication.feishu.FeishuLoginFilterConfigurer;
-import dev.macula.cloud.iam.authentication.feishu.FeishuLoginMode;
-import dev.macula.cloud.iam.authentication.github.GithubLoginFilterConfigurer;
+import dev.macula.cloud.iam.authentication.hosted.LoginRequestMatchers;
+import dev.macula.cloud.iam.authentication.mfa.MfaCompletionService;
+import dev.macula.cloud.iam.authentication.mfa.MfaSessionAuthenticationStrategy;
 import dev.macula.cloud.iam.authentication.sms.SmsLoginFilterConfigurer;
 import dev.macula.cloud.iam.authentication.sms.SmsService;
+import dev.macula.cloud.iam.authentication.sms.SmsServiceImpl;
 import dev.macula.cloud.iam.authentication.sms.SmsUserDetailsService;
+import dev.macula.cloud.iam.authentication.sms.UnavailableSmsService;
 import dev.macula.cloud.iam.authentication.thirdparty.PendingThirdPartyBindingRepository;
-import dev.macula.cloud.iam.authentication.wecom.WecomLoginFilterConfigurer;
-import dev.macula.cloud.iam.authentication.wecom.WecomLoginMode;
-import dev.macula.cloud.iam.authentication.wechat.WechatLoginFilterConfigurer;
+import dev.macula.cloud.iam.authentication.thirdparty.browser.ThirdPartyLoginFilterConfigurer;
+import dev.macula.cloud.iam.authentication.userdetails.HostedUserDetailsService;
+import dev.macula.cloud.iam.authentication.verification.EmailVerificationProperties;
+import dev.macula.cloud.iam.authentication.verification.SmsVerificationProperties;
+import dev.macula.cloud.iam.authentication.verification.VerificationCodeService;
+import dev.macula.cloud.iam.authentication.wechat.WechatAuthenticationFilter;
 import dev.macula.cloud.iam.authentication.wechat.WechatLoginMode;
-import dev.macula.cloud.iam.controller.ThirdPartyBindingController;
+import dev.macula.cloud.iam.authentication.wecom.WecomAuthenticationFilter;
+import dev.macula.cloud.iam.authentication.wecom.WecomLoginMode;
 import dev.macula.cloud.iam.enums.ThirdPartyProviderType;
 import dev.macula.cloud.iam.handler.BrowserAuthenticationFailureHandler;
-import dev.macula.cloud.iam.message.EmailVerificationProperties;
-import dev.macula.cloud.iam.message.LoginSmsDispatcher;
-import dev.macula.cloud.iam.message.SmsVerificationCodeStore;
-import dev.macula.cloud.iam.message.SmsVerificationProperties;
-import dev.macula.cloud.iam.service.support.SysOAuth2ClientService;
-import dev.macula.cloud.iam.service.support.SysUserService;
-import dev.macula.cloud.iam.service.support.UserAuthInfoService;
-import dev.macula.cloud.iam.service.support.impl.SmsServiceImpl;
-import dev.macula.cloud.iam.service.userdetails.ClientAwareAccountResolver;
-import dev.macula.cloud.iam.service.userdetails.SysUserDetailsServiceImpl;
+import dev.macula.cloud.iam.message.mail.LoginMailDispatcher;
+import dev.macula.cloud.iam.message.sms.LoginSmsDispatcher;
+import dev.macula.cloud.iam.service.account.ClientAccountDetailsService;
 import dev.macula.cloud.system.security.UserIdentifierNormalizer;
-import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.security.config.Customizer;
@@ -64,6 +66,9 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.SavedRequestAwareAuthenticationSuccessHandler;
+import org.springframework.security.web.authentication.logout.LogoutFilter;
+import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
+import org.springframework.security.web.savedrequest.RequestCache;
 
 /**
  * {@code AuthenticationDefaultConfiguration} 默认的登录认证配置
@@ -72,71 +77,65 @@ import org.springframework.security.web.authentication.SavedRequestAwareAuthenti
  * @since 2023/3/11 22:25
  */
 @EnableWebSecurity
-@org.springframework.context.annotation.Import(MfaExtensionConfiguration.class)
+@Import(MfaExtensionConfiguration.class)
 @Configuration(proxyBeanMethods = false)
-@EnableConfigurationProperties({SmsVerificationProperties.class, EmailVerificationProperties.class,
-    LoginCaptchaProperties.class})
+@EnableConfigurationProperties({SmsVerificationProperties.class, EmailVerificationProperties.class})
 public class DefaultSecurityConfiguration {
     private static final String DEVTOOLS_WORKSPACE_PATH = "/.well-known/appspecific/com.chrome.devtools.json";
 
-    /** 两条链共享缓存；浏览器探测不能覆盖登录续转，其他请求仍执行Spring默认规则。 */
+    /**
+     * 两条链共享缓存；浏览器探测不能覆盖登录续转，其他请求仍执行Spring默认规则。
+     */
     @Bean
-    org.springframework.security.web.savedrequest.RequestCache browserRequestCache() {
-        return new org.springframework.security.web.savedrequest.HttpSessionRequestCache() {
-            /** 仅跳过精确探测路径，不放行端点或改变已保存的授权请求。 */
-            @Override
-            public void saveRequest(jakarta.servlet.http.HttpServletRequest request,
-                jakarta.servlet.http.HttpServletResponse response) {
-                if (request.getRequestURI().equals(request.getContextPath() + DEVTOOLS_WORKSPACE_PATH)) {
-                    return;
-                }
-                super.saveRequest(request, response);
-            }
-        };
+    RequestCache browserRequestCache() {
+        var cache = new HttpSessionRequestCache();
+        cache.setRequestMatcher(
+                request -> !request.getRequestURI().equals(request.getContextPath() + DEVTOOLS_WORKSPACE_PATH));
+        return cache;
     }
 
+    /**
+     * 共用账号标识规范化规则，不在认证适配器重复实现。
+     */
     @Bean
     @ConditionalOnMissingBean(name = "identifierNormalizer")
     public UserIdentifierNormalizer identifierNormalizer() {
         return new UserIdentifierNormalizer();
     }
 
-    /** 装配托管登录过滤链，CSRF先于Client策略，策略先于密码和SMS认证。 */
+    /**
+     * 装配托管登录过滤链，CSRF先于Client策略，策略先于密码和SMS认证。
+     */
     @Bean
     @Order(Ordered.HIGHEST_PRECEDENCE + 2)
     SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http,
-        @Qualifier("sysUserDetailsService") UserDetailsService userDetailsService,
-        BrowserAuthenticationFailureHandler authenticationFailureHandler,
-        HostedLoginClientPolicyService hostedPolicy,
-        dev.macula.cloud.iam.authentication.mfa.MfaCompletionService mfaCompletion,
-        org.springframework.security.web.savedrequest.RequestCache browserRequestCache) throws Exception {
+            @Qualifier("sysUserDetailsService") UserDetailsService userDetailsService,
+            BrowserAuthenticationFailureHandler authenticationFailureHandler,
+            HostedLoginClientPolicyService hostedPolicy, MfaCompletionService mfaCompletion,
+            RequestCache browserRequestCache) throws Exception {
         http.sessionManagement(session -> session.addSessionAuthenticationStrategy(
-            new dev.macula.cloud.iam.authentication.mfa.MfaSessionAuthenticationStrategy(mfaCompletion)));
+                new MfaSessionAuthenticationStrategy(mfaCompletion)));
         // @formatter:off
         SavedRequestAwareAuthenticationSuccessHandler authenticationSuccessHandler =
             new SavedRequestAwareAuthenticationSuccessHandler();
+
+        var thirdPartyLogin = new ThirdPartyLoginFilterConfigurer()
+            .add(new GithubAuthenticationFilter(),
+            ThirdPartyProviderType.GITHUB.providerType(), ThirdPartyProviderType.GITHUB.loginPath(), ThirdPartyProviderType.GITHUB.loginPath())
+            .add(new WecomAuthenticationFilter(),
+            ThirdPartyProviderType.WECOM.providerType(), ThirdPartyProviderType.WECOM.loginPath(), ThirdPartyProviderType.WECOM.loginPath(), WecomLoginMode.BROWSER.loginPath(), WecomLoginMode.WEBVIEW.loginPath())
+            .add(new FeishuAuthenticationFilter(),
+            ThirdPartyProviderType.FEISHU.providerType(), ThirdPartyProviderType.FEISHU.loginPath(), ThirdPartyProviderType.FEISHU.loginPath(), FeishuLoginMode.BROWSER.loginPath())
+            .add(new DingtalkAuthenticationFilter(),
+            ThirdPartyProviderType.DINGTALK.providerType(), ThirdPartyProviderType.DINGTALK.loginPath(), ThirdPartyProviderType.DINGTALK.loginPath(), DingtalkLoginMode.BROWSER.loginPath())
+            .add(new WechatAuthenticationFilter(),
+            ThirdPartyProviderType.WECHAT.providerType(), ThirdPartyProviderType.WECHAT.loginPath(), ThirdPartyProviderType.WECHAT.loginPath(), WechatLoginMode.BROWSER.loginPath(), WechatLoginMode.WEBVIEW.loginPath());
+
         http.requestCache(cache -> cache.requestCache(browserRequestCache))
             .authorizeHttpRequests(authorize -> authorize
-                .requestMatchers("/component/**").permitAll()
+                .requestMatchers(LoginRequestMatchers.staticResources()).permitAll()
+                .requestMatchers(LoginRequestMatchers.loginEndpoints(thirdPartyLogin)).permitAll()
                 .requestMatchers("/actuator/health").permitAll()
-                .requestMatchers("/h2-console/**").permitAll()
-                .requestMatchers("/pear.config.json").permitAll()
-                .requestMatchers("/pear.config.yml").permitAll()
-                .requestMatchers("/admin/css/**").permitAll()
-                .requestMatchers("/admin/fonts/**").permitAll()
-                .requestMatchers("/admin/js/**").permitAll()
-                .requestMatchers("/admin/images/**").permitAll()
-                .requestMatchers("/favicon.ico").permitAll()
-                .requestMatchers("/iam/**").permitAll()
-                .requestMatchers("/login", ThirdPartyProviderType.GITHUB.loginPath(),
-                    ThirdPartyProviderType.WECOM.loginPath(), WecomLoginMode.BROWSER.loginPath(),
-                    WecomLoginMode.WEBVIEW.loginPath(), ThirdPartyProviderType.FEISHU.loginPath(),
-                    FeishuLoginMode.BROWSER.loginPath(), ThirdPartyProviderType.DINGTALK.loginPath(),
-                    DingtalkLoginMode.BROWSER.loginPath(), ThirdPartyProviderType.WECHAT.loginPath(),
-                    WechatLoginMode.BROWSER.loginPath(), WechatLoginMode.WEBVIEW.loginPath(),
-                    ThirdPartyBindingController.BINDING_PATH, "/login/bind/external", "/login/bind/sms-code",
-                    ThirdPartyBindingController.BINDING_CANCEL_PATH).permitAll()
-                .requestMatchers("/api/v1/sms-code").permitAll()
                 .anyRequest().authenticated())
             .userDetailsService(userDetailsService)
             .csrf(Customizer.withDefaults());
@@ -158,87 +157,55 @@ public class DefaultSecurityConfiguration {
             .failureHandler(authenticationFailureHandler)
             .permitAll());
 
-        http.with(new GithubLoginFilterConfigurer<>(), github -> github
-            .successHandler(authenticationSuccessHandler)
-            .failureHandler(authenticationFailureHandler)
-            .permitAll());
-        http.with(new WecomLoginFilterConfigurer<>(), wecom -> wecom
-            .successHandler(authenticationSuccessHandler)
-            .failureHandler(authenticationFailureHandler)
-            .permitAll());
-        http.with(new FeishuLoginFilterConfigurer<>(), feishu -> feishu
-            .successHandler(authenticationSuccessHandler)
-            .failureHandler(authenticationFailureHandler)
-            .permitAll());
-        http.with(new DingtalkLoginFilterConfigurer<>(), dingtalk -> dingtalk
-            .successHandler(authenticationSuccessHandler)
-            .failureHandler(authenticationFailureHandler)
-            .permitAll());
-        http.with(new WechatLoginFilterConfigurer<>(), wechat -> wechat
-            .successHandler(authenticationSuccessHandler)
-            .failureHandler(authenticationFailureHandler)
-            .permitAll());
+        http.with(new EmailLoginFilterConfigurer(), email -> email
+            .successHandler(authenticationSuccessHandler).failureHandler(authenticationFailureHandler).permitAll());
+
+        http.with(thirdPartyLogin, login -> login.successHandler(authenticationSuccessHandler)
+            .failureHandler(authenticationFailureHandler).permitAll());
         return http.build();
         // @formatter:on
     }
 
+    /**
+     * 浏览器失败处理保留账号绑定分流与可信issuer。
+     */
     @Bean
     public BrowserAuthenticationFailureHandler browserAuthenticationFailureHandler(
-        PendingThirdPartyBindingRepository pendingBindings, AuthorizationServerSettings authorizationServerSettings) {
+            PendingThirdPartyBindingRepository pendingBindings,
+            AuthorizationServerSettings authorizationServerSettings) {
         return new BrowserAuthenticationFailureHandler(pendingBindings, authorizationServerSettings.getIssuer());
     }
 
+    /**
+     * 登录请求仅适配公共账号服务，不在配置类重新组合目录算法。
+     */
     @Bean
     @Qualifier("sysUserDetailsService")
-    public SysUserDetailsServiceImpl sysUserDetailsService(SysUserService sysUserService,
-        SysOAuth2ClientService clientService, ClientAwareAccountResolver accountResolver,
-        @Nullable UserAuthInfoService authInfoService) {
-        return new SysUserDetailsServiceImpl(sysUserService, clientService, accountResolver, authInfoService);
+    public HostedUserDetailsService sysUserDetailsService(ClientAccountDetailsService accounts) {
+        return new HostedUserDetailsService(accounts);
     }
 
+    /**
+     * 邮箱认证依赖完整内核及投递配置；未配置渠道时由投递服务失败关闭。
+     */
     @Bean
-    public SmsService smsService(ObjectProvider<SmsVerificationCodeStore> stores,
-        ObjectProvider<LoginSmsDispatcher> dispatchers, UserIdentifierNormalizer identifierNormalizer) {
-        SmsVerificationCodeStore store = stores.getIfAvailable();
+    public EmailCodeService emailCodeService(VerificationCodeService codes, LoginMailDispatcher mail,
+            UserIdentifierNormalizer normalizer, EmailVerificationProperties settings) {
+        return new EmailCodeService(codes, mail, normalizer, settings);
+    }
+
+    /**
+     * 完整短信设施可用时启用真实实现，否则保留原失败关闭策略。
+     */
+    @Bean
+    public SmsService smsService(ObjectProvider<VerificationCodeService> services,
+            ObjectProvider<LoginSmsDispatcher> dispatchers, UserIdentifierNormalizer normalizer,
+            SmsVerificationProperties settings) {
+        VerificationCodeService codes = services.getIfAvailable();
         LoginSmsDispatcher dispatcher = dispatchers.getIfAvailable();
-        if (store != null && dispatcher != null) {
-            return new SmsServiceImpl(store, dispatcher, identifierNormalizer);
+        if (codes != null && dispatcher != null) {
+            return new SmsServiceImpl(codes, dispatcher, normalizer, settings);
         }
-        return new SmsService() {
-            /** 未配置短信时所有绑定用途同样失败关闭。 */
-            @Override
-            public boolean verifyCode(String phone, String code, String clientId,
-                dev.macula.cloud.iam.authentication.sms.SmsCodePurpose purpose) { return false; }
-
-            /** 禁止绑定页面绕过短信基础设施配置。 */
-            @Override
-            public void sendCode(String phone, String ip, String clientId,
-                dev.macula.cloud.iam.authentication.sms.SmsCodePurpose purpose) { sendCode(phone); }
-
-            @Override
-            public boolean verifyCode(String phone, String rawCode) {
-                return false;
-            }
-
-            @Override
-            public boolean verifyCode(String phone, String rawCode, String clientId) {
-                return false;
-            }
-
-            @Override
-            public void sendCode(String phone) {
-                throw new IllegalStateException("短信服务未配置");
-            }
-
-            @Override
-            public void sendCode(String phone, String remoteAddress) {
-                sendCode(phone);
-            }
-
-            @Override
-            public void sendCode(String phone, String remoteAddress, String clientId) {
-                sendCode(phone);
-            }
-        };
+        return new UnavailableSmsService();
     }
 }

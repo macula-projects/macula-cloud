@@ -214,6 +214,19 @@ describe("IAM 应用配置", () => {
     field('Scope').should('contain.text','OpenID登录');
   });
 
+  it("EMAIL can be selected and disabled again after reload", () => {
+    open({hostedLoginMethods:["PASSWORD", "SMS", "EMAIL"]});
+    detail(); tab('登录控制');
+    cy.contains('label','邮箱验证码').find('input').should('be.checked');
+    cy.contains('label','邮箱验证码').click();
+    cy.contains('button','保存并启用').click();
+    cy.wait('@update').then(({request}) => {
+      expect(request.body.hostedLoginMethods).to.deep.equal(['PASSWORD','SMS']);
+    });
+    cy.reload(); cy.wait('@detail'); tab('登录控制');
+    cy.contains('label','邮箱验证码').find('input').should('not.be.checked');
+  });
+
   it("preserves other sections on save and independently controls hosted methods", () => {
     open();
     detail();
@@ -721,6 +734,25 @@ describe("IAM 应用配置", () => {
         expect(request.body).not.to.have.property('clientSecret');
       });
       cy.screenshot(`application-conversion-${width}`,{capture:'viewport'});
+    });
+  }
+
+  for (const width of [1280, 390]) {
+    it(`keeps retired grants visible until explicit removal at ${width}px`, () => {
+      cy.viewport(width, 844);
+      open({protocol:'OAUTH2_1',defaultProtocol:'OAUTH2_1',enabledProtocols:['OAUTH2_1'],
+        authorizationGrantTypes:'authorization_code,sms,email',scopes:'api.read'});
+      detail(); tab('协议配置');
+      cy.get('.retired-grant').should('have.length', 2);
+      cy.get('.retired-grant').contains('sms').should('exist');
+      cy.get('.retired-grant').contains('email').should('exist');
+      cy.get('@update.all').should('have.length', 0);
+      cy.get('.retired-grant').contains('sms').parent().contains('button','移除').scrollIntoView().click();
+      cy.get('.retired-grant').should('have.length', 1).and('contain','email');
+      cy.get('.retired-grant').contains('button','移除').scrollIntoView().click();
+      cy.get('.retired-grant').should('not.exist');
+      cy.get('[data-grant="authorization_code"]').should('contain', '授权码');
+      cy.get('@update.all').should('have.length', 0);
     });
   }
 

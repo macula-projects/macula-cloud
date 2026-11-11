@@ -16,7 +16,7 @@
  */
 package dev.macula.cloud.iam.protocol.oauth2.grant.externalcode;
 
-import dev.macula.cloud.iam.utils.OAuth2ErrorCodesExpand;
+import dev.macula.cloud.iam.protocol.oauth2.endpoint.OAuth2ExtensionErrorCodes;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2Error;
 
@@ -30,8 +30,8 @@ public class ExternalBindingRequiredException extends OAuth2AuthenticationExcept
     private final String bindingTicket;
 
     public ExternalBindingRequiredException(String bindingTicket) {
-        super(new OAuth2Error(OAuth2ErrorCodesExpand.BINDING_REQUIRED,
-            "The verified identity must be bound to an existing account.", null));
+        super(new OAuth2Error(OAuth2ExtensionErrorCodes.BINDING_REQUIRED,
+                "The verified identity must be bound to an existing account.", null));
         this.bindingTicket = bindingTicket;
     }
 

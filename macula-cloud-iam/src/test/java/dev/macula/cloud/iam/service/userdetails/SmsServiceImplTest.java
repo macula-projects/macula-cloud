@@ -16,9 +16,14 @@
  */
 package dev.macula.cloud.iam.service.userdetails;
 
-import dev.macula.cloud.iam.message.LoginSmsDispatcher;
-import dev.macula.cloud.iam.message.SmsVerificationCodeStore;
-import dev.macula.cloud.iam.service.support.impl.SmsServiceImpl;
+import dev.macula.cloud.iam.authentication.sms.SmsServiceImpl;
+import dev.macula.cloud.iam.authentication.verification.SmsVerificationProperties;
+import dev.macula.cloud.iam.authentication.verification.VerificationChannel;
+import dev.macula.cloud.iam.authentication.verification.VerificationCodePurpose;
+import dev.macula.cloud.iam.authentication.verification.VerificationCodeScope;
+import dev.macula.cloud.iam.authentication.verification.VerificationCodeService;
+import dev.macula.cloud.iam.authentication.verification.VerificationCodeStore;
+import dev.macula.cloud.iam.message.sms.LoginSmsDispatcher;
 import dev.macula.cloud.system.security.UserIdentifierNormalizer;
 import org.junit.jupiter.api.Test;
 
@@ -37,48 +42,57 @@ import static org.mockito.Mockito.when;
  * @since 2026-10-17
  */
 class SmsServiceImplTest {
-    private final SmsVerificationCodeStore store = mock(SmsVerificationCodeStore.class);
+    private final VerificationCodeStore store = mock(VerificationCodeStore.class);
+    private final SmsVerificationProperties settings = new SmsVerificationProperties();
     private final LoginSmsDispatcher dispatcher = mock(LoginSmsDispatcher.class);
-    private final SmsServiceImpl service = new SmsServiceImpl(store, dispatcher, new UserIdentifierNormalizer());
+    private final SmsServiceImpl service = new SmsServiceImpl(new VerificationCodeService(store), dispatcher,
+            new UserIdentifierNormalizer(), settings);
 
     @Test
     void activatesCodeOnlyAfterSupplierAcceptance() {
-        when(store.issue("+8613800000000", "127.0.0.1")).thenReturn("123456");
+        when(store.issue(scope(null), "+8613800000000", "127.0.0.1", settings)).thenReturn("123456");
 
         service.sendCode("+86 138-0000-0000", "127.0.0.1");
 
         verify(dispatcher).send("+8613800000000", "123456");
-        verify(store).activate("+8613800000000", "123456");
+        verify(store).activate(scope(null), "+8613800000000", "123456", settings);
     }
 
     @Test
     void supplierFailureDoesNotCreateUsableCodeOrReleaseAbuseLimits() {
-        when(store.issue("13800000000", "127.0.0.1")).thenReturn("123456");
+        when(store.issue(scope(null), "13800000000", "127.0.0.1", settings)).thenReturn("123456");
         doThrow(new IllegalStateException("rejected")).when(dispatcher).send("13800000000", "123456");
 
         assertThatThrownBy(() -> service.sendCode("13800000000", "127.0.0.1"))
-            .isInstanceOf(IllegalStateException.class);
-        verify(store, never()).activate("13800000000", "123456");
+                .isInstanceOf(IllegalStateException.class);
+        verify(store, never()).activate(scope(null), "13800000000", "123456", settings);
     }
 
     @Test
     void delegatesVerificationToAtomicStore() {
-        when(store.consume("13800000000", "123456")).thenReturn(true);
+        when(store.consume(scope(null), "13800000000", "123456", settings)).thenReturn(true);
 
         assertThat(service.verifyCode("138-0000-0000", "123456")).isTrue();
         assertThat(service.verifyCode(null, "123456")).isFalse();
-        verify(store).consume("13800000000", "123456");
+        verify(store).consume(scope(null), "13800000000", "123456", settings);
     }
 
     @Test
     void protocolCodeIsIssuedAndConsumedInsideClientContext() {
-        when(store.issue("13800000000", "127.0.0.1", "client-a")).thenReturn("123456");
-        when(store.consume("13800000000", "123456", "client-a")).thenReturn(true);
+        when(store.issue(scope("client-a"), "13800000000", "127.0.0.1", settings)).thenReturn("123456");
+        when(store.consume(scope("client-a"), "13800000000", "123456", settings)).thenReturn(true);
 
         service.sendCode("13800000000", "127.0.0.1", "client-a");
 
         verify(dispatcher).send("13800000000", "123456");
-        verify(store).activate("13800000000", "123456", "client-a");
+        verify(store).activate(scope("client-a"), "13800000000", "123456", settings);
         assertThat(service.verifyCode("13800000000", "123456", "client-a")).isTrue();
+    }
+
+    /**
+     * 共享引擎中仍使用原SMS登录作用域。
+     */
+    private VerificationCodeScope scope(String clientId) {
+        return new VerificationCodeScope(VerificationChannel.SMS, VerificationCodePurpose.LOGIN, clientId);
     }
 }

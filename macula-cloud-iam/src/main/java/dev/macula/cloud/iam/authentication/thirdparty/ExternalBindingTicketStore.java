@@ -16,21 +16,6 @@
  */
 package dev.macula.cloud.iam.authentication.thirdparty;
 
-import dev.macula.cloud.iam.enums.UserTypeEnum;
-import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeSecurityProperties;
-import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeVerification;
-import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.core.script.DefaultRedisScript;
-import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.crypto.keygen.Base64StringKeyGenerator;
-import org.springframework.security.crypto.keygen.StringKeyGenerator;
-import org.springframework.stereotype.Component;
-import org.springframework.util.Assert;
-
-import javax.crypto.Cipher;
-import javax.crypto.Mac;
-import javax.crypto.spec.GCMParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
@@ -41,6 +26,21 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import javax.crypto.Cipher;
+import javax.crypto.Mac;
+import javax.crypto.spec.GCMParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
+
+import dev.macula.cloud.iam.enums.UserTypeEnum;
+import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeSecurityProperties;
+import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeVerification;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.crypto.keygen.Base64StringKeyGenerator;
+import org.springframework.security.crypto.keygen.StringKeyGenerator;
+import org.springframework.stereotype.Component;
+import org.springframework.util.Assert;
 
 /**
  * 生成不可解析票据，并只以摘要作为 Redis key 保存已核验绑定材料。
@@ -71,48 +71,48 @@ public class ExternalBindingTicketStore {
     private static final String FIELD_OWNER = "owner";
     private static final String FIELD_LEASE_UNTIL = "leaseUntil";
     private static final DefaultRedisScript<Long> ISSUE = new DefaultRedisScript<>("""
-        if redis.call('exists', KEYS[1]) == 1 then return 0 end
-        for i = 1, #ARGV - 1, 2 do
-            redis.call('hset', KEYS[1], ARGV[i], ARGV[i + 1])
-        end
-        redis.call('pexpire', KEYS[1], ARGV[#ARGV])
-        return 1
-        """, Long.class);
-    private static final DefaultRedisScript<Long> CLAIM = new DefaultRedisScript<>("""
-        local state = redis.call('hget', KEYS[1], 'state')
-        if not state then return 0 end
-        local lease = tonumber(redis.call('hget', KEYS[1], 'leaseUntil') or '0')
-        if state == 'READY' or (state == 'CLAIMED' and lease < tonumber(ARGV[2])) then
-            redis.call('hset', KEYS[1], 'state', 'CLAIMED', 'owner', ARGV[1], 'leaseUntil', ARGV[3])
+            if redis.call('exists', KEYS[1]) == 1 then return 0 end
+            for i = 1, #ARGV - 1, 2 do
+                redis.call('hset', KEYS[1], ARGV[i], ARGV[i + 1])
+            end
+            redis.call('pexpire', KEYS[1], ARGV[#ARGV])
             return 1
-        end
-        return 0
-        """, Long.class);
+            """, Long.class);
+    private static final DefaultRedisScript<Long> CLAIM = new DefaultRedisScript<>("""
+            local state = redis.call('hget', KEYS[1], 'state')
+            if not state then return 0 end
+            local lease = tonumber(redis.call('hget', KEYS[1], 'leaseUntil') or '0')
+            if state == 'READY' or (state == 'CLAIMED' and lease < tonumber(ARGV[2])) then
+                redis.call('hset', KEYS[1], 'state', 'CLAIMED', 'owner', ARGV[1], 'leaseUntil', ARGV[3])
+                return 1
+            end
+            return 0
+            """, Long.class);
     private static final DefaultRedisScript<Long> RELEASE = new DefaultRedisScript<>("""
-        if redis.call('hget', KEYS[1], 'state') ~= 'CLAIMED' or
-            redis.call('hget', KEYS[1], 'owner') ~= ARGV[1] then return 0 end
-        redis.call('hset', KEYS[1], 'state', 'READY')
-        redis.call('hdel', KEYS[1], 'owner', 'leaseUntil')
-        return 1
-        """, Long.class);
-    private static final DefaultRedisScript<Long> FAILED = new DefaultRedisScript<>("""
-        if redis.call('hget', KEYS[1], 'state') ~= 'CLAIMED' or
-            redis.call('hget', KEYS[1], 'owner') ~= ARGV[1] then return 0 end
-        local attempts = redis.call('hincrby', KEYS[1], 'failedAttempts', 1)
-        if attempts >= tonumber(ARGV[2]) then
-            redis.call('hset', KEYS[1], 'state', 'TERMINATED')
-        else
+            if redis.call('hget', KEYS[1], 'state') ~= 'CLAIMED' or
+                redis.call('hget', KEYS[1], 'owner') ~= ARGV[1] then return 0 end
             redis.call('hset', KEYS[1], 'state', 'READY')
-        end
-        redis.call('hdel', KEYS[1], 'owner', 'leaseUntil')
-        return attempts
-        """, Long.class);
+            redis.call('hdel', KEYS[1], 'owner', 'leaseUntil')
+            return 1
+            """, Long.class);
+    private static final DefaultRedisScript<Long> FAILED = new DefaultRedisScript<>("""
+            if redis.call('hget', KEYS[1], 'state') ~= 'CLAIMED' or
+                redis.call('hget', KEYS[1], 'owner') ~= ARGV[1] then return 0 end
+            local attempts = redis.call('hincrby', KEYS[1], 'failedAttempts', 1)
+            if attempts >= tonumber(ARGV[2]) then
+                redis.call('hset', KEYS[1], 'state', 'TERMINATED')
+            else
+                redis.call('hset', KEYS[1], 'state', 'READY')
+            end
+            redis.call('hdel', KEYS[1], 'owner', 'leaseUntil')
+            return attempts
+            """, Long.class);
     private static final DefaultRedisScript<Long> CONSUME = new DefaultRedisScript<>("""
-        if redis.call('hget', KEYS[1], 'state') ~= 'CLAIMED' or
-            redis.call('hget', KEYS[1], 'owner') ~= ARGV[1] then return 0 end
-        redis.call('del', KEYS[1])
-        return 1
-        """, Long.class);
+            if redis.call('hget', KEYS[1], 'state') ~= 'CLAIMED' or
+                redis.call('hget', KEYS[1], 'owner') ~= ARGV[1] then return 0 end
+            redis.call('del', KEYS[1])
+            return 1
+            """, Long.class);
 
     private final StringRedisTemplate redis;
     private final ExternalCodeSecurityProperties properties;
@@ -121,14 +121,14 @@ public class ExternalBindingTicketStore {
     public ExternalBindingTicketStore(StringRedisTemplate redis, ExternalCodeSecurityProperties properties) {
         Assert.hasText(properties.getDigestKey(), "external-code digestKey cannot be empty");
         Assert.isTrue(!properties.getBindingTicketTtl().isNegative()
-            && !properties.getBindingTicketTtl().isZero()
-            && properties.getBindingTicketTtl().compareTo(java.time.Duration.ofMinutes(5)) <= 0,
-            "binding ticket TTL must be between zero and five minutes");
+                        && !properties.getBindingTicketTtl().isZero()
+                        && properties.getBindingTicketTtl().compareTo(java.time.Duration.ofMinutes(5)) <= 0,
+                "binding ticket TTL must be between zero and five minutes");
         Assert.isTrue(properties.getBindingTicketMaxAttempts() > 0,
-            "binding ticket max attempts must be positive");
+                "binding ticket max attempts must be positive");
         Assert.isTrue(!properties.getBindingTicketClaimLease().isNegative()
-            && !properties.getBindingTicketClaimLease().isZero(),
-            "binding ticket claim lease must be positive");
+                        && !properties.getBindingTicketClaimLease().isZero(),
+                "binding ticket claim lease must be positive");
         this.redis = redis;
         this.properties = properties;
     }
@@ -143,7 +143,7 @@ public class ExternalBindingTicketStore {
      * @return opaque ticket
      */
     public String issue(String clientId, Long tenantId, UserTypeEnum userType,
-        ExternalCodeVerification verification) {
+            ExternalCodeVerification verification) {
         String ticket = ticketGenerator.generateKey();
         String key = key(ticket);
         Map<String, String> values = new LinkedHashMap<>();
@@ -153,7 +153,7 @@ public class ExternalBindingTicketStore {
         values.put(FIELD_USER_TYPE, userType.getType());
         values.put(FIELD_FAILED_ATTEMPTS, "0");
         values.put(FIELD_IDENTITY, encrypt(FIELD_IDENTITY,
-            tools.jackson.databind.json.JsonMapper.builder().build().writeValueAsString(verification.identity())));
+                tools.jackson.databind.json.JsonMapper.builder().build().writeValueAsString(verification.identity())));
         values.put(FIELD_EXPIRES_AT, java.time.Instant.now().plus(properties.getBindingTicketTtl()).toString());
         java.util.ArrayList<String> arguments = new java.util.ArrayList<>(values.size() * 2 + 1);
         values.forEach((field, value) -> {
@@ -189,11 +189,11 @@ public class ExternalBindingTicketStore {
                 throw invalid();
             }
             ExternalBindingTicket value = new ExternalBindingTicket(required(values, FIELD_CLIENT_ID),
-                Long.valueOf(required(values, FIELD_TENANT_ID)), userType(required(values, FIELD_USER_TYPE)),
-                tools.jackson.databind.json.JsonMapper.builder().build().readValue(
-                    decrypt(FIELD_IDENTITY, required(values, FIELD_IDENTITY)), VerifiedExternalIdentity.class),
-                java.time.Instant.parse(required(values, FIELD_EXPIRES_AT)),
-                Integer.parseInt(required(values, FIELD_FAILED_ATTEMPTS)));
+                    Long.valueOf(required(values, FIELD_TENANT_ID)), userType(required(values, FIELD_USER_TYPE)),
+                    tools.jackson.databind.json.JsonMapper.builder().build().readValue(
+                            decrypt(FIELD_IDENTITY, required(values, FIELD_IDENTITY)), VerifiedExternalIdentity.class),
+                    java.time.Instant.parse(required(values, FIELD_EXPIRES_AT)),
+                    Integer.parseInt(required(values, FIELD_FAILED_ATTEMPTS)));
             return new ClaimedTicket(key, owner, value);
         } catch (BadCredentialsException | IllegalArgumentException ex) {
             redis.execute(CONSUME, List.of(key), owner);
@@ -204,40 +204,54 @@ public class ExternalBindingTicketStore {
         }
     }
 
-    /** 将Redis claim固定至原过期时间，页面停留不能重置TTL或让其他浏览器抢占。 */
+    /**
+     * 将Redis claim固定至原过期时间，页面停留不能重置TTL或让其他浏览器抢占。
+     */
     public ClaimedTicket claimForBrowser(String ticket) {
         ClaimedTicket claimed = claim(ticket);
         Long result = redis.execute(new DefaultRedisScript<>("""
-            if redis.call('hget',KEYS[1],'owner') ~= ARGV[1] then return 0 end
-            redis.call('hset',KEYS[1],'leaseUntil',ARGV[2])
-            return 1
-            """, Long.class), List.of(claimed.key()), claimed.owner(), Long.toString(claimed.value().expiresAt().toEpochMilli()));
-        if (!Long.valueOf(1).equals(result)) { throw invalid(); }
+                        if redis.call('hget',KEYS[1],'owner') ~= ARGV[1] then return 0 end
+                        redis.call('hset',KEYS[1],'leaseUntil',ARGV[2])
+                        return 1
+                        """, Long.class), List.of(claimed.key()), claimed.owner(),
+                Long.toString(claimed.value().expiresAt().toEpochMilli()));
+        if (!Long.valueOf(1).equals(result)) {
+            throw invalid();
+        }
         return claimed;
     }
 
-    /** 检查当前浏览器仍持有原票据，缺失/过期/取消后不得继续绑定。 */
+    /**
+     * 检查当前浏览器仍持有原票据，缺失/过期/取消后不得继续绑定。
+     */
     public void requireBrowserClaim(ClaimedTicket claimed) {
         Map<Object, Object> values = redis.opsForHash().entries(claimed.key());
         if (!"CLAIMED".equals(text(values, FIELD_STATE)) || !claimed.owner().equals(text(values, FIELD_OWNER))
-            || !claimed.value().expiresAt().isAfter(java.time.Instant.now())) { throw invalid(); }
+                || !claimed.value().expiresAt().isAfter(java.time.Instant.now())) {
+            throw invalid();
+        }
     }
 
-    /** 页面验证失败保持同一持有者并累计Redis全局次数，不能换页面重置。 */
+    /**
+     * 页面验证失败保持同一持有者并累计Redis全局次数，不能换页面重置。
+     */
     public void failedBrowserAttempt(ClaimedTicket claimed) {
         Long result = redis.execute(new DefaultRedisScript<>("""
-            if redis.call('hget',KEYS[1],'state') ~= 'CLAIMED' or
-               redis.call('hget',KEYS[1],'owner') ~= ARGV[1] then return 0 end
-            local attempts=redis.call('hincrby',KEYS[1],'failedAttempts',1)
-            if attempts >= tonumber(ARGV[2]) then redis.call('hset',KEYS[1],'state','TERMINATED') end
-            return attempts
-            """, Long.class), List.of(claimed.key()), claimed.owner(), Integer.toString(properties.getBindingTicketMaxAttempts()));
-        if (result == null || result == 0) { throw invalid(); }
+                        if redis.call('hget',KEYS[1],'state') ~= 'CLAIMED' or
+                           redis.call('hget',KEYS[1],'owner') ~= ARGV[1] then return 0 end
+                        local attempts=redis.call('hincrby',KEYS[1],'failedAttempts',1)
+                        if attempts >= tonumber(ARGV[2]) then redis.call('hset',KEYS[1],'state','TERMINATED') end
+                        return attempts
+                        """, Long.class), List.of(claimed.key()), claimed.owner(),
+                Integer.toString(properties.getBindingTicketMaxAttempts()));
+        if (result == null || result == 0) {
+            throw invalid();
+        }
     }
 
     public void failedAttempt(ClaimedTicket claimed) {
         Long attempts = redis.execute(FAILED, List.of(claimed.key()), claimed.owner(),
-            Integer.toString(properties.getBindingTicketMaxAttempts()));
+                Integer.toString(properties.getBindingTicketMaxAttempts()));
         if (attempts == null || attempts == 0) {
             throw invalid();
         }
@@ -330,7 +344,7 @@ public class ExternalBindingTicketStore {
 
     private SecretKeySpec encryptionKey() throws GeneralSecurityException {
         byte[] digest = MessageDigest.getInstance("SHA-256")
-            .digest((ENCRYPTION_KEY_CONTEXT + properties.getDigestKey()).getBytes(StandardCharsets.UTF_8));
+                .digest((ENCRYPTION_KEY_CONTEXT + properties.getDigestKey()).getBytes(StandardCharsets.UTF_8));
         return new SecretKeySpec(digest, "AES");
     }
 

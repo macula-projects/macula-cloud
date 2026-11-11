@@ -17,6 +17,8 @@
 
 package dev.macula.cloud.iam.pojo.entity;
 
+import java.util.List;
+
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import dev.macula.boot.starter.mp.entity.BaseEntity;
@@ -24,8 +26,11 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
-import java.util.List;
-
+/**
+ * IAM本地用户持久化实体，保留现有账号、手机号和邮箱字段合同。
+ * @author Macula
+ * @since 6.1.0
+ */
 @EqualsAndHashCode(callSuper = true)
 @Data
 public class SysUser extends BaseEntity {

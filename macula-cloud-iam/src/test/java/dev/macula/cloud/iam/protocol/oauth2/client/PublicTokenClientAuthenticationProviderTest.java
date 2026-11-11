@@ -16,6 +16,8 @@
  */
 package dev.macula.cloud.iam.protocol.oauth2.client;
 
+import java.util.Map;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
@@ -24,8 +26,6 @@ import org.springframework.security.oauth2.core.endpoint.OAuth2ParameterNames;
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2ClientAuthenticationToken;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
-
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -41,14 +41,16 @@ import static org.mockito.Mockito.when;
 class PublicTokenClientAuthenticationProviderTest {
     private final RegisteredClientRepository clients = mock(RegisteredClientRepository.class);
     private final PublicTokenClientAuthenticationProvider provider =
-        new PublicTokenClientAuthenticationProvider(clients);
+            new PublicTokenClientAuthenticationProvider(clients);
 
     @Test
     void authenticatesRegisteredPublicGrant() {
-        when(clients.findByClientId("public-client")).thenReturn(client(ClientAuthenticationMethod.NONE, "sms"));
+        when(clients.findByClientId("public-client")).thenReturn(
+                client(ClientAuthenticationMethod.NONE, "urn:macula:params:oauth:grant-type:external_code"));
 
         OAuth2ClientAuthenticationToken result =
-            (OAuth2ClientAuthenticationToken)provider.authenticate(request("sms"));
+                (OAuth2ClientAuthenticationToken) provider.authenticate(
+                        request("urn:macula:params:oauth:grant-type:external_code"));
 
         assertThat(result.isAuthenticated()).isTrue();
         assertThat(result.getRegisteredClient().getClientId()).isEqualTo("public-client");
@@ -56,38 +58,40 @@ class PublicTokenClientAuthenticationProviderTest {
 
     @Test
     void rejectsUnknownConfidentialOrUnregisteredGrant() {
-        assertThatThrownBy(() -> provider.authenticate(request("sms")))
-            .isInstanceOf(OAuth2AuthenticationException.class);
+        assertThatThrownBy(() -> provider.authenticate(request("urn:macula:params:oauth:grant-type:external_code")))
+                .isInstanceOf(OAuth2AuthenticationException.class);
 
         when(clients.findByClientId("public-client"))
-            .thenReturn(client(ClientAuthenticationMethod.CLIENT_SECRET_POST, "sms"));
-        assertThatThrownBy(() -> provider.authenticate(request("sms")))
-            .isInstanceOf(OAuth2AuthenticationException.class);
+                .thenReturn(client(ClientAuthenticationMethod.CLIENT_SECRET_POST,
+                        "urn:macula:params:oauth:grant-type:external_code"));
+        assertThatThrownBy(() -> provider.authenticate(request("urn:macula:params:oauth:grant-type:external_code")))
+                .isInstanceOf(OAuth2AuthenticationException.class);
 
         when(clients.findByClientId("public-client"))
-            .thenReturn(client(ClientAuthenticationMethod.NONE, "password"));
-        assertThatThrownBy(() -> provider.authenticate(request("sms")))
-            .isInstanceOf(OAuth2AuthenticationException.class);
+                .thenReturn(client(ClientAuthenticationMethod.NONE, "password"));
+        assertThatThrownBy(() -> provider.authenticate(request("urn:macula:params:oauth:grant-type:external_code")))
+                .isInstanceOf(OAuth2AuthenticationException.class);
     }
 
     @Test
     void leavesAuthorizationCodeAndConfidentialAuthenticationToFramework() {
         assertThat(provider.authenticate(request("authorization_code"))).isNull();
         OAuth2ClientAuthenticationToken confidential = new OAuth2ClientAuthenticationToken(
-            client(ClientAuthenticationMethod.CLIENT_SECRET_POST, "sms"),
-            ClientAuthenticationMethod.CLIENT_SECRET_POST, "fixture");
+                client(ClientAuthenticationMethod.CLIENT_SECRET_POST,
+                        "urn:macula:params:oauth:grant-type:external_code"),
+                ClientAuthenticationMethod.CLIENT_SECRET_POST, "fixture");
         assertThat(provider.authenticate(confidential)).isNull();
     }
 
     private OAuth2ClientAuthenticationToken request(String grantType) {
         return new OAuth2ClientAuthenticationToken("public-client", ClientAuthenticationMethod.NONE, null,
-            Map.of(OAuth2ParameterNames.GRANT_TYPE, grantType));
+                Map.of(OAuth2ParameterNames.GRANT_TYPE, grantType));
     }
 
     private RegisteredClient client(ClientAuthenticationMethod method, String grantType) {
         RegisteredClient.Builder builder = RegisteredClient.withId("public-client").clientId("public-client")
-            .clientAuthenticationMethod(method).authorizationGrantType(new AuthorizationGrantType(grantType))
-            .scope("profile");
+                .clientAuthenticationMethod(method).authorizationGrantType(new AuthorizationGrantType(grantType))
+                .scope("profile");
         if (!ClientAuthenticationMethod.NONE.equals(method)) {
             builder.clientSecret("{noop}fixture");
         }

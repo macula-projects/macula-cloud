@@ -16,14 +16,14 @@
  */
 package dev.macula.cloud.iam.protocol.oauth2.grant.externalcode;
 
-import dev.macula.cloud.iam.protocol.oauth2.grant.base.OAuth2ResourceOwnerBaseAuthenticationToken;
+import java.util.Map;
+import java.util.Set;
+
 import dev.macula.cloud.system.enums.ExternalCodeType;
 import lombok.Getter;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
-
-import java.util.Map;
-import java.util.Set;
+import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationGrantAuthenticationToken;
 
 /**
  * 已完成协议参数解析、等待服务端核验的外部凭证 grant 请求。
@@ -32,15 +32,20 @@ import java.util.Set;
  * @since 6.1.0
  */
 @Getter
-public class OAuth2ExternalCodeAuthenticationToken extends OAuth2ResourceOwnerBaseAuthenticationToken {
+public class OAuth2ExternalCodeAuthenticationToken extends OAuth2AuthorizationGrantAuthenticationToken {
     public static final AuthorizationGrantType GRANT_TYPE = new AuthorizationGrantType(ExternalCodeType.GRANT_TYPE);
 
     private final ExternalCodeType codeType;
     private final String code;
+    private final Set<String> scopes;
 
+    /**
+     * 保存不可变的请求快照；平台 Code 仍须由固定来源服务端核验。
+     */
     public OAuth2ExternalCodeAuthenticationToken(Authentication clientPrincipal, Set<String> scopes,
-        Map<String, Object> additionalParameters, ExternalCodeType codeType, String code) {
-        super(GRANT_TYPE, clientPrincipal, scopes, additionalParameters);
+            Map<String, Object> additionalParameters, ExternalCodeType codeType, String code) {
+        super(GRANT_TYPE, clientPrincipal, additionalParameters);
+        this.scopes = scopes == null ? Set.of() : Set.copyOf(scopes);
         this.codeType = codeType;
         this.code = code;
     }

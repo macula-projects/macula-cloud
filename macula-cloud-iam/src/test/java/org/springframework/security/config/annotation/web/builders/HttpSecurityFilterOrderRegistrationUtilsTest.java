@@ -41,13 +41,25 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 class HttpSecurityFilterOrderRegistrationUtilsTest {
 
+    private static HttpSecurity httpSecurity() {
+        ObjectPostProcessor<Object> objectPostProcessor = new ObjectPostProcessor<>() {
+            @Override
+            public <O> O postProcess(O object) {
+                return object;
+            }
+        };
+        AuthenticationManagerBuilder authenticationBuilder =
+                new AuthenticationManagerBuilder(objectPostProcessor);
+        return new HttpSecurity(objectPostProcessor, authenticationBuilder, new HashMap<>());
+    }
+
     @Test
     void shouldAllowParentConfigurerToAddFilterAfterOrderRegistration() {
         HttpSecurity http = httpSecurity();
         Filter filter = new TestFilter();
 
         FilterOrderRegUtils.registryFilterOrder(http, filter,
-            UsernamePasswordAuthenticationFilter.class, FilterOrderRegUtils.Position.AFTER);
+                UsernamePasswordAuthenticationFilter.class, FilterOrderRegUtils.Position.AFTER);
 
         assertThatCode(() -> http.addFilter(filter)).doesNotThrowAnyException();
     }
@@ -58,7 +70,7 @@ class HttpSecurityFilterOrderRegistrationUtilsTest {
         Filter filter = new TestFilter();
 
         FilterOrderRegUtils.registryFilterOrder(http, filter,
-            UsernamePasswordAuthenticationFilter.class, FilterOrderRegUtils.Position.BEFORE);
+                UsernamePasswordAuthenticationFilter.class, FilterOrderRegUtils.Position.BEFORE);
 
         assertThatCode(() -> http.addFilter(filter)).doesNotThrowAnyException();
     }
@@ -68,32 +80,28 @@ class HttpSecurityFilterOrderRegistrationUtilsTest {
         HttpSecurity http = httpSecurity();
 
         assertThatThrownBy(() -> FilterOrderRegUtils.registryFilterOrder(http,
-            new TestFilter(), UnknownFilter.class, FilterOrderRegUtils.Position.AFTER))
+                new TestFilter(), UnknownFilter.class, FilterOrderRegUtils.Position.AFTER))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining(UnknownFilter.class.getName());
     }
 
-    private static HttpSecurity httpSecurity() {
-        ObjectPostProcessor<Object> objectPostProcessor = new ObjectPostProcessor<>() {
-            @Override
-            public <O> O postProcess(O object) {
-                return object;
-            }
-        };
-        AuthenticationManagerBuilder authenticationBuilder =
-            new AuthenticationManagerBuilder(objectPostProcessor);
-        return new HttpSecurity(objectPostProcessor, authenticationBuilder, new HashMap<>());
-    }
-
+    /**
+     * 最小过滤器替身，只验证框架的顺序注册能力。
+     * @since 6.1.0
+     */
     private static class TestFilter implements Filter {
 
         @Override
         public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
-            throws IOException, ServletException {
+                throws IOException, ServletException {
             chain.doFilter(request, response);
         }
     }
 
+    /**
+     * 未注册到框架顺序表的过滤器，必须在引用时被拒绝。
+     * @since 6.1.0
+     */
     private static final class UnknownFilter extends TestFilter {
     }
 }

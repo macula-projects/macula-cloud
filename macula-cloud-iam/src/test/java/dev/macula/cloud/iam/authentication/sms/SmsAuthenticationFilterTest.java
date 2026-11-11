@@ -17,16 +17,16 @@
 
 package dev.macula.cloud.iam.authentication.sms;
 
-import dev.macula.cloud.iam.authentication.hosted.HostedLoginClientPolicyService;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
+
+import dev.macula.cloud.iam.authentication.hosted.HostedLoginClientPolicyService;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationServiceException;
 import org.springframework.security.core.Authentication;
-
-import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -38,6 +38,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * @since 6.1.0
  */
 class SmsAuthenticationFilterTest {
+
+    private static MockHttpServletRequest request(String method, String path) {
+        MockHttpServletRequest request = new MockHttpServletRequest(method, path);
+        request.setServletPath(path);
+        return request;
+    }
 
     @Test
     void shouldMatchOnlyConfiguredPostEndpoint() {
@@ -60,7 +66,7 @@ class SmsAuthenticationFilterTest {
         request.addParameter("phone", " 13800138000 ");
         request.addParameter("code", " 123456 ");
         request.setAttribute(HostedLoginClientPolicyService.CONTEXT_ATTRIBUTE,
-            new HostedLoginClientPolicyService.Context(null, Set.of()));
+                new HostedLoginClientPolicyService.Context(null, Set.of()));
 
         Authentication result = filter.attemptAuthentication(request, new MockHttpServletResponse());
 
@@ -74,14 +80,8 @@ class SmsAuthenticationFilterTest {
         SmsAuthenticationFilter filter = new SmsAuthenticationFilter(authentication -> authentication);
 
         assertThatThrownBy(() -> filter.attemptAuthentication(request("GET", "/login/sms"),
-            new MockHttpServletResponse())).isInstanceOf(AuthenticationServiceException.class)
+                new MockHttpServletResponse())).isInstanceOf(AuthenticationServiceException.class)
                 .hasMessageContaining("GET");
-    }
-
-    private static MockHttpServletRequest request(String method, String path) {
-        MockHttpServletRequest request = new MockHttpServletRequest(method, path);
-        request.setServletPath(path);
-        return request;
     }
 
     /**

@@ -57,10 +57,11 @@ class BrowserAuthenticationFailureHandlerTest {
         BrowserAuthenticationFailureHandler handler = new BrowserAuthenticationFailureHandler(pending, TRUSTED_ISSUER);
         MockHttpServletRequest request = new MockHttpServletRequest();
         MockHttpServletResponse response = new MockHttpServletResponse();
-        var context = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.context(ThirdPartyProviderType.GITHUB.providerType(), "", "test-client",
-            Instant.now(), "/");
+        var context = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.context(
+                ThirdPartyProviderType.GITHUB.providerType(), "", "test-client",
+                Instant.now(), "/");
         var required = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.bindingRequired(
-            ThirdPartyProviderType.GITHUB.providerType(), "external-subject", context);
+                ThirdPartyProviderType.GITHUB.providerType(), "external-subject", context);
 
         handler.onAuthenticationFailure(request, response, required);
 
@@ -72,17 +73,17 @@ class BrowserAuthenticationFailureHandlerTest {
     @Test
     void accountAndCredentialFailuresUseSamePublicReason(CapturedOutput output) throws Exception {
         List<AuthenticationException> failures = List.of(
-            new UsernameNotFoundException("missing-user-marker"),
-            new BadCredentialsException("bad-credential-marker"),
-            new LockedException("locked-account-marker"),
-            new DisabledException("disabled-account-marker"),
-            new AccountExpiredException("expired-account-marker"),
-            new CredentialsExpiredException("expired-credential-marker"));
+                new UsernameNotFoundException("missing-user-marker"),
+                new BadCredentialsException("bad-credential-marker"),
+                new LockedException("locked-account-marker"),
+                new DisabledException("disabled-account-marker"),
+                new AccountExpiredException("expired-account-marker"),
+                new CredentialsExpiredException("expired-credential-marker"));
 
         for (AuthenticationException failure : failures) {
             MockHttpServletResponse response = handle(failure);
             assertThat(response.getRedirectedUrl())
-                .isEqualTo(TRUSTED_ISSUER + "/login?error=authentication_rejected");
+                    .isEqualTo(TRUSTED_ISSUER + "/login?error=authentication_rejected");
         }
         assertThat(output).doesNotContain("marker");
     }
@@ -91,15 +92,15 @@ class BrowserAuthenticationFailureHandlerTest {
     void unexpectedFailureUsesUnavailableReasonWithoutLeakingDetails(CapturedOutput output) throws Exception {
         MockHttpServletRequest request = new MockHttpServletRequest();
         MockHttpServletResponse response = handle(request,
-            new AuthenticationServiceException("provider-secret-response-marker"));
+                new AuthenticationServiceException("provider-secret-response-marker"));
 
         assertThat(response.getRedirectedUrl())
-            .isEqualTo(TRUSTED_ISSUER + "/login?error=authentication_unavailable");
+                .isEqualTo(TRUSTED_ISSUER + "/login?error=authentication_unavailable");
         assertThat(output).doesNotContain("provider-secret-response-marker");
         assertThat(request.getSession(false)).isNull();
         assertThat(request.getAttribute(WebAttributes.AUTHENTICATION_EXCEPTION)).isNull();
         assertThat(AuthenticationFailureReason.fromCode("forged-error"))
-            .isEqualTo(AuthenticationFailureReason.AUTHENTICATION_UNAVAILABLE);
+                .isEqualTo(AuthenticationFailureReason.AUTHENTICATION_UNAVAILABLE);
     }
 
     private MockHttpServletResponse handle(AuthenticationException failure) throws Exception {
@@ -107,9 +108,9 @@ class BrowserAuthenticationFailureHandlerTest {
     }
 
     private MockHttpServletResponse handle(MockHttpServletRequest request, AuthenticationException failure)
-        throws Exception {
+            throws Exception {
         BrowserAuthenticationFailureHandler handler =
-            new BrowserAuthenticationFailureHandler(mock(PendingThirdPartyBindingRepository.class), TRUSTED_ISSUER);
+                new BrowserAuthenticationFailureHandler(mock(PendingThirdPartyBindingRepository.class), TRUSTED_ISSUER);
         MockHttpServletResponse response = new MockHttpServletResponse();
         handler.onAuthenticationFailure(request, response, failure);
         return response;

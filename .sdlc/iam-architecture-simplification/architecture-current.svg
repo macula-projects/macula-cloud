@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1170" viewBox="0 0 1600 1170">
+<defs><marker id="a" markerWidth="9" markerHeight="9" refX="8" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8" fill="none" stroke="#687d98" stroke-width="1.5"/></marker></defs>
+<rect width="1600" height="1170" fill="#f4f7fc"/>
+<style>text{font-family:'PingFang SC','Microsoft YaHei',sans-serif;fill:#19334e} .title{font-size:34px;font-weight:650} .sub{font-size:18px;fill:#59708b} .head{font-size:22px;font-weight:600} .body{font-size:18px} .small{font-size:16px;fill:#59708b}</style>
+<text x="45" y="60" class="title">MACULA CLOUD IAM · 当前实现架构</text>
+<text x="45" y="93" class="sub">2026-11-11  /  HEAD 8baee0a  /  源码静态核对 · 不代表运行验证</text>
+<rect x="45" y="125" width="480" height="112" rx="15" fill="#e8f0ff" stroke="#b8cff3" stroke-width="1.5"/>
+<text x="67" y="159" class="head">Web / SPA · 托管登录</text>
+<text x="67" y="190" class="body">/oauth2/authorize + S256 PKCE</text>
+<text x="67" y="216" class="body">密码 / SMS / 第三方网页授权</text>
+<path d="M285,237 L285,274" fill="none" stroke="#687d98" stroke-width="2" marker-end="url(#a)"/>
+<rect x="560" y="125" width="480" height="112" rx="15" fill="#e8f0ff" stroke="#b8cff3" stroke-width="1.5"/>
+<text x="582" y="159" class="head">App / 小程序 / 端内 JSAPI</text>
+<text x="582" y="190" class="body">平台 SDK / JSAPI 获取 Code</text>
+<text x="582" y="216" class="body">/oauth2/token · external_code</text>
+<path d="M800,237 L800,274" fill="none" stroke="#687d98" stroke-width="2" marker-end="url(#a)"/>
+<rect x="1075" y="125" width="480" height="112" rx="15" fill="#e8f0ff" stroke="#b8cff3" stroke-width="1.5"/>
+<text x="1097" y="159" class="head">标准 OAuth / OIDC 客户端</text>
+<text x="1097" y="190" class="body">authorization_code / refresh_token</text>
+<text x="1097" y="216" class="body">client_credentials · 服务身份</text>
+<path d="M1315,237 L1315,274" fill="none" stroke="#687d98" stroke-width="2" marker-end="url(#a)"/>
+<rect x="45" y="274" width="480" height="150" rx="15" fill="#fff" stroke="#d5dfec" stroke-width="1.5"/>
+<text x="67" y="308" class="head">托管认证安全链</text>
+<text x="67" y="339" class="body">CSRF / Session / SavedRequest</text>
+<text x="67" y="365" class="body">HostedLoginPolicy + 一次性 state</text>
+<text x="67" y="391" class="body">五组厂商 Filter / Provider / Configurer</text>
+<rect x="560" y="274" width="480" height="150" rx="15" fill="#e8faf5" stroke="#a8d9c9" stroke-width="1.5"/>
+<text x="582" y="308" class="head">Code 直登扩展链</text>
+<text x="582" y="339" class="body">external_code Converter → Provider</text>
+<text x="582" y="365" class="body">Client / 来源 / Scope / 限流 / Replay</text>
+<text x="582" y="391" class="body">VerifierRegistry → 各厂商核验器</text>
+<rect x="1075" y="274" width="480" height="150" rx="15" fill="#fff" stroke="#d5dfec" stroke-width="1.5"/>
+<text x="1097" y="308" class="head">Spring 授权服务器协议链</text>
+<text x="1097" y="339" class="body">标准 grant / OIDC / Client 认证</text>
+<text x="1097" y="365" class="body">端内证明 / 协议策略 / CORS</text>
+<text x="1097" y="391" class="body">另注册 sms / email 自定义 grant</text>
+<path d="M285,424 L285,472" fill="none" stroke="#687d98" stroke-width="2" marker-end="url(#a)"/>
+<path d="M800,424 L800,472" fill="none" stroke="#687d98" stroke-width="2" marker-end="url(#a)"/>
+<rect x="45" y="472" width="995" height="120" rx="15" fill="#e8faf5" stroke="#a8d9c9" stroke-width="1.5"/>
+<text x="67" y="506" class="head">共享身份解析与本地账号边界</text>
+<text x="67" y="537" class="body">IdentitySourceBindingPolicyService → RegistrationIdentityBindingService</text>
+<text x="67" y="563" class="body">目录准入 · 已绑定优先 · 多字段匹配 · 稳定 userId · Client / 来源版本复核</text>
+<rect x="1075" y="472" width="480" height="120" rx="15" fill="#fff" stroke="#d5dfec" stroke-width="1.5"/>
+<text x="1097" y="506" class="head">账号与绑定证明</text>
+<text x="1097" y="537" class="body">未绑定 → 浏览器 pending / SDK ticket</text>
+<text x="1097" y="563" class="body">账号证明 → 锁内复核 → 绑定关系</text>
+<path d="M1040,532 L1075,532" fill="none" stroke="#687d98" stroke-width="2" marker-end="url(#a)"/>
+<rect x="45" y="642" width="480" height="133" rx="15" fill="#fff" stroke="#d5dfec" stroke-width="1.5"/>
+<text x="67" y="676" class="head">浏览器结果</text>
+<text x="67" y="707" class="body">MFA 策略检查 → Session</text>
+<text x="67" y="733" class="body">恢复受控授权请求 → 标准授权码</text>
+<text x="67" y="759" class="body">由标准授权服务器完成换码</text>
+<rect x="560" y="642" width="480" height="133" rx="15" fill="#e8faf5" stroke="#a8d9c9" stroke-width="1.5"/>
+<text x="582" y="676" class="head">external_code 结果</text>
+<text x="582" y="707" class="body">MFA 策略检查 → 专用 TokenIssuer</text>
+<text x="582" y="733" class="body">Access Token / 按协议输出 ID Token</text>
+<text x="582" y="759" class="body">不因此建立浏览器 SSO</text>
+<rect x="1075" y="642" width="480" height="133" rx="15" fill="#fff" stroke="#d5dfec" stroke-width="1.5"/>
+<text x="1097" y="676" class="head">标准协议结果</text>
+<text x="1097" y="707" class="body">框架 TokenGenerator + 受控 Claims</text>
+<text x="1097" y="733" class="body">授权码 / Token / Refresh 发布校验</text>
+<text x="1097" y="759" class="body">撤销 · 内省 · JWKS · UserInfo</text>
+<path d="M285,592 L285,642" fill="none" stroke="#687d98" stroke-width="2" marker-end="url(#a)"/>
+<path d="M800,592 L800,642" fill="none" stroke="#687d98" stroke-width="2" marker-end="url(#a)"/>
+<path d="M1543,424 L1574,424 L1574,622 L1315,622 L1315,642" fill="none" stroke="#687d98" stroke-width="2" marker-end="url(#a)"/>
+<path d="M45,811 H1555" stroke="#bdcbdc" stroke-dasharray="5 6"/>
+<text x="45" y="840" class="sub">配置与存储依赖（上层组件按职责使用）</text>
+<rect x="45" y="865" width="480" height="126" rx="15" fill="#e8f0ff" stroke="#b8cff3" stroke-width="1.5"/>
+<text x="67" y="899" class="head">System / System API / Admin</text>
+<text x="67" y="930" class="body">Client · 身份源 · 能力 · 登录控制</text>
+<text x="67" y="956" class="body">UI / 保存规则 / 运行规则保持一致</text>
+<text x="67" y="982" class="body">Gateway / 资源服务消费受信 Token</text>
+<rect x="560" y="865" width="480" height="126" rx="15" fill="#fff" stroke="#d5dfec" stroke-width="1.5"/>
+<text x="582" y="899" class="head">MySQL / 身份与配置数据</text>
+<text x="582" y="930" class="body">IAM Mapper → 共享身份与配置表</text>
+<text x="582" y="956" class="body">registration / 绑定 / 用户范围</text>
+<text x="582" y="982" class="body">事务与版本检查保持</text>
+<rect x="1075" y="865" width="480" height="126" rx="15" fill="#fff" stroke="#d5dfec" stroke-width="1.5"/>
+<text x="1097" y="899" class="head">Redis / 授权与短期状态</text>
+<text x="1097" y="930" class="body">授权记录 / 索引 / CAS / 撤销</text>
+<text x="1097" y="956" class="body">Replay / 票据 / 限流 / 加密缓存</text>
+<text x="1097" y="982" class="body">原子性、TTL 与所有权保持</text>
+<rect x="45" y="1021" width="1510" height="104" rx="15" fill="#fff0e8" stroke="#ecc4aa" stroke-width="1.5"/>
+<text x="67" y="1055" class="head">审阅定位</text>
+<text x="67" y="1086" class="body">216 个生产 Java 文件 / 19,633 行；84 个 Java 测试文件。候选精简以历史 grant 与重复编排为主。</text>
+<text x="67" y="1112" class="body">CAS / SAML 配置当前为空壳；图中的绿色部分为需要保留的第三方 Code 与共享身份主干。</text>
+</svg>

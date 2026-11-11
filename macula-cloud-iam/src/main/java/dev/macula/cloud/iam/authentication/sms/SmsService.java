@@ -16,6 +16,8 @@
  */
 package dev.macula.cloud.iam.authentication.sms;
 
+import dev.macula.cloud.iam.authentication.verification.VerificationCodePurpose;
+
 /**
  * 校验手机号短信验证码的服务契约。
  *
@@ -24,13 +26,17 @@ package dev.macula.cloud.iam.authentication.sms;
  */
 public interface SmsService {
 
-    /** 是否具有已装配的真实短信发送与验证码存储能力。 */
-    default boolean isAvailable() { return false; }
+    /**
+     * 是否具有已装配的真实短信发送与验证码存储能力。
+     */
+    default boolean isAvailable() {
+        return false;
+    }
 
     /**
      * verify code
      *
-     * @param phone   phone
+     * @param phone phone
      * @param rawCode rawCode
      * @return isVerified
      */
@@ -48,12 +54,14 @@ public interface SmsService {
 
     /**
      * 发送验证码
+     *
      * @param phone 手机号
      */
     void sendCode(String phone);
 
     /**
      * 发送验证码并对来源地址执行限流。
+     *
      * @param phone 手机号
      * @param remoteAddress 来源地址
      */
@@ -67,9 +75,14 @@ public interface SmsService {
      * @param clientId OAuth Client ID
      */
     void sendCode(String phone, String remoteAddress, String clientId);
-    /** 仅服务端限定用途的账号归属证明验证码。 */
-    boolean verifyCode(String phone, String rawCode, String clientId, SmsCodePurpose purpose);
 
-    /** 在Client和用途作用域内发送；共享手机号/IP限流。 */
-    void sendCode(String phone, String remoteAddress, String clientId, SmsCodePurpose purpose);
+    /**
+     * 仅服务端限定用途的账号归属证明验证码。
+     */
+    boolean verifyCode(String phone, String rawCode, String clientId, VerificationCodePurpose purpose);
+
+    /**
+     * 在Client和用途作用域内发送；共享手机号/IP限流。
+     */
+    void sendCode(String phone, String remoteAddress, String clientId, VerificationCodePurpose purpose);
 }

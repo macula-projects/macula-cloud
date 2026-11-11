@@ -1,6 +1,6 @@
 <template>
   <section class="configuration-panel">
-    <div v-if="!['SERVICE','IN_APP'].includes(client.applicationType)" class="section-heading"><h3>IAM 统一登录</h3><p>使用内置账号密码、短信登录。标准Web与SPA还可展示已关联的第三方网页授权图标。</p></div>
+    <div v-if="!['SERVICE','IN_APP'].includes(client.applicationType)" class="section-heading"><h3>IAM 统一登录</h3><p>使用内置账号密码、短信或邮箱验证码登录。标准Web与SPA还可展示已关联的第三方网页授权图标。</p></div>
     <el-form-item v-if="!['SERVICE','IN_APP'].includes(client.applicationType)" label="统一登录入口">
       <el-switch :model-value="hostedEnabled" @change="setHostedEnabled" />
       <p class="hint">启用后需在应用配置填写登录回调；使用授权码与S256 PKCE。第三方平台Code仍走独立登录路径。</p>
@@ -8,14 +8,14 @@
     <template v-if="!['SERVICE','IN_APP'].includes(client.applicationType) && hostedEnabled">
       <el-form-item label="本地登录策略">
         <el-radio-group :model-value="client.hostedLoginMethods == null ? 'default' : 'custom'"
-          @change="value => client.hostedLoginMethods = value === 'default' ? null : ['PASSWORD', 'SMS']">
+          @change="value => client.hostedLoginMethods = value === 'default' ? null : ['PASSWORD', 'SMS', 'EMAIL']">
           <el-radio value="default">使用平台默认</el-radio><el-radio value="custom">为此应用单独设置</el-radio>
         </el-radio-group>
-        <p class="hint">平台默认只跟随 IAM 的密码、短信登录全局开关；不包含身份源或自动绑定策略。</p>
+        <p class="hint">平台默认只跟随 IAM 的密码、短信、邮箱登录全局开关；不包含身份源或自动绑定策略。</p>
       </el-form-item>
       <el-form-item v-if="client.hostedLoginMethods != null" label="本地认证">
         <el-checkbox-group v-model="client.hostedLoginMethods">
-          <el-checkbox value="PASSWORD">账号密码</el-checkbox><el-checkbox value="SMS">手机验证码</el-checkbox>
+          <el-checkbox value="PASSWORD">账号密码</el-checkbox><el-checkbox value="SMS">手机验证码</el-checkbox><el-checkbox value="EMAIL">邮箱验证码</el-checkbox>
         </el-checkbox-group>
         <p class="hint">全部取消关闭此应用的本地登录。平台全局关闭或服务未配置时，此处不能开启。</p>
       </el-form-item>

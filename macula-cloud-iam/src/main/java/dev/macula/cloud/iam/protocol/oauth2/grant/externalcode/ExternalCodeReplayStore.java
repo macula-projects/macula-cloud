@@ -16,6 +16,14 @@
  */
 package dev.macula.cloud.iam.protocol.oauth2.grant.externalcode;
 
+import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
+import java.util.HexFormat;
+import java.util.List;
+import java.util.UUID;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+
 import dev.macula.cloud.system.enums.ExternalCodeType;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
@@ -24,14 +32,6 @@ import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.OAuth2ErrorCodes;
 import org.springframework.stereotype.Component;
 import org.springframework.util.Assert;
-
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
-import java.nio.charset.StandardCharsets;
-import java.security.GeneralSecurityException;
-import java.util.HexFormat;
-import java.util.List;
-import java.util.UUID;
 
 /**
  * 仅保存 HMAC 摘要并通过 Redis SET NX 原子占用外部凭证。
@@ -44,19 +44,19 @@ public class ExternalCodeReplayStore {
     private static final String HMAC_ALGORITHM = "HmacSHA256";
     private static final String KEY_PREFIX = "iam:external-code:replay:";
     private static final java.util.Map<ExternalCodeType, java.time.Duration> MINIMUM_TTLS = java.util.Map.of(
-        ExternalCodeType.FEISHU_APP_CODE, java.time.Duration.ofMinutes(10),
-        ExternalCodeType.WECOM_APP_CODE, java.time.Duration.ofMinutes(10),
-        ExternalCodeType.DINGTALK_APP_CODE, java.time.Duration.ofMinutes(10),
-        ExternalCodeType.WECHAT_OPEN_APP_CODE, java.time.Duration.ofMinutes(10),
-        ExternalCodeType.ALIYUN_MOBILE_TOKEN, java.time.Duration.ofMinutes(31),
-        ExternalCodeType.WECHAT_MINIAPP_LOGIN_CODE, java.time.Duration.ofMinutes(10),
-        ExternalCodeType.WECHAT_MINIAPP_PHONE_CODE, java.time.Duration.ofMinutes(10),
-        ExternalCodeType.WECOM_MINIAPP_CODE, java.time.Duration.ofMinutes(10),
-        ExternalCodeType.FEISHU_WEBVIEW_CODE, java.time.Duration.ofMinutes(10),
-        ExternalCodeType.DINGTALK_WEBVIEW_CODE, java.time.Duration.ofMinutes(10));
+            ExternalCodeType.FEISHU_APP_CODE, java.time.Duration.ofMinutes(10),
+            ExternalCodeType.WECOM_APP_CODE, java.time.Duration.ofMinutes(10),
+            ExternalCodeType.DINGTALK_APP_CODE, java.time.Duration.ofMinutes(10),
+            ExternalCodeType.WECHAT_OPEN_APP_CODE, java.time.Duration.ofMinutes(10),
+            ExternalCodeType.ALIYUN_MOBILE_TOKEN, java.time.Duration.ofMinutes(31),
+            ExternalCodeType.WECHAT_MINIAPP_LOGIN_CODE, java.time.Duration.ofMinutes(10),
+            ExternalCodeType.WECHAT_MINIAPP_PHONE_CODE, java.time.Duration.ofMinutes(10),
+            ExternalCodeType.WECOM_MINIAPP_CODE, java.time.Duration.ofMinutes(10),
+            ExternalCodeType.FEISHU_WEBVIEW_CODE, java.time.Duration.ofMinutes(10),
+            ExternalCodeType.DINGTALK_WEBVIEW_CODE, java.time.Duration.ofMinutes(10));
     private static final DefaultRedisScript<Long> RELEASE = new DefaultRedisScript<>(
-        "if redis.call('get',KEYS[1])==ARGV[1] then return redis.call('del',KEYS[1]) else return 0 end",
-        Long.class);
+            "if redis.call('get',KEYS[1])==ARGV[1] then return redis.call('del',KEYS[1]) else return 0 end",
+            Long.class);
 
     private final StringRedisTemplate redis;
     private final ExternalCodeSecurityProperties properties;
@@ -72,19 +72,24 @@ public class ExternalCodeReplayStore {
         String owner = UUID.randomUUID().toString();
         java.time.Duration configured = properties.getReplayTtl();
         if (configured == null || configured.isNegative() || configured.isZero()
-            || configured.compareTo(java.time.Duration.ofDays(1)) > 0) {
+                || configured.compareTo(java.time.Duration.ofDays(1)) > 0) {
             throw new OAuth2AuthenticationException(OAuth2ErrorCodes.SERVER_ERROR);
         }
         java.time.Duration floor = MINIMUM_TTLS.get(codeType);
-        if (floor == null) { throw new OAuth2AuthenticationException(OAuth2ErrorCodes.UNAUTHORIZED_CLIENT); }
+        if (floor == null) {
+            throw new OAuth2AuthenticationException(OAuth2ErrorCodes.UNAUTHORIZED_CLIENT);
+        }
         java.time.Duration ttl = configured.compareTo(floor) < 0 ? floor : configured;
         try {
             if (!Boolean.TRUE.equals(redis.opsForValue().setIfAbsent(key, owner, ttl))) {
                 throw new OAuth2AuthenticationException(new OAuth2Error(OAuth2ErrorCodes.INVALID_GRANT,
-                    "External credential is invalid or has already been used.", null));
+                        "External credential is invalid or has already been used.", null));
             }
-        } catch (OAuth2AuthenticationException ex) { throw ex; }
-        catch (RuntimeException ex) { throw new OAuth2AuthenticationException(OAuth2ErrorCodes.SERVER_ERROR); }
+        } catch (OAuth2AuthenticationException ex) {
+            throw ex;
+        } catch (RuntimeException ex) {
+            throw new OAuth2AuthenticationException(OAuth2ErrorCodes.SERVER_ERROR);
+        }
         return new ReplayClaim(key, owner);
     }
 

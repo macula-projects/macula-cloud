@@ -16,13 +16,14 @@
  */
 package dev.macula.cloud.iam.authentication.hosted;
 
+import java.io.IOException;
+import java.util.Set;
+
 import dev.macula.cloud.system.enums.OAuth2HostedLoginMethod;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.io.IOException;
-import java.util.Set;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -34,43 +35,58 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * @since 6.1.0
  */
 public class HostedLoginPolicyFilter extends OncePerRequestFilter {
+    private static final String EMAIL_CODE_PATH = dev.macula.cloud.iam.controller.EmailCodeController.PATH;
+    private static final String EMAIL_LOGIN_PATH =
+            dev.macula.cloud.iam.authentication.email.EmailCodeAuthenticationFilter.PATH;
     private static final String SMS_CODE_PATH = "/api/v1/sms-code";
-    private static final Set<String> PATHS = Set.of("/login", "/login/sms", SMS_CODE_PATH);
+    private static final Set<String> PATHS = Set.of("/login", "/login/sms", SMS_CODE_PATH, EMAIL_CODE_PATH,
+            EMAIL_LOGIN_PATH);
     private final HostedLoginClientPolicyService policy;
     private final AuthenticationFailureHandler failureHandler;
 
-    /** 过滤器只由Security链安装，避免Servlet容器重复注册。 */
+    /**
+     * 过滤器只由Security链安装，避免Servlet容器重复注册。
+     */
     public HostedLoginPolicyFilter(HostedLoginClientPolicyService policy, AuthenticationFailureHandler failureHandler) {
         this.policy = policy;
         this.failureHandler = failureHandler;
     }
 
-    /** 同时适用于根Servlet映射和反向代理contextPath，避免空servletPath绕过策略。 */
+    /**
+     * 同时适用于根Servlet映射和反向代理contextPath，避免空servletPath绕过策略。
+     */
     private String path(HttpServletRequest request) {
         return request.getRequestURI().substring(request.getContextPath().length());
     }
 
-    /** 不干预Token扩展、第三方回调和既有SSO会话。 */
+    /**
+     * 不干预Token扩展、第三方回调和既有SSO会话。
+     */
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         return !"POST".equals(request.getMethod()) || !PATHS.contains(path(request));
     }
 
-    /** 拒绝发生在密码/SMS认证和验证码发送副作用之前。 */
+    /**
+     * 拒绝发生在密码/SMS认证和验证码发送副作用之前。
+     */
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
-        throws ServletException, IOException {
+            throws ServletException, IOException {
         try {
             HostedLoginClientPolicyService.Context context = policy.resolve(request, response);
             OAuth2HostedLoginMethod method = "/login".equals(path(request))
-                ? OAuth2HostedLoginMethod.PASSWORD : OAuth2HostedLoginMethod.SMS;
+                    ? OAuth2HostedLoginMethod.PASSWORD :
+                    EMAIL_LOGIN_PATH.equals(path(request)) || EMAIL_CODE_PATH.equals(path(request))
+                            ? OAuth2HostedLoginMethod.EMAIL : OAuth2HostedLoginMethod.SMS;
             if (!context.methods().contains(method)) {
-                throw new org.springframework.security.authentication.AuthenticationServiceException("当前应用不允许该登录方式");
+                throw new org.springframework.security.authentication.AuthenticationServiceException(
+                        "当前应用不允许该登录方式");
             }
             request.setAttribute(HostedLoginClientPolicyService.CONTEXT_ATTRIBUTE, context);
         } catch (AuthenticationException ex) {
-            if (SMS_CODE_PATH.equals(path(request))) {
-                response.sendError(HttpServletResponse.SC_FORBIDDEN, "当前应用不允许短信登录");
+            if (SMS_CODE_PATH.equals(path(request)) || EMAIL_CODE_PATH.equals(path(request))) {
+                response.sendError(HttpServletResponse.SC_FORBIDDEN, "当前应用不允许该验证码登录");
             } else {
                 failureHandler.onAuthenticationFailure(request, response, ex);
             }

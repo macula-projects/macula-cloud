@@ -64,11 +64,11 @@ public enum OAuth2ClientApplicationType {
     }
     /** 内置托管登录与直接平台Code可以并存，但端内应用不能回退标准页。 */
     public boolean supportsHostedLogin() { return this != IN_APP && this != SERVICE; }
-    /** 在统一Token边界约束实际请求；兼容既有内置验证码扩展，不为其新建默认入口。 */
+    /** 在统一Token边界约束实际请求；仅允许标准授权和受控第三方Code扩展。 */
     public boolean supportsGrant(String grant) {
         if (this == SERVICE) { return "client_credentials".equals(grant); }
         if (this == IN_APP) { return "authorization_code".equals(grant) || ExternalCodeType.GRANT_TYPE.equals(grant); }
         if (ExternalCodeType.GRANT_TYPE.equals(grant)) { return this == NATIVE || this == MINIAPP; }
-        return java.util.Set.of("authorization_code", "refresh_token", "sms", "email").contains(grant);
+        return java.util.Set.of("authorization_code", "refresh_token").contains(grant);
     }
 }

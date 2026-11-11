@@ -16,6 +16,8 @@
  */
 package dev.macula.cloud.iam.authentication.sms;
 
+import java.util.Collection;
+
 import org.jspecify.annotations.NonNull;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.context.MessageSource;
@@ -32,8 +34,6 @@ import org.springframework.security.core.authority.mapping.NullAuthoritiesMapper
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.util.Assert;
 
-import java.util.Collection;
-
 /**
  * 校验短信验证码并建立用户认证状态。
  *
@@ -48,7 +48,7 @@ public class SmsAuthenticationProvider implements AuthenticationProvider, Initia
     private MessageSourceAccessor messages = SpringSecurityMessageSource.getAccessor();
 
     public SmsAuthenticationProvider(SmsUserDetailsService smsUserDetailsService,
-        SmsService smsService) {
+            SmsService smsService) {
         this.smsUserDetailsService = smsUserDetailsService;
         this.smsService = smsService;
     }
@@ -56,17 +56,17 @@ public class SmsAuthenticationProvider implements AuthenticationProvider, Initia
     @Override
     public Authentication authenticate(@NonNull Authentication authentication) throws AuthenticationException {
         Assert.isInstanceOf(SmsAuthenticationToken.class, authentication,
-            () -> messages.getMessage("SmsAuthenticationProvider.onlySupports",
-                "Only SmsAuthenticationToken is supported"));
+                () -> messages.getMessage("SmsAuthenticationProvider.onlySupports",
+                        "Only SmsAuthenticationToken is supported"));
 
-        SmsAuthenticationToken unAuthenticationToken = (SmsAuthenticationToken)authentication;
+        SmsAuthenticationToken unAuthenticationToken = (SmsAuthenticationToken) authentication;
 
         String phone = unAuthenticationToken.getName();
-        String rawCode = (String)unAuthenticationToken.getCredentials();
+        String rawCode = (String) unAuthenticationToken.getCredentials();
         // 验证码校验
         boolean verified = unAuthenticationToken.getClientId() == null
-            ? smsService.verifyCode(phone, rawCode)
-            : smsService.verifyCode(phone, rawCode, unAuthenticationToken.getClientId());
+                ? smsService.verifyCode(phone, rawCode)
+                : smsService.verifyCode(phone, rawCode, unAuthenticationToken.getClientId());
         if (verified) {
             UserDetails userDetails = smsUserDetailsService.loadUserByPhone(phone);
             return createSuccessAuthentication(authentication, userDetails);
@@ -95,7 +95,7 @@ public class SmsAuthenticationProvider implements AuthenticationProvider, Initia
      * 认证成功将非授信凭据转为授信凭据. 封装用户信息 角色信息。
      *
      * @param authentication the authentication
-     * @param user           the user
+     * @param user the user
      * @return the authentication
      */
     protected Authentication createSuccessAuthentication(Authentication authentication, UserDetails user) {

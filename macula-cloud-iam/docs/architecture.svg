@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1170" viewBox="0 0 1600 1170">
+    <rect width="1600" height="1170" fill="#f4f7fc"/>
+    <style>text{font-family:'PingFang
+        SC',sans-serif;fill:#19334e}.h{font-size:23px;font-weight:600}.b{font-size:19px}.s{font-size:17px;fill:#59708b}
+    </style>
+    <text x="45" y="57" class="h">MACULA CLOUD IAM · 架构与职责</text>
+    <text x="45" y="91" class="s">用户登录与协议发布分离 · 公共账号和身份规则通过明确端口复用</text>
+    <rect x="45" y="120" width="490" height="160" rx="16" fill="#e8f0ff" stroke="#c7d7e9"/>
+    <text x="67" y="156" class="h">登录认证链 / 用户身份</text>
+    <text x="67" y="192" class="b">DefaultSecurityConfiguration</text>
+    <text x="67" y="221" class="b">密码 / SMS / EMAIL / 第三方网页登录</text>
+    <text x="67" y="250" class="b">Session / CSRF / SavedRequest</text>
+    <rect x="565" y="120" width="990" height="160" rx="16" fill="#e8faf5" stroke="#c7d7e9"/>
+    <text x="587" y="156" class="h">协议链 / OAuth2 · OIDC</text>
+    <text x="587" y="192" class="b">ProtocolOAuth2Configuration：端点、Matcher、过滤顺序</text>
+    <text x="587" y="221" class="b">标准 authorization_code / refresh_token / client_credentials</text>
+    <text x="587" y="250" class="b">唯一自定义 grant：external_code；不因此建立浏览器 SSO</text>
+    <path d="M290,280 L290,310" stroke="#6987a5" stroke-width="2"/>
+    <path d="M1060,280 L1060,310" stroke="#6987a5" stroke-width="2"/>
+    <rect x="45" y="310" width="490" height="190" rx="16" fill="#fff" stroke="#c7d7e9"/>
+    <text x="67" y="346" class="h">登录编排 · Strategy + Adapter</text>
+    <text x="67" y="382" class="b">ThirdPartyAuthenticationProvider</text>
+    <text x="67" y="411" class="b">ThirdPartyProviderAdapter 接口</text>
+    <text x="67" y="440" class="b">Registry + 五家 Adapter / 原有 Client</text>
+    <text x="67" y="469" class="b">单个组合 Configurer 保留各路由生命周期</text>
+    <rect x="565" y="310" width="990" height="190" rx="16" fill="#fff" stroke="#c7d7e9"/>
+    <text x="587" y="346" class="h">协议扩展 · 显式组合</text>
+    <text x="587" y="382" class="b">AuthorizationServerExtension 接口</text>
+    <text x="587" y="411" class="b">ClientAuthentication / AuthorizationEndpoint / TokenEndpoint</text>
+    <text x="587" y="440" class="b">OAuth2ProtocolExtensionConfiguration 负责组装</text>
+    <text x="587" y="469" class="b">OAuth Client 认证与用户登录认证各归其链</text>
+    <path d="M290,500 L290,530" stroke="#6987a5" stroke-width="2"/>
+    <path d="M1060,500 L1060,530" stroke="#6987a5" stroke-width="2"/>
+    <rect x="45" y="530" width="490" height="190" rx="16" fill="#e8f0ff" stroke="#c7d7e9"/>
+    <text x="67" y="566" class="h">公共身份与绑定规则</text>
+    <text x="67" y="602" class="b">service.identity / IdentityDirectoryService</text>
+    <text x="67" y="631" class="b">目录准入 / 稳定 userId / 来源版本</text>
+    <text x="67" y="660" class="b">绑定事务 / 锁内复核 / 事务后完成</text>
+    <text x="67" y="689" class="b">浏览器 pending 与 SDK ticket 分离</text>
+    <rect x="565" y="530" width="480" height="190" rx="16" fill="#e8faf5" stroke="#c7d7e9"/>
+    <text x="587" y="566" class="h">OAuth2 Token 声明端口</text>
+    <text x="587" y="602" class="b">AccessTokenClaimsService 接口</text>
+    <text x="587" y="631" class="b">默认实现共享受控 Claims 算法</text>
+    <text x="587" y="660" class="b">JWT / opaque Customizer 适配</text>
+    <text x="587" y="689" class="b">OAuth2TokenConfiguration 组装</text>
+    <rect x="1075" y="530" width="480" height="190" rx="16" fill="#e8faf5" stroke="#c7d7e9"/>
+    <text x="1097" y="566" class="h">协议 JWT 基础设施</text>
+    <text x="1097" y="602" class="b">JwtConfiguration：仅 3 个 Bean</text>
+    <text x="1097" y="631" class="b">SigningKeyProvider → JKS 实现</text>
+    <text x="1097" y="660" class="b">不可变 JWKSource / JwtDecoder</text>
+    <text x="1097" y="689" class="b">保留 RS256 与框架校验</text>
+    <path d="M290,720 L290,750" stroke="#6987a5" stroke-width="2"/>
+    <path d="M805,720 L805,750" stroke="#6987a5" stroke-width="2"/>
+    <path d="M1315,720 L1315,750" stroke="#6987a5" stroke-width="2"/>
+    <rect x="45" y="750" width="490" height="160" rx="16" fill="#fff" stroke="#c7d7e9"/>
+    <text x="67" y="786" class="h">公共应用服务 / service</text>
+    <text x="67" y="822" class="b">account：ClientAccountDetailsService</text>
+    <text x="67" y="851" class="b">client：Client 配置查询</text>
+    <text x="67" y="880" class="b">identity：来源 / 匹配 / 绑定规则</text>
+    <rect x="565" y="750" width="990" height="160" rx="16" fill="#fff" stroke="#c7d7e9"/>
+    <text x="587" y="786" class="h">持久化与发布边界</text>
+    <text x="587" y="822" class="b">OAuth2PersistenceConfiguration：Client / Authorization / Consent</text>
+    <text x="587" y="851" class="b">Redis 原子更新、TTL、撤销与版本验证；MySQL 身份与绑定事务</text>
+    <text x="587" y="880" class="b">MFA、Replay、来源/租户隔离不随编排精简而削弱</text>
+    <rect x="45" y="945" width="1510" height="175" rx="16" fill="#fff0e8" stroke="#c7d7e9"/>
+    <text x="67" y="981" class="h">边界与兼容合同</text>
+    <text x="67" y="1017" class="b">登录 Provider 与协议 grant Provider
+        分别注册到所属安全链；来源固定到真实平台应用与能力。
+    </text>
+    <text x="67" y="1046" class="b">JwtConfiguration 不装配登录 Filter / Provider；协议配置消费已认证身份，协议持有 Token
+        签发与校验。
+    </text>
+    <text x="67" y="1075" class="b">协议支持授权码、机密客户端 Refresh、client_credentials 和 external_code；Scope 与
+        audience 约束资源访问。
+    </text>
+    <text x="67" y="1104" class="b">目录准入、账号绑定、Replay 与 MFA 发布检查共用受控身份；绑定完成不直接签发 Token。
+    </text>
+</svg>

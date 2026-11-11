@@ -26,6 +26,8 @@ import java.util.stream.Collectors;
  * @since 6.1.0
  */
 public final class OAuth2ResourcePolicy {
+    /** RegisteredClient中受信任的Scope到资源映射设置键。 */
+    public static final String PERMISSIONS_SETTING = "macula.resource-permissions";
     public static final String SYSTEM_RESOURCE = "urn:macula:system";
     public static final String PROFILE_RESOURCE = "urn:macula:iam:profile";
     public static final String SYSTEM_SCOPE = "system:access";

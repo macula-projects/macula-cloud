@@ -16,11 +16,11 @@
  */
 package dev.macula.cloud.iam.authentication.thirdparty;
 
+import java.util.Collection;
+
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
-
-import java.util.Collection;
 
 /**
  * 第三方授权码认证令牌；认证成功后不再保留授权码。
@@ -31,13 +31,13 @@ import java.util.Collection;
 public final class ThirdPartyAuthenticationToken extends AbstractAuthenticationToken {
     private final String providerType;
     private final Object principal;
-    private String code;
     private final ThirdPartyLoginContext loginContext;
     private final String redirectUri;
+    private String code;
 
     private ThirdPartyAuthenticationToken(String providerType, Object principal, String code,
-        ThirdPartyLoginContext loginContext, String redirectUri,
-        Collection<? extends GrantedAuthority> authorities) {
+            ThirdPartyLoginContext loginContext, String redirectUri,
+            Collection<? extends GrantedAuthority> authorities) {
         super(authorities);
         this.providerType = providerType;
         this.principal = principal;
@@ -48,17 +48,19 @@ public final class ThirdPartyAuthenticationToken extends AbstractAuthenticationT
     }
 
     public static ThirdPartyAuthenticationToken unauthenticated(String providerType, String code,
-        ThirdPartyLoginContext context, String redirectUri) {
+            ThirdPartyLoginContext context, String redirectUri) {
         return new ThirdPartyAuthenticationToken(providerType, providerType, code, context,
-            redirectUri, java.util.List.of());
+                redirectUri, java.util.List.of());
     }
 
-    /** 平台Code已核验后记录认证时间，供SS7签发OIDC auth_time；不代表完成其他MFA因子。 */
+    /**
+     * 平台Code已核验后记录认证时间，供SS7签发OIDC auth_time；不代表完成其他MFA因子。
+     */
     public static ThirdPartyAuthenticationToken authenticated(String providerType, UserDetails user,
-        ThirdPartyLoginContext context) {
+            ThirdPartyLoginContext context) {
         var authorities = new java.util.ArrayList<GrantedAuthority>(user.getAuthorities());
         authorities.add(org.springframework.security.core.authority.FactorGrantedAuthority.fromAuthority(
-            org.springframework.security.core.authority.FactorGrantedAuthority.AUTHORIZATION_CODE_AUTHORITY));
+                org.springframework.security.core.authority.FactorGrantedAuthority.AUTHORIZATION_CODE_AUTHORITY));
         return new ThirdPartyAuthenticationToken(providerType, user, null, context, null, authorities);
     }
 

@@ -53905,8 +53905,8 @@
 
                         if (reRoot && reRoot.direction === 'drillDown') {
                             target = parent === reRoot.rootNodeGroup // This is the content element of view root.
-                                // Only `content` will enter this branch, because
-                                // `background` and `nodeGroup` will not be deleted.
+                                                                     // Only `content` will enter this branch, because
+                                                                     // `background` and `nodeGroup` will not be deleted.
                                 ? {
                                     shape: {
                                         x: 0,

@@ -23,6 +23,7 @@ import lombok.EqualsAndHashCode;
 
 /**
  * 应用单协议配置；不保存Secret，不将JSON当作可执行多态类型。
+ *
  * @author Rain
  * @since 6.1.0
  */

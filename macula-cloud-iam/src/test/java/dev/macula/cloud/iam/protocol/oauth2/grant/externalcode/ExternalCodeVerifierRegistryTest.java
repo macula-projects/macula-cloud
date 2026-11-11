@@ -16,11 +16,11 @@
  */
 package dev.macula.cloud.iam.protocol.oauth2.grant.externalcode;
 
-import dev.macula.cloud.system.enums.ExternalCodeType;
-import org.junit.jupiter.api.Test;
-
 import java.util.List;
 import java.util.Set;
+
+import dev.macula.cloud.system.enums.ExternalCodeType;
+import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -42,7 +42,7 @@ class ExternalCodeVerifierRegistryTest {
 
         assertThat(registry.require(ExternalCodeType.WECOM_MINIAPP_CODE)).isSameAs(verifier);
         assertThatThrownBy(() -> registry.require(ExternalCodeType.FEISHU_APP_CODE))
-            .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(IllegalStateException.class);
     }
 
     @Test
@@ -53,16 +53,21 @@ class ExternalCodeVerifierRegistryTest {
         when(second.supportedTypes()).thenReturn(Set.of(ExternalCodeType.WECOM_MINIAPP_CODE));
 
         assertThatThrownBy(() -> new ExternalCodeVerifierRegistry(List.of(first, second)))
-            .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(IllegalStateException.class);
     }
-    /** 未实现专用合同的适配器不能默默忽略回调或PKCE扩展材料。 */
+
+    /**
+     * 未实现专用合同的适配器不能默默忽略回调或PKCE扩展材料。
+     */
     @Test
     void defaultAdapterRejectsUnexpectedProviderContext() {
         var verifier = mock(ExternalCodeVerifier.class, org.mockito.Mockito.CALLS_REAL_METHODS);
-        assertThatThrownBy(() -> verifier.verify(ExternalCodeType.WECOM_APP_CODE, 7L, "fixture-code", null, "https://app.example/callback"))
-            .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> verifier.verify(ExternalCodeType.WECOM_APP_CODE, 7L, "fixture-code", "p".repeat(43), null))
-            .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> verifier.verify(ExternalCodeType.WECOM_APP_CODE, 7L, "fixture-code", null,
+                "https://app.example/callback"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(
+                () -> verifier.verify(ExternalCodeType.WECOM_APP_CODE, 7L, "fixture-code", "p".repeat(43), null))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
 }

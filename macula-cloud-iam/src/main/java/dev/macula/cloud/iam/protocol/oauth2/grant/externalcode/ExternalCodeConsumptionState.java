@@ -18,6 +18,7 @@ package dev.macula.cloud.iam.protocol.oauth2.grant.externalcode;
 
 /**
  * 平台凭据的消费确定性；未知结果不能释放防重放占用。
+ *
  * @author Rain
  * @since 6.1.0
  */

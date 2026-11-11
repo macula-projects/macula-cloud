@@ -16,8 +16,14 @@
  */
 package dev.macula.cloud.iam.authentication.feishu;
 
-import dev.macula.cloud.iam.authentication.thirdparty.IdentityProviderConfigService.ProviderConfig;
+import java.io.IOException;
+import java.net.HttpURLConnection;
+import java.time.Duration;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeInfrastructureException;
+import dev.macula.cloud.iam.service.identity.IdentityProviderConfigService.ProviderConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
@@ -33,12 +39,6 @@ import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.util.UriComponentsBuilder;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
-
-import java.io.IOException;
-import java.net.HttpURLConnection;
-import java.time.Duration;
-import java.util.LinkedHashMap;
-import java.util.Map;
 
 /**
  * 使用飞书固定 HTTPS 端点交换授权码并读取员工编号。
@@ -69,42 +69,64 @@ public class FeishuClient {
         this.restClient = restClient;
     }
 
+    static SimpleClientHttpRequestFactory noRedirectRequestFactory() {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory() {
+            @Override
+            protected void prepareConnection(HttpURLConnection connection, String httpMethod) throws IOException {
+                super.prepareConnection(connection, httpMethod);
+                connection.setInstanceFollowRedirects(false);
+            }
+        };
+        factory.setConnectTimeout(Duration.ofSeconds(5));
+        factory.setReadTimeout(Duration.ofSeconds(8));
+        return factory;
+    }
+
     public String authorizationUri(ProviderConfig config, String state, String redirectUri, FeishuLoginMode mode) {
         if (mode != FeishuLoginMode.BROWSER) {
             throw failed();
         }
         return UriComponentsBuilder.fromUriString(AUTHORIZE)
-            .queryParam(OAuth2ParameterNames.CLIENT_ID, config.require(APP_ID_CONFIG))
-            .queryParam(OAuth2ParameterNames.REDIRECT_URI, redirectUri)
-            .queryParam(OAuth2ParameterNames.RESPONSE_TYPE, OAuth2AuthorizationResponseType.CODE.getValue())
-            .queryParam(OAuth2ParameterNames.STATE, state).build().encode().toUriString();
+                .queryParam(OAuth2ParameterNames.CLIENT_ID, config.require(APP_ID_CONFIG))
+                .queryParam(OAuth2ParameterNames.REDIRECT_URI, redirectUri)
+                .queryParam(OAuth2ParameterNames.RESPONSE_TYPE, OAuth2AuthorizationResponseType.CODE.getValue())
+                .queryParam(OAuth2ParameterNames.STATE, state).build().encode().toUriString();
     }
 
     public dev.macula.cloud.iam.authentication.thirdparty.VerifiedExternalIdentity fetchIdentity(
-        ProviderConfig config, String code, String redirectUri, FeishuLoginMode mode, String capability) {
+            ProviderConfig config, String code, String redirectUri, FeishuLoginMode mode, String capability) {
         return fetchIdentity(config, code, redirectUri, mode, capability, null);
     }
 
-    /** AppLink仅使用本次授权的受控回调及专用证明；不等于IAM授权码PKCE。 */
+    /**
+     * AppLink仅使用本次授权的受控回调及专用证明；不等于IAM授权码PKCE。
+     */
     public dev.macula.cloud.iam.authentication.thirdparty.VerifiedExternalIdentity fetchIdentity(
-        ProviderConfig config, String code, String redirectUri, FeishuLoginMode mode, String capability,
-        String providerCodeVerifier) {
+            ProviderConfig config, String code, String redirectUri, FeishuLoginMode mode, String capability,
+            String providerCodeVerifier) {
         if (providerCodeVerifier != null && (!config.flow().providerPkce()
-            || !providerCodeVerifier.matches("[A-Za-z0-9._~-]{43,128}"))) { throw failed(); }
+                || !providerCodeVerifier.matches("[A-Za-z0-9._~-]{43,128}"))) {
+            throw failed();
+        }
         if (mode == FeishuLoginMode.APP && (!config.flow().providerPkce() || providerCodeVerifier == null
-            || redirectUri == null || redirectUri.isBlank())) { throw failed(); }
+                || redirectUri == null || redirectUri.isBlank())) {
+            throw failed();
+        }
         String stage = TOKEN_STAGE;
         boolean codeConsumed = false;
         try {
             String accessToken;
             if (mode == FeishuLoginMode.APP) {
-                accessToken = oauthAccessToken(config, code, config.flow().providerPkce() ? redirectUri : null, providerCodeVerifier);
+                accessToken = oauthAccessToken(config, code, config.flow().providerPkce() ? redirectUri : null,
+                        providerCodeVerifier);
             } else if (mode == FeishuLoginMode.BROWSER) {
                 accessToken = oauthAccessToken(config, code, redirectUri, null);
             } else if (mode == FeishuLoginMode.WEBVIEW) {
                 // requestAccess链按官方v1→v2→v3迁移说明固定换码，不失败后尝试旧接口。
                 if (config.flow() != dev.macula.cloud.system.enums.IdentitySourceFlow.FEISHU_WEBVIEW_V3
-                    || config.sourceType() != dev.macula.cloud.system.enums.IdentitySourceType.FEISHU_WEBVIEW) { throw failed(); }
+                        || config.sourceType() != dev.macula.cloud.system.enums.IdentitySourceType.FEISHU_WEBVIEW) {
+                    throw failed();
+                }
                 accessToken = oauthAccessToken(config, code, null, null);
             } else {
                 throw failed();
@@ -112,7 +134,7 @@ public class FeishuClient {
             codeConsumed = true;
             stage = USER_STAGE;
             String userBody = restClient.get().uri(USER)
-                .headers(headers -> headers.setBearerAuth(accessToken)).retrieve().body(String.class);
+                    .headers(headers -> headers.setBearerAuth(accessToken)).retrieve().body(String.class);
             JsonNode user = successfulData(stage, userBody);
             String openId = user.path("open_id").asText();
             if (openId.isBlank()) {
@@ -120,41 +142,50 @@ public class FeishuClient {
                 throw failed();
             }
             String tenantKey = user.path("tenant_key").asText();
-            if (config.organizationId() != null && !config.organizationId().equals(tenantKey)) { throw failed(); }
+            if (config.organizationId() != null && !config.organizationId().equals(tenantKey)) {
+                throw failed();
+            }
             Map<String, String> attributes = new LinkedHashMap<>();
-            if (!tenantKey.isBlank()) { attributes.put("tenant_key", tenantKey); }
+            if (!tenantKey.isBlank()) {
+                attributes.put("tenant_key", tenantKey);
+            }
             String employeeNo = user.path(EMPLOYEE_NO).asText();
-            if (!employeeNo.isBlank()) { attributes.put(EMPLOYEE_NO, employeeNo); }
+            if (!employeeNo.isBlank()) {
+                attributes.put(EMPLOYEE_NO, employeeNo);
+            }
             return dev.macula.cloud.iam.authentication.thirdparty.VerifiedExternalIdentity.of(config, capability,
-                dev.macula.cloud.iam.authentication.thirdparty.VerifiedExternalIdentity.OPEN_ID, openId,
-                attributes);
+                    dev.macula.cloud.iam.authentication.thirdparty.VerifiedExternalIdentity.OPEN_ID, openId,
+                    attributes);
         } catch (AuthenticationServiceException ex) {
             throw ex;
         } catch (RestClientResponseException ex) {
             LOGGER.warn("第三方接口 HTTP 失败 provider=FEISHU stage={} status={}", stage,
-                ex.getStatusCode().value());
+                    ex.getStatusCode().value());
             if (ex.getStatusCode().is5xxServerError()) {
                 throw new ExternalCodeInfrastructureException(codeConsumed
-                    ? dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeConsumptionState.CONSUMED
-                    : dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeConsumptionState.UNKNOWN);
+                        ? dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeConsumptionState.CONSUMED
+                        : dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeConsumptionState.UNKNOWN);
             }
             throw failed();
         } catch (RestClientException ex) {
             LOGGER.warn("第三方接口调用失败 provider=FEISHU stage={} failure=transport_error exception={}",
-                stage, ex.getClass().getSimpleName());
+                    stage, ex.getClass().getSimpleName());
             throw new ExternalCodeInfrastructureException(codeConsumed
                     ? dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeConsumptionState.CONSUMED
                     : dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeConsumptionState.UNKNOWN);
         } catch (RuntimeException ex) {
             LOGGER.error("第三方接口响应处理失败 provider=FEISHU stage={} "
-                    + "failure=invalid_response exception={}",
-                stage, ex.getClass().getSimpleName());
+                            + "failure=invalid_response exception={}",
+                    stage, ex.getClass().getSimpleName());
             throw failed();
         }
     }
 
-    /** 使用固定v3端点，只有明确flow才把平台Verifier提交到该平台校验。 */
-    private String oauthAccessToken(ProviderConfig config, String code, String redirectUri, String providerCodeVerifier) {
+    /**
+     * 使用固定v3端点，只有明确flow才把平台Verifier提交到该平台校验。
+     */
+    private String oauthAccessToken(ProviderConfig config, String code, String redirectUri,
+            String providerCodeVerifier) {
         Map<String, String> request = new LinkedHashMap<>();
         request.put(OAuth2ParameterNames.GRANT_TYPE, AuthorizationGrantType.AUTHORIZATION_CODE.getValue());
         request.put(OAuth2ParameterNames.CLIENT_ID, config.require(APP_ID_CONFIG));
@@ -164,10 +195,11 @@ public class FeishuClient {
             request.put(OAuth2ParameterNames.REDIRECT_URI, redirectUri);
         }
         if (providerCodeVerifier != null) {
-            request.put(org.springframework.security.oauth2.core.endpoint.PkceParameterNames.CODE_VERIFIER, providerCodeVerifier);
+            request.put(org.springframework.security.oauth2.core.endpoint.PkceParameterNames.CODE_VERIFIER,
+                    providerCodeVerifier);
         }
         String body = restClient.post().uri(OAUTH_TOKEN).contentType(MediaType.APPLICATION_JSON)
-            .body(request).retrieve().body(String.class);
+                .body(request).retrieve().body(String.class);
         JsonNode response = json.readTree(body);
         requireProviderSuccess(TOKEN_STAGE, response);
         return requireToken(TOKEN_STAGE, response, OAuth2ParameterNames.ACCESS_TOKEN);
@@ -197,23 +229,10 @@ public class FeishuClient {
 
     private void logProviderError(String stage, JsonNode response) {
         LOGGER.warn("第三方接口返回错误 provider=FEISHU stage={} failure=provider_error errcode={}",
-            stage, response.path(ERROR_CODE).asInt());
+                stage, response.path(ERROR_CODE).asInt());
     }
 
     private AuthenticationServiceException failed() {
         return new AuthenticationServiceException("飞书身份校验失败");
-    }
-
-    static SimpleClientHttpRequestFactory noRedirectRequestFactory() {
-        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory() {
-            @Override
-            protected void prepareConnection(HttpURLConnection connection, String httpMethod) throws IOException {
-                super.prepareConnection(connection, httpMethod);
-                connection.setInstanceFollowRedirects(false);
-            }
-        };
-        factory.setConnectTimeout(Duration.ofSeconds(5));
-        factory.setReadTimeout(Duration.ofSeconds(8));
-        return factory;
     }
 }
