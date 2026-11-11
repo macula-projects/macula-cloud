@@ -16,24 +16,29 @@
  */
 package dev.macula.cloud.iam.authentication.mfa;
 
-import dev.macula.cloud.iam.service.userdetails.SysUserDetails;
 import java.util.concurrent.atomic.AtomicReference;
+
+import dev.macula.cloud.iam.service.userdetails.SysUserDetails;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * 会话完成前的检查不得把请求自报client_id当可信应用，也不得预先建立Session。
+ *
  * @author Rain
  * @since 6.1.0
  */
 class MfaSessionAuthenticationStrategyTest {
-    /** 裸门户没有客户端上下文时保留未知，实际密码方式仍可识别。 */
+    /**
+     * 裸门户没有客户端上下文时保留未知，实际密码方式仍可识别。
+     */
     @Test
     void ignoresCallerClientIdAndDoesNotCreateSession() {
         var capture = new AtomicReference<AuthenticationCompletionContext>();
@@ -48,7 +53,10 @@ class MfaSessionAuthenticationStrategyTest {
         assertEquals(AuthenticationMethod.PASSWORD, capture.get().method());
         assertNull(request.getSession(false));
     }
-    /** 策略拒绝不能自己留下认证上下文或新会话。 */
+
+    /**
+     * 策略拒绝不能自己留下认证上下文或新会话。
+     */
     @Test
     void denialPrecedesAnySessionMutation() {
         var strategy = new MfaSessionAuthenticationStrategy(new MfaCompletionService(context -> {
@@ -60,9 +68,11 @@ class MfaSessionAuthenticationStrategyTest {
         SecurityContextHolder.clearContext();
         try {
             assertThrows(AdditionalAuthenticationRequiredException.class, () -> strategy.onAuthentication(
-                authentication, request, new MockHttpServletResponse()));
+                    authentication, request, new MockHttpServletResponse()));
             assertNull(request.getSession(false));
             assertNull(SecurityContextHolder.getContext().getAuthentication());
-        } finally { SecurityContextHolder.clearContext(); }
+        } finally {
+            SecurityContextHolder.clearContext();
+        }
     }
 }

@@ -17,16 +17,16 @@
 
 package dev.macula.cloud.iam.protocol.oauth2.endpoint;
 
-import cn.hutool.core.util.StrUtil;
-import org.springframework.security.core.AuthenticationException;
-import org.springframework.security.oauth2.core.endpoint.OAuth2ParameterNames;
-import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
+import java.io.IOException;
 
+import cn.hutool.core.util.StrUtil;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.io.IOException;
+import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.oauth2.core.endpoint.OAuth2ParameterNames;
+import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 
 /**
  * {@code OAuth2AuthenticationExceptionEntryPoint} is
@@ -37,7 +37,7 @@ import java.io.IOException;
 public class OAuth2AuthenticationExceptionEntryPoint extends LoginUrlAuthenticationEntryPoint {
     /**
      * @param loginFormUrl URL where the login page can be found. Should either be relative to the web-app context path
-     *                     (include a leading {@code /}) or an absolute URL.
+     * (include a leading {@code /}) or an absolute URL.
      */
     public OAuth2AuthenticationExceptionEntryPoint(String loginFormUrl) {
         super(loginFormUrl);
@@ -45,7 +45,7 @@ public class OAuth2AuthenticationExceptionEntryPoint extends LoginUrlAuthenticat
 
     @Override
     public void commence(HttpServletRequest request, HttpServletResponse response,
-        AuthenticationException authException) throws IOException, ServletException {
+            AuthenticationException authException) throws IOException, ServletException {
         // 如果存在client_id参数，则添加到COOKIE
         String clientId = request.getParameter(OAuth2ParameterNames.CLIENT_ID);
         if (StrUtil.isNotBlank(clientId)) {

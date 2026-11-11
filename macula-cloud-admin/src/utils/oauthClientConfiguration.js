@@ -1,5 +1,5 @@
 import {externalCodeAllowed,browserCapabilities,singleSourceApplication} from '@/utils/identitySourceCompatibility';
-import {projectProtocol,anyProtocolUses,protocolDefaults} from './applicationProtocolRegistry';
+import {projectProtocol,anyProtocolUses,protocolDefaults,RETIRED_GRANTS} from './applicationProtocolRegistry';
 import {
   AUTHORIZATION_CODE_GRANT,
   EXTERNAL_CODE_GRANT,
@@ -33,7 +33,7 @@ export const AUTHORIZATION_GRANTS = Object.freeze([
     value: AUTHORIZATION_CODE_GRANT,
     label: "授权码",
     description:
-      "跳转 IAM 登录页后换取 Token；登录页短信认证无需额外选择 sms。",
+      "跳转 IAM 登录页后换取 Token；登录页可使用已启用的密码或短信认证。",
   },
   {
     value: "refresh_token",
@@ -44,16 +44,6 @@ export const AUTHORIZATION_GRANTS = Object.freeze([
     value: "client_credentials",
     label: "服务凭据",
     description: "服务自身身份，不代表用户，也不签发刷新令牌。",
-  },
-  {
-    value: "sms",
-    label: "短信验证码",
-    description: "业务前端直接使用手机号和验证码换 Token。",
-  },
-  {
-    value: "email",
-    label: "邮箱验证码",
-    description: "业务前端直接使用邮箱和验证码换 Token。",
   },
   {
     value: EXTERNAL_CODE_GRANT,
@@ -79,20 +69,19 @@ export const usesPrivateKey = (client) =>
   client.settings ? anyProtocolUses(client, settings => csvValues(settings.clientAuthenticationMethods).includes("private_key_jwt")) : csvValues(client.clientAuthenticationMethods).includes("private_key_jwt");
 
 export function grantIssue(client, grant) {
+  if (RETIRED_GRANTS.includes(grant)) return "该授权方式已退役，请显式移除并整改接入";
   const auth = csvValues(client.clientAuthenticationMethods);
   const type = client.applicationType;
   if (type === 'SERVICE' && grant !== 'client_credentials') return '后端服务仅允许服务凭据';
   if (grant === 'client_credentials' && type && type !== 'SERVICE') return '服务凭据仅用于后端服务';
   if (grant === EXTERNAL_CODE_GRANT && ['WEB_SERVER','SPA'].includes(type)) return '网页应用仅支持第三方网页授权';
   if (type === 'IN_APP' && ![AUTHORIZATION_CODE_GRANT,EXTERNAL_CODE_GRANT].includes(grant)) return '端内应用只允许固定平台登录';
-  if (['client_credentials','sms','email'].includes(grant) && !client.enabledProtocols?.includes('OAUTH2_1'))
+  if (grant === 'client_credentials' && !client.enabledProtocols?.includes('OAUTH2_1'))
     return '此直接Token授权需要启用OAuth2.1';
   if (auth.includes("none") && grant === "client_credentials")
     return "公共客户端不能使用服务凭据授权";
   if (auth.includes("none") && grant === "refresh_token")
     return "当前公共客户端流程不签发刷新令牌，请通过SSO重新授权";
-  if (!auth.includes("none") && ["sms", "email"].includes(grant))
-    return "短信或邮箱扩展授权只允许公共客户端";
   if (grant === EXTERNAL_CODE_GRANT) {
     if (!auth.includes("none")) return "外部凭证授权只允许公共客户端（none）";
     if (!client.externalCodeTypes?.length)
@@ -189,7 +178,7 @@ export function configurationIssues(client) {
     const grant = AUTHORIZATION_GRANTS.find((g) => g.value === value);
     const reason = grant
       ? grantIssue(client, value)
-      : "未知授权方式，请显式移除后保存";
+      : RETIRED_GRANTS.includes(value) ? "授权方式已退役，请显式移除后保存" : "未知授权方式，请显式移除后保存";
     if (reason) issues.push(`${grant?.label || value}：${reason}`);
   }
   if (client.externalCodeTypes?.length && !grants.includes(EXTERNAL_CODE_GRANT))
@@ -246,6 +235,8 @@ export function requestExample(
 ) {
   if (client.settings) client=projectProtocol(client)
   const selected = csvValues(client.authorizationGrantTypes);
+  if (selected.some(value => RETIRED_GRANTS.includes(value))) return "存在已退役授权，请先显式整改配置";
+  if (!AUTHORIZATION_GRANTS.some(value => value.value === grant)) return "授权方式不受支持";
   if (!selected.includes(grant)) return "请先选择授权方式";
   const auth = authMethod || csvValues(client.clientAuthenticationMethods)[0];
   const id = client.clientId || "<CLIENT_ID>";
@@ -276,12 +267,6 @@ export function requestExample(
     params.push(["code_verifier", "<SAVED_CODE_VERIFIER>"]);
   if (grant === "refresh_token")
     params.push(["refresh_token", "<REFRESH_TOKEN>"]);
-  if (grant === "password")
-    params.push(["username", "<USERNAME>"], ["password", "<PASSWORD>"]);
-  if (grant === "sms")
-    params.push(["phone", "<PHONE>"], ["code", "<SMS_CODE>"]);
-  if (grant === "email")
-    params.push(["email", "<EMAIL>"], ["code", "<EMAIL_CODE>"]);
   if (grant === EXTERNAL_CODE_GRANT) {
     if (!externalCodeAllowed(client,codeType,source) || !client.externalCodeTypes?.includes(codeType) || !source?.available || source.id == null
       || client.externalProviderBindings?.[codeType] == null || String(client.externalProviderBindings?.[codeType]) !== String(source.id)
@@ -418,7 +403,7 @@ export function applicationTemplate(
     externalCodeTypes: [],
     externalProviderBindings: {},
     directLoginProviderType: "",
-    hostedLoginMethods: service || inApp ? [] : mini ? null : ["PASSWORD", "SMS"],
+    hostedLoginMethods: service || inApp ? [] : mini ? null : ["PASSWORD", "SMS", "EMAIL"],
     requireProofKey: true,
     reuseRefreshTokens: false,
     jwkSetUrl: "",

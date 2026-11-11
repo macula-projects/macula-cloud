@@ -1,0 +1,50 @@
+{
+  "@class": "java.util.HashMap",
+  "java.security.Principal": {
+    "@class": "dev.macula.cloud.iam.authentication.email.EmailAuthenticationToken",
+    "authenticated": true,
+    "authorities": [
+      "java.util.Collections$UnmodifiableRandomAccessList",
+      [
+        {
+          "@class": "org.springframework.security.core.authority.SimpleGrantedAuthority",
+          "authority": "USER"
+        }
+      ]
+    ],
+    "clientId": null,
+    "credentials": null,
+    "details": {
+      "@class": "org.springframework.security.web.authentication.WebAuthenticationDetails",
+      "remoteAddress": "127.0.0.1",
+      "sessionId": "fixture"
+    },
+    "name": "fixture-user",
+    "principal": {
+      "@class": "dev.macula.cloud.iam.service.userdetails.SysUserDetails",
+      "accountNonExpired": true,
+      "accountNonLocked": true,
+      "authorities": [
+        "java.util.ArrayList",
+        [
+          {
+            "@class": "org.springframework.security.core.authority.SimpleGrantedAuthority",
+            "authority": "USER"
+          }
+        ]
+      ],
+      "credentialsNonExpired": true,
+      "dataScope": 0,
+      "deptId": null,
+      "enabled": true,
+      "mobile": null,
+      "nickname": null,
+      "openId": null,
+      "password": null,
+      "tenantId": 1,
+      "unionId": null,
+      "userId": 42,
+      "username": "fixture-user"
+    }
+  }
+}

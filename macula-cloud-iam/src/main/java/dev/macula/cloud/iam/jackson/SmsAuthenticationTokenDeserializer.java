@@ -17,6 +17,8 @@
 
 package dev.macula.cloud.iam.jackson;
 
+import java.util.List;
+
 import dev.macula.cloud.iam.authentication.sms.SmsAuthenticationToken;
 import org.springframework.security.core.GrantedAuthority;
 import tools.jackson.core.JsonParser;
@@ -25,8 +27,6 @@ import tools.jackson.databind.DeserializationContext;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ValueDeserializer;
 import tools.jackson.databind.node.MissingNode;
-
-import java.util.List;
 
 /**
  * IAM 认证对象的 Jackson 3 序列化适配。
@@ -37,8 +37,8 @@ import java.util.List;
 class SmsAuthenticationTokenDeserializer extends ValueDeserializer<SmsAuthenticationToken> {
 
     private static final TypeReference<List<GrantedAuthority>> GRANTED_AUTHORITY_LIST =
-        new TypeReference<List<GrantedAuthority>>() {
-        };
+            new TypeReference<List<GrantedAuthority>>() {
+            };
 
     @Override
     public SmsAuthenticationToken deserialize(JsonParser jp, DeserializationContext ctxt) {
@@ -49,9 +49,9 @@ class SmsAuthenticationTokenDeserializer extends ValueDeserializer<SmsAuthentica
         JsonNode credentialsNode = readJsonNode(jsonNode, "code");
         String credentials = getCode(credentialsNode);
         List<GrantedAuthority> authorities = ctxt.readTreeAsValue(readJsonNode(jsonNode, "authorities"),
-            ctxt.getTypeFactory().constructType(GRANTED_AUTHORITY_LIST));
+                ctxt.getTypeFactory().constructType(GRANTED_AUTHORITY_LIST));
         SmsAuthenticationToken token = (!authenticated) ? new SmsAuthenticationToken(principal, credentials)
-            : new SmsAuthenticationToken(principal, credentials, authorities);
+                : new SmsAuthenticationToken(principal, credentials, authorities);
         JsonNode detailsNode = readJsonNode(jsonNode, "details");
         if (detailsNode.isNull() || detailsNode.isMissingNode()) {
             token.setDetails(null);

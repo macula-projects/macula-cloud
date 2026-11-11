@@ -16,12 +16,13 @@
  */
 package dev.macula.cloud.iam.authentication.wecom;
 
+import java.util.Map;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 
-import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * 验证企业微信环境识别仅用于选择入口，不作为回调凭据。
@@ -36,9 +37,9 @@ class WecomLoginModeTest {
         browser.addHeader("User-Agent", "wxwork/4.0");
         assertEquals(WecomLoginMode.BROWSER, WecomLoginMode.from(browser));
         assertEquals(WecomLoginMode.WEBVIEW,
-            WecomLoginMode.from(new MockHttpServletRequest("GET", "/login/wecom/webview")));
+                WecomLoginMode.from(new MockHttpServletRequest("GET", "/login/wecom/webview")));
         assertEquals(WecomLoginMode.UNKNOWN,
-            WecomLoginMode.from(new MockHttpServletRequest("GET", "/login/wecom")));
+                WecomLoginMode.from(new MockHttpServletRequest("GET", "/login/wecom")));
         MockHttpServletRequest internal = new MockHttpServletRequest("GET", "/login/wecom");
         internal.addHeader("User-Agent", "Mozilla/5.0 wxwork/4.0");
         assertEquals(WecomLoginMode.WEBVIEW, WecomLoginMode.from(internal));
@@ -47,8 +48,9 @@ class WecomLoginModeTest {
     @Test
     void buildsCorpAppAndWebviewUrlsWithTheSameCallback() {
         WecomClient client = new WecomClient();
-        var config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(dev.macula.cloud.system.enums.IdentitySourceType.WECOM_WEB,
-            "WECOM", "corp", "secret", Map.of("corpId", "corp", "agentId", "agent"));
+        var config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(
+                dev.macula.cloud.system.enums.IdentitySourceType.WECOM_WEB,
+                "WECOM", "corp", "secret", Map.of("corpId", "corp", "agentId", "agent"));
         String callback = "https://iam.example/login/wecom";
         String browser = client.authorizationUri(config, "state-value", callback, WecomLoginMode.BROWSER);
         assertTrue(browser.startsWith("https://login.work.weixin.qq.com/wwlogin/sso/login?"));

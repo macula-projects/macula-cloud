@@ -60,7 +60,8 @@
                 CAST(REGEXP_REPLACE(username, #{trimPattern}, '') AS BINARY) = CAST(#{value} AS BINARY)
             </when>
             <when test="target == 'mobile'">
-                CAST(REGEXP_REPLACE(REGEXP_REPLACE(mobile, #{trimPattern}, ''), #{mobilePattern}, '') AS BINARY) = CAST(#{value} AS BINARY)
+                CAST(REGEXP_REPLACE(REGEXP_REPLACE(mobile, #{trimPattern}, ''), #{mobilePattern}, '') AS BINARY) =
+                CAST(#{value} AS BINARY)
             </when>
             <when test="target == 'email'">
                 CAST(LOWER(REGEXP_REPLACE(email, #{trimPattern}, '')) AS BINARY) = CAST(#{value} AS BINARY)

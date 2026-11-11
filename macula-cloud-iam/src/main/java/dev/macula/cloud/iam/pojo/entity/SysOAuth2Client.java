@@ -17,6 +17,9 @@
 
 package dev.macula.cloud.iam.pojo.entity;
 
+import java.time.Duration;
+import java.time.Instant;
+
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import dev.macula.boot.starter.mp.entity.BaseEntity;
@@ -24,9 +27,6 @@ import dev.macula.boot.starter.mp.handler.DurationTypeHandler;
 import dev.macula.cloud.iam.enums.UserTypeEnum;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
-
-import java.time.Duration;
-import java.time.Instant;
 
 /**
  * {@code SysOAuth2Client} Oauth2 Client DTO
@@ -43,21 +43,32 @@ public class SysOAuth2Client extends BaseEntity {
     private Long authorizationVersion;
     private String resourcePermissions;
 
-    /** 客户端ID */
+    /**
+     * 客户端ID
+     */
     @com.baomidou.mybatisplus.annotation.TableField(exist = false)
-    private java.util.List<dev.macula.cloud.system.protocol.ApplicationProtocolConfiguration> protocolConfigurations = java.util.List.of();
+    private java.util.List<dev.macula.cloud.system.protocol.ApplicationProtocolConfiguration> protocolConfigurations
+            = java.util.List.of();
 
     @com.baomidou.mybatisplus.annotation.TableField(exist = false)
     private java.util.Map<String, Long> externalProviderBindings = java.util.Map.of();
 
     private String clientId;
-    /** 创建时间 */
+    /**
+     * 创建时间
+     */
     private Instant clientIdIssuedAt;
-    /** 客户端密钥 */
+    /**
+     * 客户端密钥
+     */
     private String clientSecret;
-    /** 客户端密钥过期时间 */
+    /**
+     * 客户端密钥过期时间
+     */
     private Instant clientSecretExpiresAt;
-    /** 客户端名称 */
+    /**
+     * 客户端名称
+     */
     private String clientName;
     private String protocolMode;
     private String enabledProtocols;
@@ -66,56 +77,102 @@ public class SysOAuth2Client extends BaseEntity {
     private String browserProviderBindings;
     private String browserCapabilityBindings;
 
-    /** 应用架构类型，历史记录不推断。 */
+    /**
+     * 应用架构类型，历史记录不推断。
+     */
     private String applicationType;
-    /** 小程序平台。 */
+    /**
+     * 小程序平台。
+     */
     private String miniappPlatform;
-    /** null继承全局，空字符串关闭全部本地方式。 */
+    /**
+     * null继承全局，空字符串关闭全部本地方式。
+     */
     private String hostedLoginMethods;
 
-    /** 客户端认证方式，逗号分隔 */
+    /**
+     * 客户端认证方式，逗号分隔
+     */
     private String clientAuthenticationMethods;
-    /** 授权方式，逗号分隔 */
+    /**
+     * 授权方式，逗号分隔
+     */
     private String authorizationGrantTypes;
-    /** 允许的重定向URL，逗号分隔 */
+    /**
+     * 允许的重定向URL，逗号分隔
+     */
     private String redirectUris;
-    /** 授权范围，逗号分隔 */
+    /**
+     * 授权范围，逗号分隔
+     */
     private String scopes;
-    /** 允许的外部凭证类型，逗号分隔 */
+    /**
+     * 允许的外部凭证类型，逗号分隔
+     */
     private String externalCodeTypes;
-    /** 协议验证码端点允许的精确 Origin，逗号分隔 */
+    /**
+     * 协议验证码端点允许的精确 Origin，逗号分隔
+     */
     private String allowedOrigins;
-    /** 允许的浏览器第三方登录提供商，逗号分隔 */
+    /**
+     * 允许的浏览器第三方登录提供商，逗号分隔
+     */
     private String browserLoginProviderTypes;
-    /** 进入登录页时直接发起的第三方登录提供商 */
+    /**
+     * 进入登录页时直接发起的第三方登录提供商
+     */
     private String directLoginProviderType;
 
-    /** 是否需要proofKe */
+    /**
+     * 是否需要proofKe
+     */
     private boolean requireProofKey;
-    /** 是否授权确认 */
+    /**
+     * 是否授权确认
+     */
     private boolean requireAuthorizationConsent;
-    /** JWK端点(授权方式为PRIVATE_KEY_JWT时请输入客户端提供的jwkSetUrl) */
+    /**
+     * JWK端点(授权方式为PRIVATE_KEY_JWT时请输入客户端提供的jwkSetUrl)
+     */
     private String jwkSetUrl;
-    /** 签名算法(认证方式为CLIENT_SECRET_JWT或PRIVATE_KEY_JWT时需要指定签名算法) */
+    /**
+     * 签名算法(认证方式为CLIENT_SECRET_JWT或PRIVATE_KEY_JWT时需要指定签名算法)
+     */
     private String signingAlgorithm;
 
-    /** CODE的生存时间，单位秒 */
+    /**
+     * CODE的生存时间，单位秒
+     */
     @TableField(typeHandler = DurationTypeHandler.class)
     private Duration authorizationCodeTimeToLive;
-    /** 访问令牌生存时间，单位秒 */
+    /**
+     * 访问令牌生存时间，单位秒
+     */
     @TableField(typeHandler = DurationTypeHandler.class)
     private Duration accessTokenTimeToLive;
-    /** 令牌格式 */
+    /**
+     * 令牌格式
+     */
     private String tokenFormat;
-    /** 复用刷新令牌 */
+    /**
+     * 复用刷新令牌
+     */
     private boolean reuseRefreshTokens = true;
-    /** 刷新令牌生存时间，单位秒 */
+    /**
+     * 刷新令牌生存时间，单位秒
+     */
     @TableField(typeHandler = DurationTypeHandler.class)
     private Duration refreshTokenTimeToLive;
-    /** IDToken 签名算法 */
+    /**
+     * IDToken 签名算法
+     */
     private String idTokenSignatureAlgorithm;
-    /** 用户类型 */
+    /**
+     * 用户类型
+     */
     private UserTypeEnum userType;
-    /** 租户ID */
+    /**
+     * 租户ID
+     */
     private Long tenantId;
 }

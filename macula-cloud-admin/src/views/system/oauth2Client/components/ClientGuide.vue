@@ -5,6 +5,7 @@
     <p v-if="!client.protocol" class="hint">尚未选择接入协议，请先在协议配置中完成设置。</p>
     <template v-else>
     <p>接入协议：{{client.protocol==='OIDC'?'OIDC':'OAuth 2.1'}}</p>
+    <el-alert v-if="hasRetiredGrant" type="error" :closable="false" title="配置包含已退役授权，请先显式整改；接入示例暂停复制。" />
     <p v-if="grant===EXTERNAL_CODE_GRANT" class="hint">{{ $t('identitySourceIntegration.codeTypeHelp') }}</p>
     <p v-if="client.applicationType === 'IN_APP'" class="hint">端内应用只使用固定平台能力。企业微信、微信公众号在对应容器直接进入平台授权；飞书、钉钉由业务前端JSAPI取Code后换取Token。不提供IAM标准登录页。</p>
     <p v-if="['NATIVE','MINIAPP'].includes(client.applicationType)" class="hint">第三方直接登录只使用已关联的唯一来源。另开IAM登录页时仅提供内置账号密码、短信登录。</p>
@@ -49,7 +50,7 @@
       <el-checkbox v-if="exampleSecret" v-model="reveal"
         >在示例中显示密钥内容</el-checkbox
       >
-      <el-button :disabled="grant === EXTERNAL_CODE_GRANT && !selectedSource" @click="$emit('copy', example(true))">复制请求内容</el-button>
+      <el-button :disabled="hasRetiredGrant || (grant === EXTERNAL_CODE_GRANT && !selectedSource)" @click="$emit('copy', example(true))">复制请求内容</el-button>
       <p v-if="exampleSecret" class="hint">
         复制内容包含本次输入的密钥，请妥善保管。离开此分区将清除临时值。
       </p>
@@ -74,6 +75,7 @@
   </section>
 </template>
 <script setup>
+import { RETIRED_GRANTS } from '@/utils/applicationProtocolRegistry';
 import {externalCodeAllowed} from "@/utils/identitySourceCompatibility";
 import { computed, ref, watch, onBeforeUnmount, onDeactivated } from "vue";
 import {EXTERNAL_CODE_GRANT} from '@/api/model/system/oauth2Client';
@@ -102,7 +104,8 @@ watch(availableProtocols,values=>{if(!values.includes(selectedProtocol.value))se
 const view=computed(()=>projectProtocol(props.client,selectedProtocol.value));
 const selectedMetadata=computed(()=>props.metadata?.[selectedProtocol.value]);
 const management=computed(()=>managementProtocol(props.client));
-const grants = computed(() => csvValues(view.value.authorizationGrantTypes));
+const hasRetiredGrant = computed(() => csvValues(view.value.authorizationGrantTypes).some(value => RETIRED_GRANTS.includes(value)));
+const grants = computed(() => csvValues(view.value.authorizationGrantTypes).filter(value => !RETIRED_GRANTS.includes(value)));
 const codeType = ref('');
 const codeChoices = computed(() => (props.client.externalCodeTypes || []).flatMap(code => {
   const id = props.client.externalProviderBindings?.[code];

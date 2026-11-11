@@ -24,35 +24,10 @@
       <el-tag :type="selected.includes(EXTERNAL_CODE_GRANT) ? 'success' : 'info'">{{ selected.includes(EXTERNAL_CODE_GRANT) ? '已启用' : '尚未关联SDK身份源' }}</el-tag>
       <el-button link type="primary" @click="$emit('manage-sources')">添加或管理身份源</el-button>
     </div>
-    <el-collapse v-if="protocol === 'OAUTH2_1' && !['SERVICE','IN_APP'].includes(application.applicationType)"
-      ><el-collapse-item title="Macula 扩展授权" name="extensions"
-        ><p class="hint">
-          用于直接请求
-          Token，与托管登录页开关独立，不属于标准OAuth2.1授权方式。
-        </p>
-        <div class="grants">
-          <el-tooltip
-            v-for="grant in extensionGrants"
-            :key="grant.value"
-            :content="reason(grant.value) || grant.description"
-            :enterable="false"
-            ><el-checkbox
-              :model-value="selected.includes(grant.value)"
-              :disabled="disabled(grant.value)"
-              :data-grant="grant.value"
-              @change="(checked) => toggle(grant.value, checked)"
-              >{{ grant.label }} <code>{{ grant.value }}</code></el-checkbox
-            ></el-tooltip
-          >
-        </div>
-        <p v-for="unknown in unknownGrants" :key="unknown">
-          未知授权：{{ unknown }}
-          <el-button link type="danger" @click="toggle(unknown, false)"
-            >移除</el-button
-          >
-        </p>
-      </el-collapse-item></el-collapse
-    >
+    <p v-for="unknown in unknownGrants" :key="unknown" class="retired-grant">
+      已退役或未知授权：{{ unknown }}。请确认接入整改后显式移除。
+      <el-button link type="danger" @click="toggle(unknown, false)">移除</el-button>
+    </p>
     <el-alert
       v-for="issue in issues"
       :key="issue"
@@ -145,7 +120,6 @@ const settings=computed(()=>ensureProtocol(props.application,props.protocol).set
 const client=computed(()=>projectProtocol(props.application,props.protocol))
 const algorithms=['RS256','RS384','RS512']
 const mainGrants=computed(()=>AUTHORIZATION_GRANTS.slice(0,3).filter(item=>props.application.applicationType==='SERVICE'?item.value==='client_credentials':item.value!=='client_credentials' && (props.application.applicationType!=='IN_APP' || item.value==='authorization_code')))
-const extensionGrants=AUTHORIZATION_GRANTS.slice(3).filter(grant=>grant.value!==EXTERNAL_CODE_GRANT)
 const selected=computed(()=>csvValues(settings.value.authorizationGrantTypes))
 const unknownGrants=computed(()=>selected.value.filter(value=>!AUTHORIZATION_GRANTS.some(item=>item.value===value)))
 const availableScopes=computed(()=>(props.catalog.scopes||[]).filter(scope=>(!scope.oidcOnly || props.protocol==='OIDC') &&

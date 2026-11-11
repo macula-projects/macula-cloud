@@ -16,7 +16,11 @@
  */
 package dev.macula.cloud.iam.protocol.oauth2.endpoint;
 
-import dev.macula.cloud.iam.service.support.SysOAuth2ClientService;
+import java.io.IOException;
+import java.util.Collections;
+import java.util.List;
+
+import dev.macula.cloud.iam.service.client.SysOAuth2ClientService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -32,10 +36,6 @@ import org.springframework.security.oauth2.server.authorization.web.authenticati
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
-
-import java.io.IOException;
-import java.util.Collections;
-import java.util.List;
 
 /**
  * 在 Client 认证后校验浏览器 Token 请求的精确 Origin。
@@ -55,7 +55,7 @@ public class OAuth2TokenOriginFilter extends OncePerRequestFilter {
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
-        FilterChain filterChain) throws ServletException, IOException {
+            FilterChain filterChain) throws ServletException, IOException {
         if (!tokenEndpointMatcher.matches(request) || !hasOriginHeader(request)) {
             filterChain.doFilter(request, response);
             return;
@@ -63,19 +63,21 @@ public class OAuth2TokenOriginFilter extends OncePerRequestFilter {
         String origin = singleOrigin(request);
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (origin == null || !(authentication instanceof OAuth2ClientAuthenticationToken client)
-            || !client.isAuthenticated() || client.getRegisteredClient() == null
-            || !allowedForProtocol(client, origin)) {
+                || !client.isAuthenticated() || client.getRegisteredClient() == null
+                || !allowedForProtocol(client, origin)) {
             failureHandler.onAuthenticationFailure(request, response,
-                new OAuth2AuthenticationException(OAuth2ErrorCodes.INVALID_REQUEST));
+                    new OAuth2AuthenticationException(OAuth2ErrorCodes.INVALID_REQUEST));
             return;
         }
         filterChain.doFilter(request, response);
     }
 
-    /** 预检可以用应用Origin并集，实际Token请求只能使用已认证协议视图。 */
+    /**
+     * 预检可以用应用Origin并集，实际Token请求只能使用已认证协议视图。
+     */
     private boolean allowedForProtocol(OAuth2ClientAuthenticationToken client, String origin) {
         Object allowed = client.getRegisteredClient().getClientSettings().getSetting(
-            dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeClientSettings.ALLOWED_ORIGINS);
+                dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeClientSettings.ALLOWED_ORIGINS);
         return allowed instanceof java.util.Collection<?> values && values.contains(origin);
     }
 
@@ -86,7 +88,7 @@ public class OAuth2TokenOriginFilter extends OncePerRequestFilter {
     private String singleOrigin(HttpServletRequest request) {
         List<String> values = Collections.list(request.getHeaders(HttpHeaders.ORIGIN));
         if (values.size() != 1 || values.get(0) == null || values.get(0).isBlank()
-            || values.get(0).contains(",")) {
+                || values.get(0).contains(",")) {
             return null;
         }
         return values.get(0).trim();

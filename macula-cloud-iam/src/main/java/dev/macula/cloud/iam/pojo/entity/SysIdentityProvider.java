@@ -44,9 +44,11 @@ public class SysIdentityProvider {
     private String oauthRedirectUri;
     private Boolean autoBindEnabled;
     private String bindingRule;
-    @com.baomidou.mybatisplus.annotation.TableField(updateStrategy = com.baomidou.mybatisplus.annotation.FieldStrategy.ALWAYS)
+    @com.baomidou.mybatisplus.annotation.TableField(updateStrategy =
+            com.baomidou.mybatisplus.annotation.FieldStrategy.ALWAYS)
     private String bindingSourceField;
-    @com.baomidou.mybatisplus.annotation.TableField(updateStrategy = com.baomidou.mybatisplus.annotation.FieldStrategy.ALWAYS)
+    @com.baomidou.mybatisplus.annotation.TableField(updateStrategy =
+            com.baomidou.mybatisplus.annotation.FieldStrategy.ALWAYS)
     private String bindingTargetField;
     private String bindingMappingsJson;
     private Long version;

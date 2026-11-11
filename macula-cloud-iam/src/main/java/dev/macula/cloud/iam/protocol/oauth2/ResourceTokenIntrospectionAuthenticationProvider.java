@@ -16,11 +16,12 @@
  */
 package dev.macula.cloud.iam.protocol.oauth2;
 
-import dev.macula.cloud.iam.service.support.SysOAuth2ClientService;
-import dev.macula.cloud.system.security.OAuth2ResourcePolicy;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
-import java.util.HashMap;
+
+import dev.macula.cloud.iam.service.client.SysOAuth2ClientService;
+import dev.macula.cloud.system.security.OAuth2ResourcePolicy;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
@@ -35,25 +36,31 @@ import org.springframework.security.oauth2.server.authorization.client.Registere
 
 /**
  * 通过机密Client认证的内省返回Token原始资源与Scope；不增加业务Client间的资源许可配置。
+ *
  * @author Rain
  * @since 6.1.0
  */
 public final class ResourceTokenIntrospectionAuthenticationProvider implements AuthenticationProvider {
-    private static final Set<String> COMMON = Set.of("active", "client_id", "sub", "iss", "iat", "exp", "nbf", "token_type");
+    private static final Set<String> COMMON = Set.of("active", "client_id", "sub", "iss", "iat", "exp", "nbf",
+            "token_type");
     private static final Set<String> SYSTEM = Set.of("tenantId", "authorities", "deptId", "dataScope", "grant_type");
     private final SysOAuth2ClientService clients;
     private final OAuth2AuthorizationService authorizations;
     private final AuthenticationProvider delegate;
 
-    /** 原生provider验证并恢复claims；响应仅包含既有安全元数据。 */
+    /**
+     * 原生provider验证并恢复claims；响应仅包含既有安全元数据。
+     */
     public ResourceTokenIntrospectionAuthenticationProvider(RegisteredClientRepository base,
-        OAuth2AuthorizationService authorizations, SysOAuth2ClientService clients) {
+            OAuth2AuthorizationService authorizations, SysOAuth2ClientService clients) {
         this.clients = clients;
         this.authorizations = authorizations;
         this.delegate = new OAuth2TokenIntrospectionAuthenticationProvider(base, authorizations);
     }
 
-    /** 校验调用方及Token有效性；业务资源授权由API自己执行，不在内省处额外配置许可。 */
+    /**
+     * 校验调用方及Token有效性；业务资源授权由API自己执行，不在内省处额外配置许可。
+     */
     @Override
     public Authentication authenticate(Authentication authentication) {
         var request = (OAuth2TokenIntrospectionAuthenticationToken) authentication;
@@ -64,10 +71,12 @@ public final class ResourceTokenIntrospectionAuthenticationProvider implements A
         if (client == null || !"RESOURCE_SERVER".equals(client.getPurpose())) {
             throw new OAuth2AuthenticationException(OAuth2ErrorCodes.UNAUTHORIZED_CLIENT);
         }
-        Number authenticatedVersion = caller.getRegisteredClient().getClientSettings().getSetting(OAuth2ResourcePolicy.AUTHORIZATION_VERSION);
+        Number authenticatedVersion = caller.getRegisteredClient().getClientSettings()
+                .getSetting(OAuth2ResourcePolicy.AUTHORIZATION_VERSION);
         if (authenticatedVersion == null || client.getAuthorizationVersion() == null
-            || authenticatedVersion.longValue() != client.getAuthorizationVersion()
-            || !java.util.Objects.equals(caller.getRegisteredClient().getClientSecret(), client.getClientSecret())) {
+                || authenticatedVersion.longValue() != client.getAuthorizationVersion()
+                ||
+                !java.util.Objects.equals(caller.getRegisteredClient().getClientSecret(), client.getClientSecret())) {
             throw new OAuth2AuthenticationException(OAuth2ErrorCodes.INVALID_CLIENT);
         }
         var authorization = authorizations.findByToken(request.getToken(), OAuth2TokenType.ACCESS_TOKEN);
@@ -76,7 +85,9 @@ public final class ResourceTokenIntrospectionAuthenticationProvider implements A
             return inactive(request, caller);
         }
         var nativeResult = (OAuth2TokenIntrospectionAuthenticationToken) delegate.authenticate(authentication);
-        if (!nativeResult.getTokenClaims().isActive()) { return inactive(request, caller); }
+        if (!nativeResult.getTokenClaims().isActive()) {
+            return inactive(request, caller);
+        }
         Map<String, Object> projection = new HashMap<>();
         nativeResult.getTokenClaims().getClaims().forEach((key, value) -> {
             if (COMMON.contains(key) || SYSTEM.contains(key) || "aud".equals(key) || "scope".equals(key)) {
@@ -84,20 +95,28 @@ public final class ResourceTokenIntrospectionAuthenticationProvider implements A
             }
         });
         var owner = clients.getClientByClientId(authorization.getRegisteredClientId());
-        if (owner == null) { return inactive(request, caller); }
+        if (owner == null) {
+            return inactive(request, caller);
+        }
         // Scope来自已签发Token，不按内省调用方再建立一套许可或裁剪。
         projection.put("scope", access.getToken().getScopes().stream().sorted().toList());
         projection.put(OAuth2ResourcePolicy.AUTHORIZATION_VERSION, owner.getAuthorizationVersion());
         return new OAuth2TokenIntrospectionAuthenticationToken(request.getToken(), caller,
-            OAuth2TokenIntrospection.withClaims(projection).build());
+                OAuth2TokenIntrospection.withClaims(projection).build());
     }
 
-    /** 无效Token只返回active:false，不附带内部原因。 */
-    private Authentication inactive(OAuth2TokenIntrospectionAuthenticationToken request, OAuth2ClientAuthenticationToken caller) {
-        return new OAuth2TokenIntrospectionAuthenticationToken(request.getToken(), caller, OAuth2TokenIntrospection.builder().build());
+    /**
+     * 无效Token只返回active:false，不附带内部原因。
+     */
+    private Authentication inactive(OAuth2TokenIntrospectionAuthenticationToken request,
+            OAuth2ClientAuthenticationToken caller) {
+        return new OAuth2TokenIntrospectionAuthenticationToken(request.getToken(), caller,
+                OAuth2TokenIntrospection.builder().build());
     }
 
-    /** 只处理内省，不参与令牌签发。 */
+    /**
+     * 只处理内省，不参与令牌签发。
+     */
     @Override
     public boolean supports(Class<?> authentication) {
         return OAuth2TokenIntrospectionAuthenticationToken.class.isAssignableFrom(authentication);

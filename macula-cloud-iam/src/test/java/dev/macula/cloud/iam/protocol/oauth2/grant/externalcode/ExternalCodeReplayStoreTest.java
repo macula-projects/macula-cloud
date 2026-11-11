@@ -16,6 +16,8 @@
  */
 package dev.macula.cloud.iam.protocol.oauth2.grant.externalcode;
 
+import java.time.Duration;
+
 import dev.macula.cloud.system.enums.ExternalCodeType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,8 +26,6 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2ErrorCodes;
-
-import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
@@ -62,13 +62,13 @@ class ExternalCodeReplayStoreTest {
         when(values.setIfAbsent(anyString(), anyString(), any(Duration.class))).thenReturn(true);
 
         ExternalCodeReplayStore.ReplayClaim claim =
-            store.claim(ExternalCodeType.WECOM_MINIAPP_CODE, "raw-sensitive-code");
+                store.claim(ExternalCodeType.WECOM_MINIAPP_CODE, "raw-sensitive-code");
 
         ArgumentCaptor<String> key = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<String> owner = ArgumentCaptor.forClass(String.class);
         verify(values).setIfAbsent(key.capture(), owner.capture(), eq(Duration.ofMinutes(10)));
         assertThat(key.getValue()).startsWith("iam:external-code:replay:")
-            .doesNotContain("raw-sensitive-code", ExternalCodeType.WECOM_MINIAPP_CODE.name());
+                .doesNotContain("raw-sensitive-code", ExternalCodeType.WECOM_MINIAPP_CODE.name());
         assertThat(owner.getValue()).isEqualTo(claim.owner()).doesNotContain("raw-sensitive-code");
     }
 
@@ -77,8 +77,8 @@ class ExternalCodeReplayStoreTest {
         when(values.setIfAbsent(anyString(), anyString(), any(Duration.class))).thenReturn(false);
 
         OAuth2AuthenticationException error = catchThrowableOfType(
-            () -> store.claim(ExternalCodeType.WECOM_MINIAPP_CODE, "duplicate-code"),
-            OAuth2AuthenticationException.class);
+                () -> store.claim(ExternalCodeType.WECOM_MINIAPP_CODE, "duplicate-code"),
+                OAuth2AuthenticationException.class);
 
         assertThat(error.getError().getErrorCode()).isEqualTo(OAuth2ErrorCodes.INVALID_GRANT);
     }
@@ -86,14 +86,17 @@ class ExternalCodeReplayStoreTest {
     @Test
     void releasesOnlyThroughOwnerCheckedScript() {
         ExternalCodeReplayStore.ReplayClaim claim =
-            new ExternalCodeReplayStore.ReplayClaim("digest-key", "owner-nonce");
+                new ExternalCodeReplayStore.ReplayClaim("digest-key", "owner-nonce");
 
         store.release(claim);
 
         verify(redis).execute(any(org.springframework.data.redis.core.script.RedisScript.class),
-            eq(java.util.List.of("digest-key")), eq("owner-nonce"));
+                eq(java.util.List.of("digest-key")), eq("owner-nonce"));
     }
-    /** 运营商最长有效期不能被通用10分钟配置缩短，且仍允许更保守的延长。 */
+
+    /**
+     * 运营商最长有效期不能被通用10分钟配置缩短，且仍允许更保守的延长。
+     */
     @Test
     void aliyunCredentialUsesAtLeastThirtyOneMinutes() {
         when(values.setIfAbsent(anyString(), anyString(), any(Duration.class))).thenReturn(true);
@@ -105,12 +108,15 @@ class ExternalCodeReplayStoreTest {
         verify(values).setIfAbsent(anyString(), anyString(), eq(Duration.ofHours(1)));
     }
 
-    /** Redis claim不确定时闭合拒绝，不能当作尚未使用而绕过防重放。 */
+    /**
+     * Redis claim不确定时闭合拒绝，不能当作尚未使用而绕过防重放。
+     */
     @Test
     void infrastructureFailureIsSafeServerError() {
-        when(values.setIfAbsent(anyString(), anyString(), any(Duration.class))).thenThrow(new IllegalStateException("fixture outage"));
+        when(values.setIfAbsent(anyString(), anyString(), any(Duration.class))).thenThrow(
+                new IllegalStateException("fixture outage"));
         var error = catchThrowableOfType(() -> store.claim(ExternalCodeType.WECOM_MINIAPP_CODE, "fixture-code"),
-            OAuth2AuthenticationException.class);
+                OAuth2AuthenticationException.class);
         assertThat(error.getError().getErrorCode()).isEqualTo(OAuth2ErrorCodes.SERVER_ERROR);
     }
 

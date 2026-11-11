@@ -30,10 +30,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class ThirdPartyProviderTypeTest {
     @Test
     void keepsExistingProviderTypesAndLoginPaths() {
-        assertArrayEquals(new ThirdPartyProviderType[] {
-            ThirdPartyProviderType.GITHUB, ThirdPartyProviderType.WECOM, ThirdPartyProviderType.FEISHU,
-            ThirdPartyProviderType.DINGTALK, ThirdPartyProviderType.WECHAT,
-            ThirdPartyProviderType.ALIYUN_MOBILE
+        assertArrayEquals(new ThirdPartyProviderType[]{
+                ThirdPartyProviderType.GITHUB, ThirdPartyProviderType.WECOM, ThirdPartyProviderType.FEISHU,
+                ThirdPartyProviderType.DINGTALK, ThirdPartyProviderType.WECHAT,
+                ThirdPartyProviderType.ALIYUN_MOBILE
         }, ThirdPartyProviderType.values());
         assertEquals("GITHUB", ThirdPartyProviderType.GITHUB.providerType());
         assertEquals("/login/github", ThirdPartyProviderType.GITHUB.loginPath());

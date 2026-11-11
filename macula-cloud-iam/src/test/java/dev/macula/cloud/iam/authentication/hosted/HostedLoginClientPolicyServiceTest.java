@@ -16,10 +16,11 @@
  */
 package dev.macula.cloud.iam.authentication.hosted;
 
-import dev.macula.cloud.iam.pojo.entity.SysOAuth2Client;
-import dev.macula.cloud.iam.service.support.SysOAuth2ClientService;
-import dev.macula.cloud.system.enums.OAuth2HostedLoginMethod;
 import java.util.Set;
+
+import dev.macula.cloud.iam.pojo.entity.SysOAuth2Client;
+import dev.macula.cloud.iam.service.client.SysOAuth2ClientService;
+import dev.macula.cloud.system.enums.OAuth2HostedLoginMethod;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -27,6 +28,7 @@ import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.authentication.AuthenticationServiceException;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
 import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -42,19 +44,25 @@ import static org.mockito.Mockito.when;
 class HostedLoginClientPolicyServiceTest {
     private final SysOAuth2ClientService clients = mock(SysOAuth2ClientService.class);
     private final HostedLoginClientPolicyService service = new HostedLoginClientPolicyService(clients,
-        AuthorizationServerSettings.builder().build(), true, true);
+            AuthorizationServerSettings.builder().build(), true, true, true);
 
-    /** 缺少SavedRequest的Client声明不能降级为门户。 */
+    /**
+     * 缺少SavedRequest的Client声明不能降级为门户。
+     */
     @Test
     void rejectsForgedContextAndKeepsPlainPortal() {
         MockHttpServletRequest request = new MockHttpServletRequest();
-        assertEquals(Set.of(OAuth2HostedLoginMethod.PASSWORD, OAuth2HostedLoginMethod.SMS),
-            service.resolve(request, new MockHttpServletResponse()).methods());
+        assertEquals(
+                Set.of(OAuth2HostedLoginMethod.PASSWORD, OAuth2HostedLoginMethod.SMS, OAuth2HostedLoginMethod.EMAIL),
+                service.resolve(request, new MockHttpServletResponse()).methods());
         request.addParameter("client_id", "test");
-        assertThrows(AuthenticationServiceException.class, () -> service.resolve(request, new MockHttpServletResponse()));
+        assertThrows(AuthenticationServiceException.class,
+                () -> service.resolve(request, new MockHttpServletResponse()));
     }
 
-    /** 策略空值继承与显式关闭不同，参数不能覆盖已保存的Client。 */
+    /**
+     * 策略空值继承与显式关闭不同，参数不能覆盖已保存的Client。
+     */
     @Test
     void enforcesCallbackAndPolicyIntersection() {
         SysOAuth2Client client = new SysOAuth2Client();
@@ -67,20 +75,27 @@ class HostedLoginClientPolicyServiceTest {
         request.addParameter("client_id", "attacker");
         assertEquals("test", service.resolve(request, new MockHttpServletResponse()).clientId());
         client.setHostedLoginMethods("SMS");
-        assertEquals(Set.of(OAuth2HostedLoginMethod.SMS), service.resolve(request, new MockHttpServletResponse()).methods());
-        var globallyDisabled = new HostedLoginClientPolicyService(clients, AuthorizationServerSettings.builder().build(), true, false);
+        assertEquals(Set.of(OAuth2HostedLoginMethod.SMS),
+                service.resolve(request, new MockHttpServletResponse()).methods());
+        var globallyDisabled = new HostedLoginClientPolicyService(clients,
+                AuthorizationServerSettings.builder().build(), true, false, true);
         assertTrue(globallyDisabled.resolve(request, new MockHttpServletResponse()).methods().isEmpty());
         client.setHostedLoginMethods("");
         assertTrue(service.resolve(request, new MockHttpServletResponse()).methods().isEmpty());
         client.setHostedLoginMethods("UNKNOWN");
-        assertThrows(AuthenticationServiceException.class, () -> service.resolve(request, new MockHttpServletResponse()));
+        assertThrows(AuthenticationServiceException.class,
+                () -> service.resolve(request, new MockHttpServletResponse()));
         client.setHostedLoginMethods(null);
-        assertThrows(AuthenticationServiceException.class, () -> service.resolve(request("https://attacker.example"), new MockHttpServletResponse()));
+        assertThrows(AuthenticationServiceException.class,
+                () -> service.resolve(request("https://attacker.example"), new MockHttpServletResponse()));
         client.setApplicationType("SERVICE");
-        assertThrows(AuthenticationServiceException.class, () -> service.resolve(request, new MockHttpServletResponse()));
+        assertThrows(AuthenticationServiceException.class,
+                () -> service.resolve(request, new MockHttpServletResponse()));
     }
 
-    /** SavedRequest也要校验参数唯一性、授权端点及grant，不能把任意受保护页面当授权。 */
+    /**
+     * SavedRequest也要校验参数唯一性、授权端点及grant，不能把任意受保护页面当授权。
+     */
     @Test
     void rejectsPollutedAndNonAuthorizationSavedRequests() {
         SysOAuth2Client client = new SysOAuth2Client();
@@ -93,7 +108,7 @@ class HostedLoginClientPolicyServiceTest {
             MockHttpServletRequest saved = new MockHttpServletRequest("GET", "/oauth2/authorize");
             saved.addParameter("client_id", "test");
             saved.addParameter("response_type", "code");
-        saved.addParameter("scope", "openid");
+            saved.addParameter("scope", "openid");
             saved.addParameter("redirect_uri", "https://client.example/callback");
             saved.addParameter(field, "duplicate");
             MockHttpSession session = new MockHttpSession();
@@ -101,15 +116,18 @@ class HostedLoginClientPolicyServiceTest {
             new HttpSessionRequestCache().saveRequest(saved, new MockHttpServletResponse());
             MockHttpServletRequest request = new MockHttpServletRequest();
             request.setSession(session);
-            assertThrows(AuthenticationServiceException.class, () -> service.resolve(request, new MockHttpServletResponse()));
+            assertThrows(AuthenticationServiceException.class,
+                    () -> service.resolve(request, new MockHttpServletResponse()));
         }
         ((dev.macula.cloud.system.protocol.OAuth2ProtocolSettings) client.getProtocolConfigurations().get(0).settings())
-            .setAuthorizationGrantTypes("client_credentials");
+                .setAuthorizationGrantTypes("client_credentials");
         assertThrows(AuthenticationServiceException.class,
-            () -> service.resolve(request("https://client.example/callback"), new MockHttpServletResponse()));
+                () -> service.resolve(request("https://client.example/callback"), new MockHttpServletResponse()));
     }
 
-    /** 模拟Security RequestCache保存的原始授权请求。 */
+    /**
+     * 模拟Security RequestCache保存的原始授权请求。
+     */
     private MockHttpServletRequest request(String callback) {
         MockHttpSession session = new MockHttpSession();
         MockHttpServletRequest saved = new MockHttpServletRequest("GET", "/oauth2/authorize");

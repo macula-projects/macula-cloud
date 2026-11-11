@@ -15,11 +15,15 @@
  * limitations under the License.
  */
 package dev.macula.cloud.iam.authentication.mfa;
+
 /**
  * MFA策略的最小可信投影；不包含密码、平台凭据、原始请求或自报声明。
  * clientId为空表示独立门户尚无可信应用上下文。
+ *
  * @author Rain
  * @since 6.1.0
  */
 public record AuthenticationCompletionContext(String clientId, Long tenantId, Long userId,
-    String entryPoint, AuthenticationMethod method, Long registrationId, AuthenticationCheckpoint checkpoint) { }
+                                              String entryPoint, AuthenticationMethod method, Long registrationId,
+                                              AuthenticationCheckpoint checkpoint) {
+}

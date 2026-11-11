@@ -21,17 +21,35 @@ import org.springframework.util.Assert;
 
 /**
  * 外部凭证核验结果，始终保留确定来源和实际已核验属性。
+ *
  * @author Rain
  * @since 6.1.0
  */
 public record ExternalCodeVerification(VerifiedExternalIdentity identity) {
-    /** 缺少确定来源的结果不能进入后续解析。 */
-    public ExternalCodeVerification { Assert.notNull(identity, "verified identity is required"); }
-    /** 返回厂商协议值。 */
-    public String providerType() { return identity.providerType(); }
-    /** 返回外部身份键，仅身份型结果有值。 */
-    public String subject() { return mobile() == null ? identity.identityValue() : null; }
-    /** 返回已核验手机号，不是端侧提交的账号信息。 */
+    /**
+     * 缺少确定来源的结果不能进入后续解析。
+     */
+    public ExternalCodeVerification {
+        Assert.notNull(identity, "verified identity is required");
+    }
+
+    /**
+     * 返回厂商协议值。
+     */
+    public String providerType() {
+        return identity.providerType();
+    }
+
+    /**
+     * 返回外部身份键，仅身份型结果有值。
+     */
+    public String subject() {
+        return mobile() == null ? identity.identityValue() : null;
+    }
+
+    /**
+     * 返回已核验手机号，不是端侧提交的账号信息。
+     */
     public String mobile() {
         return VerifiedExternalIdentity.MOBILE_PROOF.equals(identity.identityKind()) ? identity.identityValue() : null;
     }

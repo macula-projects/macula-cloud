@@ -17,11 +17,11 @@
 
 package dev.macula.cloud.iam.pojo.dto;
 
-import lombok.Data;
-
 import java.io.Serial;
 import java.io.Serializable;
 import java.time.Instant;
+
+import lombok.Data;
 
 /**
  * The type Authorization.

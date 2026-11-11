@@ -15,11 +15,13 @@
  * limitations under the License.
  */
 package dev.macula.cloud.iam.authentication.mfa;
+
 /**
  * 服务端实际核验的认证方式；已有会话不得冒充本次密码证明。
+ *
  * @author Rain
  * @since 6.1.0
  */
 public enum AuthenticationMethod {
-    PASSWORD, SMS, EXTERNAL, EXISTING_SESSION, UNKNOWN
+    PASSWORD, SMS, EMAIL, EXTERNAL, EXISTING_SESSION, UNKNOWN
 }

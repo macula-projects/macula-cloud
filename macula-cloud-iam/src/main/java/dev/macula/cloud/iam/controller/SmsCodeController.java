@@ -16,8 +16,10 @@
  */
 package dev.macula.cloud.iam.controller;
 
-import dev.macula.cloud.iam.authentication.sms.SmsService;
+import java.util.Map;
+
 import dev.macula.cloud.iam.authentication.hosted.HostedLoginClientPolicyService;
+import dev.macula.cloud.iam.authentication.sms.SmsService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.constraints.Pattern;
 import lombok.RequiredArgsConstructor;
@@ -27,8 +29,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
-
-import java.util.Map;
 
 /**
  * 登录页同源、CSRF 保护的短信验证码申请端点。
@@ -42,10 +42,12 @@ import java.util.Map;
 public class SmsCodeController {
     private final SmsService smsService;
 
-    /** 使用安全过滤器已校验的Client上下文发送验证码。 */
+    /**
+     * 使用安全过滤器已校验的Client上下文发送验证码。
+     */
     @PostMapping("/api/v1/sms-code")
     public Map<String, String> send(@RequestParam @Pattern(regexp = "^\\+?[0-9 -]{6,24}$") String phone,
-        HttpServletRequest request) {
+            HttpServletRequest request) {
         try {
             String clientId = HostedLoginClientPolicyService.context(request).clientId();
             if (clientId == null) {

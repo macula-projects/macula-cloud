@@ -17,17 +17,17 @@
 
 package dev.macula.cloud.iam.service.userdetails;
 
+import java.util.Collection;
+import java.util.stream.Collectors;
+
 import cn.hutool.core.collection.CollectionUtil;
-import tools.jackson.databind.annotation.JsonDeserialize;
 import dev.macula.boot.enums.StatusEnum;
 import dev.macula.cloud.iam.pojo.dto.UserAuthInfo;
 import lombok.Data;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
-
-import java.util.Collection;
-import java.util.stream.Collectors;
+import tools.jackson.databind.annotation.JsonDeserialize;
 
 /**
  * 系统用户认证信息
@@ -41,13 +41,19 @@ public class SysUserDetails implements UserDetails, org.springframework.security
     private Long userId;
     private Long tenantId;
 
-    /** 扩展字段：部门ID */
+    /**
+     * 扩展字段：部门ID
+     */
     private Long deptId;
 
-    /** 用户角色数据权限集合 */
+    /**
+     * 用户角色数据权限集合
+     */
     private int dataScope;
 
-    /** 默认字段 */
+    /**
+     * 默认字段
+     */
     private String username;
     private String nickname;
     private String password;
@@ -56,16 +62,9 @@ public class SysUserDetails implements UserDetails, org.springframework.security
     private String openId;
     private String unionId;
     private Collection<SimpleGrantedAuthority> authorities = new java.util.ArrayList<>();
-
-    public void setAuthorities(Collection<SimpleGrantedAuthority> authorities) {
-        // Use a supported concrete collection in the Security serialization allowlist.
-        this.authorities = authorities == null ? new java.util.ArrayList<>() : new java.util.ArrayList<>(authorities);
-    }
-
     private boolean accountNonExpired = true;
     private boolean accountNonLocked = true;
     private boolean credentialsNonExpired = true;
-
     public SysUserDetails() {
     }
 
@@ -85,6 +84,11 @@ public class SysUserDetails implements UserDetails, org.springframework.security
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return this.authorities;
+    }
+
+    public void setAuthorities(Collection<SimpleGrantedAuthority> authorities) {
+        // Use a supported concrete collection in the Security serialization allowlist.
+        this.authorities = authorities == null ? new java.util.ArrayList<>() : new java.util.ArrayList<>(authorities);
     }
 
     @Override

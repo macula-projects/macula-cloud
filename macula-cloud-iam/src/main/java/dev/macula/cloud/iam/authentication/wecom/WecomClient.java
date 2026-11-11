@@ -16,8 +16,12 @@
  */
 package dev.macula.cloud.iam.authentication.wecom;
 
-import dev.macula.cloud.iam.authentication.thirdparty.IdentityProviderConfigService.ProviderConfig;
+import java.io.IOException;
+import java.net.HttpURLConnection;
+import java.time.Duration;
+
 import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeInfrastructureException;
+import dev.macula.cloud.iam.service.identity.IdentityProviderConfigService.ProviderConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -32,10 +36,6 @@ import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.util.UriComponentsBuilder;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
-
-import java.io.IOException;
-import java.net.HttpURLConnection;
-import java.time.Duration;
 
 /**
  * 使用企业微信固定 HTTPS 端点获取成员 UserId。
@@ -52,7 +52,7 @@ public class WecomClient {
     private static final String USER = "https://qyapi.weixin.qq.com/cgi-bin/auth/getuserinfo";
     private static final String APP_USER = "https://qyapi.weixin.qq.com/cgi-bin/user/getuserinfo";
     private static final String MINIAPP_SESSION =
-        "https://qyapi.weixin.qq.com/cgi-bin/miniprogram/jscode2session";
+            "https://qyapi.weixin.qq.com/cgi-bin/miniprogram/jscode2session";
     private static final String CORP_ID_CONFIG = "corpId";
     private static final String AGENT_ID_CONFIG = "agentId";
     private static final String APP_ID_PARAMETER = "appid";
@@ -73,41 +73,62 @@ public class WecomClient {
     private final RestClient restClient;
     private final boolean httpContractTest;
     private final JsonMapper json = JsonMapper.builder().build();
-    private dev.macula.cloud.iam.authentication.thirdparty.ProviderApplicationTokenCache applicationTokens;
-
-    /** 生产装配来源隔离缓存；显式HTTP测试构造器仍可仅验证平台合同。 */
-    @org.springframework.beans.factory.annotation.Autowired(required = false)
-    void applicationTokenCache(dev.macula.cloud.iam.authentication.thirdparty.ProviderApplicationTokenCache cache) { this.applicationTokens = cache; }
-
+    private dev.macula.cloud.iam.authentication.thirdparty.cache.ProviderApplicationTokenCache applicationTokens;
 
     public WecomClient() {
         this(RestClient.builder().requestFactory(noRedirectRequestFactory()).build(), false);
     }
 
-    /** 显式HTTP合同测试可跳过Redis，仅此包内构造方式允许。 */
+    /**
+     * 显式HTTP合同测试可跳过Redis，仅此包内构造方式允许。
+     */
     WecomClient(RestClient restClient) {
         this(restClient, true);
     }
 
-    /** 默认生产构造不能在缓存缺失时直接返回未经过owner栅栏的结果。 */
+    /**
+     * 默认生产构造不能在缓存缺失时直接返回未经过owner栅栏的结果。
+     */
     private WecomClient(RestClient restClient, boolean httpContractTest) {
         this.restClient = restClient;
         this.httpContractTest = httpContractTest;
     }
 
+    static SimpleClientHttpRequestFactory noRedirectRequestFactory() {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory() {
+            @Override
+            protected void prepareConnection(HttpURLConnection connection, String httpMethod) throws IOException {
+                super.prepareConnection(connection, httpMethod);
+                connection.setInstanceFollowRedirects(false);
+            }
+        };
+        factory.setConnectTimeout(Duration.ofSeconds(5));
+        factory.setReadTimeout(Duration.ofSeconds(8));
+        return factory;
+    }
+
+    /**
+     * 生产装配来源隔离缓存；显式HTTP测试构造器仍可仅验证平台合同。
+     */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void applicationTokenCache(
+            dev.macula.cloud.iam.authentication.thirdparty.cache.ProviderApplicationTokenCache cache) {
+        this.applicationTokens = cache;
+    }
+
     public String authorizationUri(ProviderConfig config, String state, String redirectUri) {
         return UriComponentsBuilder.fromUriString(AUTHORIZE)
-            .queryParam(APP_ID_PARAMETER, config.require(CORP_ID_CONFIG))
-            .queryParam(OAuth2ParameterNames.REDIRECT_URI, redirectUri)
-            .queryParam(OAuth2ParameterNames.RESPONSE_TYPE, OAuth2AuthorizationResponseType.CODE.getValue())
-            .queryParam(OAuth2ParameterNames.SCOPE, BASE_SCOPE)
-            .queryParam(OAuth2ParameterNames.STATE, state)
-            .queryParam(AGENT_ID_PARAMETER, config.require(AGENT_ID_CONFIG))
-            .fragment(WECHAT_REDIRECT_FRAGMENT).build().encode().toUriString();
+                .queryParam(APP_ID_PARAMETER, config.require(CORP_ID_CONFIG))
+                .queryParam(OAuth2ParameterNames.REDIRECT_URI, redirectUri)
+                .queryParam(OAuth2ParameterNames.RESPONSE_TYPE, OAuth2AuthorizationResponseType.CODE.getValue())
+                .queryParam(OAuth2ParameterNames.SCOPE, BASE_SCOPE)
+                .queryParam(OAuth2ParameterNames.STATE, state)
+                .queryParam(AGENT_ID_PARAMETER, config.require(AGENT_ID_CONFIG))
+                .fragment(WECHAT_REDIRECT_FRAGMENT).build().encode().toUriString();
     }
 
     public String authorizationUri(ProviderConfig config, String state, String redirectUri,
-        WecomLoginMode mode) {
+            WecomLoginMode mode) {
         if (mode == WecomLoginMode.WEBVIEW) {
             return authorizationUri(config, state, redirectUri);
         }
@@ -115,12 +136,12 @@ public class WecomClient {
             throw failed();
         }
         return UriComponentsBuilder.fromUriString(BROWSER_AUTHORIZE)
-            .queryParam(LOGIN_TYPE_PARAMETER, CORP_APP_LOGIN_TYPE)
-            .queryParam(APP_ID_PARAMETER, config.require(CORP_ID_CONFIG))
-            .queryParam(AGENT_ID_PARAMETER, config.require(AGENT_ID_CONFIG))
-            .queryParam(OAuth2ParameterNames.REDIRECT_URI, redirectUri)
-            .queryParam(OAuth2ParameterNames.STATE, state)
-            .build().encode().toUriString();
+                .queryParam(LOGIN_TYPE_PARAMETER, CORP_APP_LOGIN_TYPE)
+                .queryParam(APP_ID_PARAMETER, config.require(CORP_ID_CONFIG))
+                .queryParam(AGENT_ID_PARAMETER, config.require(AGENT_ID_CONFIG))
+                .queryParam(OAuth2ParameterNames.REDIRECT_URI, redirectUri)
+                .queryParam(OAuth2ParameterNames.STATE, state)
+                .build().encode().toUriString();
     }
 
     public String fetchUserId(ProviderConfig config, String code) {
@@ -137,9 +158,9 @@ public class WecomClient {
             String accessToken = fetchAccessToken(config);
             stage = USER_STAGE;
             String userBody = restClient.get().uri(UriComponentsBuilder.fromUriString(endpoint)
-                .queryParam(OAuth2ParameterNames.ACCESS_TOKEN, accessToken)
-                .queryParam(OAuth2ParameterNames.CODE, code)
-                .build().encode().toUri()).retrieve().body(String.class);
+                    .queryParam(OAuth2ParameterNames.ACCESS_TOKEN, accessToken)
+                    .queryParam(OAuth2ParameterNames.CODE, code)
+                    .build().encode().toUri()).retrieve().body(String.class);
             JsonNode userJson = json.readTree(userBody);
             if (userJson.path(ERROR_CODE).asInt() != 0) {
                 logProviderError(stage, userJson);
@@ -155,18 +176,18 @@ public class WecomClient {
             throw ex;
         } catch (RestClientResponseException ex) {
             LOGGER.warn("第三方接口 HTTP 失败 provider=WECOM stage={} status={}", stage,
-                ex.getStatusCode().value());
+                    ex.getStatusCode().value());
             if (ex.getStatusCode().is5xxServerError()) {
                 throw new ExternalCodeInfrastructureException();
             }
             throw failed();
         } catch (RestClientException ex) {
             LOGGER.warn("第三方接口调用失败 provider=WECOM stage={} failure=transport_error exception={}",
-                stage, ex.getClass().getSimpleName());
+                    stage, ex.getClass().getSimpleName());
             throw new ExternalCodeInfrastructureException();
         } catch (RuntimeException ex) {
             LOGGER.error("第三方接口响应处理失败 provider=WECOM stage={} "
-                + "failure=invalid_response exception={}", stage, ex.getClass().getSimpleName());
+                    + "failure=invalid_response exception={}", stage, ex.getClass().getSimpleName());
             throw failed();
         }
     }
@@ -177,10 +198,10 @@ public class WecomClient {
             String accessToken = fetchAccessToken(config);
             stage = MINIAPP_SESSION_STAGE;
             String sessionBody = restClient.get().uri(UriComponentsBuilder.fromUriString(MINIAPP_SESSION)
-                .queryParam(OAuth2ParameterNames.ACCESS_TOKEN, accessToken)
-                .queryParam(JS_CODE_PARAMETER, code)
-                .queryParam(OAuth2ParameterNames.GRANT_TYPE, AuthorizationGrantType.AUTHORIZATION_CODE.getValue())
-                .build().encode().toUri()).retrieve().body(String.class);
+                    .queryParam(OAuth2ParameterNames.ACCESS_TOKEN, accessToken)
+                    .queryParam(JS_CODE_PARAMETER, code)
+                    .queryParam(OAuth2ParameterNames.GRANT_TYPE, AuthorizationGrantType.AUTHORIZATION_CODE.getValue())
+                    .build().encode().toUri()).retrieve().body(String.class);
             JsonNode sessionJson = json.readTree(sessionBody);
             if (sessionJson.path(ERROR_CODE).asInt() != 0) {
                 logProviderError(stage, sessionJson);
@@ -196,82 +217,79 @@ public class WecomClient {
             throw ex;
         } catch (RestClientResponseException ex) {
             LOGGER.warn("第三方接口 HTTP 失败 provider=WECOM stage={} status={}", stage,
-                ex.getStatusCode().value());
+                    ex.getStatusCode().value());
             if (ex.getStatusCode().is5xxServerError()) {
                 throw new ExternalCodeInfrastructureException();
             }
             throw failed();
         } catch (RestClientException ex) {
             LOGGER.warn("第三方接口调用失败 provider=WECOM stage={} failure=transport_error exception={}",
-                stage, ex.getClass().getSimpleName());
+                    stage, ex.getClass().getSimpleName());
             throw new ExternalCodeInfrastructureException();
         } catch (RuntimeException ex) {
             LOGGER.error("第三方接口响应处理失败 provider=WECOM stage={} "
-                + "failure=invalid_response exception={}", stage, ex.getClass().getSimpleName());
+                    + "failure=invalid_response exception={}", stage, ex.getClass().getSimpleName());
             throw failed();
         }
     }
 
-    /** 使用当前来源版本的应用Token，不混用用户Token或其他企业凭据。 */
+    /**
+     * 使用当前来源版本的应用Token，不混用用户Token或其他企业凭据。
+     */
     String fetchAccessToken(ProviderConfig config) {
         if (applicationTokens == null && !httpContractTest) {
             throw new ExternalCodeInfrastructureException(
-                dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeConsumptionState.NOT_SUBMITTED);
+                    dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeConsumptionState.NOT_SUBMITTED);
         }
         return applicationTokens == null ? loadApplicationToken(config).token()
-            : applicationTokens.get(config, dev.macula.cloud.iam.authentication.thirdparty.ProviderApplicationTokenCache.APPLICATION_TOKEN, () -> loadApplicationToken(config));
+                : applicationTokens.get(config,
+                dev.macula.cloud.iam.authentication.thirdparty.cache.ProviderApplicationTokenCache.APPLICATION_TOKEN,
+                () -> loadApplicationToken(config));
     }
 
-    /** 该HTTP阶段尚未提交用户Code，明确的网络故障可安全释放占用。 */
-    private dev.macula.cloud.iam.authentication.thirdparty.ProviderApplicationTokenCache.TokenValue loadApplicationToken(ProviderConfig config) {
+    /**
+     * 该HTTP阶段尚未提交用户Code，明确的网络故障可安全释放占用。
+     */
+    private dev.macula.cloud.iam.authentication.thirdparty.cache.ProviderApplicationTokenCache.TokenValue loadApplicationToken(
+            ProviderConfig config) {
         try {
-        String tokenBody = restClient.get().uri(UriComponentsBuilder.fromUriString(TOKEN)
-            .queryParam(CORP_ID_PARAMETER, config.require(CORP_ID_CONFIG))
-            .queryParam(CORP_SECRET_PARAMETER, config.appSecret())
-            .build().encode().toUri()).retrieve().body(String.class);
-        JsonNode tokenJson = json.readTree(tokenBody);
-        if (tokenJson.path(ERROR_CODE).asInt() != 0) {
-            logProviderError(TOKEN_STAGE, tokenJson);
-            throw failed();
-        }
-        String accessToken = tokenJson.path(OAuth2ParameterNames.ACCESS_TOKEN).asText();
-        if (accessToken.isBlank()) {
-            LOGGER.warn("第三方接口响应无效 provider=WECOM stage={} failure=missing_access_token",
-                TOKEN_STAGE);
-            throw failed();
-        }
-        return new dev.macula.cloud.iam.authentication.thirdparty.ProviderApplicationTokenCache.TokenValue(accessToken, Duration.ofSeconds(tokenJson.path("expires_in").asLong()));
+            String tokenBody = restClient.get().uri(UriComponentsBuilder.fromUriString(TOKEN)
+                    .queryParam(CORP_ID_PARAMETER, config.require(CORP_ID_CONFIG))
+                    .queryParam(CORP_SECRET_PARAMETER, config.appSecret())
+                    .build().encode().toUri()).retrieve().body(String.class);
+            JsonNode tokenJson = json.readTree(tokenBody);
+            if (tokenJson.path(ERROR_CODE).asInt() != 0) {
+                logProviderError(TOKEN_STAGE, tokenJson);
+                throw failed();
+            }
+            String accessToken = tokenJson.path(OAuth2ParameterNames.ACCESS_TOKEN).asText();
+            if (accessToken.isBlank()) {
+                LOGGER.warn("第三方接口响应无效 provider=WECOM stage={} failure=missing_access_token",
+                        TOKEN_STAGE);
+                throw failed();
+            }
+            return new dev.macula.cloud.iam.authentication.thirdparty.cache.ProviderApplicationTokenCache.TokenValue(
+                    accessToken, Duration.ofSeconds(tokenJson.path("expires_in").asLong()));
         } catch (RestClientResponseException ex) {
             LOGGER.warn("第三方接口 HTTP 失败 provider=WECOM stage={} status={}", TOKEN_STAGE,
-                ex.getStatusCode().value());
+                    ex.getStatusCode().value());
             if (ex.getStatusCode().is5xxServerError()) {
-                throw new ExternalCodeInfrastructureException(dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeConsumptionState.NOT_SUBMITTED);
+                throw new ExternalCodeInfrastructureException(
+                        dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeConsumptionState.NOT_SUBMITTED);
             }
             throw failed();
         } catch (RestClientException ex) {
-            throw new ExternalCodeInfrastructureException(dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeConsumptionState.NOT_SUBMITTED);
+            throw new ExternalCodeInfrastructureException(
+                    dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeConsumptionState.NOT_SUBMITTED);
         }
     }
 
     private void logProviderError(String stage, JsonNode response) {
         LOGGER.warn("第三方接口返回错误 provider=WECOM stage={} failure=provider_error errcode={}",
-            stage, response.path(ERROR_CODE).asInt());
+                stage, response.path(ERROR_CODE).asInt());
     }
 
     private AuthenticationServiceException failed() {
         return new AuthenticationServiceException("企业微信身份校验失败");
-    }
-
-    static SimpleClientHttpRequestFactory noRedirectRequestFactory() {
-        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory() {
-            @Override
-            protected void prepareConnection(HttpURLConnection connection, String httpMethod) throws IOException {
-                super.prepareConnection(connection, httpMethod);
-                connection.setInstanceFollowRedirects(false);
-            }
-        };
-        factory.setConnectTimeout(Duration.ofSeconds(5));
-        factory.setReadTimeout(Duration.ofSeconds(8));
-        return factory;
     }
 }

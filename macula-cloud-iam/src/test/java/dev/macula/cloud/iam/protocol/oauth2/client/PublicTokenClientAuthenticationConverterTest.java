@@ -39,27 +39,26 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 class PublicTokenClientAuthenticationConverterTest {
     private final PublicTokenClientAuthenticationConverter converter =
-        new PublicTokenClientAuthenticationConverter(PathPatternRequestMatcher.pathPattern(
-            HttpMethod.POST, "/oauth2/token"));
+            new PublicTokenClientAuthenticationConverter(PathPatternRequestMatcher.pathPattern(
+                    HttpMethod.POST, "/oauth2/token"));
 
     @ParameterizedTest
-    @ValueSource(strings = {"password", "sms", "email",
-        "urn:macula:params:oauth:grant-type:external_code", "refresh_token"})
+    @ValueSource(strings = {"urn:macula:params:oauth:grant-type:external_code", "refresh_token"})
     void convertsSupportedPublicGrant(String grantType) {
         MockHttpServletRequest request = request(grantType);
 
         OAuth2ClientAuthenticationToken authentication =
-            (OAuth2ClientAuthenticationToken)converter.convert(request);
+                (OAuth2ClientAuthenticationToken) converter.convert(request);
 
         assertThat(authentication).isNotNull();
         assertThat(authentication.getPrincipal()).isEqualTo("public-client");
         assertThat(authentication.getClientAuthenticationMethod()).isEqualTo(ClientAuthenticationMethod.NONE);
         assertThat(authentication.getAdditionalParameters()).containsEntry(OAuth2ParameterNames.GRANT_TYPE,
-            grantType);
+                grantType);
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"authorization_code", "client_credentials"})
+    @ValueSource(strings = {"authorization_code", "client_credentials", "password", "sms", "email"})
     void leavesOfficialAndForbiddenGrantToFramework(String grantType) {
         assertThat(converter.convert(request(grantType))).isNull();
     }
@@ -74,7 +73,7 @@ class PublicTokenClientAuthenticationConverterTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"/oauth2/introspect", "/oauth2/revoke", "/oauth2/device_authorization",
-        "/oauth2/par", "/oauth2/token-extra"})
+            "/oauth2/par", "/oauth2/token-extra"})
     void ignoresOtherClientAuthenticationEndpointsBeforeParsingParameters(String endpoint) {
         MockHttpServletRequest request = request("password");
         request.setRequestURI(endpoint);
@@ -93,26 +92,26 @@ class PublicTokenClientAuthenticationConverterTest {
 
     @Test
     void rejectsMissingOrDuplicateClientId() {
-        MockHttpServletRequest missing = request("sms");
+        MockHttpServletRequest missing = request("urn:macula:params:oauth:grant-type:external_code");
         missing.removeParameter(OAuth2ParameterNames.CLIENT_ID);
         assertThatThrownBy(() -> converter.convert(missing)).isInstanceOf(OAuth2AuthenticationException.class);
 
-        MockHttpServletRequest duplicate = request("sms");
+        MockHttpServletRequest duplicate = request("urn:macula:params:oauth:grant-type:external_code");
         duplicate.addParameter(OAuth2ParameterNames.CLIENT_ID, "other-client");
         assertThatThrownBy(() -> converter.convert(duplicate)).isInstanceOf(OAuth2AuthenticationException.class);
     }
 
     @Test
     void confidentialCredentialsRemainOwnedByOfficialConverters() {
-        MockHttpServletRequest basic = request("sms");
+        MockHttpServletRequest basic = request("urn:macula:params:oauth:grant-type:external_code");
         basic.addHeader(HttpHeaders.AUTHORIZATION, "Basic fixture");
         assertThat(converter.convert(basic)).isNull();
 
-        MockHttpServletRequest secret = request("sms");
+        MockHttpServletRequest secret = request("urn:macula:params:oauth:grant-type:external_code");
         secret.addParameter(OAuth2ParameterNames.CLIENT_SECRET, "fixture");
         assertThat(converter.convert(secret)).isNull();
 
-        MockHttpServletRequest assertion = request("sms");
+        MockHttpServletRequest assertion = request("urn:macula:params:oauth:grant-type:external_code");
         assertion.addParameter(OAuth2ParameterNames.CLIENT_ASSERTION, "fixture");
         assertThat(converter.convert(assertion)).isNull();
     }

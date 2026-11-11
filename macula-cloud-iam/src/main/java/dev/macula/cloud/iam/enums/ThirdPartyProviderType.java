@@ -30,7 +30,7 @@ public enum ThirdPartyProviderType {
     FEISHU("FEISHU", "/login/feishu", Set.of("appId"), Set.of()),
     DINGTALK("DINGTALK", "/login/dingtalk", Set.of("appKey", "corpId"), Set.of()),
     WECHAT("WECHAT", "/login/wechat", Set.of("appId", "officialAccountAppId"),
-        Set.of("officialAccountAppSecret", "mobileAppSecret", "miniAppSecret")),
+            Set.of("officialAccountAppSecret", "mobileAppSecret", "miniAppSecret")),
     ALIYUN_MOBILE("ALIYUN_MOBILE", "", Set.of("accessKeyId"), Set.of());
 
     private final String providerType;
@@ -39,11 +39,20 @@ public enum ThirdPartyProviderType {
     private final Set<String> additionalSecretFields;
 
     ThirdPartyProviderType(String providerType, String loginPath, Set<String> requiredPublicFields,
-        Set<String> additionalSecretFields) {
+            Set<String> additionalSecretFields) {
         this.providerType = providerType;
         this.loginPath = loginPath;
         this.requiredPublicFields = requiredPublicFields;
         this.additionalSecretFields = additionalSecretFields;
+    }
+
+    public static ThirdPartyProviderType fromProviderType(String providerType) {
+        for (ThirdPartyProviderType type : values()) {
+            if (type.providerType.equals(providerType)) {
+                return type;
+            }
+        }
+        throw new IllegalArgumentException("不支持的第三方登录类型");
     }
 
     public String providerType() {
@@ -67,14 +76,5 @@ public enum ThirdPartyProviderType {
 
     public Set<String> requiredPublicFields() {
         return requiredPublicFields;
-    }
-
-    public static ThirdPartyProviderType fromProviderType(String providerType) {
-        for (ThirdPartyProviderType type : values()) {
-            if (type.providerType.equals(providerType)) {
-                return type;
-            }
-        }
-        throw new IllegalArgumentException("不支持的第三方登录类型");
     }
 }

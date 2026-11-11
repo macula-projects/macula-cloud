@@ -17,13 +17,18 @@
 
 package dev.macula.cloud.iam.mapper;
 
+import java.util.Set;
+
 import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import dev.macula.cloud.iam.pojo.entity.SysRole;
 import org.apache.ibatis.annotations.Mapper;
 
-import java.util.Set;
-
+/**
+ * 查询IAM角色和聚合数据范围；跨租户查询由明确的Mapper方法约束。
+ * @author Macula
+ * @since 6.1.0
+ */
 @Mapper
 public interface SysRoleMapper extends BaseMapper<SysRole> {
 

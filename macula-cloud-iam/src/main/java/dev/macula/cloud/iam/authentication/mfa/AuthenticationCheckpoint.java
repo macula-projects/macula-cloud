@@ -15,8 +15,10 @@
  * limitations under the License.
  */
 package dev.macula.cloud.iam.authentication.mfa;
+
 /**
  * 认证成果发布前的检查阶段，不代表已经完成额外因子。
+ *
  * @author Rain
  * @since 6.1.0
  */

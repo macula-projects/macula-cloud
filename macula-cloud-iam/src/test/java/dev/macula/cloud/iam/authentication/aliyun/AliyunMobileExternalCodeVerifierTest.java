@@ -16,10 +16,10 @@
  */
 package dev.macula.cloud.iam.authentication.aliyun;
 
+import java.util.Map;
+
 import com.aliyun.tea.TeaException;
 import org.junit.jupiter.api.Test;
-
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -42,6 +42,6 @@ class AliyunMobileExternalCodeVerifierTest {
 
     private TeaException exception(int status) {
         return new TeaException(Map.of("code", "fixture", "message", "fixture",
-            "data", Map.of("statusCode", status)));
+                "data", Map.of("statusCode", status)));
     }
 }

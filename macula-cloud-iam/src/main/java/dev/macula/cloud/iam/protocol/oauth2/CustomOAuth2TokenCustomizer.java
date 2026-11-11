@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Macula
+ * Copyright (c) 2026 Macula
  *   macula.dev, China
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,88 +14,38 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package dev.macula.cloud.iam.protocol.oauth2;
 
-import dev.macula.boot.constants.GlobalConstants;
-import dev.macula.boot.constants.SecurityConstants;
-import dev.macula.cloud.iam.service.userdetails.SysUserDetails;
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.oauth2.core.endpoint.OAuth2ParameterNames;
+import dev.macula.cloud.iam.protocol.oauth2.token.claims.AccessTokenClaimsService;
 import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenClaimsContext;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenCustomizer;
 
-import java.util.stream.Collectors;
-
 /**
- * token 输出增强
+ * 不透明Token的框架适配器；声明业务规则统一委托AccessTokenClaimsService。
  *
- * @author lengleng
- * @since 2022/6/3
+ * @author Macula
+ * @since 6.1.0
  */
-public class CustomOAuth2TokenCustomizer implements OAuth2TokenCustomizer<OAuth2TokenClaimsContext> {
+public final class CustomOAuth2TokenCustomizer implements OAuth2TokenCustomizer<OAuth2TokenClaimsContext> {
+    private final AccessTokenClaimsService claimsService;
 
     /**
-     * Customize the OAuth 2.0 Token attributes.
-     *
-     * @param context the context containing the OAuth 2.0 Token attributes
+     * 注入与JWT共用的声明服务，不在协议适配器中复制资源权限规则。
+     */
+    public CustomOAuth2TokenCustomizer(AccessTokenClaimsService claimsService) {
+        this.claimsService = claimsService;
+    }
+
+    /**
+     * 只增强Access Token，不向其他类型写入资源权限声明。
      */
     @Override
     public void customize(OAuth2TokenClaimsContext context) {
         if (OAuth2TokenType.ACCESS_TOKEN.equals(context.getTokenType())) {
-            context.getClaims().claims(claims -> {
-                claims.putAll(resourceClaims(context.getPrincipal(), context.getRegisteredClient(),
-                    context.getAuthorizedScopes(), context.getAuthorizationGrantType().getValue()));
-            });
+            context.getClaims().claims(claims -> claims.putAll(claimsService.create(context.getPrincipal(),
+                    context.getRegisteredClient(), context.getAuthorizedScopes(),
+                    context.getAuthorizationGrantType().getValue())));
         }
-    }
-
-    /** 访问令牌统一绑定资源、配置版本及可信租户；服务令牌不能从请求参数取租户。 */
-    static java.util.Map<String, Object> resourceClaims(org.springframework.security.core.Authentication principal,
-        org.springframework.security.oauth2.server.authorization.client.RegisteredClient client, java.util.Set<String> scopes, String grant) {
-        java.util.Map<String, Object> claims = accessClaims(principal, client.getClientId());
-        java.util.Set<String> audience = ResourceAuthorizationPolicy.audiences(client, scopes);
-        claims.put("aud", new java.util.ArrayList<>(audience));
-        if (!audience.contains(dev.macula.cloud.system.security.OAuth2ResourcePolicy.SYSTEM_RESOURCE)) {
-            claims.remove(SecurityConstants.AUTHORITIES_KEY);
-            claims.remove(SecurityConstants.JWT_DEPTID_KEY);
-            claims.remove(SecurityConstants.JWT_DATASCOPE_KEY);
-        }
-        claims.put(dev.macula.cloud.system.security.OAuth2ResourcePolicy.AUTHORIZATION_VERSION,
-            client.getClientSettings().getSetting(dev.macula.cloud.system.security.OAuth2ResourcePolicy.AUTHORIZATION_VERSION));
-        claims.put(OAuth2ParameterNames.GRANT_TYPE, grant);
-        if ("client_credentials".equals(grant)) {
-            Object tenant = client.getClientSettings().getSetting(
-                dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeClientSettings.TENANT_ID);
-            if (tenant == null) { throw new org.springframework.security.oauth2.core.OAuth2AuthenticationException("unauthorized_client"); }
-            claims.put(GlobalConstants.TENANT_ID_NAME, tenant);
-        }
-        return claims;
-    }
-
-    /** Shared platform access claims for opaque and JWT formats; never add these to ID Tokens. */
-    static java.util.Map<String, Object> accessClaims(org.springframework.security.core.Authentication principal,
-        String clientId) {
-        java.util.Map<String, Object> claims = new java.util.HashMap<>();
-        claims.put(OAuth2ParameterNames.CLIENT_ID, clientId);
-        if (principal == null) {
-            return claims;
-        }
-        if (principal.getPrincipal() instanceof SysUserDetails user) {
-            if (user.getTenantId() != null) {
-                claims.put(GlobalConstants.TENANT_ID_NAME, user.getTenantId());
-            }
-            // 资料通过已授权的Profile/UserInfo读取，不能让JWT Access Token绕过profile Scope。
-            claims.put(SecurityConstants.JWT_DATASCOPE_KEY, user.getDataScope());
-            if (user.getDeptId() != null) {
-                claims.put(SecurityConstants.JWT_DEPTID_KEY, user.getDeptId());
-            }
-        }
-        if (principal.getAuthorities() != null) {
-            claims.put(SecurityConstants.AUTHORITIES_KEY, principal.getAuthorities().stream()
-                .map(GrantedAuthority::getAuthority).collect(Collectors.toList()));
-        }
-        return claims;
     }
 }

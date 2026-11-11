@@ -17,6 +17,11 @@
 
 package dev.macula.cloud.iam.protocol.oauth2.endpoint;
 
+import java.security.Principal;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Set;
+
 import lombok.AllArgsConstructor;
 import org.springframework.security.oauth2.core.endpoint.OAuth2ParameterNames;
 import org.springframework.security.oauth2.core.oidc.OidcScopes;
@@ -32,12 +37,6 @@ import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-
-import java.security.Principal;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Set;
 
 /**
  * 自定义用户确认页
@@ -56,43 +55,43 @@ public class AuthorizationConsentController {
      * {@link OAuth2AuthorizationEndpointFilter} 会302重定向到{@code  /oauth2/consent}并携带入参
      *
      * @param principal 当前用户
-     * @param model     视图模型
-     * @param clientId  oauth2 client id
-     * @param scope     请求授权的scope
-     * @param state     state 值
+     * @param model 视图模型
+     * @param clientId oauth2 client id
+     * @param scope 请求授权的scope
+     * @param state state 值
      * @return 自定义授权确认页面 consent.html
      */
     @GetMapping(value = "/oauth2/consent")
     public String consent(Principal principal, Model model,
-        @RequestParam(OAuth2ParameterNames.CLIENT_ID) String clientId,
-        @RequestParam(OAuth2ParameterNames.SCOPE) String scope,
-        @RequestParam(OAuth2ParameterNames.STATE) String state) {
+            @RequestParam(OAuth2ParameterNames.CLIENT_ID) String clientId,
+            @RequestParam(OAuth2ParameterNames.SCOPE) String scope,
+            @RequestParam(OAuth2ParameterNames.STATE) String state) {
 
         RegisteredClient registeredClient = this.registeredClientRepository.findByClientId(clientId);
         Assert.notNull(registeredClient, "找不到客户端");
         OAuth2AuthorizationConsent currentAuthorizationConsent =
-            this.authorizationConsentService.findById(registeredClient.getId(), principal.getName());
+                this.authorizationConsentService.findById(registeredClient.getId(), principal.getName());
 
         Set<String> authorizedScopes =
-            currentAuthorizationConsent != null ? currentAuthorizationConsent.getScopes() : Collections.emptySet();
+                currentAuthorizationConsent != null ? currentAuthorizationConsent.getScopes() : Collections.emptySet();
 
         Set<String> scopesToApproves = new java.util.TreeSet<>();
         Set<String> previouslyApprovedScopesSet = new java.util.TreeSet<>();
 
         String[] scopes = StringUtils.delimitedListToStringArray(scope, " ");
         model.addAttribute("openidRequested", Arrays.asList(scopes).contains(OidcScopes.OPENID)
-            && registeredClient.getScopes().contains(OidcScopes.OPENID));
+                && registeredClient.getScopes().contains(OidcScopes.OPENID));
         model.addAttribute("scopeLabels", java.util.Map.of("profile", "基本资料", "email", "电子邮箱",
-            "phone", "手机号码", "address", "联系地址", "offline_access", "离线访问"));
+                "phone", "手机号码", "address", "联系地址", "offline_access", "离线访问"));
 
         Arrays.stream(scopes).filter(s -> registeredClient.getScopes().contains(s) && !OidcScopes.OPENID.equals(s))
-            .forEach(s -> {
-                if (authorizedScopes.contains(s)) {
-                    previouslyApprovedScopesSet.add(s);
-                } else {
-                    scopesToApproves.add(s);
-                }
-            });
+                .forEach(s -> {
+                    if (authorizedScopes.contains(s)) {
+                        previouslyApprovedScopesSet.add(s);
+                    } else {
+                        scopesToApproves.add(s);
+                    }
+                });
 
         String clientName = registeredClient.getClientName();
 

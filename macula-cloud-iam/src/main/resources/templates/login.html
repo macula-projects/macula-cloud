@@ -1,59 +1,144 @@
 <!DOCTYPE html>
 <html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="color-scheme" content="light"><meta name="referrer" content="same-origin">
-  <title>登录 · Macula</title>
-  <link rel="stylesheet" th:href="@{/iam/auth.css}" href="/iam/auth.css">
-  <script th:src="@{/iam/auth.js}" src="/iam/auth.js" defer></script>
+    <meta charset="utf-8">
+    <meta content="width=device-width, initial-scale=1, viewport-fit=cover" name="viewport">
+    <meta content="light" name="color-scheme">
+    <meta content="same-origin" name="referrer">
+    <title>登录 · Macula</title>
+    <link href="/iam/auth.css" rel="stylesheet" th:href="@{/iam/auth.css}">
+    <script defer src="/iam/auth.js" th:src="@{/iam/auth.js}"></script>
 </head>
 <body>
 <main class="shell">
-  <aside class="brand-panel" aria-label="Macula 统一身份平台">
-    <div class="brand"><span class="brand-mark" aria-hidden="true">M</span>Macula</div>
-    <div class="brand-content"><div class="eyebrow">ONE IDENTITY. CONNECTED WORK.</div>
-      <h1>一个身份，<br>连接你的工作。</h1><p>以统一、安全的身份访问企业应用，<br>让每一次连接都简单可信。</p></div>
-    <div class="orbit" aria-hidden="true"></div><div class="brand-meta">MACULA CLOUD · 统一身份平台</div>
-  </aside>
-  <section class="content-panel">
-    <div class="brand mobile-brand"><span class="brand-mark" aria-hidden="true">M</span>Macula</div>
-    <div class="card">
-      <span class="step">统一身份认证</span><h1>欢迎回来</h1><p class="subtitle">使用你的企业账号登录，继续访问应用。</p>
-      <div th:if="${authenticationError}" class="external-error" role="alert" th:text="${authenticationError}"></div>
-      <p class="alert" role="status" th:if="${!enablePasswordLogin and !enableSmsLogin and !githubLoginEnabled and !wecomLoginEnabled and !feishuLoginEnabled and !dingtalkLoginEnabled and !wechatLoginEnabled}">此应用暂无可用登录方式，请联系管理员。</p>
-      <div th:if="${enablePasswordLogin and enableSmsLogin}" class="tabs" role="tablist" aria-label="登录方式">
-        <button class="tab" type="button" role="tab" data-tab="password-login" aria-selected="true" aria-controls="password-login">账号密码</button>
-        <button class="tab" type="button" role="tab" data-tab="sms-login" aria-selected="false" aria-controls="sms-login">手机验证码</button>
-      </div>
-      <form th:if="${enablePasswordLogin}" id="password-login" data-login method="post" th:action="@{/login}">
-        <input th:if="${_csrf != null}" type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"><div class="error" role="alert" tabindex="-1"></div>
-        <div class="form-field"><label for="username">账号</label><input class="text-input" id="username" name="username" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="请输入你的账号" required></div>
-        <div class="form-field"><label for="password">密码</label><div class="password-wrap">
-          <input class="text-input" id="password" name="password" type="password" autocomplete="current-password" placeholder="请输入密码" required>
-          <button class="reveal" type="button" data-reveal="password" aria-controls="password" aria-pressed="false" aria-label="显示或隐藏密码">显示</button>
-        </div></div>
-        <button class="primary" type="submit">登录并继续 <span aria-hidden="true">&nbsp; →</span></button>
-      </form>
-      <form th:if="${enableSmsLogin}" id="sms-login" data-login method="post" th:action="@{/login/sms}" th:hidden="${enablePasswordLogin}">
-        <input th:if="${_csrf != null}" type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"><div class="error" role="alert" tabindex="-1"></div>
-        <div class="form-field"><label for="phone">手机号码</label><input class="text-input" id="phone" name="phone" type="tel" autocomplete="tel" placeholder="请输入手机号码" required></div>
-        <div class="form-field"><label for="code">验证码</label><div class="password-wrap code-wrap"><input class="text-input" id="code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="请输入验证码" required><button class="reveal" type="button" data-send-code data-send-code-url="api/v1/sms-code">获取验证码</button></div></div>
-        <button class="primary" type="submit">验证并登录</button>
-      </form>
-      <div th:if="${githubLoginEnabled or wecomLoginEnabled or feishuLoginEnabled or dingtalkLoginEnabled or wechatLoginEnabled}" class="external-login">
-        <div class="external-divider"><span>其他登录方式</span></div>
-        <a th:if="${githubLoginEnabled}" class="external-button" th:href="@{${githubLoginPath}}">使用 GitHub 登录</a>
-        <a th:if="${wecomLoginEnabled}" class="external-button wecom" th:href="@{${wecomLoginPath}}">使用企业微信登录</a>
-        <a th:if="${feishuLoginEnabled}" class="external-button feishu" th:href="@{${feishuLoginPath}}">使用飞书登录</a>
-        <a th:if="${dingtalkLoginEnabled}" class="external-button dingtalk" th:href="@{${dingtalkLoginPath}}">使用钉钉登录</a>
-        <a th:if="${wechatLoginEnabled}" class="external-button wechat" th:href="@{${wechatLoginPath}}">使用微信登录</a>
-      </div>
-      <p th:if="${browserEnvironmentNotice}" class="footnote">部分第三方入口适用于桌面或其专用客户端，请使用当前可用的登录方式。</p>
-      <p th:if="${wechatNeedsWebview}" class="footnote">此应用关联微信公众号，请在微信内打开登录。</p>
-      <p class="footnote">登录遇到问题？请联系你的企业管理员。</p>
-    </div>
-    <footer class="footer">Macula Cloud · 统一身份认证</footer>
-  </section>
+    <aside aria-label="Macula 统一身份平台" class="brand-panel">
+        <div class="brand"><span aria-hidden="true" class="brand-mark">M</span>Macula</div>
+        <div class="brand-content">
+            <div class="eyebrow">ONE IDENTITY. CONNECTED WORK.</div>
+            <h1>一个身份，<br>连接你的工作。</h1>
+            <p>以统一、安全的身份访问企业应用，<br>让每一次连接都简单可信。</p></div>
+        <div aria-hidden="true" class="orbit"></div>
+        <div class="brand-meta">MACULA CLOUD · 统一身份平台</div>
+    </aside>
+    <section class="content-panel">
+        <div class="brand mobile-brand"><span aria-hidden="true" class="brand-mark">M</span>Macula</div>
+        <div class="card">
+            <span class="step">统一身份认证</span>
+            <h1>欢迎回来</h1>
+            <p class="subtitle">使用你的企业账号登录，继续访问应用。</p>
+            <div class="external-error" role="alert" th:if="${authenticationError}"
+                 th:text="${authenticationError}"></div>
+            <p class="alert" role="status"
+               th:if="${!enablePasswordLogin and !enableSmsLogin and !enableEmailLogin and !githubLoginEnabled and !wecomLoginEnabled and !feishuLoginEnabled and !dingtalkLoginEnabled and !wechatLoginEnabled}">
+                此应用暂无可用登录方式，请联系管理员。</p>
+            <div aria-label="登录方式"
+                 class="tabs" role="tablist" th:if="${(enablePasswordLogin and enableSmsLogin) or (enablePasswordLogin and enableEmailLogin) or (enableSmsLogin and enableEmailLogin)}">
+                <button aria-controls="password-login" aria-selected="true" class="tab" data-tab="password-login" role="tab"
+                        th:if="${enablePasswordLogin}" type="button">账号密码
+                </button>
+                <button aria-controls="sms-login" class="tab" data-tab="sms-login" role="tab" th:attr="aria-selected=${!enablePasswordLogin},tabindex=${enablePasswordLogin ? -1 : 0}"
+                        th:if="${enableSmsLogin}"
+                        type="button">手机验证码
+                </button>
+                <button aria-controls="email-login" class="tab" data-tab="email-login" role="tab" th:attr="aria-selected=${!enablePasswordLogin and !enableSmsLogin},tabindex=${enablePasswordLogin or enableSmsLogin ? -1 : 0}"
+                        th:if="${enableEmailLogin}"
+                        type="button">邮箱验证码
+                </button>
+            </div>
+            <form data-login id="password-login" method="post" th:action="@{/login}" th:if="${enablePasswordLogin}">
+                <input th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"
+                       type="hidden">
+                <div class="error" role="alert" tabindex="-1"></div>
+                <div class="form-field"><label for="username">账号</label><input autocapitalize="none" autocomplete="username"
+                                                                                 class="text-input" id="username"
+                                                                                 name="username"
+                                                                                 placeholder="请输入你的账号"
+                                                                                 required
+                                                                                 spellcheck="false" type="text">
+                </div>
+                <div class="form-field"><label for="password">密码</label>
+                    <div class="password-wrap">
+                        <input autocomplete="current-password" class="text-input" id="password" name="password"
+                               placeholder="请输入密码" required type="password">
+                        <button aria-controls="password" aria-label="显示或隐藏密码" aria-pressed="false" class="reveal"
+                                data-reveal="password" type="button">显示
+                        </button>
+                    </div>
+                </div>
+                <button class="primary" type="submit">登录并继续 <span aria-hidden="true">&nbsp; →</span></button>
+            </form>
+            <form data-login id="sms-login" method="post" th:action="@{/login/sms}" th:hidden="${enablePasswordLogin}"
+                  th:if="${enableSmsLogin}">
+                <input th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"
+                       type="hidden">
+                <div class="error" role="alert" tabindex="-1"></div>
+                <div class="form-field"><label for="phone">手机号码</label><input autocomplete="tel" class="text-input"
+                                                                                  id="phone" name="phone"
+                                                                                  placeholder="请输入手机号码"
+                                                                                  required type="tel">
+                </div>
+                <div class="form-field"><label for="code">验证码</label>
+                    <div class="password-wrap code-wrap"><input autocomplete="one-time-code" class="text-input" id="code" inputmode="numeric"
+                                                                name="code" placeholder="请输入验证码"
+                                                                required type="text">
+                        <button class="reveal" data-send-code data-send-code-url="api/v1/sms-code" type="button">
+                            获取验证码
+                        </button>
+                    </div>
+                </div>
+                <button class="primary" type="submit">验证并登录</button>
+            </form>
+            <form data-login id="email-login" method="post" th:action="@{/login/email}" th:hidden="${enablePasswordLogin or enableSmsLogin}"
+                  th:if="${enableEmailLogin}">
+                <input th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"
+                       type="hidden">
+                <div class="error" role="alert" tabindex="-1"></div>
+                <div class="form-field"><label for="email">邮箱</label><input autocapitalize="none" autocomplete="email" class="text-input"
+                                                                              id="email" maxlength="128"
+                                                                              name="email" placeholder="请输入账号邮箱"
+                                                                              required
+                                                                              spellcheck="false" type="email">
+                </div>
+                <div class="form-field"><label for="email-code">验证码</label>
+                    <div class="password-wrap code-wrap"><input autocomplete="one-time-code" class="text-input" id="email-code"
+                                                                inputmode="numeric" maxlength="6"
+                                                                name="code" pattern="[0-9]{6}"
+                                                                placeholder="请输入验证码" required type="text">
+                        <button class="reveal" data-code-target="email" data-send-code th:data-send-code-url="@{/api/v1/email-code}"
+                                type="button">获取验证码
+                        </button>
+                    </div>
+                </div>
+                <button class="primary" type="submit">验证并登录</button>
+            </form>
+            <div class="external-login"
+                 th:if="${githubLoginEnabled or wecomLoginEnabled or feishuLoginEnabled or dingtalkLoginEnabled or wechatLoginEnabled}">
+                <div class="external-divider"><span>其他登录方式</span></div>
+                <div aria-label="第三方登录" class="external-icons" role="group">
+                    <a aria-label="使用GitHub登录" class="external-button github" th:href="@{${githubLoginPath}}"
+                       th:if="${githubLoginEnabled}" title="使用GitHub登录"><img alt=""
+                                                                               height="28" th:src="@{/iam/icons/github.svg}" width="28"></a>
+                    <a aria-label="使用企业微信登录" class="external-button wecom" th:href="@{${wecomLoginPath}}"
+                       th:if="${wecomLoginEnabled}" title="使用企业微信登录"><img alt=""
+                                                                                   height="28" th:src="@{/iam/icons/wecom.svg}" width="28"></a>
+                    <a aria-label="使用飞书登录" class="external-button feishu" th:href="@{${feishuLoginPath}}"
+                       th:if="${feishuLoginEnabled}" title="使用飞书登录"><img alt="" height="28"
+                                                                           th:src="@{/iam/icons/feishu.svg}" width="28"></a>
+                    <a aria-label="使用钉钉登录" class="external-button dingtalk"
+                       th:href="@{${dingtalkLoginPath}}" th:if="${dingtalkLoginEnabled}" title="使用钉钉登录"><img
+                            alt="" height="28" th:src="@{/iam/icons/dingtalk.svg}" width="28"></a>
+                    <a aria-label="使用微信登录" class="external-button wechat" th:href="@{${wechatLoginPath}}"
+                       th:if="${wechatLoginEnabled}" title="使用微信登录"><img alt="" height="28"
+                                                                           th:src="@{/iam/icons/wechat.svg}" width="28"></a>
+                </div>
+            </div>
+            <p class="footnote" th:if="${browserEnvironmentNotice}">
+                部分第三方入口适用于桌面或其专用客户端，请使用当前可用的登录方式。</p>
+            <p class="footnote" th:if="${wechatNeedsWebview}">此应用关联微信公众号，请在微信内打开登录。</p>
+            <p class="footnote">登录遇到问题？请联系你的企业管理员。</p>
+        </div>
+        <footer class="footer">Macula Cloud · 统一身份认证</footer>
+    </section>
 </main>
 </body>
 </html>

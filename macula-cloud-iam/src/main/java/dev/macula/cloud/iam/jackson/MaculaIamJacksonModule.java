@@ -17,9 +17,9 @@
 
 package dev.macula.cloud.iam.jackson;
 
+import dev.macula.cloud.iam.authentication.sms.SmsAuthenticationToken;
 import tools.jackson.core.Version;
 import tools.jackson.databind.module.SimpleModule;
-import dev.macula.cloud.iam.authentication.sms.SmsAuthenticationToken;
 
 /**
  * IAM 认证对象的 Jackson 3 序列化适配。
@@ -35,6 +35,8 @@ public class MaculaIamJacksonModule extends SimpleModule {
 
     @Override
     public void setupModule(SetupContext context) {
+        context.setMixIn(dev.macula.cloud.iam.authentication.email.EmailCodeAuthenticationToken.class,
+                EmailCodeAuthenticationTokenMixin.class);
         context.setMixIn(SmsAuthenticationToken.class, SmsAuthenticationTokenMixin.class);
         context.setMixIn(Long.class, LongMixin.class);
     }

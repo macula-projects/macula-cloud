@@ -63,7 +63,7 @@ import static org.mockito.Mockito.times;
  */
 @EnabledIfEnvironmentVariable(named = "SYSTEM_CLIENT_CONCURRENCY_IT", matches = "true")
 class OAuth2ClientApplicationConcurrencyIT {
-    /** 两个连接同时读取相同配置快照，再按指定顺序提交，仅获胜者产生绑定/缓存副作用。 */
+    /** 两个连接竞争EMAIL/PASSWORD配置快照，只有获胜者提交，失败方409且无重复缓存副作用。 */
     @Test
     void racesCompleteConfigurationSnapshots() throws Exception {
         String url = System.getenv("SYSTEM_CLIENT_CONCURRENCY_URL");
@@ -129,6 +129,8 @@ class OAuth2ClientApplicationConcurrencyIT {
                     session.getMapper(SysIdentityProviderMapper.class)), new dev.macula.cloud.system.service.impl.ApplicationProtocolConfigurationService(session.getMapper(dev.macula.cloud.system.mapper.SysApplicationProtocolConfigMapper.class), session.getMapper(SysOAuth2ClientExternalProviderMapper.class)));
             OAuth2ClientForm first = form("SPA", "winner");
             OAuth2ClientForm second = form("SPA", "loser");
+            first.setHostedLoginMethods(java.util.Set.of("EMAIL"));
+            second.setHostedLoginMethods(java.util.Set.of("PASSWORD"));
             String version = new dev.macula.cloud.system.service.impl.ApplicationProtocolConfigurationService(
                 session.getMapper(dev.macula.cloud.system.mapper.SysApplicationProtocolConfigMapper.class),
                 session.getMapper(SysOAuth2ClientExternalProviderMapper.class)).version(realMapper.selectById(1L));
@@ -159,7 +161,8 @@ class OAuth2ClientApplicationConcurrencyIT {
                 assertEquals(409, loser.get(15, TimeUnit.SECONDS));
                 assertEquals(first.getApplicationType(), jdbc.queryForObject("SELECT application_type FROM sys_oauth2_client WHERE id=1", String.class));
                 assertEquals("winner", jdbc.queryForObject("SELECT client_name FROM sys_oauth2_client WHERE id=1", String.class));
-                verify(cache, times(1)).clear();
+                assertEquals("EMAIL", jdbc.queryForObject("SELECT hosted_login_methods FROM sys_oauth2_client WHERE id=1", String.class));
+                verify(cache, times(1)).invalidate();
             } finally {
                 executor.shutdownNow();
             }

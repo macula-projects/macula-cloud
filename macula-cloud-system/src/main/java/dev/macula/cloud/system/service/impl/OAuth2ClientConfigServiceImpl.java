@@ -30,7 +30,7 @@ import dev.macula.cloud.system.pojo.entity.SysIdentityProvider;
 import dev.macula.cloud.system.pojo.entity.SysOAuth2ClientConfig;
 import dev.macula.cloud.system.pojo.entity.SysOAuth2ClientExternalProvider;
 import dev.macula.cloud.system.service.OAuth2ClientConfigService;
-import dev.macula.cloud.system.security.OAuth2LoginGrantTypes;
+import dev.macula.cloud.system.security.OAuth2GrantPolicy;
 import dev.macula.cloud.system.security.OAuth2ClientCacheNames;
 import dev.macula.cloud.system.enums.BrowserLoginProviderType;
 import dev.macula.cloud.system.enums.ExternalCodeType;
@@ -84,11 +84,9 @@ import java.util.stream.Collectors;
 public class OAuth2ClientConfigServiceImpl implements OAuth2ClientConfigService {
     private static final String AUTHORIZATION_CODE_GRANT = "authorization_code";
     private static final String CLIENT_CREDENTIALS_GRANT = "client_credentials";
-    private static final String SMS_GRANT = "sms";
     private static final Set<String> AUTH = Set.of("none", "client_secret_basic", "client_secret_post",
         "private_key_jwt");
-    private static final Set<String> GRANTS = Set.of(AUTHORIZATION_CODE_GRANT, "refresh_token",
-        CLIENT_CREDENTIALS_GRANT, SMS_GRANT, OAuth2LoginGrantTypes.EMAIL, ExternalCodeType.GRANT_TYPE);
+    private static final Set<String> GRANTS = OAuth2GrantPolicy.supported();
     private static final Set<String> USERS = Set.of("member", "employee", "odc", "supplier");
     private static final String MOBILE_APP_ID = "mobileAppId";
     private static final String MOBILE_APP_SECRET = "mobileAppSecret";
@@ -218,7 +216,7 @@ public class OAuth2ClientConfigServiceImpl implements OAuth2ClientConfigService 
         if (csv(form.getClientAuthenticationMethods()).contains("none") && csv(form.getClientAuthenticationMethods()).size() != 1) { bad("none不能与其他认证组合"); }
         Set<String> grants = csv(form.getAuthorizationGrantTypes());
         if (!GRANTS.containsAll(grants) || !AUTH.containsAll(csv(form.getClientAuthenticationMethods()))) { bad("认证或授权方式无效"); }
-        boolean oauthOnlyGrant = grants.stream().anyMatch(grant -> Set.of("client_credentials", "sms", "email").contains(grant));
+        boolean oauthOnlyGrant = grants.stream().anyMatch(grant -> Set.of("client_credentials").contains(grant));
         if (!form.getEnabledProtocols().contains(OAuth2ProtocolMode.OAUTH2_1.value()) && oauthOnlyGrant) { bad("直接Token授权及SDK能力需要启用OAuth2.1"); }
         Set<String> allowed = form.getEnabledProtocols().stream().flatMap(protocol -> configurationCatalog
             .allowedScopes(protocol, form.getApplicationType(), grants).stream()).collect(Collectors.toSet());
@@ -530,10 +528,6 @@ public class OAuth2ClientConfigServiceImpl implements OAuth2ClientConfigService 
             bad("外部凭证登录必须由公共客户端同时配置 grant 和非空 code type");
         }
         Set<String> allowedOrigins = normalizeOrigins(form.getAllowedOrigins());
-        boolean verificationCodeGrant = hasVerificationCodeGrant(grants);
-        if (verificationCodeGrant && !publicClient) {
-            bad("短信或邮箱验证码 grant 必须由公共客户端使用");
-        }
         if (csvValue(allowedOrigins).length() > ALLOWED_ORIGINS_MAX_LENGTH) {
             bad("浏览器协议允许 Origin 超出长度限制");
         }
@@ -729,9 +723,6 @@ public class OAuth2ClientConfigServiceImpl implements OAuth2ClientConfigService 
         return true;
     }
 
-    private boolean hasVerificationCodeGrant(Set<String> grants) {
-        return grants.contains(SMS_GRANT) || grants.contains(OAuth2LoginGrantTypes.EMAIL);
-    }
 
     private boolean hasInvalidCsvStructure(String value) {
         if (!StringUtils.hasText(value)) {

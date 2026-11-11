@@ -1,3 +1,5 @@
+export const RETIRED_GRANTS = Object.freeze(["password", "sms", "email"]);
+
 // 单应用只保留一个协议；新协议须有独立配置实现后才加入目录。
 export const APPLICATION_PROTOCOLS = Object.freeze([
   {code:'OIDC',label:'OIDC',description:'用户登录及身份资料',family:'oauth2'},
@@ -56,6 +58,7 @@ export function normalizeProtocol(client, code=client.protocol) {
   const settings=ensureProtocol(client,code).settings,old=JSON.stringify(settings)
   if (['SPA','NATIVE','MINIAPP'].includes(client.applicationType)) settings.clientAuthenticationMethods='none'
   let grants=csv(settings.authorizationGrantTypes)
+  const retired=grants.filter(value=>RETIRED_GRANTS.includes(value))
   if (code==='OIDC') {
     grants=grants.filter(item=>['authorization_code','refresh_token','urn:macula:params:oauth:grant-type:external_code'].includes(item))
     // 默认授权在创建模板中设置；移除SDK来源后保持空授权，不自动变成网页登录。
@@ -72,6 +75,6 @@ export function normalizeProtocol(client, code=client.protocol) {
   if(grants.includes('client_credentials'))settings.scopes=csv(settings.scopes).filter(item=>item!=='profile').join(',')
   if (grants.includes('authorization_code')) settings.requireProofKey=true
   if (settings.clientAuthenticationMethods==='private_key_jwt') settings.signingAlgorithm ||= 'RS256'
-  settings.authorizationGrantTypes=[...new Set(grants)].join(',')
+  settings.authorizationGrantTypes=[...new Set([...grants,...retired])].join(',')
   return old!==JSON.stringify(settings)
 }

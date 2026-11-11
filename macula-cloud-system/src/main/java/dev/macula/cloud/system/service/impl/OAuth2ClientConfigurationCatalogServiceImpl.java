@@ -64,7 +64,7 @@ public class OAuth2ClientConfigurationCatalogServiceImpl implements OAuth2Client
     private List<OAuth2ClientConfigurationCatalogVO.Scope> scopes() {
         List<OAuth2ClientConfigurationCatalogVO.Scope> scopes = new ArrayList<>();
         scopes.add(new OAuth2ClientConfigurationCatalogVO.Scope("openid", "OpenID登录", "签发ID Token", true, Set.of(), Set.of()));
-        scopes.add(new OAuth2ClientConfigurationCatalogVO.Scope("profile", "基础资料", "当前仅用户名、昵称", false, Set.of(), Set.of("authorization_code", "sms", "email", ExternalCodeType.GRANT_TYPE)));
+        scopes.add(new OAuth2ClientConfigurationCatalogVO.Scope("profile", "基础资料", "当前仅用户名、昵称", false, Set.of(), Set.of("authorization_code", ExternalCodeType.GRANT_TYPE)));
         scopes.add(new OAuth2ClientConfigurationCatalogVO.Scope("system:access", "系统API", "仍需通过角色及租户权限检查", false, Set.of(), Set.of()));
         for (OAuth2ScopeCatalogProperties.Scope scope : properties.getBusiness()) {
             scopes.add(new OAuth2ClientConfigurationCatalogVO.Scope(scope.getId(), scope.getName(),

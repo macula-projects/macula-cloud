@@ -31,7 +31,7 @@ import tools.jackson.databind.deser.jdk.NumberDeserializers;
  */
 @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, property = "@class")
 @JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY, getterVisibility = JsonAutoDetect.Visibility.NONE,
-    isGetterVisibility = JsonAutoDetect.Visibility.NONE)
+        isGetterVisibility = JsonAutoDetect.Visibility.NONE)
 @JsonDeserialize(using = NumberDeserializers.LongDeserializer.class)
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class LongMixin {

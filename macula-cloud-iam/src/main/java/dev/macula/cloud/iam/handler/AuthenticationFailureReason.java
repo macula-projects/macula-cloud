@@ -42,17 +42,9 @@ public enum AuthenticationFailureReason {
         this.message = message;
     }
 
-    public String code() {
-        return code;
-    }
-
-    public String message() {
-        return message;
-    }
-
     public static AuthenticationFailureReason from(AuthenticationException exception) {
         if (exception instanceof BadCredentialsException || exception instanceof AccountStatusException
-            || exception instanceof UsernameNotFoundException) {
+                || exception instanceof UsernameNotFoundException) {
             return AUTHENTICATION_REJECTED;
         }
         return AUTHENTICATION_UNAVAILABLE;
@@ -60,6 +52,14 @@ public enum AuthenticationFailureReason {
 
     public static AuthenticationFailureReason fromCode(String code) {
         return Arrays.stream(values()).filter(reason -> reason.code.equals(code)).findFirst()
-            .orElse(AUTHENTICATION_UNAVAILABLE);
+                .orElse(AUTHENTICATION_UNAVAILABLE);
+    }
+
+    public String code() {
+        return code;
+    }
+
+    public String message() {
+        return message;
     }
 }

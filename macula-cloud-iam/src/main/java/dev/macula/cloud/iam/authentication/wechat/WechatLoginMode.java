@@ -16,11 +16,11 @@
  */
 package dev.macula.cloud.iam.authentication.wechat;
 
+import java.util.Locale;
+
 import dev.macula.cloud.iam.enums.ThirdPartyProviderType;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpHeaders;
-
-import java.util.Locale;
 
 /**
  * 选择微信开放平台网站登录或公众号网页授权模式。
@@ -56,7 +56,7 @@ public enum WechatLoginMode {
             return WEBVIEW;
         }
         if (value.contains("chrome/") || value.contains("firefox/") || value.contains("safari/") ||
-            value.contains("edg/")) {
+                value.contains("edg/")) {
             return BROWSER;
         }
         return UNKNOWN;

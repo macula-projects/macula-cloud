@@ -16,9 +16,9 @@
  */
 package dev.macula.cloud.iam.protocol.oauth2.grant.externalcode;
 
-import dev.macula.cloud.system.enums.ExternalCodeType;
-
 import java.util.Set;
+
+import dev.macula.cloud.system.enums.ExternalCodeType;
 
 /**
  * 使用固定身份源配置向对应第三方核验一种或多种 code type。
@@ -31,14 +31,20 @@ public interface ExternalCodeVerifier {
 
     ExternalCodeVerification verify(ExternalCodeType codeType, Long identityProviderId, String code);
 
-    /** 仅实现了精确上游PKCE合同的适配器可接收证明；默认不扩展既有平台参数。 */
+    /**
+     * 仅实现了精确上游PKCE合同的适配器可接收证明；默认不扩展既有平台参数。
+     */
     default ExternalCodeVerification verify(ExternalCodeType codeType, Long identityProviderId, String code,
-        String providerCodeVerifier) {
-        if (providerCodeVerifier != null) { throw new IllegalArgumentException("当前flow不接收上游PKCE材料"); }
+            String providerCodeVerifier) {
+        if (providerCodeVerifier != null) {
+            throw new IllegalArgumentException("当前flow不接收上游PKCE材料");
+        }
         return verify(codeType, identityProviderId, code);
     }
+
     /**
      * 仅精确实现AppLink合同的适配器接收已校验回调，其他厂商默认拒绝。
+     *
      * @param codeType 已登记Code类型
      * @param identityProviderId Client固定来源
      * @param code 单次厂商Code
@@ -47,8 +53,10 @@ public interface ExternalCodeVerifier {
      * @return 完成厂商核验后的身份
      */
     default ExternalCodeVerification verify(ExternalCodeType codeType, Long identityProviderId, String code,
-        String providerCodeVerifier, String providerRedirectUri) {
-        if (providerRedirectUri != null) { throw new IllegalArgumentException("当前能力不接收平台回调参数"); }
+            String providerCodeVerifier, String providerRedirectUri) {
+        if (providerRedirectUri != null) {
+            throw new IllegalArgumentException("当前能力不接收平台回调参数");
+        }
         return verify(codeType, identityProviderId, code, providerCodeVerifier);
     }
 

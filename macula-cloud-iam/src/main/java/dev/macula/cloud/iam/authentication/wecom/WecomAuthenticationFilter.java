@@ -16,9 +16,7 @@
  */
 package dev.macula.cloud.iam.authentication.wecom;
 
-import dev.macula.cloud.iam.authentication.thirdparty.AbstractThirdPartyAuthenticationFilter;
-import dev.macula.cloud.iam.authentication.thirdparty.IdentityProviderConfigService.ProviderConfig;
-import dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyLoginContext;
+import dev.macula.cloud.iam.authentication.thirdparty.browser.AbstractThirdPartyAuthenticationFilter;
 import dev.macula.cloud.iam.enums.ThirdPartyProviderType;
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -29,26 +27,21 @@ import jakarta.servlet.http.HttpServletRequest;
  * @since 6.1.0
  */
 public class WecomAuthenticationFilter extends AbstractThirdPartyAuthenticationFilter {
-    private WecomClient client;
 
+    /**
+     * 仅接受该厂商已登记入口。
+     */
     public WecomAuthenticationFilter() {
         super(ThirdPartyProviderType.WECOM.providerType(), ThirdPartyProviderType.WECOM.loginPath());
     }
 
-    void wecomClient(WecomClient client) {
-        this.client = client;
-    }
-
+    /**
+     * 从精确入口解析既有浏览器/容器模式。
+     */
     @Override
     protected String loginMode(HttpServletRequest request) {
         WecomLoginMode mode = WecomLoginMode.from(request);
         return mode == WecomLoginMode.UNKNOWN ? null : mode.name();
     }
 
-    @Override
-    protected String authorizationUri(ProviderConfig config, String state, String redirectUri,
-        ThirdPartyLoginContext context) {
-        return client.authorizationUri(config, state, redirectUri,
-            WecomLoginMode.valueOf(context.loginMode()));
-    }
 }

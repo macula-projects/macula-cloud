@@ -39,7 +39,7 @@ import static org.springframework.security.config.annotation.web.builders.Filter
  * @since 6.1.0
  */
 public class SmsLoginFilterConfigurer<H extends HttpSecurityBuilder<H>>
-    extends AbstractAuthenticationFilterConfigurer<H, SmsLoginFilterConfigurer<H>, SmsAuthenticationFilter> {
+        extends AbstractAuthenticationFilterConfigurer<H, SmsLoginFilterConfigurer<H>, SmsAuthenticationFilter> {
 
     private SmsUserDetailsService smsUserDetailsService;
 
@@ -62,8 +62,8 @@ public class SmsLoginFilterConfigurer<H extends HttpSecurityBuilder<H>>
     @Override
     public void init(H http) {
         http.authenticationProvider(postProcess(authenticationProvider(http)));
-        registryFilterOrder((HttpSecurity)http, getAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class,
-            AFTER);
+        registryFilterOrder((HttpSecurity) http, getAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class,
+                AFTER);
         super.init(http);
     }
 
@@ -75,12 +75,12 @@ public class SmsLoginFilterConfigurer<H extends HttpSecurityBuilder<H>>
     protected AuthenticationProvider authenticationProvider(H http) {
         ApplicationContext applicationContext = http.getSharedObject(ApplicationContext.class);
         SmsUserDetailsService smsUserDetailsService = this.smsUserDetailsService != null ? this.smsUserDetailsService
-            : getBeanOrNull(applicationContext, SmsUserDetailsService.class);
+                : getBeanOrNull(applicationContext, SmsUserDetailsService.class);
 
         Assert.notNull(smsUserDetailsService, "smsUserDetailsService is required");
 
         SmsService smsService = this.smsService != null ? this.smsService
-            : getBeanOrNull(applicationContext, SmsService.class);
+                : getBeanOrNull(applicationContext, SmsService.class);
 
         Assert.notNull(smsService, "smsService is required");
 

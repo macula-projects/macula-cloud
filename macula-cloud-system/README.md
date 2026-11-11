@@ -83,7 +83,7 @@ JSON时间点同样可以使用 `Instant`：Jackson原生支持带时区ISO读�
 
 Web 默认 Basic 与授权码；SPA/本地应用使用 none 与 S256 PKCE；服务应用使用 client_credentials 和目录中的业务 Scope；小程序使用已关联具体来源的 external_code。协议、Scope 和来源能力均从目录选择。private_key_jwt 保持 HTTPS JWKS URL 配置，私钥由客户端保管；平台端点使用紧凑只读文本与复制。
 
-托管登录方式`hostedLoginMethods`支持PASSWORD/SMS，null继承平台、[]关闭全部本地方式；全局关闭优先。托管页呈现、密码/SMS POST和发码使用Session受控授权请求的同一Client策略，核对授权端点、唯一client_id、code响应及精确回调。请求参数/header/cookie不能成为可信身份，验证码发送与消费绑定相同Client。策略只控制新托管认证，不撤销已有SSO会话/Token，不改变独立Token扩展grant的校验。
+托管登录方式`hostedLoginMethods`支持PASSWORD/SMS/EMAIL，null继承平台、[]关闭全部本地方式；全局关闭优先。托管页呈现、密码/SMS/EMAIL POST和发码使用Session受控授权请求的同一Client策略，核对授权端点、唯一client_id、code响应及精确回调。请求参数/header/cookie不能成为可信身份，验证码发送与消费绑定相同Client。策略只控制新托管认证，不撤销已有SSO会话/Token，不改变独立Token扩展grant的校验。
 
 同厂商可配置多个具体身份源。每个 Client 为每个网页厂商明确关联一个 registration，SDK/小程序按认证能力关联具体来源；运行时不按厂商全局择一。取消应用关联不删除来源，有引用时禁止删除来源。来源类型及 AppID/CorpID 等身份域标识保存后不可替换，Secret 可轮换。
 
@@ -249,7 +249,7 @@ System追加V21两个nullable映射列，确定转换原三种bindingRule；未�
 
 管理页面将“应用类型”单选与“登录能力”多选分开，凭据只填写一次；不显示flow、接口版本或通讯录策略。应用类型创建后固定，修改应用身份标识需新建来源；应用Secret仍可轮换，变化递增来源版本。关闭全部能力可保留来源配置，但不能用于认证。已有显式历史合同保留，不自动切换厂商接口。
 
-应用登录控制按能力固定registrationId，微信网站来源用于Web/SPA，服务号来源用于IN_APP，不能在同一Client混用。展示、显式发起、自动直登、回调、Code换码、目录、缓存及账号证明都复查当前能力与来源版本；不能凭客户端自报终端或registration切换凭据。应用类型先筛选能力，实际浏览器/容器再筛选网页登录入口。密码/SMS与统一登录/平台Code双入口策略保持。
+应用登录控制按能力固定registrationId，微信网站来源用于Web/SPA，服务号来源用于IN_APP，不能在同一Client混用。展示、显式发起、自动直登、回调、Code换码、目录、缓存及账号证明都复查当前能力与来源版本；不能凭客户端自报终端或registration切换凭据。应用类型先筛选能力，实际浏览器/容器再筛选网页登录入口。密码/SMS/EMAIL与统一登录/平台Code双入口策略保持。
 
 存储与接口：V22新增sys_identity_provider.credential_type、capabilities_json及sys_oauth2_client.browser_capability_bindings。身份源请求新增credentialType/loginCapabilities；Client新增browserCapabilityBindings（能力代码→registrationId）。来源能力JSON只保存服务器选定的合同，密钥留在原加密列。Client网页关联使用受控JSON文本，与旧关联字段保持字符串CAS语义。
 
@@ -274,9 +274,9 @@ V23只新增nullable `binding_mappings_json`。NULL按旧单条合同读取；�
 
 | 业务应用类型 | 第三方能力及数量 | IAM页面 |
 | --- | --- | --- |
-| 标准Web `WEB_SERVER` | 多个通用网页来源：微信网站、企微浏览器、飞书网页、钉钉网页、GitHub | 内置密码/短信，下方显示第三方图标；不按UA自动直登 |
+| 标准Web `WEB_SERVER` | 多个通用网页来源：微信网站、企微浏览器、飞书网页、钉钉网页、GitHub | 内置密码/短信/邮箱，下方显示第三方图标；不按UA自动直登 |
 | 单页Web `SPA` | 同标准Web；授权码使用S256 PKCE | 同标准Web |
-| 移动客户端 `NATIVE` | 仅一个移动SDK或AppLink能力、一个固定来源 | 可另开内置密码/短信入口；无第三方网页图标 |
+| 移动客户端 `NATIVE` | 仅一个移动SDK或AppLink能力、一个固定来源 | 可另开内置密码/短信/邮箱入口；无第三方网页图标 |
 | 小程序 `MINIAPP` | 仅一个本平台小程序来源；微信登录Code/手机号Code可同时关联同一来源 | 可另开内置入口；无第三方网页图标，业务方负责回传桥接 |
 | 端内应用 `IN_APP` | 启用时恰一个端内能力：企微/公众号网页授权，或飞书/钉钉JSAPI Code | 无标准页；企微/微信在对应容器直接进入平台授权；JSAPI由业务前端取码 |
 | 后端服务 `SERVICE` | 无用户身份源；OAuth2.1仅`client_credentials`及业务Scope | 无用户登录；界面只保留客户端认证、Scope、Token参数和示例 |
@@ -307,3 +307,19 @@ V23只新增nullable `binding_mappings_json`。NULL按旧单条合同读取；�
 升级顺序：先升级全部相关网关；执行新增 Flyway `V24__application_url_ip_allowlist.sql`，再启用新版 System/Admin 写入口并重建缓存。迁移仅新增两张表的可空 IP 列、将应用 URL 扩为 2000 字符，历史值不改写，不改旧迁移。启用新配置后不可直接回退旧网关；回退不自动删列/缩列。
 
 网关默认使用直连对端地址，不直接信任调用者的转发头；代理场景可能匹配代理 IP，部署需保证服务器转发头处理不会让调用方伪造匹配地址。数据库提交后缓存发布仍可能失败，错误响应不代表新限制已经生效，应刷新确认并按既有机制重试/重建。
+
+
+## 自定义授权收敛与旧配置整改
+
+当前可用授权为 `authorization_code`、`refresh_token`、`client_credentials` 及唯一自定义扩展 `urn:macula:params:oauth:grant-type:external_code`，仍受应用类型、协议、客户端认证和固定来源约束。公共客户端不因此获得刷新或服务凭据权限。托管密码/SMS/EMAIL、绑定专用短信、SDK/小程序/JSAPI 登录和业务邮件/短信能力保留；邮箱字段映射与托管认证独立；当前未开放 OIDC `email` Scope。
+
+`password`、`sms`、`email` 不再兑换新 Token。有效机密 Client 请求这些 grant 返回 `unsupported_grant_type`；未提取到有效客户端身份时返回 JSON `invalid_client`，不跳转登录页。三个原协议专属端点 `/api/v1/oauth2/sms-codes`、`/api/v1/oauth2/email-codes`、`/api/v1/oauth2/login-challenges/captcha` 返回 HTTP 410 和 `{"error":"endpoint_retired"}`，不发码、不创建会话。托管 `/api/v1/sms-code` 与绑定 `/login/bind/sms-code` 保留原用途、CSRF 和限流规则。
+
+升级前盘点旧调用方；管理员明确移除已退役 grant 并为实际应用配置受支持流程。页面保留历史值并提示整改，禁止未整改保存和接入示例复制，不在加载时自动转换或批量修改 Client。System 两条写入链均拒绝旧值；已知旧配置仅允许按原边界读取，不恢复退役执行权限。配置显式更新仍按原 authorizationVersion 规则使旧授权失效。
+
+本次代码升级不主动批量撤销旧 Access Token，继续执行到期、撤销和当前配置版本校验；旧 password/sms/email 原授权的 Refresh 不再换发，返回 `invalid_grant`。退役邮箱主体只按固定旧序列化结构受限读取，不扩大任意类白名单或重写缓存。
+
+SDK 首次绑定可继续通过 `/login/bind/external` 的密码、绑定短信或合格会话证明完成，绑定后重新取得平台 Code；不因此创建 SSO 或直接发 Token。Token 绑定 API 只保留同 Client 的授权码 Token 证明，不能用待绑定的 external_code 自证。没有数据库 schema/历史绑定表变更，不执行自动数据整改；真实厂商、设备和现网退出日期仍须单独验收。
+
+
+EMAIL 为托管邮箱验证码认证方式。V25 一次性为具备托管能力的合法非空显式列表追加 EMAIL；null 继承默认、空列表保持关闭，迁移后管理员主动取消不会被重开。上线前需配置 MAIL 渠道、MAIL_LOGIN 模板及 IAM_EMAIL_DIGEST_KEY，回滚旧版本需同步处理 EMAIL 配置值。

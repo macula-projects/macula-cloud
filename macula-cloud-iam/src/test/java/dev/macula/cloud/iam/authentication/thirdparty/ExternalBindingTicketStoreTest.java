@@ -16,14 +16,14 @@
  */
 package dev.macula.cloud.iam.authentication.thirdparty;
 
+import java.util.Arrays;
+import java.util.stream.Stream;
+
 import dev.macula.cloud.iam.enums.UserTypeEnum;
 import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeSecurityProperties;
 import org.junit.jupiter.api.Test;
 import org.mockito.Answers;
 import org.springframework.data.redis.core.StringRedisTemplate;
-
-import java.util.Arrays;
-import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -36,6 +36,17 @@ import static org.mockito.Mockito.mockingDetails;
  * @since 6.1.0
  */
 class ExternalBindingTicketStoreTest {
+    private static Stream<String> strings(Object value) {
+        if (value instanceof Object[] values) {
+            return Arrays.stream(values).flatMap(ExternalBindingTicketStoreTest::strings);
+        }
+        if (value instanceof Iterable<?> values) {
+            return java.util.stream.StreamSupport.stream(values.spliterator(), false)
+                    .flatMap(ExternalBindingTicketStoreTest::strings);
+        }
+        return Stream.of(String.valueOf(value));
+    }
+
     @Test
     void storesSensitiveBindingValuesAsCiphertextBehindDigestKey() {
         StringRedisTemplate redis = mock(StringRedisTemplate.class, invocation -> {
@@ -49,27 +60,17 @@ class ExternalBindingTicketStoreTest {
         ExternalBindingTicketStore store = new ExternalBindingTicketStore(redis, properties);
 
         String mobileTicket = store.issue("client-a", 1L, UserTypeEnum.EMPLOYEE,
-            dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.mobile("13800000000"));
+                dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.mobile("13800000000"));
         String identityTicket = store.issue("client-a", 1L, UserTypeEnum.EMPLOYEE,
-            dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.sdkIdentity("WECOM", "member-sensitive-subject"));
+                dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.sdkIdentity("WECOM",
+                        "member-sensitive-subject"));
 
         String redisArguments = mockingDetails(redis).getInvocations().stream()
-            .filter(invocation -> "execute".equals(invocation.getMethod().getName()))
-            .flatMap(invocation -> Arrays.stream(invocation.getArguments()))
-            .flatMap(ExternalBindingTicketStoreTest::strings)
-            .reduce("", (left, right) -> left + '\n' + right);
+                .filter(invocation -> "execute".equals(invocation.getMethod().getName()))
+                .flatMap(invocation -> Arrays.stream(invocation.getArguments()))
+                .flatMap(ExternalBindingTicketStoreTest::strings)
+                .reduce("", (left, right) -> left + '\n' + right);
         assertThat(redisArguments)
-            .doesNotContain("13800000000", "member-sensitive-subject", mobileTicket, identityTicket);
-    }
-
-    private static Stream<String> strings(Object value) {
-        if (value instanceof Object[] values) {
-            return Arrays.stream(values).flatMap(ExternalBindingTicketStoreTest::strings);
-        }
-        if (value instanceof Iterable<?> values) {
-            return java.util.stream.StreamSupport.stream(values.spliterator(), false)
-                .flatMap(ExternalBindingTicketStoreTest::strings);
-        }
-        return Stream.of(String.valueOf(value));
+                .doesNotContain("13800000000", "member-sensitive-subject", mobileTicket, identityTicket);
     }
 }

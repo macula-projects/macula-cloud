@@ -16,7 +16,9 @@
  */
 package dev.macula.cloud.iam.authentication.github;
 
-import dev.macula.cloud.iam.authentication.thirdparty.IdentityProviderConfigService.ProviderConfig;
+import java.time.Duration;
+
+import dev.macula.cloud.iam.service.identity.IdentityProviderConfigService.ProviderConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
@@ -31,8 +33,6 @@ import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.util.UriComponentsBuilder;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
-
-import java.time.Duration;
 
 /**
  * 使用 GitHub 固定 HTTPS 端点交换授权码并读取稳定用户 ID。
@@ -65,9 +65,9 @@ public class GithubClient {
 
     public String authorizationUri(ProviderConfig config, String state, String redirectUri) {
         return UriComponentsBuilder.fromUriString(AUTHORIZE)
-            .queryParam(OAuth2ParameterNames.CLIENT_ID, config.require(CLIENT_ID_CONFIG))
-            .queryParam(OAuth2ParameterNames.REDIRECT_URI, redirectUri)
-            .queryParam(OAuth2ParameterNames.STATE, state).build().encode().toUriString();
+                .queryParam(OAuth2ParameterNames.CLIENT_ID, config.require(CLIENT_ID_CONFIG))
+                .queryParam(OAuth2ParameterNames.REDIRECT_URI, redirectUri)
+                .queryParam(OAuth2ParameterNames.STATE, state).build().encode().toUriString();
     }
 
     public String fetchSubject(ProviderConfig config, String code, String redirectUri) {
@@ -79,21 +79,21 @@ public class GithubClient {
             form.add(OAuth2ParameterNames.CODE, code);
             form.add(OAuth2ParameterNames.REDIRECT_URI, redirectUri);
             String tokenBody = restClient.post().uri(TOKEN).contentType(MediaType.APPLICATION_FORM_URLENCODED)
-                .accept(MediaType.APPLICATION_JSON).body(form).retrieve().body(String.class);
+                    .accept(MediaType.APPLICATION_JSON).body(form).retrieve().body(String.class);
             JsonNode tokenJson = json.readTree(tokenBody);
             String accessToken = tokenJson.path(OAuth2ParameterNames.ACCESS_TOKEN).asText();
             if (accessToken.isBlank()) {
                 String failure = tokenJson.path(OAuth2ParameterNames.ERROR).asText().isBlank()
-                    ? "missing_access_token" : "provider_rejected";
+                        ? "missing_access_token" : "provider_rejected";
                 LOGGER.warn("第三方接口响应无效 provider=GITHUB stage={} failure={}", stage, failure);
                 throw failed();
             }
             stage = USER_STAGE;
             String userBody = restClient.get().uri(USER)
-                .header("Authorization", "Bearer " + accessToken)
-                .header("Accept", "application/vnd.github+json")
-                .header("X-GitHub-Api-Version", "2022-11-28")
-                .retrieve().body(String.class);
+                    .header("Authorization", "Bearer " + accessToken)
+                    .header("Accept", "application/vnd.github+json")
+                    .header("X-GitHub-Api-Version", "2022-11-28")
+                    .retrieve().body(String.class);
             JsonNode userJson = json.readTree(userBody);
             if (!userJson.path("id").isIntegralNumber()) {
                 LOGGER.warn("第三方接口响应无效 provider=GITHUB stage={} failure=missing_or_invalid_subject", stage);
@@ -104,15 +104,15 @@ public class GithubClient {
             throw ex;
         } catch (RestClientResponseException ex) {
             LOGGER.warn("第三方接口 HTTP 失败 provider=GITHUB stage={} status={}", stage,
-                ex.getStatusCode().value());
+                    ex.getStatusCode().value());
             throw failed();
         } catch (RestClientException ex) {
             LOGGER.warn("第三方接口调用失败 provider=GITHUB stage={} failure=transport_error exception={}",
-                stage, ex.getClass().getSimpleName());
+                    stage, ex.getClass().getSimpleName());
             throw failed();
         } catch (RuntimeException ex) {
             LOGGER.error("第三方接口响应处理失败 provider=GITHUB stage={} failure=invalid_response exception={}",
-                stage, ex.getClass().getSimpleName());
+                    stage, ex.getClass().getSimpleName());
             throw failed();
         }
     }

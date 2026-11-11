@@ -53,7 +53,7 @@ describe("平台身份、消息与接入应用管理", () => {
         clientAuthenticationMethods: "none",
         authorizationGrantTypes: "authorization_code,sms",
       }, "sms"))
-    ).toBe(false);
+    ).toBe(true);
     expect(
       configurationIssues({clientAuthenticationMethods:"", authorizationGrantTypes:"sms"}).join(" ")
     ).toContain("认证方式");

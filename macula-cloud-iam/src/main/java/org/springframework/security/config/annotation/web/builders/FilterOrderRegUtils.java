@@ -17,11 +17,11 @@
 
 package org.springframework.security.config.annotation.web.builders;
 
+import java.lang.reflect.Field;
+
 import jakarta.servlet.Filter;
 import org.springframework.util.Assert;
 import org.springframework.util.ReflectionUtils;
-
-import java.lang.reflect.Field;
 
 /**
  * 为由 {@link HttpSecurity#addFilter(Filter)} 延迟添加的自定义过滤器注册顺序。
@@ -42,13 +42,13 @@ public final class FilterOrderRegUtils {
     /**
      * 注册相对参考过滤器的顺序，但不把过滤器实例加入过滤器链。
      *
-     * @param http            HttpSecurity 构建器
-     * @param filter          待注册顺序的过滤器
+     * @param http HttpSecurity 构建器
+     * @param filter 待注册顺序的过滤器
      * @param referenceFilter 已注册顺序的参考过滤器类型
-     * @param position        位于参考过滤器之前或之后
+     * @param position 位于参考过滤器之前或之后
      */
     public static void registryFilterOrder(HttpSecurity http, Filter filter,
-        Class<? extends Filter> referenceFilter, Position position) {
+            Class<? extends Filter> referenceFilter, Position position) {
         Assert.notNull(http, "http cannot be null");
         Assert.notNull(filter, "filter cannot be null");
         Assert.notNull(referenceFilter, "referenceFilter cannot be null");
@@ -57,21 +57,8 @@ public final class FilterOrderRegUtils {
         FilterOrderRegistration filterOrders = getFilterOrders(http);
         Integer referenceFilterOrder = filterOrders.getOrder(referenceFilter);
         Assert.notNull(referenceFilterOrder,
-            () -> "The Filter class " + referenceFilter.getName() + " does not have a registered order");
+                () -> "The Filter class " + referenceFilter.getName() + " does not have a registered order");
         filterOrders.put(filter.getClass(), referenceFilterOrder + position.offset);
-    }
-
-    /**
-     * 相对参考过滤器的位置。
-     */
-    public enum Position {
-        BEFORE(-1), AFTER(1);
-
-        private final int offset;
-
-        Position(int offset) {
-            this.offset = offset;
-        }
     }
 
     private static Field findFilterOrdersField() {
@@ -84,7 +71,21 @@ public final class FilterOrderRegUtils {
     private static FilterOrderRegistration getFilterOrders(HttpSecurity http) {
         Object filterOrders = ReflectionUtils.getField(FILTER_ORDERS_FIELD, http);
         Assert.state(filterOrders instanceof FilterOrderRegistration,
-            "HttpSecurity.filterOrders is not a FilterOrderRegistration");
-        return (FilterOrderRegistration)filterOrders;
+                "HttpSecurity.filterOrders is not a FilterOrderRegistration");
+        return (FilterOrderRegistration) filterOrders;
+    }
+
+    /**
+     * 相对参考过滤器的位置。
+     * @since 6.1.0
+     */
+    public enum Position {
+        BEFORE(-1), AFTER(1);
+
+        private final int offset;
+
+        Position(int offset) {
+            this.offset = offset;
+        }
     }
 }

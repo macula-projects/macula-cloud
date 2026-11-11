@@ -22,8 +22,10 @@ import org.apache.ibatis.annotations.Mapper;
 
 /**
  * 按应用内部ID读取独立协议配置，不以OAuth Client ID限制未来协议。
+ *
  * @author Rain
  * @since 6.1.0
  */
 @Mapper
-public interface SysApplicationProtocolConfigMapper extends BaseMapper<SysApplicationProtocolConfig> { }
+public interface SysApplicationProtocolConfigMapper extends BaseMapper<SysApplicationProtocolConfig> {
+}

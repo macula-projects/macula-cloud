@@ -16,13 +16,14 @@
  */
 package dev.macula.cloud.iam.authentication.wechat;
 
-import dev.macula.cloud.iam.authentication.thirdparty.IdentityProviderConfigService.ProviderConfig;
+import java.util.Map;
+
+import dev.macula.cloud.iam.service.identity.IdentityProviderConfigService.ProviderConfig;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 
-import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * 验证微信环境识别及网站应用、公众号授权入口。
@@ -40,15 +41,16 @@ class WechatLoginModeTest {
         internal.addHeader("User-Agent", "Mozilla/5.0 MicroMessenger/8.0");
         assertEquals(WechatLoginMode.WEBVIEW, WechatLoginMode.from(internal));
         assertEquals(WechatLoginMode.UNKNOWN,
-            WechatLoginMode.from(new MockHttpServletRequest("GET", "/login/wechat")));
+                WechatLoginMode.from(new MockHttpServletRequest("GET", "/login/wechat")));
     }
 
     @Test
     void bothModesUseTheSameFixedCallback() {
         WechatClient client = new WechatClient();
-        ProviderConfig config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(dev.macula.cloud.system.enums.IdentitySourceType.WECHAT_WEBSITE, "WECHAT", "site-app", "site-secret",
-            Map.of("appId", "site-app", "officialAccountAppId", "oa-app"),
-            Map.of("officialAccountAppSecret", "oa-secret"));
+        ProviderConfig config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(
+                dev.macula.cloud.system.enums.IdentitySourceType.WECHAT_WEBSITE, "WECHAT", "site-app", "site-secret",
+                Map.of("appId", "site-app", "officialAccountAppId", "oa-app"),
+                Map.of("officialAccountAppSecret", "oa-secret"));
         String callback = "https://iam.example/login/wechat";
         String browser = client.authorizationUri(config, "state-value", callback, WechatLoginMode.BROWSER);
         String webview = client.authorizationUri(config, "state-value", callback, WechatLoginMode.WEBVIEW);

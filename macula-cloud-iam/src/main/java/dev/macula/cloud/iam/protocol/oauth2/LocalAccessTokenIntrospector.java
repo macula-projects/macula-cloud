@@ -17,47 +17,55 @@
 
 package dev.macula.cloud.iam.protocol.oauth2;
 
-import java.util.Map;
 import java.util.HashMap;
+import java.util.Map;
+
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.oauth2.core.OAuth2AuthenticatedPrincipal;
 import org.springframework.security.oauth2.core.DefaultOAuth2AuthenticatedPrincipal;
+import org.springframework.security.oauth2.core.OAuth2AuthenticatedPrincipal;
 import org.springframework.security.oauth2.server.authorization.OAuth2Authorization;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
-import org.springframework.security.oauth2.server.resource.introspection.OpaqueTokenIntrospector;
 import org.springframework.security.oauth2.server.resource.InvalidBearerTokenException;
+import org.springframework.security.oauth2.server.resource.introspection.OpaqueTokenIntrospector;
 
 /**
  * IAM UserInfo 使用本地授权状态验证 opaque/JWT access token，撤销即时生效。
+ *
  * @author rain
  * @since 6.1.0
  */
 public final class LocalAccessTokenIntrospector implements OpaqueTokenIntrospector {
     private final OAuth2AuthorizationService authorizations;
 
-    /** 只使用本地持久化授权，不接受未验证JWT的claims。 */
+    /**
+     * 只使用本地持久化授权，不接受未验证JWT的claims。
+     */
     public LocalAccessTokenIntrospector(OAuth2AuthorizationService authorizations) {
         this.authorizations = authorizations;
     }
 
-    /** 保留原访问令牌Scope和过期/撤销语义，不按当前默认协议重写身份。 */
+    /**
+     * 保留原访问令牌Scope和过期/撤销语义，不按当前默认协议重写身份。
+     */
     @Override
     public OAuth2AuthenticatedPrincipal introspect(String token) {
         OAuth2Authorization authorization = authorizations.findByToken(token, OAuth2TokenType.ACCESS_TOKEN);
         if (authorization == null || authorization.getAccessToken() == null
-            || !authorization.getAccessToken().isActive()) {
+                || !authorization.getAccessToken().isActive()) {
             throw new InvalidBearerTokenException("Invalid access token");
         }
         var access = authorization.getAccessToken();
         Map<String, Object> claims = new HashMap<>();
-        if (access.getClaims() != null) { claims.putAll(access.getClaims()); }
+        if (access.getClaims() != null) {
+            claims.putAll(access.getClaims());
+        }
         claims.putIfAbsent("sub", authorization.getPrincipalName());
         claims.put("scope", access.getToken().getScopes());
         claims.put("iat", access.getToken().getIssuedAt());
         claims.put("exp", access.getToken().getExpiresAt());
         return new DefaultOAuth2AuthenticatedPrincipal(authorization.getPrincipalName(), claims,
-            access.getToken().getScopes().stream().<org.springframework.security.core.GrantedAuthority>map(
-                scope -> new SimpleGrantedAuthority("SCOPE_" + scope)).toList());
+                access.getToken().getScopes().stream().<org.springframework.security.core.GrantedAuthority>map(
+                        scope -> new SimpleGrantedAuthority("SCOPE_" + scope)).toList());
     }
 }

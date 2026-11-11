@@ -16,13 +16,13 @@
  */
 package dev.macula.cloud.iam.authentication.wecom;
 
-import dev.macula.cloud.iam.authentication.thirdparty.IdentityProviderConfigService;
-import dev.macula.cloud.iam.authentication.thirdparty.IdentityProviderConfigService.ProviderConfig;
+import java.util.Map;
+
 import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeVerification;
+import dev.macula.cloud.iam.service.identity.IdentityProviderConfigService;
+import dev.macula.cloud.iam.service.identity.IdentityProviderConfigService.ProviderConfig;
 import dev.macula.cloud.system.enums.ExternalCodeType;
 import org.junit.jupiter.api.Test;
-
-import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -41,14 +41,15 @@ class WecomExternalCodeVerifierTest {
     void appCodeUsesNativeSdkExchange() {
         IdentityProviderConfigService configs = mock(IdentityProviderConfigService.class);
         WecomClient client = mock(WecomClient.class);
-        ProviderConfig config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(dev.macula.cloud.system.enums.IdentitySourceType.WECOM_SDK, "WECOM", "corp", "secret",
-            Map.of("corpId", "corp", "agentId", "agent"));
+        ProviderConfig config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(
+                dev.macula.cloud.system.enums.IdentitySourceType.WECOM_SDK, "WECOM", "corp", "secret",
+                Map.of("corpId", "corp", "agentId", "agent"));
         when(configs.requireEnabledById(6L, "WECOM")).thenReturn(config);
         when(client.fetchAppUserId(config, "app-code")).thenReturn("member01");
         WecomExternalCodeVerifier verifier = new WecomExternalCodeVerifier(configs, client);
 
         ExternalCodeVerification verification = verifier.verify(
-            ExternalCodeType.WECOM_APP_CODE, 6L, "app-code");
+                ExternalCodeType.WECOM_APP_CODE, 6L, "app-code");
 
         assertEquals("WECOM", verification.providerType());
         assertEquals("member01", verification.subject());
@@ -60,14 +61,15 @@ class WecomExternalCodeVerifierTest {
     void miniAppCodeUsesMiniAppSessionExchange() {
         IdentityProviderConfigService configs = mock(IdentityProviderConfigService.class);
         WecomClient client = mock(WecomClient.class);
-        ProviderConfig config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(dev.macula.cloud.system.enums.IdentitySourceType.WECOM_MINIAPP, "WECOM", "corp", "secret",
-            Map.of("corpId", "corp", "agentId", "agent"));
+        ProviderConfig config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(
+                dev.macula.cloud.system.enums.IdentitySourceType.WECOM_MINIAPP, "WECOM", "corp", "secret",
+                Map.of("corpId", "corp", "agentId", "agent"));
         when(configs.requireEnabledById(7L, "WECOM")).thenReturn(config);
         when(client.fetchMiniAppUserId(config, "miniapp-code")).thenReturn("member02");
         WecomExternalCodeVerifier verifier = new WecomExternalCodeVerifier(configs, client);
 
         ExternalCodeVerification verification = verifier.verify(
-            ExternalCodeType.WECOM_MINIAPP_CODE, 7L, "miniapp-code");
+                ExternalCodeType.WECOM_MINIAPP_CODE, 7L, "miniapp-code");
 
         assertEquals("WECOM", verification.providerType());
         assertEquals("member02", verification.subject());

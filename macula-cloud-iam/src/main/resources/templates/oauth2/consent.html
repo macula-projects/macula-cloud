@@ -1,43 +1,63 @@
 <!DOCTYPE html>
 <html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="color-scheme" content="light"><meta name="referrer" content="same-origin">
-  <title>授权确认 · Macula</title>
-  <link rel="stylesheet" th:href="@{/iam/auth.css}" href="/iam/auth.css">
-  <script th:src="@{/iam/auth.js}" src="/iam/auth.js" defer></script>
+    <meta charset="utf-8">
+    <meta content="width=device-width, initial-scale=1, viewport-fit=cover" name="viewport">
+    <meta content="light" name="color-scheme">
+    <meta content="same-origin" name="referrer">
+    <title>授权确认 · Macula</title>
+    <link href="/iam/auth.css" rel="stylesheet" th:href="@{/iam/auth.css}">
+    <script defer src="/iam/auth.js" th:src="@{/iam/auth.js}"></script>
 </head>
 <body>
 <main class="shell">
-  <aside class="brand-panel" aria-label="Macula 统一身份平台">
-    <div class="brand"><span class="brand-mark" aria-hidden="true">M</span>Macula</div>
-    <div class="brand-content"><div class="eyebrow">ONE IDENTITY. CONNECTED WORK.</div>
-      <h1>一个身份，<br>连接你的工作。</h1><p>以统一、安全的身份访问企业应用，<br>让每一次连接都简单可信。</p></div>
-    <div class="orbit" aria-hidden="true"></div><div class="brand-meta">MACULA CLOUD · 统一身份平台</div>
-  </aside>
-  <section class="content-panel">
-    <div class="brand mobile-brand"><span class="brand-mark" aria-hidden="true">M</span>Macula</div>
-    <div class="card wide">
-      <span class="step">应用访问授权</span><h1>确认应用访问权限</h1><p class="subtitle">请核对应用信息，仅授权你信任的应用。</p>
-      <div class="identity"><div class="app-icon" aria-hidden="true">↗</div><div><strong th:text="${clientName}">应用名称</strong><small>当前账号 · <span th:text="${principalName}">账号</span></small></div></div>
-      <form data-consent method="post" th:action="@{${authorizationEndpoint}}">
-        <input th:if="${_csrf != null}" type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"><input type="hidden" name="client_id" th:value="${clientId}"><input type="hidden" name="state" th:value="${state}">
-        <input th:if="${openidRequested}" type="hidden" name="scope" value="openid">
-        <p class="section-label" th:if="${!#sets.isEmpty(scopes)}">此应用请求以下权限</p>
-        <div class="scope-list" th:if="${!#sets.isEmpty(scopes)}">
-          <label class="scope-row" th:each="scope : ${scopes}"><input type="checkbox" name="scope" th:value="${scope}"><span th:text="${scopeLabels.get(scope) ?: scope}">权限</span></label>
+    <aside aria-label="Macula 统一身份平台" class="brand-panel">
+        <div class="brand"><span aria-hidden="true" class="brand-mark">M</span>Macula</div>
+        <div class="brand-content">
+            <div class="eyebrow">ONE IDENTITY. CONNECTED WORK.</div>
+            <h1>一个身份，<br>连接你的工作。</h1>
+            <p>以统一、安全的身份访问企业应用，<br>让每一次连接都简单可信。</p></div>
+        <div aria-hidden="true" class="orbit"></div>
+        <div class="brand-meta">MACULA CLOUD · 统一身份平台</div>
+    </aside>
+    <section class="content-panel">
+        <div class="brand mobile-brand"><span aria-hidden="true" class="brand-mark">M</span>Macula</div>
+        <div class="card wide">
+            <span class="step">应用访问授权</span>
+            <h1>确认应用访问权限</h1>
+            <p class="subtitle">请核对应用信息，仅授权你信任的应用。</p>
+            <div class="identity">
+                <div aria-hidden="true" class="app-icon">↗</div>
+                <div><strong th:text="${clientName}">应用名称</strong><small>当前账号 · <span
+                        th:text="${principalName}">账号</span></small></div>
+            </div>
+            <form data-consent method="post" th:action="@{${authorizationEndpoint}}">
+                <input th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"
+                       type="hidden"><input name="client_id" th:value="${clientId}" type="hidden"><input
+                    name="state" th:value="${state}" type="hidden">
+                <input name="scope" th:if="${openidRequested}" type="hidden" value="openid">
+                <p class="section-label" th:if="${!#sets.isEmpty(scopes)}">此应用请求以下权限</p>
+                <div class="scope-list" th:if="${!#sets.isEmpty(scopes)}">
+                    <label class="scope-row" th:each="scope : ${scopes}"><input name="scope" th:value="${scope}"
+                                                                                type="checkbox"><span
+                            th:text="${scopeLabels.get(scope) ?: scope}">权限</span></label>
+                </div>
+                <p class="empty-note" th:if="${#sets.isEmpty(scopes)}">此应用没有请求额外的可选权限。</p>
+                <p class="section-label" th:if="${!#sets.isEmpty(previouslyApprovedScopes)}">此前已授予的权限</p>
+                <div class="scope-list" th:if="${!#sets.isEmpty(previouslyApprovedScopes)}">
+                    <div class="scope-row scope-approved" th:each="scope : ${previouslyApprovedScopes}"><span
+                            aria-hidden="true">✓</span><span th:text="${scope}">权限</span><small>已授权</small></div>
+                </div>
+                <div class="client-note">你可以选择本次同意的权限。拒绝后，将返回应用且不完成本次授权。</div>
+                <div class="actions">
+                    <button class="secondary" formnovalidate name="decision" type="submit" value="deny">拒绝授权
+                    </button>
+                    <button class="primary" name="decision" type="submit" value="allow">同意并继续</button>
+                </div>
+            </form>
         </div>
-        <p class="empty-note" th:if="${#sets.isEmpty(scopes)}">此应用没有请求额外的可选权限。</p>
-        <p class="section-label" th:if="${!#sets.isEmpty(previouslyApprovedScopes)}">此前已授予的权限</p>
-        <div class="scope-list" th:if="${!#sets.isEmpty(previouslyApprovedScopes)}">
-          <div class="scope-row scope-approved" th:each="scope : ${previouslyApprovedScopes}"><span aria-hidden="true">✓</span><span th:text="${scope}">权限</span><small>已授权</small></div>
-        </div>
-        <div class="client-note">你可以选择本次同意的权限。拒绝后，将返回应用且不完成本次授权。</div>
-        <div class="actions"><button class="secondary" type="submit" name="decision" value="deny" formnovalidate>拒绝授权</button><button class="primary" type="submit" name="decision" value="allow">同意并继续</button></div>
-      </form>
-    </div>
-    <footer class="footer">Macula Cloud · 统一身份认证</footer>
-  </section>
+        <footer class="footer">Macula Cloud · 统一身份认证</footer>
+    </section>
 </main>
 </body>
 </html>

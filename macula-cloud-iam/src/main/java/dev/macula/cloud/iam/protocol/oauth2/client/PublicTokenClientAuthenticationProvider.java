@@ -16,6 +16,8 @@
  */
 package dev.macula.cloud.iam.protocol.oauth2.client;
 
+import java.util.Set;
+
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
@@ -26,8 +28,6 @@ import org.springframework.security.oauth2.core.endpoint.OAuth2ParameterNames;
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2ClientAuthenticationToken;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
-
-import java.util.Set;
 
 /**
  * 校验受限 Token grant 的 public Client 注册信息。
@@ -44,19 +44,19 @@ public final class PublicTokenClientAuthenticationProvider implements Authentica
 
     @Override
     public Authentication authenticate(Authentication authentication) {
-        OAuth2ClientAuthenticationToken client = (OAuth2ClientAuthenticationToken)authentication;
+        OAuth2ClientAuthenticationToken client = (OAuth2ClientAuthenticationToken) authentication;
         if (!ClientAuthenticationMethod.NONE.equals(client.getClientAuthenticationMethod())) {
             return null;
         }
         Object grantValue = client.getAdditionalParameters().get(OAuth2ParameterNames.GRANT_TYPE);
         if (!(grantValue instanceof String grantType)
-            || !PublicTokenClientAuthenticationConverter.supportsGrant(grantType)) {
+                || !PublicTokenClientAuthenticationConverter.supportsGrant(grantType)) {
             return null;
         }
         RegisteredClient registeredClient = clients.findByClientId(client.getPrincipal().toString());
         if (registeredClient == null
-            || !registeredClient.getClientAuthenticationMethods().equals(Set.of(ClientAuthenticationMethod.NONE))
-            || !registeredClient.getAuthorizationGrantTypes().contains(new AuthorizationGrantType(grantType))) {
+                || !registeredClient.getClientAuthenticationMethods().equals(Set.of(ClientAuthenticationMethod.NONE))
+                || !registeredClient.getAuthorizationGrantTypes().contains(new AuthorizationGrantType(grantType))) {
             throw new OAuth2AuthenticationException(OAuth2ErrorCodes.INVALID_CLIENT);
         }
         return new OAuth2ClientAuthenticationToken(registeredClient, ClientAuthenticationMethod.NONE, null);

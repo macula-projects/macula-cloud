@@ -41,12 +41,15 @@ public interface SysUserMapper extends BaseMapper<SysUser> {
     @InterceptorIgnore(tenantLine = "true")
     UserAuthInfo getUserAuthInfo(Long tenantId, String username);
 
-    /** 返回当前绑定连接的实际隔离级别，避免READ COMMITTED缺少范围锁而漏掉并发新候选。 */
+    /**
+     * 返回当前绑定连接的实际隔离级别，避免READ COMMITTED缺少范围锁而漏掉并发新候选。
+     */
     @org.apache.ibatis.annotations.Select("SELECT @@transaction_isolation")
     String identityBindingIsolation();
 
     /**
      * 按固定目标字段查询规范化候选；最多两条用于证明唯一，绑定事务使用同一条件加锁。
+     *
      * @param target 仅来自受控枚举的目标标识
      * @param value 已按目标语义规范化的值
      * @param trimPattern 与Java trim相同的ASCII边界
@@ -56,9 +59,9 @@ public interface SysUserMapper extends BaseMapper<SysUser> {
      */
     @InterceptorIgnore(tenantLine = "true")
     java.util.List<SysUser> findIdentityBindingCandidates(@org.apache.ibatis.annotations.Param("target") String target,
-        @org.apache.ibatis.annotations.Param("value") String value,
-        @org.apache.ibatis.annotations.Param("trimPattern") String trimPattern,
-        @org.apache.ibatis.annotations.Param("mobilePattern") String mobilePattern,
-        @org.apache.ibatis.annotations.Param("forUpdate") boolean forUpdate);
+            @org.apache.ibatis.annotations.Param("value") String value,
+            @org.apache.ibatis.annotations.Param("trimPattern") String trimPattern,
+            @org.apache.ibatis.annotations.Param("mobilePattern") String mobilePattern,
+            @org.apache.ibatis.annotations.Param("forUpdate") boolean forUpdate);
 
 }

@@ -16,12 +16,12 @@
  */
 package dev.macula.cloud.iam.protocol.oauth2.grant.externalcode;
 
-import dev.macula.cloud.system.enums.ExternalCodeType;
-import org.springframework.stereotype.Component;
-
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+
+import dev.macula.cloud.system.enums.ExternalCodeType;
+import org.springframework.stereotype.Component;
 
 /**
  * 按稳定 code type 选择唯一 verifier，拒绝条件分支回退或多端点试探。
