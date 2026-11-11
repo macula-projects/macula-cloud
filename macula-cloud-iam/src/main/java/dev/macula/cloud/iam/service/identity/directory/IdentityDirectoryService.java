@@ -17,10 +17,12 @@
 package dev.macula.cloud.iam.service.identity.directory;
 
 import java.time.Instant;
+import java.util.Map;
 import java.util.Objects;
 
 import dev.macula.cloud.iam.authentication.thirdparty.VerifiedExternalIdentity;
 import dev.macula.cloud.iam.service.identity.IdentityProviderConfigService;
+import org.springframework.security.authentication.BadCredentialsException;
 
 /**
  * 公共身份服务所需的目录准入端口；隔离平台网络、缓存与后台刷新实现。
@@ -50,7 +52,7 @@ public interface IdentityDirectoryService {
      * @since 6.1.0
      */
     public record Admission(VerifiedExternalIdentity identity, Long sourceVersion, String flow, String organizationId,
-                            Instant expiresAt, java.util.Map<String, String> profile) {
+                            Instant expiresAt, Map<String, String> profile) {
         /**
          * 固化服务端资料，不能由业务客户端构造准入响应。
          */
@@ -60,14 +62,14 @@ public interface IdentityDirectoryService {
             if (!Objects.equals(identity.sourceVersion(), sourceVersion) || !identity.flow().equals(flow)) {
                 throw new IllegalArgumentException("目录快照来源不一致");
             }
-            profile = java.util.Map.copyOf(profile);
+            profile = Map.copyOf(profile);
         }
 
         /**
          * 仅比较有效期/来源时可不携带资料。
          */
         public Admission(VerifiedExternalIdentity identity, String organizationId, Instant expiresAt) {
-            this(identity, identity.sourceVersion(), identity.flow(), organizationId, expiresAt, java.util.Map.of());
+            this(identity, identity.sourceVersion(), identity.flow(), organizationId, expiresAt, Map.of());
         }
 
         /**
@@ -80,7 +82,7 @@ public interface IdentityDirectoryService {
                     !identity.identityValue().equals(expected.identityValue())
                     || !Objects.equals(sourceVersion, source.version()) || !flow.equals(source.flow().value())
                     || !Objects.equals(organizationId, source.organizationId()) || !expiresAt.isAfter(Instant.now())) {
-                throw new org.springframework.security.authentication.BadCredentialsException("目录准入证明无效");
+                throw new BadCredentialsException("目录准入证明无效");
             }
         }
 

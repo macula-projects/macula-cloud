@@ -16,19 +16,28 @@
  */
 package dev.macula.cloud.iam.service.identity;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 
 import dev.macula.cloud.iam.mapper.SysIdentityProviderMapper;
 import dev.macula.cloud.iam.pojo.entity.SysIdentityProvider;
+import dev.macula.cloud.system.enums.ExternalCodeType;
 import dev.macula.cloud.system.enums.IdentityBindingMapping;
+import dev.macula.cloud.system.enums.IdentityBindingMappings;
 import dev.macula.cloud.system.enums.IdentityBindingRule;
 import dev.macula.cloud.system.enums.IdentityCredentialType;
+import dev.macula.cloud.system.enums.IdentityDirectoryPolicy;
 import dev.macula.cloud.system.enums.IdentityLoginCapability;
+import dev.macula.cloud.system.enums.IdentitySourceFlow;
 import dev.macula.cloud.system.enums.IdentitySourceType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationServiceException;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
+import tools.jackson.core.JacksonException;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -64,7 +73,7 @@ public class IdentityProviderConfigService {
      */
     public ProviderConfig requireLoaded(SysIdentityProvider provider, Long registrationId,
             String expectedProviderType) {
-        if (provider == null || !java.util.Objects.equals(provider.getId(), registrationId) ||
+        if (provider == null || !Objects.equals(provider.getId(), registrationId) ||
                 !Boolean.TRUE.equals(provider.getEnabled())
                 || !expectedProviderType.equals(provider.getProviderType()) || provider.getSourceType() == null) {
             throw unavailable();
@@ -74,7 +83,7 @@ public class IdentityProviderConfigService {
         String selectedCapability;
         IdentityBindingRule rule = null;
         IdentityBindingMapping mapping = null;
-        java.util.List<IdentityBindingMapping> mappings;
+        List<IdentityBindingMapping> mappings;
         try {
             type = IdentitySourceType.fromValue(provider.getSourceType());
             if (provider.getCredentialType() != null &&
@@ -84,16 +93,16 @@ public class IdentityProviderConfigService {
             capabilities = IdentityLoginCapability.decode(provider.getCapabilitiesJson(), type,
                     provider.getIdentityFlow());
             var anchor = type;
-            selectedCapability = java.util.Arrays.stream(IdentityLoginCapability.values())
+            selectedCapability = Arrays.stream(IdentityLoginCapability.values())
                     .filter(item -> item.source() == anchor && capabilities.containsKey(item.value())).findFirst()
-                    .or(() -> java.util.Arrays.stream(IdentityLoginCapability.values())
+                    .or(() -> Arrays.stream(IdentityLoginCapability.values())
                             .filter(item -> capabilities.containsKey(item.value())).findFirst())
                     .orElseThrow(this::unavailable).value();
             type = IdentityLoginCapability.fromValue(selectedCapability).source();
             if (!type.providerType().equals(expectedProviderType)) {
                 throw unavailable();
             }
-            mappings = dev.macula.cloud.system.enums.IdentityBindingMappings.decode(provider.getBindingMappingsJson(),
+            mappings = IdentityBindingMappings.decode(provider.getBindingMappingsJson(),
                     provider.getBindingSourceField(), provider.getBindingTargetField(), provider.getBindingRule());
             if (Boolean.TRUE.equals(provider.getAutoBindEnabled())) {
                 if (mappings.isEmpty()) {
@@ -125,7 +134,7 @@ public class IdentityProviderConfigService {
                     throw unavailable();
                 }
             }
-        } catch (tools.jackson.core.JacksonException ex) {
+        } catch (JacksonException ex) {
             throw unavailable();
         }
         var validationType = type;
@@ -140,17 +149,17 @@ public class IdentityProviderConfigService {
                 .anyMatch(key -> !StringUtils.hasText(values.get(key)))) {
             throw unavailable();
         }
-        dev.macula.cloud.system.enums.IdentitySourceFlow flow;
-        dev.macula.cloud.system.enums.IdentityDirectoryPolicy directoryPolicy;
+        IdentitySourceFlow flow;
+        IdentityDirectoryPolicy directoryPolicy;
         try {
-            flow = dev.macula.cloud.system.enums.IdentitySourceFlow.resolve(type, capabilities.get(selectedCapability));
-            directoryPolicy = dev.macula.cloud.system.enums.IdentityDirectoryPolicy.fromValue(
+            flow = IdentitySourceFlow.resolve(type, capabilities.get(selectedCapability));
+            directoryPolicy = IdentityDirectoryPolicy.fromValue(
                     provider.getDirectoryPolicy());
             if (provider.getVersion() == null || provider.getVersion() < 0) {
                 throw unavailable();
             }
-            if (directoryPolicy != dev.macula.cloud.system.enums.IdentityDirectoryPolicy.IDENTITY_ONLY
-                    && (!java.util.Set.of("WECOM", "DINGTALK", "FEISHU").contains(type.providerType())
+            if (directoryPolicy != IdentityDirectoryPolicy.IDENTITY_ONLY
+                    && (!Set.of("WECOM", "DINGTALK", "FEISHU").contains(type.providerType())
                     || !StringUtils.hasText(provider.getOrganizationId()))) {
                 throw unavailable();
             }
@@ -188,18 +197,18 @@ public class IdentityProviderConfigService {
                                  IdentityBindingRule bindingRule, Long version, String providerType, String appId,
                                  String appSecret, Map<String, String> values, Map<String, String> secrets,
                                  boolean visible,
-                                 dev.macula.cloud.system.enums.IdentitySourceFlow flow,
-                                 dev.macula.cloud.system.enums.IdentityDirectoryPolicy directoryPolicy,
+                                 IdentitySourceFlow flow,
+                                 IdentityDirectoryPolicy directoryPolicy,
                                  String organizationId, String oauthRedirectUri, IdentityBindingMapping bindingMapping,
                                  Map<String, String> capabilities, String loginCapability,
-                                 java.util.List<IdentityBindingMapping> bindingMappings) {
+                                 List<IdentityBindingMapping> bindingMappings) {
         /**
          * 配置视图必须持有完整不可变集合，不能被调用方截断或原地改写。
          */
         public ProviderConfig {
-            bindingMappings = java.util.List.copyOf(bindingMappings);
+            bindingMappings = List.copyOf(bindingMappings);
             capabilities = Map.copyOf(capabilities);
-            if (!java.util.Objects.equals(bindingMapping,
+            if (!Objects.equals(bindingMapping,
                     bindingMappings.size() == 1 ? bindingMappings.get(0) : null)) {
                 throw new IllegalArgumentException("单条投影与绑定集合不一致");
             }
@@ -211,14 +220,14 @@ public class IdentityProviderConfigService {
         public ProviderConfig(Long registrationId, IdentitySourceType sourceType, boolean autoBindEnabled,
                 IdentityBindingRule bindingRule, Long version, String providerType, String appId,
                 String appSecret, Map<String, String> values, Map<String, String> secrets, boolean visible,
-                dev.macula.cloud.system.enums.IdentitySourceFlow flow,
-                dev.macula.cloud.system.enums.IdentityDirectoryPolicy directoryPolicy, String organizationId,
+                IdentitySourceFlow flow,
+                IdentityDirectoryPolicy directoryPolicy, String organizationId,
                 String oauthRedirectUri, IdentityBindingMapping bindingMapping, Map<String, String> capabilities,
                 String loginCapability) {
             this(registrationId, sourceType, autoBindEnabled, bindingRule, version, providerType, appId, appSecret,
                     values, secrets, visible, flow, directoryPolicy, organizationId, oauthRedirectUri, bindingMapping,
                     capabilities, loginCapability,
-                    bindingMapping == null ? java.util.List.of() : java.util.List.of(bindingMapping));
+                    bindingMapping == null ? List.of() : List.of(bindingMapping));
         }
 
         /**
@@ -227,8 +236,8 @@ public class IdentityProviderConfigService {
         public ProviderConfig(Long registrationId, IdentitySourceType sourceType, boolean autoBindEnabled,
                 IdentityBindingRule bindingRule, Long version, String providerType, String appId,
                 String appSecret, Map<String, String> values, Map<String, String> secrets, boolean visible,
-                dev.macula.cloud.system.enums.IdentitySourceFlow flow,
-                dev.macula.cloud.system.enums.IdentityDirectoryPolicy directoryPolicy, String organizationId,
+                IdentitySourceFlow flow,
+                IdentityDirectoryPolicy directoryPolicy, String organizationId,
                 String oauthRedirectUri, IdentityBindingMapping bindingMapping) {
             this(registrationId, sourceType, autoBindEnabled, bindingRule, version, providerType, appId, appSecret,
                     values, secrets, visible, flow, directoryPolicy, organizationId, oauthRedirectUri, bindingMapping,
@@ -243,8 +252,8 @@ public class IdentityProviderConfigService {
         public ProviderConfig(Long registrationId, IdentitySourceType sourceType, boolean autoBindEnabled,
                 IdentityBindingRule bindingRule, Long version, String providerType, String appId,
                 String appSecret, Map<String, String> values, Map<String, String> secrets, boolean visible,
-                dev.macula.cloud.system.enums.IdentitySourceFlow flow,
-                dev.macula.cloud.system.enums.IdentityDirectoryPolicy directoryPolicy, String organizationId,
+                IdentitySourceFlow flow,
+                IdentityDirectoryPolicy directoryPolicy, String organizationId,
                 String oauthRedirectUri) {
             this(registrationId, sourceType, autoBindEnabled, bindingRule, version, providerType, appId,
                     appSecret, values, secrets, visible, flow, directoryPolicy, organizationId, oauthRedirectUri,
@@ -261,7 +270,7 @@ public class IdentityProviderConfigService {
                         capability.credentialType() != IdentityCredentialType.forSource(sourceType)) {
                     throw new IllegalArgumentException("能力不可用");
                 }
-                var contract = dev.macula.cloud.system.enums.IdentitySourceFlow.resolve(capability.source(),
+                var contract = IdentitySourceFlow.resolve(capability.source(),
                         capabilities.get(value));
                 for (var mapping : bindingMappings) {
                     mapping.validateFor(capability.source());
@@ -277,7 +286,7 @@ public class IdentityProviderConfigService {
         /**
          * Code与来源能力一一对应，不能因共享Secret而互换Code。
          */
-        public ProviderConfig forCode(dev.macula.cloud.system.enums.ExternalCodeType code) {
+        public ProviderConfig forCode(ExternalCodeType code) {
             return forCapability(IdentityLoginCapability.forCode(code).value());
         }
 

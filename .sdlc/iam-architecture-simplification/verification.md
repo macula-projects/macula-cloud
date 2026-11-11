@@ -113,3 +113,15 @@ Verification is green。
 本轮初始失败及修复：JSON夹具被排版后，拒绝测试的紧凑字符串替换没有修改样本，改为结构化JSON变异；不削弱生产兼容读取器。真实模板输出改为模块target，Cypress16使用expose公开预览配置，未启用时显式跳过，最终完整运行已启用并通过。Checkstyle按暂存+重命名完整集合扫描，补既有排版类型的Javadoc及since；未修改校验规则。所有最终命令退出码均0。
 
 完整原始日志仅保存在本地临时目录，不提交日志或私有库备份。本节证明本地测试，不代替第三方联调或人工PR风险接受。
+
+
+## Stage 4 — 显式import后续整理（2026-11-11）
+
+范围仅IAM service下8个Java文件，以及计划/验证记录；不涉及协议合同、配置、数据库或前端变动。用户已要求提交合并，并已明确授权公开仓库发布。
+
+- 逐文件解析各自import，将类型解析回全限定名后比较Java token：`Resolved Java token streams identical: 8 files`；字符串及序列化类名未改变。比较基线是已合并main `78624af241091d543eb121b09fd5f94537feb333`，含用户先前同类import整理。
+- `mvn test -Plocal`实际重新执行：`BUILD SUCCESS`，643项，0失败/错误，1项既有SysUserUsernameUniqueMigrationTest环境门控跳过，实际642项通过；IAM387项和API21项全部通过。日志：`/private/tmp/macula-iam-review-20261111/import-cleanup/merge-tests.log`，退出码0。
+- 8个变更Java文件Checkstyle退出码0；`git diff --check`通过。
+- 未修改CLAUDE.md、AGENTS.md、REVIEW.md、技能或hooks，无适用配置eval变化；既有前端/数据库/厂商能力代码不变，不把原有外部验证成绩重新算作本轮执行。
+
+Verification is green。独立审查仅覆盖本轮差异，不重报此前已关闭的Plan问题；此结论不构成人工风险接受。

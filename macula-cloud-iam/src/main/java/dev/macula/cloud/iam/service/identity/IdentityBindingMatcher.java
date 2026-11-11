@@ -17,13 +17,18 @@
 package dev.macula.cloud.iam.service.identity;
 
 import java.util.List;
+import java.util.Objects;
 
 import dev.macula.cloud.iam.authentication.thirdparty.VerifiedExternalIdentity;
 import dev.macula.cloud.iam.mapper.SysUserMapper;
 import dev.macula.cloud.iam.pojo.entity.SysUser;
 import dev.macula.cloud.system.enums.IdentityBindingMapping;
+import dev.macula.cloud.system.enums.IdentityBindingMappings;
 import dev.macula.cloud.system.enums.IdentityBindingSourceField;
+import dev.macula.cloud.system.enums.IdentityBindingTargetField;
 import dev.macula.cloud.system.security.UserIdentifierNormalizer;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * 首次与事务内重查共用的字段规范化匹配，不参与跨字段登录兜底或用户资料回写。
@@ -59,7 +64,7 @@ public final class IdentityBindingMatcher {
         }
         if (VerifiedExternalIdentity.MOBILE_PROOF.equals(identity.identityKind())
                 && (mapping.source() != IdentityBindingSourceField.MOBILE
-                || mapping.target() != dev.macula.cloud.system.enums.IdentityBindingTargetField.MOBILE)) {
+                || mapping.target() != IdentityBindingTargetField.MOBILE)) {
             return List.of();
         }
         String value = normalized(mapping, mapping.attribute(identity.attributes()));
@@ -69,9 +74,9 @@ public final class IdentityBindingMatcher {
         if (forUpdate) {
             // 规范化表达式没有唯一索引，必须在有范围锁的真实绑定事务内重查。
             String isolation = users.identityBindingIsolation();
-            if (!org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()
+            if (!TransactionSynchronizationManager.isActualTransactionActive()
                     || !("REPEATABLE-READ".equals(isolation) || "SERIALIZABLE".equals(isolation))) {
-                throw new org.springframework.security.authentication.BadCredentialsException("账号绑定条件暂不可用");
+                throw new BadCredentialsException("账号绑定条件暂不可用");
             }
         }
         return users.findIdentityBindingCandidates(mapping.target().value(), value, TRIM_PATTERN, MOBILE_PATTERN,
@@ -89,14 +94,14 @@ public final class IdentityBindingMatcher {
     public List<SysUser> candidates(List<IdentityBindingMapping> mappings, VerifiedExternalIdentity identity,
             boolean forUpdate) {
         SysUser candidate = null;
-        for (var mapping : dev.macula.cloud.system.enums.IdentityBindingMappings.ordered(mappings)) {
+        for (var mapping : IdentityBindingMappings.ordered(mappings)) {
             List<SysUser> matches = candidates(mapping, identity, forUpdate);
             if (matches.size() > 1) {
                 return List.of();
             }
             if (!matches.isEmpty()) {
                 SysUser current = matches.get(0);
-                if (candidate != null && !java.util.Objects.equals(candidate.getId(), current.getId())) {
+                if (candidate != null && !Objects.equals(candidate.getId(), current.getId())) {
                     return List.of();
                 }
                 candidate = current;
