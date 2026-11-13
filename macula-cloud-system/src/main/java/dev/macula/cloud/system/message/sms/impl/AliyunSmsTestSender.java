@@ -14,7 +14,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package dev.macula.cloud.system.message;
+package dev.macula.cloud.system.message.sms.impl;
+
+import dev.macula.cloud.system.message.sms.SmsSender;
 
 import com.aliyun.dysmsapi20170525.Client;
 import com.aliyun.dysmsapi20170525.models.SendSmsRequest;
@@ -35,9 +37,24 @@ import java.util.Map;
  * @since 2026-10-13
  */
 @Component
-public class AliyunSmsTestSender {
+public class AliyunSmsTestSender implements SmsSender {
     private final JsonMapper json = JsonMapper.builder().build();
 
+    /** 返回稳定的供应商标识。 */
+    @Override
+    public String providerType() {
+        return "ALIYUN";
+    }
+
+    /** 适配管理端统一策略接口，模板顺序由场景定义。 */
+    @Override
+    public void send(SysMessageProvider provider, String target, String templateCode,
+            dev.macula.cloud.system.enums.MessageTemplateType type, String languageCode,
+            Map<String, String> variables) {
+        send(provider, target, templateCode, variables);
+    }
+
+    /** 以供应商模板和受控变量提交测试消息。 */
     public void send(SysMessageProvider provider, String target, String templateCode, Map<String, String> variables) {
         if (!StringUtils.hasText(templateCode) || !StringUtils.hasText(provider.getAccount()) ||
             !StringUtils.hasText(provider.getCredential()) || !StringUtils.hasText(provider.getSender())) {
@@ -60,7 +77,8 @@ public class AliyunSmsTestSender {
         }
     }
 
-    Client createClient(Config config) throws Exception {
+    /** 根据服务端配置创建 SDK 客户端，测试可覆盖传输地址。 */
+    protected Client createClient(Config config) throws Exception {
         return new Client(config);
     }
 }

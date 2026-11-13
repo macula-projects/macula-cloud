@@ -100,7 +100,8 @@ describe("平台身份、消息与接入应用管理", () => {
     expect(messagePage).toContain('v-model="templateDrawer"');
     expect(messagePage).toContain('v-model="testDialog"');
     expect(messagePage).toContain('sandbox=""');
-    expect(messagePage).not.toContain("EXCHANGE");
+    expect(messagePage).toContain("EXCHANGE");
+    expect(messagePage).toContain("CUSTOM_HTTP");
     expect(messagePage).not.toContain('value:"CUSTOM",label:"自定义短信"');
     expect(oauthPage).toContain("ClientApplication");
     expect(oauthPage).not.toContain("<el-drawer");

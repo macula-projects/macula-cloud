@@ -24,8 +24,8 @@ import dev.macula.cloud.system.form.IdentityProviderForm;
 import dev.macula.cloud.system.form.MessageTemplateForm;
 import dev.macula.cloud.system.form.MessageTestForm;
 import dev.macula.cloud.system.form.IamApplicationForm;
-import dev.macula.cloud.system.message.MailTestSender.MailOptions;
-import dev.macula.cloud.system.message.TencentSmsTestSender.TencentOptions;
+import dev.macula.cloud.system.message.mail.impl.MailTestSender.MailOptions;
+import dev.macula.cloud.system.message.sms.impl.TencentSmsTestSender.TencentOptions;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
 

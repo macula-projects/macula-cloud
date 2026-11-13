@@ -23,7 +23,7 @@ import dev.macula.cloud.iam.authentication.verification.VerificationCodePurpose;
 import dev.macula.cloud.iam.authentication.verification.VerificationCodeScope;
 import dev.macula.cloud.iam.authentication.verification.VerificationCodeService;
 import dev.macula.cloud.iam.authentication.verification.VerificationCodeStore;
-import dev.macula.cloud.iam.message.sms.LoginSmsDispatcher;
+import dev.macula.cloud.iam.message.dispatch.LoginSmsDispatcher;
 import dev.macula.cloud.system.security.UserIdentifierNormalizer;
 import org.junit.jupiter.api.Test;
 

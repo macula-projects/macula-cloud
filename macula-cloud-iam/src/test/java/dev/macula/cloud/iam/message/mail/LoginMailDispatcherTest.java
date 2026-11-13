@@ -16,6 +16,8 @@
  */
 package dev.macula.cloud.iam.message.mail;
 
+import dev.macula.cloud.iam.message.dispatch.LoginMailDispatcher;
+
 import java.time.Duration;
 import java.util.List;
 

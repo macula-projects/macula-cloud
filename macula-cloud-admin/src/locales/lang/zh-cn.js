@@ -37,6 +37,22 @@ export default {
 			'这些配置目前仅保存，尚未接入 IAM 或网关运行时，暂未生效。'
 	},
 	messageSettingsPage: {
+		exchangeMail: "Exchange（企业自建）",
+		netease163Mail: "163 免费邮箱",
+		qqMail: "QQ 邮箱",
+		customHttpSms: "自定义短信服务",
+		postUrl: "POST URL",
+		authHeaders: "认证 Header",
+		headerName: "Header 名称",
+		headerValue: "认证值",
+		addHeader: "添加 Header",
+		removeHeader: "移除",
+		headersRequired: "请配置认证 Header",
+		keepHeaders: "已配置；全部留空保持原值，填写后整体替换",
+		invalidHeaders: "Header 名称、值或重复配置无效",
+		authorizationCodeHint: "请先开启 SMTP 服务，使用客户端授权码作为密码。",
+		customSmsHint: "配置可信服务地址，建议使用 HTTPS；模板配置沿用现有方式。",
+
 		retry: '重新加载',
 		emptyTemplates: '暂无模板',
 		scene: '场景',

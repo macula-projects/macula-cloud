@@ -13,7 +13,7 @@ describe("message settings", () => {
   it("renders the accepted provider scope and safe preview", () => {
     expect((page.match(/<el-tab-pane/g) || []).length).toBe(3);
     for (const value of ["ALIYUN", "TENCENT", "NETEASE"]) expect(page).toContain(value);
-    expect(page).not.toContain("EXCHANGE");
+    for (const value of ["EXCHANGE", "NETEASE_163", "QQ", "CUSTOM_HTTP"]) expect(page).toContain(value);
     expect(page).not.toContain("QINIU");
     expect(page).toContain('sandbox=""');
     expect(page).toContain(':title="previewTitle"');
@@ -26,7 +26,7 @@ describe("message settings", () => {
     expect(page).toContain("escapeHtml(row.senderName");
     expect(page).toContain('i18n.global.t');
     expect(page).toContain('@change="providerEnabledChanged"');
-    expect(page).toMatch(/providerChanged\(\).*loadTemplates/);
+    expect(page).toMatch(/providerChanged\(\)[\s\S]*loadTemplates/);
     expect(page).toContain("requestId===templateRequestId");
     expect(page).toContain('channel.value==="SMS"');
     expect(page).toContain("provider.providerType===providerType");

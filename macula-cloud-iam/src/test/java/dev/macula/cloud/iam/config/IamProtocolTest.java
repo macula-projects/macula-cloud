@@ -64,7 +64,7 @@ import dev.macula.cloud.iam.enums.UserTypeEnum;
 import dev.macula.cloud.iam.handler.AuthenticationFailureReason;
 import dev.macula.cloud.iam.mapper.SysIamApplicationIdentityProviderMapper;
 import dev.macula.cloud.iam.mapper.SysIdentityProviderMapper;
-import dev.macula.cloud.iam.message.mail.LoginMailDispatcher;
+import dev.macula.cloud.iam.message.dispatch.LoginMailDispatcher;
 import dev.macula.cloud.iam.pojo.dto.UserAuthInfo;
 import dev.macula.cloud.iam.pojo.entity.SysIamApplicationIdentityProvider;
 import dev.macula.cloud.iam.pojo.entity.SysIdentityProvider;

@@ -331,3 +331,50 @@ SDK 首次绑定可继续通过 `/login/bind/external` 的密码、绑定短信�
 
 
 EMAIL 为托管邮箱验证码认证方式。V25 一次性为具备托管能力的合法非空显式列表追加 EMAIL；null 继承默认、空列表保持关闭，迁移后管理员主动取消不会被重开。上线前需配置 MAIL 渠道、MAIL_LOGIN 模板及 IAM_EMAIL_DIGEST_KEY，回滚旧版本需同步处理 EMAIL 配置值。
+
+## 邮件与自定义短信服务
+
+消息设置为平台全局配置，沿用现有系统设置权限；关闭渠道后不发送消息。邮件支持原有自定义 SMTP、阿里/腾讯/网易企业邮，并增加以下独立类型：
+
+| 类型 | 地址 | 默认端口/安全模式 | 认证 |
+| --- | --- | --- | --- |
+| `EXCHANGE` | 企业自建主机，可配置 | `587 / STARTTLS`，可调整 | SMTP AUTH 账号、密码 |
+| `NETEASE_163` | `smtp.163.com` | `465 / SSL` | 完整邮箱账号、客户端授权码 |
+| `QQ` | `smtp.qq.com` | `465 / SSL` | 完整邮箱账号、客户端授权码 |
+
+STARTTLS 必须升级成功才认证；证书和主机名始终校验，自建 CA 需加入部署的 JVM 信任库。Exchange 需启用相应认证接收连接器并授予发件权限；本轮不支持 Microsoft 365、EWS、NTLM/Kerberos 或匿名中继。
+
+短信保留阿里云、腾讯云，新增 `CUSTOM_HTTP`。管理员提供可信 POST URL、一个或多个认证 Header 和签名，场景/语言/供应商模板编号及变量配置沿用现有方式。建议使用 HTTPS，HTTP 会以明文传输认证 Header。内网服务地址可用，但仅系统设置管理员能配置，不能由发码请求指定地址。
+
+保存示例（仅合成数据）：
+
+```json
+{
+  "providerType": "CUSTOM_HTTP",
+  "enabled": true,
+  "endpoint": "https://sms.example.test/send",
+  "sender": "示例签名",
+  "authHeaders": {"Authorization": "Bearer fixture-only"}
+}
+```
+
+认证 Header 不回显，只返回 `authHeadersConfigured`；全部留空或省略保持原值，填写后整体替换。切换服务商必须重新提供凭据。Header 名称不区分大小写且不可重复，不允许传输控制字段或 CR/LF，总 JSON 最多 2048 字符。`CUSTOM_HTTP` 不使用 AccessKey/account；旧供应商配置保持原存储格式。
+
+发送契约为 POST JSON，`Content-Type: application/json`，并携带保存的认证 Header：
+
+```json
+{
+  "phone": "+8613800000000",
+  "signName": "示例签名",
+  "templateCode": "LOGIN_001",
+  "templateParams": {"code": "123456"},
+  "scene": "SMS_LOGIN",
+  "languageCode": "zh-CN"
+}
+```
+
+响应必须同时满足 HTTP 2xx 及 JSON `{"success":true}`（布尔值）；空响应、非 JSON、业务失败、超时、重定向均失败。连接和整次调用超时均为 5 秒，响应上限 64 KiB，不跟随重定向、不自动重试。服务受理不代表短信已送达；超时可能发生于服务已受理后，调用方不应盲目重发。接口不是任意第三方短信 API 的字段映射器，已有服务需提供此契约的适配入口。
+
+实现按职责分包：`message.mail`、`message.sms` 放抽象接口，`impl` 放供应商实现，IAM 登录编排放 `message.dispatch`，HTTP 配置及传输辅助放 `message.sms.support`。System 与 IAM 不直接引用彼此实现，管理端测试发送与 IAM 实际发码遵循同一契约。
+
+本次沿用现有表结构，无需迁移现有配置；允许后续必要的数据迁移，但不自动改写历史凭据。回滚至旧代码前需先切回旧版支持的供应商。凭据沿用现有存储保护，不代表数据库静态加密；日志不记录认证 Header、验证码、完整手机号或供应商原始响应。真实 Exchange/短信服务需另行联调验收。

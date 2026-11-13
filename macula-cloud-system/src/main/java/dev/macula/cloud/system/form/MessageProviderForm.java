@@ -50,6 +50,7 @@ public class MessageProviderForm {
     private String sender;
     @Size(max = 64)
     private String smsSdkAppId;
+    private java.util.Map<String, String> authHeaders;
     @NotNull
     private Boolean enabled;
 

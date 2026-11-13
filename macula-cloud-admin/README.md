@@ -325,3 +325,7 @@ SDK 首次绑定可继续通过 `/login/bind/external` 的密码、绑定短信�
 EMAIL 为托管邮箱验证码认证方式。V25 一次性为具备托管能力的合法非空显式列表追加 EMAIL；null 继承默认、空列表保持关闭，迁移后管理员主动取消不会被重开。上线前需配置 MAIL 渠道、MAIL_LOGIN 模板及 IAM_EMAIL_DIGEST_KEY，回滚旧版本需同步处理 EMAIL 配置值。
 
 应用协议单选由`applicationProtocolRegistry.js`调度，OAuth默认值与归一化由`oauth2ProtocolConfiguration.js`负责。当前只注册OIDC/OAuth2.1；新增协议需提供自己的策略和配置组件，不能复用OAuth字段猜测配置。HTTP字段及页面路径保持。
+
+## 消息服务配置
+
+消息设置新增企业自建 Exchange、163 免费邮箱、个人 QQ 邮箱与自定义短信服务。Exchange 默认使用 587/STARTTLS，主机、端口和安全模式可编辑；163/QQ 密码填写客户端授权码。自定义短信只需维护 POST URL、认证 Header、签名及现有场景模板编号。Header 不回显，留空保留，填写后整体替换；切换服务商会清除编辑中的凭据，请重新填写。建议使用 HTTPS 和可信地址。测试发送仅使用服务端保存的配置。完整 POST 请求/响应契约见 [System README](../macula-cloud-system/README.md#邮件与自定义短信服务)。

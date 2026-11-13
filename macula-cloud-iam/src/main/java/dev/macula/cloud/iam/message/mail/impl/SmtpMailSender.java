@@ -14,10 +14,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package dev.macula.cloud.iam.message.mail;
+package dev.macula.cloud.iam.message.mail.impl;
+
+import dev.macula.cloud.iam.message.mail.MailSender;
+import dev.macula.cloud.iam.message.mail.MailSecurityMode;
 
 import java.util.Properties;
-import java.util.Set;
 
 import dev.macula.cloud.iam.pojo.entity.SysMessageProvider;
 import lombok.AllArgsConstructor;
@@ -37,7 +39,6 @@ import tools.jackson.databind.json.JsonMapper;
  */
 @Component
 public class SmtpMailSender implements MailSender {
-    private static final Set<String> SECURITY_MODES = Set.of("NONE", "SSL");
     private final JsonMapper json = JsonMapper.builder().build();
 
     /**
@@ -70,7 +71,7 @@ public class SmtpMailSender implements MailSender {
      */
     private void validate(SysMessageProvider provider, MailOptions options) {
         boolean valid = options.getPort() > 0 && options.getPort() <= 65535
-                && SECURITY_MODES.contains(options.getSecurityMode())
+                && MailSecurityMode.supports(options.getSecurityMode())
                 && StringUtils.hasText(provider.getEndpoint())
                 && StringUtils.hasText(provider.getAccount())
                 && StringUtils.hasText(provider.getCredential())
@@ -83,7 +84,7 @@ public class SmtpMailSender implements MailSender {
     /**
      * 每次发送构造有界超时的发送器，不修改全局邮件配置。
      */
-    private JavaMailSenderImpl createSender(SysMessageProvider provider, MailOptions options) {
+    protected JavaMailSenderImpl createSender(SysMessageProvider provider, MailOptions options) {
         JavaMailSenderImpl sender = new JavaMailSenderImpl();
         sender.setHost(provider.getEndpoint());
         sender.setPort(options.getPort());
@@ -91,10 +92,7 @@ public class SmtpMailSender implements MailSender {
         sender.setPassword(provider.getCredential());
         Properties properties = sender.getJavaMailProperties();
         properties.put("mail.smtp.auth", "true");
-        properties.put("mail.smtp.starttls.enable", "false");
-        properties.put("mail.smtp.starttls.required", "false");
-        properties.put("mail.smtp.ssl.enable", String.valueOf("SSL".equals(options.getSecurityMode())));
-        properties.put("mail.smtp.ssl.checkserveridentity", "true");
+        MailSecurityMode.configure(properties, options.getSecurityMode());
         properties.put("mail.smtp.connectiontimeout", "5000");
         properties.put("mail.smtp.timeout", "5000");
         properties.put("mail.smtp.writetimeout", "5000");
