@@ -16,7 +16,7 @@
  */
 package dev.macula.cloud.system.integration;
 
-import dev.macula.cloud.system.protocol.OAuth2ProtocolDefinition;
+import dev.macula.cloud.system.protocol.oauth2.OAuth2ProtocolDefinition;
 import dev.macula.cloud.system.service.impl.ProtocolConfigurationTestFixtures;
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.spring.MybatisSqlSessionFactoryBean;
@@ -29,7 +29,7 @@ import dev.macula.cloud.system.mapper.SysIamApplicationMapper;
 import dev.macula.cloud.system.mapper.SysIamApplicationIdentityProviderMapper;
 import dev.macula.cloud.system.mapper.SysTenantInfoMapper;
 import dev.macula.cloud.system.pojo.entity.SysIamApplication;
-import dev.macula.cloud.system.protocol.OAuth2ProtocolSettings;
+import dev.macula.cloud.system.protocol.oauth2.OAuth2ProtocolSettings;
 import dev.macula.cloud.system.security.OAuth2ClientCacheNames;
 import dev.macula.cloud.system.service.impl.IamApplicationCatalogServiceImpl;
 import java.util.List;

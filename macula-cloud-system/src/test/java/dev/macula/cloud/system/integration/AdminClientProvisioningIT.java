@@ -16,7 +16,7 @@
  */
 package dev.macula.cloud.system.integration;
 
-import dev.macula.cloud.system.protocol.OAuth2ProtocolDefinition;
+import dev.macula.cloud.system.protocol.oauth2.OAuth2ProtocolDefinition;
 import dev.macula.cloud.system.service.impl.ProtocolConfigurationTestFixtures;
 import dev.macula.boot.starter.mp.config.MyBatisPlusProperties;
 import dev.macula.boot.starter.mp.handler.AuditMetaObjectHandler;

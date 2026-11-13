@@ -28,7 +28,7 @@ import dev.macula.cloud.system.mapper.SysIamApplicationMapper;
 import dev.macula.cloud.system.mapper.SysIamApplicationProtocolConfigMapper;
 import dev.macula.cloud.system.mapper.SysIamApplicationIdentityProviderMapper;
 import dev.macula.cloud.system.pojo.entity.SysIamApplication;
-import dev.macula.cloud.system.protocol.OAuth2ProtocolSettings;
+import dev.macula.cloud.system.protocol.oauth2.OAuth2ProtocolSettings;
 import dev.macula.cloud.system.protocol.OAuth2ApplicationProtocolSettings;
 import dev.macula.cloud.system.protocol.IamApplicationProtocolRegistration;
 import dev.macula.boot.mapstruct.DateTimeConverter;

@@ -21,7 +21,7 @@ import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
 import dev.macula.cloud.iam.protocol.oauth2.jwt.IamJwtDecoderFactory;
-import dev.macula.cloud.iam.protocol.oauth2.jwt.keys.KeyStoreSigningKeyProvider;
+import dev.macula.cloud.iam.protocol.oauth2.jwt.keys.keystore.KeyStoreSigningKeyProvider;
 import dev.macula.cloud.iam.protocol.oauth2.jwt.keys.SigningKeyProperties;
 import dev.macula.cloud.iam.protocol.oauth2.jwt.keys.SigningKeyProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;

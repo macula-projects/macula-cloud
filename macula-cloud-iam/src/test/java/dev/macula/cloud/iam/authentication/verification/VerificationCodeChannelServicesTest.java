@@ -16,6 +16,8 @@
  */
 package dev.macula.cloud.iam.authentication.verification;
 
+import dev.macula.cloud.iam.authentication.verification.impl.UnavailableVerificationCodeService;
+
 import dev.macula.cloud.iam.authentication.email.EmailCodeService;
 import dev.macula.cloud.iam.authentication.sms.SmsCodeService;
 import dev.macula.cloud.iam.config.DefaultSecurityConfiguration;

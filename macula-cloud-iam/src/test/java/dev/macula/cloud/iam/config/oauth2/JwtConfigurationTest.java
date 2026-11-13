@@ -19,7 +19,7 @@ package dev.macula.cloud.iam.config.oauth2;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator;
-import dev.macula.cloud.iam.protocol.oauth2.jwt.keys.KeyStoreSigningKeyProvider;
+import dev.macula.cloud.iam.protocol.oauth2.jwt.keys.keystore.KeyStoreSigningKeyProvider;
 import dev.macula.cloud.iam.protocol.oauth2.jwt.keys.SigningKeyProvider;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;

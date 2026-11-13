@@ -21,7 +21,7 @@ import dev.macula.cloud.iam.protocol.oauth2.client.OAuth2ClientRegistration;
 import dev.macula.cloud.iam.protocol.oauth2.client.OAuth2ClientRegistrationService;
 import dev.macula.cloud.iam.service.application.IamApplicationTestFixtures;
 import dev.macula.cloud.system.enums.HostedLoginMethod;
-import dev.macula.cloud.system.protocol.OAuth2ProtocolSettings;
+import dev.macula.cloud.system.protocol.oauth2.OAuth2ProtocolSettings;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;

@@ -16,6 +16,9 @@
  */
 package dev.macula.cloud.system.protocol;
 
+import dev.macula.cloud.system.protocol.oauth2.OAuth2ProtocolDefinition;
+import dev.macula.cloud.system.protocol.oauth2.OAuth2ProtocolSettings;
+
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;

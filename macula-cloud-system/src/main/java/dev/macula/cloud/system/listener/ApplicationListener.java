@@ -18,7 +18,7 @@
 package dev.macula.cloud.system.listener;
 
 import dev.macula.cloud.system.service.SysPermissionService;
-import dev.macula.cloud.system.service.ApplicationCredentialCacheService;
+import dev.macula.cloud.system.service.cache.ApplicationCredentialCacheService;
 import dev.macula.cloud.system.service.SysTenantService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

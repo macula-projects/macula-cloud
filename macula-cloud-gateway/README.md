@@ -37,3 +37,7 @@ Gateway 使用独立的 RESOURCE_SERVER 身份，配置 `IAM_INTROSPECTION_CLIEN
 Gateway恢复使用原Macula Boot GatewayAutoConfiguration；没有Cloud自建的ResourceServerConfiguration、资源拦截器或转发过滤器。令牌内省、缓存、角色/租户授权及内部JWT转发沿用Starter现有行为，System使用原SecurityAutoConfiguration验证网关JWT。
 
 不再配置resource-rules或System resource-policy，不再额外声明原始Bearer转发、System二次内省或专用来源分流。平台身份认领与客户端机密认证不因撤销这些替代实现而删除。
+
+## 接口与实现包约定
+
+本地加解密实现 `CryptoLocaleServiceImpl` 位于 `dev.macula.cloud.gateway.crypto.impl`，接口沿用 Macula Boot 的契约。实现类的组件名称及加解密行为保持不变。

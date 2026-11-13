@@ -25,7 +25,7 @@ import dev.macula.cloud.iam.protocol.oauth2.ProtocolCheckingTokenGenerator;
 import dev.macula.cloud.iam.protocol.oauth2.client.OAuth2ClientRegistrationService;
 import dev.macula.cloud.iam.protocol.oauth2.grant.CustomeOAuth2AccessTokenGenerator;
 import dev.macula.cloud.iam.protocol.oauth2.token.claims.AccessTokenClaimsService;
-import dev.macula.cloud.iam.protocol.oauth2.token.claims.DefaultAccessTokenClaimsService;
+import dev.macula.cloud.iam.protocol.oauth2.token.claims.impl.DefaultAccessTokenClaimsService;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

@@ -16,6 +16,8 @@
  */
 package dev.macula.cloud.iam.authentication.verification;
 
+import dev.macula.cloud.iam.authentication.verification.redis.RedisVerificationCodeStore;
+
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;

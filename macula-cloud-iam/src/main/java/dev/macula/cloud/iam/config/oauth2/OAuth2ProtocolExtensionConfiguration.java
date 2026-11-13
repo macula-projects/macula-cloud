@@ -18,10 +18,10 @@ package dev.macula.cloud.iam.config.oauth2;
 
 import dev.macula.cloud.iam.authentication.mfa.MfaCompletionService;
 import dev.macula.cloud.iam.protocol.oauth2.client.OAuth2ClientRegistrationService;
-import dev.macula.cloud.iam.protocol.oauth2.configuration.AuthorizationEndpointExtension;
+import dev.macula.cloud.iam.protocol.oauth2.configuration.impl.AuthorizationEndpointExtension;
 import dev.macula.cloud.iam.protocol.oauth2.configuration.AuthorizationServerExtension;
-import dev.macula.cloud.iam.protocol.oauth2.configuration.ClientAuthenticationExtension;
-import dev.macula.cloud.iam.protocol.oauth2.configuration.TokenEndpointExtension;
+import dev.macula.cloud.iam.protocol.oauth2.configuration.impl.ClientAuthenticationExtension;
+import dev.macula.cloud.iam.protocol.oauth2.configuration.impl.TokenEndpointExtension;
 import dev.macula.cloud.iam.protocol.oauth2.grant.base.OAuth2UserGrantTokenIssuer;
 import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeAccountResolver;
 import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeRateLimiter;
@@ -30,7 +30,7 @@ import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeVerif
 import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.OAuth2ExternalCodeAuthenticationProvider;
 import dev.macula.cloud.iam.service.identity.IdentityProviderConfigService;
 import dev.macula.cloud.system.protocol.IamApplicationProtocolRegistry;
-import dev.macula.cloud.system.protocol.OAuth2ProtocolDefinition;
+import dev.macula.cloud.system.protocol.oauth2.OAuth2ProtocolDefinition;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

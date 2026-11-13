@@ -16,7 +16,7 @@
  */
 package dev.macula.cloud.system.service.impl;
 
-import dev.macula.cloud.system.protocol.OAuth2ProtocolDefinition;
+import dev.macula.cloud.system.protocol.oauth2.OAuth2ProtocolDefinition;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
