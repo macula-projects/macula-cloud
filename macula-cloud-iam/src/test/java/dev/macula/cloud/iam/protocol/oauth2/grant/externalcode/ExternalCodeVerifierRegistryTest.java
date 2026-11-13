@@ -21,6 +21,7 @@ import java.util.Set;
 
 import dev.macula.cloud.system.enums.ExternalCodeType;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -61,7 +62,7 @@ class ExternalCodeVerifierRegistryTest {
      */
     @Test
     void defaultAdapterRejectsUnexpectedProviderContext() {
-        var verifier = mock(ExternalCodeVerifier.class, org.mockito.Mockito.CALLS_REAL_METHODS);
+        var verifier = mock(ExternalCodeVerifier.class, Mockito.CALLS_REAL_METHODS);
         assertThatThrownBy(() -> verifier.verify(ExternalCodeType.WECOM_APP_CODE, 7L, "fixture-code", null,
                 "https://app.example/callback"))
                 .isInstanceOf(IllegalArgumentException.class);

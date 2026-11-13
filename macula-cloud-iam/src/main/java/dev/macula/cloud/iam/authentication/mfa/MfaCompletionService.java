@@ -16,14 +16,19 @@
  */
 package dev.macula.cloud.iam.authentication.mfa;
 
+import dev.macula.cloud.iam.authentication.inapp.InAppLoginPolicyService;
+import dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyAuthenticationToken;
+import dev.macula.cloud.iam.authentication.thirdparty.VerifiedExternalIdentity;
+import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeClientSettings;
+import dev.macula.cloud.iam.service.identity.IdentityProviderConfigService;
+import dev.macula.cloud.iam.service.userdetails.SysUserDetails;
+import dev.macula.cloud.system.enums.ExternalCodeType;
+import dev.macula.cloud.system.enums.IamWebLoginMode;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
-
-import dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyAuthenticationToken;
-import dev.macula.cloud.iam.authentication.thirdparty.VerifiedExternalIdentity;
-import dev.macula.cloud.iam.service.identity.IdentityProviderConfigService;
-import dev.macula.cloud.iam.service.userdetails.SysUserDetails;
+import java.util.Set;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2ErrorCodes;
@@ -40,7 +45,7 @@ public final class MfaCompletionService {
     public static final String SOURCE_PROOF = "macula.authentication.sourceProof";
     private final MfaCompletionPolicy policy;
     private final IdentityProviderConfigService sources;
-    private dev.macula.cloud.iam.authentication.inapp.InAppLoginPolicyService inAppPolicy;
+    private InAppLoginPolicyService inAppPolicy;
 
     /**
      * 单元测试或独立SPI使用；带来源证明时仍拒绝缺少权威配置读取。
@@ -86,20 +91,20 @@ public final class MfaCompletionService {
         if (authentication instanceof ThirdPartyAuthenticationToken external) {
             var context = external.getLoginContext();
             if (context.clientId() != null) {
-                result.put(dev.macula.cloud.iam.authentication.inapp.InAppLoginPolicyService.CLIENT_ID,
+                result.put(InAppLoginPolicyService.CLIENT_ID,
                         context.clientId());
             }
             if (context.clientAuthorizationVersion() != null) {
-                result.put(dev.macula.cloud.iam.authentication.inapp.InAppLoginPolicyService.CLIENT_VERSION,
+                result.put(InAppLoginPolicyService.CLIENT_VERSION,
                         context.clientAuthorizationVersion());
             }
             if (context.userType() != null) {
-                result.put(dev.macula.cloud.iam.authentication.inapp.InAppLoginPolicyService.USER_TYPE,
+                result.put(InAppLoginPolicyService.USER_TYPE,
                         context.userType().name());
             }
             if (authentication.getPrincipal() instanceof SysUserDetails user) {
-                result.put(dev.macula.cloud.iam.authentication.inapp.InAppLoginPolicyService.USER_ID, user.getUserId());
-                result.put(dev.macula.cloud.iam.authentication.inapp.InAppLoginPolicyService.TENANT_ID,
+                result.put(InAppLoginPolicyService.USER_ID, user.getUserId());
+                result.put(InAppLoginPolicyService.TENANT_ID,
                         user.getTenantId());
             }
             result.put("registrationId", context.registrationId());
@@ -121,8 +126,8 @@ public final class MfaCompletionService {
     /**
      * 生产完成点必须执行端内当前来源约束，不改变原MFA策略。
      */
-    @org.springframework.beans.factory.annotation.Autowired
-    public void setInAppPolicy(dev.macula.cloud.iam.authentication.inapp.InAppLoginPolicyService value) {
+    @Autowired
+    public void setInAppPolicy(InAppLoginPolicyService value) {
         inAppPolicy = value;
     }
 
@@ -135,14 +140,16 @@ public final class MfaCompletionService {
             return;
         }
         try {
-            if (client != null && "IN_APP".equals(client.getClientSettings().getSetting(
-                    dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeClientSettings.APPLICATION_TYPE)) &&
+            if (client != null && client.getClientSettings().getSetting(ExternalCodeClientSettings.APPLICATION_TYPE) != null
+                && IamWebLoginMode.isInApp(client.getClientSettings().getSetting(
+                    ExternalCodeClientSettings.APPLICATION_TYPE), client.getClientSettings().getSetting(
+                    ExternalCodeClientSettings.WEB_LOGIN_MODE)) &&
                     inAppPolicy == null) {
                 throw new AdditionalAuthenticationRequiredException();
             }
-            AuthenticationMethod method = dev.macula.cloud.system.enums.ExternalCodeType.GRANT_TYPE.equals(entryPoint)
+            AuthenticationMethod method = ExternalCodeType.GRANT_TYPE.equals(entryPoint)
                     ? AuthenticationMethod.EXTERNAL : "sms".equals(entryPoint) ? AuthenticationMethod.SMS
-                    : java.util.Set.of("authorization_code", "refresh_token").contains(entryPoint)
+                    : Set.of("authorization_code", "refresh_token").contains(entryPoint)
                     ? AuthenticationMethod.EXISTING_SESSION : AuthenticationMethod.UNKNOWN;
             check(authentication, client == null ? null : client.getClientId(), checkpoint,
                     entryPoint, method, sourceProof);

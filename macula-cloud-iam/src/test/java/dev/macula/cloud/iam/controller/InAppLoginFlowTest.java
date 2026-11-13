@@ -16,9 +16,6 @@
  */
 package dev.macula.cloud.iam.controller;
 
-import java.time.Instant;
-import java.util.List;
-
 import dev.macula.cloud.iam.authentication.inapp.InAppAuthorizationRequestFilter;
 import dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyAuthenticationToken;
 import dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyLoginContext;
@@ -26,9 +23,19 @@ import dev.macula.cloud.iam.config.IamProtocolTest;
 import dev.macula.cloud.iam.enums.UserTypeEnum;
 import dev.macula.cloud.iam.mapper.SysIdentityProviderMapper;
 import dev.macula.cloud.iam.pojo.entity.SysIdentityProvider;
-import dev.macula.cloud.iam.pojo.entity.SysOAuth2Client;
-import dev.macula.cloud.iam.service.client.SysOAuth2ClientService;
+import dev.macula.cloud.iam.protocol.oauth2.ProtocolTestFixtures;
+import dev.macula.cloud.iam.protocol.oauth2.client.OAuth2ClientRegistration;
+import dev.macula.cloud.iam.protocol.oauth2.client.OAuth2ClientRegistrationService;
+import dev.macula.cloud.iam.service.identity.IdentityProviderConfigService;
 import dev.macula.cloud.iam.service.userdetails.SysUserDetails;
+import dev.macula.cloud.system.protocol.OAuth2ProtocolConfiguration;
+import jakarta.servlet.Filter;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.time.Instant;
+import java.util.Base64;
+import java.util.List;
+import org.hamcrest.Matchers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,6 +44,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextImpl;
 import org.springframework.security.oauth2.server.authorization.web.OAuth2AuthorizationEndpointFilter;
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
 import org.springframework.security.web.FilterChainProxy;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextHolderFilter;
@@ -45,7 +53,9 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.test.context.web.WebAppConfiguration;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.web.context.WebApplicationContext;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -79,7 +89,7 @@ class InAppLoginFlowTest {
     @Autowired
     private WebApplicationContext context;
     private MockMvc mvc;
-    private SysOAuth2Client client;
+    private OAuth2ClientRegistration client;
 
     /**
      * 当前端内注册与协议均由服务端权威测试快照提供，厂商无外部调用。
@@ -87,9 +97,11 @@ class InAppLoginFlowTest {
     @BeforeEach
     void setup() {
         mvc = webAppContextSetup(context).apply(springSecurity()).build();
-        client = new SysOAuth2Client();
+        client = new OAuth2ClientRegistration();
         client.setClientId("public");
-        client.setApplicationType("IN_APP");
+        client.setApplicationType("SPA");
+        client.setWebLoginMode("IN_APP");
+        client.setHostedLoginMethods("");
         client.setAuthorizationVersion(7L);
         client.setClientAuthenticationMethods("none");
         client.setAuthorizationGrantTypes("authorization_code");
@@ -101,8 +113,8 @@ class InAppLoginFlowTest {
         client.setBrowserProviderBindings("{\"WECOM\":2}");
         client.setBrowserCapabilityBindings("{\"WECOM_WEBVIEW\":2}");
         client.setHostedLoginMethods("");
-        dev.macula.cloud.iam.protocol.oauth2.ProtocolTestFixtures.configure(client);
-        when(context.getBean(SysOAuth2ClientService.class).getClientByClientId("public")).thenReturn(client);
+        ProtocolTestFixtures.configure(client);
+        when(context.getBean(OAuth2ClientRegistrationService.class).getClientByClientId("public")).thenReturn(client);
         var source = new SysIdentityProvider();
         source.setId(2L);
         source.setProviderType("WECOM");
@@ -121,7 +133,7 @@ class InAppLoginFlowTest {
      */
     @Test
     void filterRunsAfterContextAndBeforeSasAuthorization() {
-        List<jakarta.servlet.Filter> filters = context.getBean(FilterChainProxy.class).getFilters("/oauth2/authorize");
+        List<Filter> filters = context.getBean(FilterChainProxy.class).getFilters("/oauth2/authorize");
         assertTrue(index(filters, SecurityContextHolderFilter.class) <
                 index(filters, InAppAuthorizationRequestFilter.class));
         assertTrue(index(filters, InAppAuthorizationRequestFilter.class) <
@@ -141,7 +153,7 @@ class InAppLoginFlowTest {
         var session = session(authentication);
         var original = session.getAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY);
         mvc.perform(authorize().session(session)).andExpect(status().is3xxRedirection())
-                .andExpect(header().string("Location", org.hamcrest.Matchers.containsString("/login")));
+                .andExpect(header().string("Location", Matchers.containsString("/login")));
         assertSame(original, session.getAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY));
         mvc.perform(get("/login").session(session).header("User-Agent", "MicroMessenger wxwork"))
                 .andExpect(status().is3xxRedirection()).andExpect(redirectedUrl("/login/wecom/webview"));
@@ -159,7 +171,7 @@ class InAppLoginFlowTest {
     @Test
     void validProofUsesSasAndInvalidRedirectNeverLeavesIam() throws Exception {
         // 使用来源实际Flow，防止测试凭空假设平台合同。
-        var source = context.getBean(dev.macula.cloud.iam.service.identity.IdentityProviderConfigService.class)
+        var source = context.getBean(IdentityProviderConfigService.class)
                 .requireEnabledById(2L, "WECOM").forCapability("WECOM_WEBVIEW");
         var proof = new ThirdPartyLoginContext("WECOM", "WEBVIEW", "public", Instant.now(),
                 "https://iam.example/oauth2/authorize",
@@ -172,7 +184,7 @@ class InAppLoginFlowTest {
         mvc.perform(invalid.session(session(authentication))).andExpect(status().isBadRequest());
         client.setAuthorizationVersion(8L);
         mvc.perform(authorize().session(session(authentication))).andExpect(status().is3xxRedirection())
-                .andExpect(header().string("Location", org.hamcrest.Matchers.containsString("/login")));
+                .andExpect(header().string("Location", Matchers.containsString("/login")));
     }
 
     /**
@@ -183,7 +195,7 @@ class InAppLoginFlowTest {
         client.setClientSecret("{noop}retained-fixture");
         String first = platformCode();
         mvc.perform(exchange(first).with(
-                        org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic(
+                        SecurityMockMvcRequestPostProcessors.httpBasic(
                                 "public", "retained-fixture")))
                 .andExpect(status().isUnauthorized());
         mvc.perform(exchange(first)).andExpect(status().isOk()).andExpect(jsonPath("$.access_token").exists());
@@ -203,9 +215,9 @@ class InAppLoginFlowTest {
      */
     @Test
     void consentSubmissionRejectsChangedClientProof() throws Exception {
-        dev.macula.cloud.system.protocol.OAuth2ProtocolConfiguration.settings(client.getProtocolConfigurations().get(0))
+        OAuth2ProtocolConfiguration.settings(client.getProtocolConfigurations().get(0))
                 .setRequireAuthorizationConsent(true);
-        var source = context.getBean(dev.macula.cloud.iam.service.identity.IdentityProviderConfigService.class)
+        var source = context.getBean(IdentityProviderConfigService.class)
                 .requireEnabledById(2L, "WECOM").forCapability("WECOM_WEBVIEW");
         var proof = new ThirdPartyLoginContext("WECOM", "WEBVIEW", "public", Instant.now(),
                 "https://iam.example/oauth2/authorize",
@@ -216,7 +228,7 @@ class InAppLoginFlowTest {
         var consent = mvc.perform(authorize().session(session)).andExpect(status().is3xxRedirection()).andReturn();
         var location = consent.getResponse().getRedirectedUrl();
         assertTrue(location.contains("/oauth2/consent"));
-        String state = org.springframework.web.util.UriComponentsBuilder.fromUriString(location).build()
+        String state = UriComponentsBuilder.fromUriString(location).build()
                 .getQueryParams().getFirst("state");
         client.setAuthorizationVersion(8L);
         mvc.perform(post("/oauth2/authorize").session(session).param("client_id", "public").param("state", state)
@@ -237,20 +249,20 @@ class InAppLoginFlowTest {
         var session = session(UsernamePasswordAuthenticationToken.authenticated(user(), "", List.of()));
         mvc.perform(authorize().session(session)).andExpect(status().is3xxRedirection());
         mvc.perform(post("/api/v1/sms-code").session(session)
-                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
+                .with(SecurityMockMvcRequestPostProcessors.csrf())
                 .param("phone", "13800000000")).andExpect(status().isForbidden());
         mvc.perform(post("/login").session(session)
-                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
+                        .with(SecurityMockMvcRequestPostProcessors.csrf())
                         .param("username", "fixture-user").param("password", "fixture-password"))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(header().string("Location", org.hamcrest.Matchers.containsString("error=")));
+                .andExpect(header().string("Location", Matchers.containsString("error=")));
     }
 
     /**
      * 测试平台证明只由服务端认证器构造；实际第三方认证由另组Mock适配器测试覆盖。
      */
     private String platformCode() throws Exception {
-        var source = context.getBean(dev.macula.cloud.iam.service.identity.IdentityProviderConfigService.class)
+        var source = context.getBean(IdentityProviderConfigService.class)
                 .requireEnabledById(2L, "WECOM").forCapability("WECOM_WEBVIEW");
         var proof = new ThirdPartyLoginContext("WECOM", "WEBVIEW", "public", Instant.now(),
                 "https://iam.example/oauth2/authorize",
@@ -259,7 +271,7 @@ class InAppLoginFlowTest {
                         authorize().session(session(ThirdPartyAuthenticationToken.authenticated("WECOM", user(),
                                 proof))))
                 .andExpect(status().is3xxRedirection()).andReturn();
-        var code = org.springframework.web.util.UriComponentsBuilder.fromUriString(
+        var code = UriComponentsBuilder.fromUriString(
                 result.getResponse().getRedirectedUrl()).build().getQueryParams().getFirst("code");
         assertNotNull(code);
         return code;
@@ -268,7 +280,7 @@ class InAppLoginFlowTest {
     /**
      * 原生授权码PKCE换码，不增加端内专用Token接口。
      */
-    private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder exchange(String code) {
+    private MockHttpServletRequestBuilder exchange(String code) {
         return post("/oauth2/token").param("grant_type", "authorization_code").param("client_id", "public")
                 .param("redirect_uri", "https://client.example/callback").param("code", code)
                 .param("code_verifier", "v".repeat(43));
@@ -299,28 +311,28 @@ class InAppLoginFlowTest {
     /**
      * 使用固定合法回调和S256挑战，框架负责全部OAuth请求校验。
      */
-    private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder authorize() throws Exception {
+    private MockHttpServletRequestBuilder authorize() throws Exception {
         return authorize("https://client.example/callback");
     }
 
     /**
      * 单一回调参数用于区分非法URI与重复参数，不绕过SAS原生校验。
      */
-    private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder authorize(String redirect) throws
+    private MockHttpServletRequestBuilder authorize(String redirect) throws
             Exception {
         return get("/oauth2/authorize").queryParam("client_id", "public").queryParam("response_type", "code")
                 .queryParam("scope", "openid profile")
                 .queryParam("redirect_uri", redirect).queryParam("state", "fixture-state").queryParam("code_challenge",
-                        java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(
-                                java.security.MessageDigest.getInstance("SHA-256")
-                                        .digest("v".repeat(43).getBytes(java.nio.charset.StandardCharsets.US_ASCII))))
+                        Base64.getUrlEncoder().withoutPadding().encodeToString(
+                                MessageDigest.getInstance("SHA-256")
+                                        .digest("v".repeat(43).getBytes(StandardCharsets.US_ASCII))))
                 .queryParam("code_challenge_method", "S256");
     }
 
     /**
      * 缺失过滤器让测试明确失败。
      */
-    private int index(List<jakarta.servlet.Filter> filters, Class<?> type) {
+    private int index(List<Filter> filters, Class<?> type) {
         for (int i = 0; i < filters.size(); i++) {
             if (type.isInstance(filters.get(i))) {
                 return i;

@@ -16,18 +16,26 @@
  */
 package dev.macula.cloud.iam.protocol.oauth2;
 
-import java.time.Duration;
-
-import dev.macula.cloud.iam.pojo.entity.SysOAuth2Client;
-import dev.macula.cloud.iam.service.client.SysOAuth2ClientService;
+import dev.macula.cloud.iam.protocol.oauth2.client.OAuth2ClientRegistration;
+import dev.macula.cloud.iam.protocol.oauth2.client.OAuth2ClientRegistrationService;
+import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeClientSettings;
+import dev.macula.cloud.system.protocol.ApplicationProtocolConfiguration;
 import dev.macula.cloud.system.protocol.OAuth2ProtocolSettings;
+import dev.macula.cloud.system.security.OAuth2ResourcePolicy;
+import java.time.Duration;
+import java.util.List;
+import java.util.Set;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
+import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
+import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationCodeRequestAuthenticationException;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.web.context.request.RequestContextHolder;
@@ -59,15 +67,15 @@ class ProtocolAwareRegisteredClientRepositoryTest {
     @Test
     @SuppressWarnings("unchecked")
     void exactProfilesHaveIndependentNativeSettings() {
-        var row = new SysOAuth2Client();
+        var row = new OAuth2ClientRegistration();
         row.setClientId("client");
-        row.setEnabledProtocols("OIDC,OAUTH2_1");
-        row.setDefaultProtocol("OIDC");
+        ProtocolTestFixtures.configure(row, "OIDC,OAUTH2_1");
+
         row.setClientSecret("{noop}shared");
         ProtocolTestFixtures.configure(row);
         var oidc = (OAuth2ProtocolSettings) row.getProtocolConfigurations().get(0).settings();
         var oauth = new OAuth2ProtocolSettings();
-        org.springframework.beans.BeanUtils.copyProperties(oidc, oauth);
+        BeanUtils.copyProperties(oidc, oauth);
         oauth.setScopes("profile,api.read");
         oidc.setAccessTokenTimeToLive(600L);
         oidc.setClientAuthenticationMethods("client_secret_basic");
@@ -75,14 +83,14 @@ class ProtocolAwareRegisteredClientRepositoryTest {
         oauth.setTokenFormat("self-contained");
         oauth.setClientAuthenticationMethods("client_secret_post");
         oauth.setRedirectUris("https://oauth.example/callback");
-        oauth.setAllowedOrigins(java.util.Set.of("https://oauth.example"));
+        oauth.setAllowedOrigins(Set.of("https://oauth.example"));
         var identity = RegisteredClient.withId("client").clientId("client").clientSecret("{noop}shared")
                 .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
                 .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
                 .redirectUri("https://client.example/callback").scope("openid").scope("api.read").build();
         var base = mock(RegisteredClientRepository.class);
         when(base.findByClientId("client")).thenReturn(identity);
-        var clients = mock(SysOAuth2ClientService.class);
+        var clients = mock(OAuth2ClientRegistrationService.class);
         when(clients.getClientByClientId("client")).thenReturn(row);
         var authorizations = mock(OAuth2AuthorizationService.class);
         var provider = (ObjectProvider<OAuth2AuthorizationService>) mock(ObjectProvider.class);
@@ -90,11 +98,17 @@ class ProtocolAwareRegisteredClientRepositoryTest {
         var repository = new ProtocolAwareRegisteredClientRepository(base, clients, provider);
         request("openid profile");
         var first = repository.findByClientId("client");
-        row.setProtocolConfigurations(java.util.List.of(
-                new dev.macula.cloud.system.protocol.ApplicationProtocolConfiguration("OAUTH2_1", 1, true, oauth)));
+        assertThat(first.getClientSettings().<String>getSetting(ExternalCodeClientSettings.WEB_LOGIN_MODE)).isEqualTo("BROWSER");
+        row.setWebLoginMode("IN_APP");
+        row.setHostedLoginMethods("");
+        row.setBrowserCapabilityBindings("{\"WECOM_WEBVIEW\":17}");
+        row.setProtocolConfigurations(List.of(
+                new ApplicationProtocolConfiguration("OAUTH2_1", 1, true, oauth)));
         row.setAuthorizationVersion(2L);
         request("api.read");
         var second = repository.findByClientId("client");
+        assertThat(second.getClientSettings().<String>getSetting(ExternalCodeClientSettings.WEB_LOGIN_MODE)).isEqualTo("IN_APP");
+        assertThat(identity.getClientSettings().getSettings()).doesNotContainKey(ExternalCodeClientSettings.WEB_LOGIN_MODE);
         assertThat(first.getClientAuthenticationMethods()).containsExactly(
                 ClientAuthenticationMethod.CLIENT_SECRET_BASIC);
         assertThat(second.getClientAuthenticationMethods()).containsExactly(
@@ -108,6 +122,25 @@ class ProtocolAwareRegisteredClientRepositoryTest {
         verifyNoInteractions(authorizations);
     }
 
+    /** 已移除类型在基础缓存拒绝时也返回授权端点专用错误，不出现框架强转异常。 */
+    @Test
+    @SuppressWarnings("unchecked")
+    void adaptsRemovedArchitectureFailureAtAuthorizationEndpoint() {
+        var base = mock(RegisteredClientRepository.class);
+        var failure = new OAuth2AuthenticationException("unauthorized_client");
+        when(base.findByClientId("removed")).thenThrow(failure);
+        var clients = mock(OAuth2ClientRegistrationService.class);
+        var provider = (ObjectProvider<OAuth2AuthorizationService>) mock(ObjectProvider.class);
+        var repository = new ProtocolAwareRegisteredClientRepository(base, clients, provider);
+        var request = new MockHttpServletRequest("GET", "/oauth2/authorize");
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+        Assertions.assertThatThrownBy(() -> repository.findByClientId("removed"))
+            .isInstanceOf(OAuth2AuthorizationCodeRequestAuthenticationException.class);
+        request.setRequestURI("/oauth2/token");
+        Assertions.assertThatThrownBy(() -> repository.findByClientId("removed")).isSameAs(failure);
+        verifyNoInteractions(clients);
+    }
+
     /**
      * 内省请求必须覆盖陈旧基础缓存中的凭据、认证方式和授权版本。
      */
@@ -119,13 +152,13 @@ class ProtocolAwareRegisteredClientRepositoryTest {
                 .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS).build();
         var base = mock(RegisteredClientRepository.class);
         when(base.findByClientId("resource")).thenReturn(cached);
-        var row = new SysOAuth2Client();
+        var row = new OAuth2ClientRegistration();
         row.setClientId("resource");
         row.setPurpose("RESOURCE_SERVER");
         row.setAuthorizationVersion(2L);
         row.setClientSecret("{noop}new");
         row.setClientAuthenticationMethods("client_secret_post");
-        var clients = mock(SysOAuth2ClientService.class);
+        var clients = mock(OAuth2ClientRegistrationService.class);
         when(clients.getClientByClientId("resource")).thenReturn(row);
         var provider = (ObjectProvider<OAuth2AuthorizationService>) mock(ObjectProvider.class);
         var request = new MockHttpServletRequest("POST", "/oauth2/introspect");
@@ -136,7 +169,7 @@ class ProtocolAwareRegisteredClientRepositoryTest {
                 ClientAuthenticationMethod.CLIENT_SECRET_POST);
         assertThat(actual.getAuthorizationGrantTypes()).doesNotContain(AuthorizationGrantType.CLIENT_CREDENTIALS);
         assertThat((Number) actual.getClientSettings()
-                .getSetting(dev.macula.cloud.system.security.OAuth2ResourcePolicy.AUTHORIZATION_VERSION)).isEqualTo(2L);
+                .getSetting(OAuth2ResourcePolicy.AUTHORIZATION_VERSION)).isEqualTo(2L);
         verifyNoInteractions(provider);
     }
 

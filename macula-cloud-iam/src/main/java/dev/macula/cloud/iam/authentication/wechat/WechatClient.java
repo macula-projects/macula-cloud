@@ -21,10 +21,13 @@ import java.net.HttpURLConnection;
 import java.time.Duration;
 import java.util.Map;
 
+import dev.macula.cloud.iam.authentication.thirdparty.cache.ProviderApplicationTokenCache;
+import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeConsumptionState;
 import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeInfrastructureException;
 import dev.macula.cloud.iam.service.identity.IdentityProviderConfigService.ProviderConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.security.authentication.AuthenticationServiceException;
@@ -76,7 +79,7 @@ public class WechatClient {
     private final RestClient restClient;
     private final boolean httpContractTest;
     private final JsonMapper json = JsonMapper.builder().build();
-    private dev.macula.cloud.iam.authentication.thirdparty.cache.ProviderApplicationTokenCache applicationTokens;
+    private ProviderApplicationTokenCache applicationTokens;
 
     public WechatClient() {
         this(RestClient.builder().requestFactory(noRedirectRequestFactory()).build(), false);
@@ -113,9 +116,9 @@ public class WechatClient {
     /**
      * 为固定小程序应用Token装配安全缓存。
      */
-    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    @Autowired(required = false)
     void applicationTokenCache(
-            dev.macula.cloud.iam.authentication.thirdparty.cache.ProviderApplicationTokenCache cache) {
+            ProviderApplicationTokenCache cache) {
         this.applicationTokens = cache;
     }
 
@@ -231,11 +234,11 @@ public class WechatClient {
         try {
             if (applicationTokens == null && !httpContractTest) {
                 throw new ExternalCodeInfrastructureException(
-                        dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeConsumptionState.NOT_SUBMITTED);
+                        ExternalCodeConsumptionState.NOT_SUBMITTED);
             }
             String accessToken = applicationTokens == null ? loadMiniappApplicationToken(config).token()
                     : applicationTokens.get(config,
-                    dev.macula.cloud.iam.authentication.thirdparty.cache.ProviderApplicationTokenCache.APPLICATION_TOKEN,
+                    ProviderApplicationTokenCache.APPLICATION_TOKEN,
                     () -> loadMiniappApplicationToken(config));
             String phoneBody = restClient.post().uri(UriComponentsBuilder.fromUriString(MINIAPP_PHONE)
                             .queryParam(OAuth2ParameterNames.ACCESS_TOKEN, accessToken).build().encode().toUri())
@@ -269,7 +272,7 @@ public class WechatClient {
     /**
      * 仅取得应用Token，未向手机号接口提交用户Code。
      */
-    private dev.macula.cloud.iam.authentication.thirdparty.cache.ProviderApplicationTokenCache.TokenValue loadMiniappApplicationToken(
+    private ProviderApplicationTokenCache.TokenValue loadMiniappApplicationToken(
             ProviderConfig config) {
         try {
             String appId = config.require(APP_ID_CONFIG);
@@ -286,17 +289,17 @@ public class WechatClient {
                         TOKEN_STAGE);
                 throw failed();
             }
-            return new dev.macula.cloud.iam.authentication.thirdparty.cache.ProviderApplicationTokenCache.TokenValue(
+            return new ProviderApplicationTokenCache.TokenValue(
                     accessToken, Duration.ofSeconds(tokenResponse.path("expires_in").asLong()));
         } catch (RestClientResponseException ex) {
             if (ex.getStatusCode().is5xxServerError()) {
                 throw new ExternalCodeInfrastructureException(
-                        dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeConsumptionState.NOT_SUBMITTED);
+                        ExternalCodeConsumptionState.NOT_SUBMITTED);
             }
             throw failed();
         } catch (RestClientException ex) {
             throw new ExternalCodeInfrastructureException(
-                    dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeConsumptionState.NOT_SUBMITTED);
+                    ExternalCodeConsumptionState.NOT_SUBMITTED);
         }
     }
 

@@ -29,16 +29,15 @@ import dev.macula.cloud.iam.authentication.hosted.HostedLoginPolicyFilter;
 import dev.macula.cloud.iam.authentication.hosted.LoginRequestMatchers;
 import dev.macula.cloud.iam.authentication.mfa.MfaCompletionService;
 import dev.macula.cloud.iam.authentication.mfa.MfaSessionAuthenticationStrategy;
+import dev.macula.cloud.iam.authentication.sms.SmsCodeService;
 import dev.macula.cloud.iam.authentication.sms.SmsLoginFilterConfigurer;
-import dev.macula.cloud.iam.authentication.sms.SmsService;
-import dev.macula.cloud.iam.authentication.sms.SmsServiceImpl;
-import dev.macula.cloud.iam.authentication.sms.SmsUserDetailsService;
-import dev.macula.cloud.iam.authentication.sms.UnavailableSmsService;
 import dev.macula.cloud.iam.authentication.thirdparty.PendingThirdPartyBindingRepository;
 import dev.macula.cloud.iam.authentication.thirdparty.browser.ThirdPartyLoginFilterConfigurer;
 import dev.macula.cloud.iam.authentication.userdetails.HostedUserDetailsService;
 import dev.macula.cloud.iam.authentication.verification.EmailVerificationProperties;
 import dev.macula.cloud.iam.authentication.verification.SmsVerificationProperties;
+import dev.macula.cloud.iam.authentication.verification.UnavailableVerificationCodeService;
+import dev.macula.cloud.iam.authentication.verification.VerificationCodeChannelService;
 import dev.macula.cloud.iam.authentication.verification.VerificationCodeService;
 import dev.macula.cloud.iam.authentication.wechat.WechatAuthenticationFilter;
 import dev.macula.cloud.iam.authentication.wechat.WechatLoginMode;
@@ -62,7 +61,6 @@ import org.springframework.core.annotation.Order;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.SavedRequestAwareAuthenticationSuccessHandler;
@@ -109,7 +107,9 @@ public class DefaultSecurityConfiguration {
     @Bean
     @Order(Ordered.HIGHEST_PRECEDENCE + 2)
     SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http,
-            @Qualifier("sysUserDetailsService") UserDetailsService userDetailsService,
+            @Qualifier("sysUserDetailsService") HostedUserDetailsService userDetailsService,
+            @Qualifier("smsCodeService") VerificationCodeChannelService smsCodes,
+            @Qualifier("emailCodeService") VerificationCodeChannelService emailCodes,
             BrowserAuthenticationFailureHandler authenticationFailureHandler,
             HostedLoginClientPolicyService hostedPolicy, MfaCompletionService mfaCompletion,
             RequestCache browserRequestCache) throws Exception {
@@ -151,13 +151,12 @@ public class DefaultSecurityConfiguration {
             .permitAll());
 
         // 短信验证码登录
-        http.with(new SmsLoginFilterConfigurer<>(), code -> code
-            .smsUserDetailsService((SmsUserDetailsService)userDetailsService)
+        http.with(new SmsLoginFilterConfigurer(smsCodes, userDetailsService), code -> code
             .successHandler(authenticationSuccessHandler)
             .failureHandler(authenticationFailureHandler)
             .permitAll());
 
-        http.with(new EmailLoginFilterConfigurer(), email -> email
+        http.with(new EmailLoginFilterConfigurer(emailCodes, userDetailsService), email -> email
             .successHandler(authenticationSuccessHandler).failureHandler(authenticationFailureHandler).permitAll());
 
         http.with(thirdPartyLogin, login -> login.successHandler(authenticationSuccessHandler)
@@ -186,26 +185,30 @@ public class DefaultSecurityConfiguration {
     }
 
     /**
-     * 邮箱认证依赖完整内核及投递配置；未配置渠道时由投递服务失败关闭。
+     * 邮箱与短信采用一致的设施判定，缺少内核或投递器时均失败关闭。
      */
-    @Bean
-    public EmailCodeService emailCodeService(VerificationCodeService codes, LoginMailDispatcher mail,
-            UserIdentifierNormalizer normalizer, EmailVerificationProperties settings) {
-        return new EmailCodeService(codes, mail, normalizer, settings);
+    @Bean("emailCodeService")
+    public VerificationCodeChannelService emailCodeService(ObjectProvider<VerificationCodeService> services,
+            ObjectProvider<LoginMailDispatcher> dispatchers, UserIdentifierNormalizer normalizer,
+            EmailVerificationProperties settings) {
+        VerificationCodeService codes = services.getIfAvailable();
+        LoginMailDispatcher dispatcher = dispatchers.getIfAvailable();
+        return codes != null && dispatcher != null
+                ? new EmailCodeService(codes, dispatcher, normalizer, settings)
+                : new UnavailableVerificationCodeService();
     }
 
     /**
-     * 完整短信设施可用时启用真实实现，否则保留原失败关闭策略。
+     * 独立名称固定通道，调用方必须以Qualifier选择，不能按公共接口猜测。
      */
-    @Bean
-    public SmsService smsService(ObjectProvider<VerificationCodeService> services,
+    @Bean("smsCodeService")
+    public VerificationCodeChannelService smsCodeService(ObjectProvider<VerificationCodeService> services,
             ObjectProvider<LoginSmsDispatcher> dispatchers, UserIdentifierNormalizer normalizer,
             SmsVerificationProperties settings) {
         VerificationCodeService codes = services.getIfAvailable();
         LoginSmsDispatcher dispatcher = dispatchers.getIfAvailable();
-        if (codes != null && dispatcher != null) {
-            return new SmsServiceImpl(codes, dispatcher, normalizer, settings);
-        }
-        return new UnavailableSmsService();
+        return codes != null && dispatcher != null
+                ? new SmsCodeService(codes, dispatcher, normalizer, settings)
+                : new UnavailableVerificationCodeService();
     }
 }

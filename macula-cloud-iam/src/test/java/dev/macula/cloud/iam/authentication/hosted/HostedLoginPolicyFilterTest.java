@@ -16,10 +16,9 @@
  */
 package dev.macula.cloud.iam.authentication.hosted;
 
+import dev.macula.cloud.system.enums.HostedLoginMethod;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
-
-import dev.macula.cloud.system.enums.OAuth2HostedLoginMethod;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -56,7 +55,7 @@ class HostedLoginPolicyFilterTest {
             assertEquals(path.contains("sms-code") ? 403 : 302, response.getStatus());
         }
         when(policy.resolve(any(), any())).thenReturn(
-                new HostedLoginClientPolicyService.Context(null, Set.of(OAuth2HostedLoginMethod.SMS)));
+                new HostedLoginClientPolicyService.Context(null, Set.of(HostedLoginMethod.SMS)));
         AtomicBoolean called = new AtomicBoolean();
         filter.doFilter(new MockHttpServletRequest("POST", "/login/sms"), new MockHttpServletResponse(),
                 (req, res) -> called.set(true));

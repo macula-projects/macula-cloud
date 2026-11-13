@@ -259,6 +259,7 @@ export default {
 		language_msg:
 			'Translation in progress,Temporarily translated the text of this view',
 	},
- applicationBoundary: {inApp: 'An in-app application uses one container login capability and has no hosted IAM login page.', native: 'A mobile client uses one SDK or AppLink source and may also enable built-in IAM login.', miniapp: 'A miniapp uses one source for its platform. WeChat login and phone codes may share that source.'}
+ applicationBoundary: {
+    webLoginMode: 'Web login mode', browserMode: 'Browser', inAppMode: 'In-app',inApp: 'An in-app application uses one container login capability and has no hosted IAM login page.', native: 'A mobile client uses one SDK or AppLink source and may also enable built-in IAM login.', miniapp: 'A miniapp uses one source for its platform. WeChat login and phone codes may share that source.'}
 
 }

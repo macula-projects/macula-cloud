@@ -16,17 +16,40 @@
  */
 package dev.macula.cloud.iam.authentication.thirdparty;
 
-import java.time.Instant;
-import java.util.Map;
-import java.util.Set;
-
 import dev.macula.cloud.iam.authentication.thirdparty.browser.BrowserLoginClientPolicyService;
 import dev.macula.cloud.iam.authentication.thirdparty.browser.ThirdPartyIdentityResolutionService;
 import dev.macula.cloud.iam.enums.UserTypeEnum;
+import dev.macula.cloud.iam.mapper.SysIamApplicationIdentityProviderMapper;
+import dev.macula.cloud.iam.mapper.SysIdentityProviderMapper;
+import dev.macula.cloud.iam.mapper.SysIdentityProviderUserBindingMapper;
+import dev.macula.cloud.iam.mapper.SysUserMapper;
+import dev.macula.cloud.iam.pojo.entity.SysIdentityProviderUserBinding;
+import dev.macula.cloud.iam.pojo.entity.SysUser;
+import dev.macula.cloud.iam.protocol.oauth2.ProtocolTestFixtures;
+import dev.macula.cloud.iam.protocol.oauth2.client.OAuth2ClientRegistration;
+import dev.macula.cloud.iam.protocol.oauth2.client.OAuth2ClientRegistrationService;
 import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeVerification;
+import dev.macula.cloud.iam.service.account.ClientAccountDetailsService;
+import dev.macula.cloud.iam.service.application.IamApplicationTestFixtures;
 import dev.macula.cloud.iam.service.identity.IdentityProviderConfigService;
-import dev.macula.cloud.iam.service.identity.RegistrationIdentityBindingService;
+import dev.macula.cloud.iam.service.identity.IdentityProviderUserBindingService;
+import dev.macula.cloud.iam.service.userdetails.SysUserDetails;
+import dev.macula.cloud.system.enums.BrowserLoginProviderType;
+import dev.macula.cloud.system.enums.ExternalCodeType;
+import dev.macula.cloud.system.enums.IdentityDirectoryPolicy;
+import dev.macula.cloud.system.enums.IdentitySourceFlow;
 import dev.macula.cloud.system.enums.IdentitySourceType;
+import dev.macula.cloud.system.protocol.OAuth2ProtocolConfiguration;
+import dev.macula.cloud.system.security.UserIdentifierNormalizer;
+import java.time.Instant;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+import org.mockito.ArgumentMatchers;
+import org.mockito.Mockito;
+import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
 
 /**
  * 测试显式构造新身份源及Client路由；不向生产代码添加旧契约构造器。
@@ -56,9 +79,9 @@ public final class IdentitySourceTestFixtures {
             String appId, String secret, Map<String, String> values, Map<String, String> secrets) {
         return new IdentityProviderConfigService.ProviderConfig(1L, type, false, null, 0L, vendor, appId,
                 secret, values, secrets, true,
-                java.util.Arrays.stream(dev.macula.cloud.system.enums.IdentitySourceFlow.values())
+                Arrays.stream(IdentitySourceFlow.values())
                         .filter(item -> item.supports(type) && item.implemented()).findFirst().orElseThrow(),
-                dev.macula.cloud.system.enums.IdentityDirectoryPolicy.IDENTITY_ONLY, null,
+                IdentityDirectoryPolicy.IDENTITY_ONLY, null,
                 type == IdentitySourceType.FEISHU_APPLINK ? "https://fixture.example/callback" : null);
     }
 
@@ -66,7 +89,7 @@ public final class IdentitySourceTestFixtures {
      * 测试显式固定来源flow，不让生产运行时猜测未核实版本。
      */
     public static String flow(String source) {
-        return java.util.Arrays.stream(dev.macula.cloud.system.enums.IdentitySourceFlow.values())
+        return Arrays.stream(IdentitySourceFlow.values())
                 .filter(item -> item.supports(IdentitySourceType.fromValue(source))).findFirst().orElseThrow().value();
     }
 
@@ -84,7 +107,7 @@ public final class IdentitySourceTestFixtures {
             default -> throw new IllegalArgumentException();
         };
         return new ThirdPartyLoginContext(vendor, mode, client, at, target, 1L, type.value(), 1L, UserTypeEnum.EMPLOYEE,
-                0L, dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.flow(type.value()),
+                0L, IdentitySourceTestFixtures.flow(type.value()),
                 "https://iam.example/login/" + vendor.toLowerCase());
     }
 
@@ -102,7 +125,7 @@ public final class IdentitySourceTestFixtures {
                 context.loginCapability())
                 : Map.of(VerifiedExternalIdentity.LOGIN_CAPABILITY_ATTRIBUTE, context.loginCapability());
         return new VerifiedExternalIdentity(context.registrationId(), context.providerType(), context.sourceType(), 0L,
-                dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.flow(context.sourceType()),
+                IdentitySourceTestFixtures.flow(context.sourceType()),
                 VerifiedExternalIdentity.BROWSER, kind, subject, attrs);
     }
 
@@ -136,7 +159,7 @@ public final class IdentitySourceTestFixtures {
         String kind = Set.of("FEISHU", "WECHAT").contains(vendor) ? VerifiedExternalIdentity.OPEN_ID :
                 VerifiedExternalIdentity.MEMBER_ID;
         return new ExternalCodeVerification(new VerifiedExternalIdentity(1L, vendor, type.value(), 0L,
-                dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.flow(type.value()), code,
+                IdentitySourceTestFixtures.flow(type.value()), code,
                 kind, subject,
                 VerifiedExternalIdentity.MEMBER_ID.equals(kind) ? Map.of("member_id", subject) : Map.of()));
     }
@@ -146,7 +169,7 @@ public final class IdentitySourceTestFixtures {
      */
     public static ExternalCodeVerification mobile(String phone) {
         return new ExternalCodeVerification(new VerifiedExternalIdentity(1L, "ALIYUN_MOBILE", "ALIYUN_MOBILE", 0L,
-                dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.flow("ALIYUN_MOBILE"),
+                IdentitySourceTestFixtures.flow("ALIYUN_MOBILE"),
                 "ALIYUN_MOBILE_TOKEN", VerifiedExternalIdentity.MOBILE_PROOF, phone, Map.of("verified_mobile", phone)));
     }
 
@@ -154,9 +177,9 @@ public final class IdentitySourceTestFixtures {
      * 测试中显式固定浏览器来源和员工目录。
      */
     public static BrowserLoginClientPolicyService.ClientPolicy policy(String clientId,
-            Set<dev.macula.cloud.system.enums.BrowserLoginProviderType> providers,
-            dev.macula.cloud.system.enums.BrowserLoginProviderType direct) {
-        Map<String, Long> fixed = providers.stream().collect(java.util.stream.Collectors.toMap(Enum::name, v -> 1L));
+            Set<BrowserLoginProviderType> providers,
+            BrowserLoginProviderType direct) {
+        Map<String, Long> fixed = providers.stream().collect(Collectors.toMap(Enum::name, v -> 1L));
         return new BrowserLoginClientPolicyService.ClientPolicy(clientId, providers, direct, fixed, 1L,
                 UserTypeEnum.EMPLOYEE);
     }
@@ -164,80 +187,66 @@ public final class IdentitySourceTestFixtures {
     /**
      * 绑定查询用真实Service，Mapper模拟只隔离数据库；稳定ID与孤儿关系由Service校验。
      */
-    public static RegistrationIdentityBindingService registrationService(
-            dev.macula.cloud.iam.pojo.entity.SysUser account) {
+    public static IdentityProviderUserBindingService registrationService(
+            SysUser account) {
         return registrationService(account, "OAUTH2_1");
     }
 
     /**
      * 同一真实绑定校验链必须支持两种单协议，不能靠Mock绕过协议判断。
      */
-    public static RegistrationIdentityBindingService registrationService(
-            dev.macula.cloud.iam.pojo.entity.SysUser account, String protocol) {
-        var clients = org.mockito.Mockito.mock(dev.macula.cloud.iam.mapper.SysOAuth2ClientMapper.class);
-        var sources = org.mockito.Mockito.mock(dev.macula.cloud.iam.mapper.SysIdentityProviderMapper.class);
-        var external = org.mockito.Mockito.mock(
-                dev.macula.cloud.iam.mapper.SysOAuth2ClientExternalProviderMapper.class);
-        var users = org.mockito.Mockito.mock(dev.macula.cloud.iam.mapper.SysUserMapper.class);
-        var rows = org.mockito.Mockito.mock(dev.macula.cloud.iam.mapper.SysRegistrationIdentityBindingMapper.class);
-        var configs = org.mockito.Mockito.mock(IdentityProviderConfigService.class);
-        var details = org.mockito.Mockito.mock(dev.macula.cloud.iam.service.account.ClientAccountDetailsService.class);
-        var client = new dev.macula.cloud.iam.pojo.entity.SysOAuth2Client();
+    public static IdentityProviderUserBindingService registrationService(
+            SysUser account, String protocol) {
+        var clients = Mockito.mock(OAuth2ClientRegistrationService.class);
+        var sources = Mockito.mock(SysIdentityProviderMapper.class);
+        var external = Mockito.mock(
+                SysIamApplicationIdentityProviderMapper.class);
+        var users = Mockito.mock(SysUserMapper.class);
+        var rows = Mockito.mock(SysIdentityProviderUserBindingMapper.class);
+        var configs = Mockito.mock(IdentityProviderConfigService.class);
+        var details = Mockito.mock(ClientAccountDetailsService.class);
+        var client = new OAuth2ClientRegistration();
         client.setClientId("app");
         client.setApplicationType("NATIVE");
         client.setUserType(UserTypeEnum.EMPLOYEE);
         client.setTenantId(1L);
-        client.setProtocolMode(protocol);
-        client.setEnabledProtocols(protocol);
-        client.setDefaultProtocol(protocol);
+
+        ProtocolTestFixtures.configure(client, protocol);
+
         client.setConfigurationStatus("ENABLED");
         client.setClientAuthenticationMethods("none");
         client.setRequireProofKey(true);
         client.setScopes("OIDC".equals(protocol) ? "openid,profile" : "profile");
         client.setExternalCodeTypes("WECOM_APP_CODE");
-        client.setAuthorizationGrantTypes(dev.macula.cloud.system.enums.ExternalCodeType.GRANT_TYPE);
-        dev.macula.cloud.iam.protocol.oauth2.ProtocolTestFixtures.configure(client);
-        dev.macula.cloud.system.protocol.OAuth2ProtocolConfiguration.settings(client.getProtocolConfigurations().get(0))
-                .setAuthorizationGrantTypes(dev.macula.cloud.system.enums.ExternalCodeType.GRANT_TYPE);
-        var protocols = org.mockito.Mockito.mock(dev.macula.cloud.iam.mapper.SysApplicationProtocolConfigMapper.class);
-        org.mockito.Mockito.when(protocols.selectList(org.mockito.ArgumentMatchers.any())).thenAnswer(call ->
-                client.getProtocolConfigurations().stream().map(configuration -> {
-                    var row = new dev.macula.cloud.iam.pojo.entity.SysApplicationProtocolConfig();
-                    row.setProtocol(configuration.protocol());
-                    row.setSchemaVersion(1);
-                    row.setEnabled(true);
-                    row.setConfiguration(tools.jackson.databind.json.JsonMapper.builder().build()
-                            .writeValueAsString(configuration.settings()));
-                    return row;
-                }).toList());
-        org.mockito.Mockito.when(clients.selectOne(org.mockito.ArgumentMatchers.any())).thenReturn(client);
-        org.mockito.Mockito.when(configs.requireEnabledById(1L, "WECOM"))
+        client.setAuthorizationGrantTypes(ExternalCodeType.GRANT_TYPE);
+        ProtocolTestFixtures.configure(client);
+        OAuth2ProtocolConfiguration.settings(client.getProtocolConfigurations().get(0))
+                .setAuthorizationGrantTypes(ExternalCodeType.GRANT_TYPE);
+        client.setExternalProviderBindings(Map.of("WECOM_APP_CODE", 1L));
+        client.setId(1L);
+        Mockito.when(clients.getClientByClientId("app")).thenReturn(client);
+        Mockito.when(configs.requireEnabledById(1L, "WECOM"))
                 .thenReturn(source(IdentitySourceType.WECOM_SDK,
                         "WECOM", "corp", "secret", Map.of("corpId", "corp", "agentId", "agent")));
-        var mapping = new dev.macula.cloud.iam.pojo.entity.SysOAuth2ClientExternalProvider();
-        mapping.setIdentityProviderId(1L);
-        mapping.setCodeType("WECOM_APP_CODE");
-        org.mockito.Mockito.when(external.selectList(org.mockito.ArgumentMatchers.any()))
-                .thenReturn(java.util.List.of(mapping));
-        var row = new dev.macula.cloud.iam.pojo.entity.SysRegistrationIdentityBinding();
+        var row = new SysIdentityProviderUserBinding();
         row.setUserId(9L);
         row.setUserType("employee");
-        org.mockito.Mockito.when(rows.selectList(org.mockito.ArgumentMatchers.any()))
-                .thenReturn(java.util.List.of(row));
-        org.mockito.Mockito.when(users.selectById(9L)).thenReturn(account);
+        Mockito.when(rows.selectList(ArgumentMatchers.any()))
+                .thenReturn(List.of(row));
+        Mockito.when(users.selectById(9L)).thenReturn(account);
         if (account != null) {
             account.setStatus(1);
-            var principal = new dev.macula.cloud.iam.service.userdetails.SysUserDetails();
+            var principal = new SysUserDetails();
             principal.setUserId(account.getId());
             principal.setTenantId(1L);
             principal.setUsername(account.getUsername());
             principal.setEnabled(true);
-            org.mockito.Mockito.when(details.loadUserByClient("app", 1L, UserTypeEnum.EMPLOYEE, account.getUsername()))
+            Mockito.when(details.loadUserByApplication(1L, 1L, UserTypeEnum.EMPLOYEE, account.getUsername()))
                     .thenReturn(principal);
         }
-        return new RegistrationIdentityBindingService(clients, protocols, sources, external, users, rows, configs,
-                details,
-                new dev.macula.cloud.system.security.UserIdentifierNormalizer());
+        return new IdentityProviderUserBindingService(IamApplicationTestFixtures.resolver(clients,
+                AuthorizationServerSettings.builder().build()), sources, users, rows, configs, details,
+                new UserIdentifierNormalizer());
     }
 
 }

@@ -1,4 +1,4 @@
-import {externalCodeAllowed,browserCapabilities,singleSourceApplication} from '@/utils/identitySourceCompatibility';
+import {externalCodeAllowed,singleSourceApplication,isInApp,isWebApplication,webLoginMode} from '@/utils/identitySourceCompatibility';
 import {projectProtocol,anyProtocolUses,protocolDefaults,RETIRED_GRANTS} from './applicationProtocolRegistry';
 import {
   AUTHORIZATION_CODE_GRANT,
@@ -74,8 +74,8 @@ export function grantIssue(client, grant) {
   const type = client.applicationType;
   if (type === 'SERVICE' && grant !== 'client_credentials') return '后端服务仅允许服务凭据';
   if (grant === 'client_credentials' && type && type !== 'SERVICE') return '服务凭据仅用于后端服务';
-  if (grant === EXTERNAL_CODE_GRANT && ['WEB_SERVER','SPA'].includes(type)) return '网页应用仅支持第三方网页授权';
-  if (type === 'IN_APP' && ![AUTHORIZATION_CODE_GRANT,EXTERNAL_CODE_GRANT].includes(grant)) return '端内应用只允许固定平台登录';
+  if (grant === EXTERNAL_CODE_GRANT && ['WEB_SERVER','SPA'].includes(type) && !isInApp(client)) return '网页应用仅支持第三方网页授权';
+  if (isInApp(client) && ![AUTHORIZATION_CODE_GRANT,EXTERNAL_CODE_GRANT].includes(grant)) return '端内应用只允许固定平台登录';
   if (grant === 'client_credentials' && !client.enabledProtocols?.includes('OAUTH2_1'))
     return '此直接Token授权需要启用OAuth2.1';
   if (auth.includes("none") && grant === "client_credentials")
@@ -83,7 +83,7 @@ export function grantIssue(client, grant) {
   if (auth.includes("none") && grant === "refresh_token")
     return "当前公共客户端流程不签发刷新令牌，请通过SSO重新授权";
   if (grant === EXTERNAL_CODE_GRANT) {
-    if (!auth.includes("none")) return "外部凭证授权只允许公共客户端（none）";
+    if (!auth.includes("none") && !(client.applicationType === "WEB_SERVER" && isInApp(client))) return "外部凭证授权只允许公共客户端（none）";
     if (!client.externalCodeTypes?.length)
       return "请先在登录能力中选择外部凭证登录方式及身份源";
     if (client.externalCodeTypes.some(code => !externalCodeAllowed(client,code)))
@@ -126,12 +126,15 @@ export function configurationIssues(client) {
   const grants = csvValues(client.authorizationGrantTypes);
   const auth = csvValues(client.clientAuthenticationMethods);
   const issues = [];
+  if (!['WEB_SERVER','SPA','NATIVE','MINIAPP','SERVICE'].includes(client.applicationType)) issues.push('应用类型无效');
+  if (isWebApplication(client) ? !['BROWSER','IN_APP'].includes(webLoginMode(client)) : client.webLoginMode != null) issues.push('网页登录模式无效');
+  if (client.managedKey === 'platform-admin' && webLoginMode(client) !== 'BROWSER') issues.push('平台Admin必须使用浏览器模式');
   const bindings = [...Object.values(client.browserCapabilityBindings || {}),...Object.values(client.externalProviderBindings || {})];
   if (singleSourceApplication(client) && new Set(bindings.map(String)).size > 1) issues.push('当前应用只能关联一个身份源');
   if (client.applicationType === 'NATIVE' && (client.externalCodeTypes || []).length > 1) issues.push('移动客户端只能选择一个SDK登录能力');
-  if (client.applicationType === 'IN_APP' && bindings.length !== 1) issues.push('端内应用必须且只能关联一个端内登录能力');
+  if (isInApp(client) && (bindings.length > 1 || client.configurationStatus === 'ENABLED' && bindings.length !== 1)) issues.push('端内应用必须且只能关联一个端内登录能力');
   if (['NATIVE','MINIAPP','SERVICE'].includes(client.applicationType) && (client.browserLoginProviderTypes?.length || Object.keys(client.browserCapabilityBindings || {}).length)) issues.push('当前应用不支持第三方网页登录，请移除旧关联');
-  if (client.applicationType === 'IN_APP' && (client.hostedLoginMethods?.length || grants.includes(AUTHORIZATION_CODE_GRANT) && grants.includes(EXTERNAL_CODE_GRANT))) issues.push('端内应用不支持IAM内置登录或混合登录路径');
+  if (isInApp(client) && (client.hostedLoginMethods?.length || grants.includes(AUTHORIZATION_CODE_GRANT) && grants.includes(EXTERNAL_CODE_GRANT))) issues.push('端内应用不支持IAM内置登录或混合登录路径');
   if (
     ["SPA", "NATIVE", "MINIAPP"].includes(client.applicationType) &&
     !equalSet(auth, ["none"])
@@ -326,6 +329,9 @@ export function requestExample(
     )
   );
   let intro = "# 将 <...> 占位符替换为本次请求的实际值。";
+  if (grant === EXTERNAL_CODE_GRANT && isInApp(client)) intro += client.applicationType === 'WEB_SERVER'
+    ? ' JSAPI仅在网页取Code；以下请求由业务后端使用机密凭据发送，密钥不得进入网页。'
+    : ' SPA取得平台Code后以none提交IAM；直接Code不建立浏览器SSO，不执行IAM授权码PKCE。';
   if (grant === "client_credentials")
     intro += " 服务身份，不包含用户身份，不返回刷新令牌。";
   if (grant === "authorization_code") {
@@ -376,13 +382,13 @@ export function applicationTemplate(
   const service = applicationType === "SERVICE";
   const confidential = service || applicationType === "WEB_SERVER";
   const mini = applicationType === "MINIAPP";
-  const inApp = applicationType === "IN_APP";
   return {
     ...client,
     purpose: 'APPLICATION',
     protocol:service || mini?'OAUTH2_1':'OIDC',
     settings:protocolDefaults({...client,applicationType},service || mini?'OAUTH2_1':'OIDC'),
     applicationType,
+    webLoginMode: ['WEB_SERVER','SPA'].includes(applicationType) ? 'BROWSER' : null,
     miniappPlatform: mini ? miniappPlatform || "WECHAT" : null,
     clientAuthenticationMethods: confidential ? "client_secret_basic" : "none",
     clientSecret: "",
@@ -403,7 +409,7 @@ export function applicationTemplate(
     externalCodeTypes: [],
     externalProviderBindings: {},
     directLoginProviderType: "",
-    hostedLoginMethods: service || inApp ? [] : mini ? null : ["PASSWORD", "SMS", "EMAIL"],
+    hostedLoginMethods: service ? [] : mini ? null : ["PASSWORD", "SMS", "EMAIL"],
     requireProofKey: true,
     reuseRefreshTokens: false,
     jwkSetUrl: "",
@@ -414,13 +420,14 @@ export function applicationTemplate(
 /** 仅发送API表单字段，示例密钥和只读状态不会进入更新请求。 */
 export function clientPayload(client) {
   const fields = ['clientId','clientName','purpose','protocol','settings','configurationVersion','configurationStatus',
-    'convertToInApp','browserProviderBindings','browserCapabilityBindings','applicationType','miniappPlatform','hostedLoginMethods','externalCodeTypes','externalProviderBindings',
+    'webLoginMode','browserProviderBindings','browserCapabilityBindings','applicationType','miniappPlatform','hostedLoginMethods','externalCodeTypes','externalProviderBindings',
     'browserLoginProviderTypes','directLoginProviderType','userType','tenantId'];
   const data = Object.fromEntries(
     fields
       .filter((key) => Object.hasOwn(client, key))
       .map((key) => [key, client[key]])
   );
+  if (!isWebApplication(client)) delete data.webLoginMode;
   if (data.browserCapabilityBindings == null) delete data.browserCapabilityBindings;
   if (
     usesSecret(client) &&
@@ -429,22 +436,4 @@ export function clientPayload(client) {
   )
     data.clientSecret = client.clientSecret;
   return data;
-}
-
-/** 显式转换只修改待保存副本；原Client ID和凭据状态保留，最终仍由服务器CAS校验。 */
-export function inAppConversion(client, source, capability) {
-  if (!['WEB_SERVER','SPA'].includes(client.applicationType) || client.managedKey || client.purpose !== 'APPLICATION') throw new Error('此应用不能转换为端内应用');
-  const browser = browserCapabilities({applicationType:'IN_APP'},source).some(item => item.loginCapability === capability);
-  const code = (source.capabilities || []).find(item => item.codeType === capability && externalCodeAllowed({applicationType:'IN_APP'},capability,source));
-  if (!source.available || !browser && !code) throw new Error('请选择可用的端内登录能力');
-  const next = structuredClone(client);
-  Object.assign(next,{applicationType:'IN_APP',miniappPlatform:null,convertToInApp:true,hostedLoginMethods:[],
-    browserCapabilityBindings:browser?{[capability]:source.id}:{},browserProviderBindings:browser?{[source.providerType]:source.id}:{},
-    browserLoginProviderTypes:browser?[source.providerType]:[],externalCodeTypes:code?[capability]:[],
-    externalProviderBindings:code?{[capability]:source.id}:{},directLoginProviderType:''});
-  next.settings.authorizationGrantTypes=browser?'authorization_code':EXTERNAL_CODE_GRANT;
-  if (code) next.settings.clientAuthenticationMethods='none';
-  next.settings.allowedOrigins=[];
-  next.settings.requireProofKey=true;
-  return next;
 }

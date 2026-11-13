@@ -17,9 +17,14 @@
 package dev.macula.cloud.iam.authentication.thirdparty;
 
 import java.io.Serializable;
+import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 import dev.macula.cloud.iam.service.identity.IdentityProviderConfigService;
+import dev.macula.cloud.system.enums.ExternalCodeType;
+import dev.macula.cloud.system.enums.IdentityLoginCapability;
+import dev.macula.cloud.system.enums.IdentitySourceFlow;
 import dev.macula.cloud.system.enums.IdentitySourceType;
 import org.springframework.util.Assert;
 
@@ -51,17 +56,17 @@ public record VerifiedExternalIdentity(Long registrationId, String providerType,
         Assert.isTrue(type.providerType().equals(providerType), "source provider mismatch");
         Assert.isTrue(sourceVersion != null && sourceVersion >= 0, "source version is required");
         Assert.hasText(flow, "source flow is required");
-        Assert.isTrue(dev.macula.cloud.system.enums.IdentitySourceFlow.declared(type, flow).supports(type),
+        Assert.isTrue(IdentitySourceFlow.declared(type, flow).supports(type),
                 "source flow mismatch");
         Assert.hasText(capability, "capability is required");
         if (BROWSER.equals(capability)) {
             Assert.isTrue(type.browser() && !MOBILE_PROOF.equals(identityKind), "browser source mismatch");
         } else {
-            dev.macula.cloud.system.enums.ExternalCodeType code =
-                    dev.macula.cloud.system.enums.ExternalCodeType.fromValue(
+            ExternalCodeType code =
+                    ExternalCodeType.fromValue(
                     capability);
             Assert.isTrue(type.supports(code), "credential source mismatch");
-            Assert.isTrue((code.resultType() == dev.macula.cloud.system.enums.ExternalCodeType.ResultType.MOBILE)
+            Assert.isTrue((code.resultType() == ExternalCodeType.ResultType.MOBILE)
                     == MOBILE_PROOF.equals(identityKind), "credential identity kind mismatch");
         }
         boolean correctKind = switch (type.providerType()) {
@@ -74,7 +79,7 @@ public record VerifiedExternalIdentity(Long registrationId, String providerType,
             default -> false;
         };
         Assert.isTrue(correctKind, "provider identity kind mismatch");
-        Assert.isTrue(java.util.Set.of(MEMBER_ID, OPEN_ID, UNION_ID, GITHUB_ID, MOBILE_PROOF).contains(identityKind),
+        Assert.isTrue(Set.of(MEMBER_ID, OPEN_ID, UNION_ID, GITHUB_ID, MOBILE_PROOF).contains(identityKind),
                 "identity kind is invalid");
         Assert.hasText(identityValue, "verified identity is required");
         Assert.isTrue(identityValue.length() <= 255, "verified identity is too long");
@@ -86,7 +91,7 @@ public record VerifiedExternalIdentity(Long registrationId, String providerType,
      */
     public static VerifiedExternalIdentity of(IdentityProviderConfigService.ProviderConfig source, String capability,
             String kind, String value, Map<String, String> attributes) {
-        var verifiedAttributes = new java.util.HashMap<>(attributes);
+        var verifiedAttributes = new HashMap<>(attributes);
         verifiedAttributes.put(LOGIN_CAPABILITY_ATTRIBUTE, source.loginCapability());
         return new VerifiedExternalIdentity(source.registrationId(), source.providerType(), source.sourceType().value(),
                 source.version(), source.flow().value(), capability, kind, value, verifiedAttributes);
@@ -98,14 +103,14 @@ public record VerifiedExternalIdentity(Long registrationId, String providerType,
     public String loginCapability() {
         String selected = attributes.get(LOGIN_CAPABILITY_ATTRIBUTE);
         if (selected != null) {
-            return dev.macula.cloud.system.enums.IdentityLoginCapability.fromValue(selected).value();
+            return IdentityLoginCapability.fromValue(selected).value();
         }
         if (!BROWSER.equals(capability)) {
-            return dev.macula.cloud.system.enums.IdentityLoginCapability.forCode(
-                    dev.macula.cloud.system.enums.ExternalCodeType.fromValue(capability)).value();
+            return IdentityLoginCapability.forCode(
+                    ExternalCodeType.fromValue(capability)).value();
         }
         var type = IdentitySourceType.fromValue(sourceType);
-        return dev.macula.cloud.system.enums.IdentityLoginCapability.browser(type,
+        return IdentityLoginCapability.browser(type,
                 type == IdentitySourceType.GITHUB_OAUTH ? "" :
                         type == IdentitySourceType.WECHAT_OFFICIAL_ACCOUNT ? "WEBVIEW" : "BROWSER").value();
     }

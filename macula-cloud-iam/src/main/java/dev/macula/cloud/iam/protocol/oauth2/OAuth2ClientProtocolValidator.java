@@ -16,8 +16,10 @@
  */
 package dev.macula.cloud.iam.protocol.oauth2;
 
+import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeClientSettings;
+import dev.macula.cloud.system.enums.IamApplicationType;
+import java.util.Set;
 import java.util.function.Consumer;
-
 import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.OAuth2ErrorCodes;
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationCodeRequestAuthenticationContext;
@@ -44,10 +46,11 @@ public class OAuth2ClientProtocolValidator implements Consumer<OAuth2Authorizati
         OAuth2AuthorizationCodeRequestAuthenticationValidator.DEFAULT_SCOPE_VALIDATOR.accept(context);
         OAuth2AuthorizationCodeRequestAuthenticationToken request = context.getAuthentication();
         String applicationType = context.getRegisteredClient().getClientSettings().getSetting(
-                dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeClientSettings.APPLICATION_TYPE);
+                ExternalCodeClientSettings.APPLICATION_TYPE);
         if (applicationType != null &&
-                !dev.macula.cloud.system.enums.OAuth2ClientApplicationType.valueOf(applicationType)
-                        .supportsGrant("authorization_code")) {
+                !IamApplicationType.valueOf(applicationType)
+                        .supportsGrant("authorization_code", context.getRegisteredClient().getClientSettings().getSetting(
+                            ExternalCodeClientSettings.WEB_LOGIN_MODE))) {
             throw rejected(request);
         }
         Object configured = context.getRegisteredClient().getClientSettings().getSetting(ENABLED_PROTOCOLS);
@@ -56,7 +59,7 @@ public class OAuth2ClientProtocolValidator implements Consumer<OAuth2Authorizati
             throw new OAuth2AuthorizationCodeRequestAuthenticationException(
                     new OAuth2Error(OAuth2ErrorCodes.INVALID_SCOPE), request);
         }
-        if (!(configured instanceof java.util.Set<?> values) || !values.contains(protocol)) {
+        if (!(configured instanceof Set<?> values) || !values.contains(protocol)) {
             throw rejected(request);
         }
         Object challenge = request.getAdditionalParameters().get("code_challenge");

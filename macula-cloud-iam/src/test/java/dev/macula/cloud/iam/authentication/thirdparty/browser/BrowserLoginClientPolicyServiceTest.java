@@ -17,10 +17,20 @@
 package dev.macula.cloud.iam.authentication.thirdparty.browser;
 
 import dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures;
-import dev.macula.cloud.iam.pojo.entity.SysOAuth2Client;
-import dev.macula.cloud.iam.service.client.SysOAuth2ClientService;
+import dev.macula.cloud.iam.enums.UserTypeEnum;
+import dev.macula.cloud.iam.protocol.oauth2.ProtocolTestFixtures;
+import dev.macula.cloud.iam.protocol.oauth2.client.OAuth2ClientRegistration;
+import dev.macula.cloud.iam.protocol.oauth2.client.OAuth2ClientRegistrationService;
+import dev.macula.cloud.iam.service.application.IamApplicationTestFixtures;
 import dev.macula.cloud.iam.service.identity.IdentityProviderConfigService;
 import dev.macula.cloud.system.enums.BrowserLoginProviderType;
+import dev.macula.cloud.system.enums.IdentitySourceType;
+import jakarta.servlet.http.Cookie;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -30,6 +40,7 @@ import org.springframework.security.authentication.AuthenticationServiceExceptio
 import org.springframework.security.oauth2.core.endpoint.OAuth2ParameterNames;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
 import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
+import tools.jackson.databind.json.JsonMapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -44,7 +55,7 @@ import static org.mockito.Mockito.when;
  */
 class BrowserLoginClientPolicyServiceTest {
     private static final String CLIENT_ID = "portal";
-    private final SysOAuth2ClientService clients = mock(SysOAuth2ClientService.class);
+    private final OAuth2ClientRegistrationService clients = mock(OAuth2ClientRegistrationService.class);
     private final IdentityProviderConfigService configs = mock(IdentityProviderConfigService.class);
     private BrowserLoginClientPolicyService policies;
 
@@ -52,7 +63,7 @@ class BrowserLoginClientPolicyServiceTest {
     void setUp() {
         AuthorizationServerSettings settings = AuthorizationServerSettings.builder()
                 .issuer("https://iam.example").build();
-        policies = new BrowserLoginClientPolicyService(clients, settings, configs);
+        policies = new BrowserLoginClientPolicyService(IamApplicationTestFixtures.resolver(clients, settings), configs);
     }
 
     @Test
@@ -62,7 +73,7 @@ class BrowserLoginClientPolicyServiceTest {
         when(clients.getClientByClientId(CLIENT_ID)).thenReturn(client("GITHUB,WECOM", "WECOM"));
         MockHttpServletRequest login = loginRequest(session);
         login.addParameter(OAuth2ParameterNames.CLIENT_ID, "forged-client");
-        login.setCookies(new jakarta.servlet.http.Cookie(OAuth2ParameterNames.CLIENT_ID, "forged-cookie"));
+        login.setCookies(new Cookie(OAuth2ParameterNames.CLIENT_ID, "forged-cookie"));
 
         BrowserLoginClientPolicyService.ClientPolicy policy = policies.resolve(login,
                 new MockHttpServletResponse()).orElseThrow();
@@ -79,24 +90,24 @@ class BrowserLoginClientPolicyServiceTest {
     @Test
     void rejectsBrowserSourcesIncompatibleWithTrustedApplicationType() {
         var source = IdentitySourceTestFixtures.source(
-                dev.macula.cloud.system.enums.IdentitySourceType.WECHAT_OFFICIAL_ACCOUNT,
-                "WECHAT", "official-app", "fixture-secret", java.util.Map.of("appId", "official-app"));
+                IdentitySourceType.WECHAT_OFFICIAL_ACCOUNT,
+                "WECHAT", "official-app", "fixture-secret", Map.of("appId", "official-app"));
         when(configs.requireEnabledById(5L, "WECHAT")).thenReturn(source);
-        for (String type : java.util.List.of("SERVICE", "NATIVE", "MINIAPP", "WEB_SERVER", "SPA")) {
+        for (String type : List.of("SERVICE", "NATIVE", "MINIAPP", "WEB_SERVER", "SPA")) {
             var policy = new BrowserLoginClientPolicyService.ClientPolicy("portal",
-                    java.util.Set.of(BrowserLoginProviderType.WECHAT),
-                    null, java.util.Map.of("WECHAT", 5L), 1L, dev.macula.cloud.iam.enums.UserTypeEnum.EMPLOYEE, type);
+                    Set.of(BrowserLoginProviderType.WECHAT),
+                    null, Map.of("WECHAT", 5L), 1L, UserTypeEnum.EMPLOYEE, type);
             assertThatThrownBy(() -> policies.requireSource(policy, "WECHAT")).isInstanceOf(
                     AuthenticationServiceException.class);
         }
         var web = new BrowserLoginClientPolicyService.ClientPolicy("portal",
-                java.util.Set.of(BrowserLoginProviderType.WECHAT),
-                null, java.util.Map.of("WECHAT", 5L), 1L, dev.macula.cloud.iam.enums.UserTypeEnum.EMPLOYEE, "SPA");
+                Set.of(BrowserLoginProviderType.WECHAT),
+                null, Map.of("WECHAT", 5L), 1L, UserTypeEnum.EMPLOYEE, "SPA");
         assertThatThrownBy(() -> policies.requireSource(web, "WECHAT")).isInstanceOf(
                 AuthenticationServiceException.class);
         var mini = new BrowserLoginClientPolicyService.ClientPolicy("portal",
-                java.util.Set.of(BrowserLoginProviderType.WECHAT),
-                null, java.util.Map.of("WECHAT", 5L), 1L, dev.macula.cloud.iam.enums.UserTypeEnum.EMPLOYEE, "MINIAPP");
+                Set.of(BrowserLoginProviderType.WECHAT),
+                null, Map.of("WECHAT", 5L), 1L, UserTypeEnum.EMPLOYEE, "MINIAPP");
         assertThatThrownBy(() -> policies.requireSource(mini, "WECHAT")).isInstanceOf(
                 AuthenticationServiceException.class);
     }
@@ -146,23 +157,23 @@ class BrowserLoginClientPolicyServiceTest {
                 BrowserLoginProviderType.WECOM)).isInstanceOf(AuthenticationServiceException.class);
     }
 
-    private SysOAuth2Client client(String allowedProviders, String directProvider) {
-        SysOAuth2Client client = new SysOAuth2Client();
+    private OAuth2ClientRegistration client(String allowedProviders, String directProvider) {
+        OAuth2ClientRegistration client = new OAuth2ClientRegistration();
         client.setClientId(CLIENT_ID);
         client.setAuthorizationGrantTypes("authorization_code,refresh_token");
         client.setRedirectUris("https://app.example/callback");
-        client.setProtocolMode("OIDC");
-        client.setEnabledProtocols("OIDC");
-        client.setDefaultProtocol("OIDC");
+
+        ProtocolTestFixtures.configure(client, "OIDC");
+
         client.setConfigurationStatus("ENABLED");
         client.setTenantId(1L);
-        client.setUserType(dev.macula.cloud.iam.enums.UserTypeEnum.EMPLOYEE);
-        client.setBrowserProviderBindings(tools.jackson.databind.json.JsonMapper.builder().build().writeValueAsString(
-                java.util.Arrays.stream(allowedProviders.split(","))
-                        .collect(java.util.stream.Collectors.toMap(v -> v, v -> 1L))));
+        client.setUserType(UserTypeEnum.EMPLOYEE);
+        client.setBrowserProviderBindings(JsonMapper.builder().build().writeValueAsString(
+                Arrays.stream(allowedProviders.split(","))
+                        .collect(Collectors.toMap(v -> v, v -> 1L))));
         client.setBrowserLoginProviderTypes(allowedProviders);
         client.setDirectLoginProviderType(directProvider);
-        return dev.macula.cloud.iam.protocol.oauth2.ProtocolTestFixtures.configure(client);
+        return ProtocolTestFixtures.configure(client);
     }
 
     private MockHttpServletRequest loginRequest(MockHttpSession session) {

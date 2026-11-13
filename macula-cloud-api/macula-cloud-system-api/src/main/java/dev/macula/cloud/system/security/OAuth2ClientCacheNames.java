@@ -27,7 +27,7 @@ public final class OAuth2ClientCacheNames {
     public static final String TOKEN_ORIGIN_INDEX = "cloud:iam:oauth2:origin-index";
 
     /** 独立协议配置缓存版本，防止恢复旧共享RegisteredClient。 */
-    public static final String CONFIGURATION_VERSION = "v5-resource";
+    public static final String CONFIGURATION_VERSION = IamApplicationCacheNames.CONFIGURATION_VERSION;
     /** Origin索引键独立于任意Client ID。 */
     public static final String ORIGIN_INDEX_KEY = CONFIGURATION_VERSION + ":__allowed_origins__";
 

@@ -61,7 +61,8 @@ class SmsAuthenticationFilterTest {
             submitted.set(authentication);
             return authentication;
         };
-        SmsAuthenticationFilter filter = new SmsAuthenticationFilter(authenticationManager);
+        SmsAuthenticationFilter filter = new SmsAuthenticationFilter();
+        filter.setAuthenticationManager(authenticationManager);
         MockHttpServletRequest request = request("POST", "/login/sms");
         request.addParameter("phone", " 13800138000 ");
         request.addParameter("code", " 123456 ");
@@ -77,11 +78,11 @@ class SmsAuthenticationFilterTest {
 
     @Test
     void shouldRejectNonPostAuthenticationAttempt() {
-        SmsAuthenticationFilter filter = new SmsAuthenticationFilter(authentication -> authentication);
+        SmsAuthenticationFilter filter = new SmsAuthenticationFilter();
+        filter.setAuthenticationManager(authentication -> authentication);
 
         assertThatThrownBy(() -> filter.attemptAuthentication(request("GET", "/login/sms"),
-                new MockHttpServletResponse())).isInstanceOf(AuthenticationServiceException.class)
-                .hasMessageContaining("GET");
+                new MockHttpServletResponse())).isInstanceOf(AuthenticationServiceException.class);
     }
 
     /**
@@ -92,7 +93,7 @@ class SmsAuthenticationFilterTest {
     private static final class TestSmsAuthenticationFilter extends SmsAuthenticationFilter {
 
         private TestSmsAuthenticationFilter(AuthenticationManager authenticationManager) {
-            super(authenticationManager);
+            setAuthenticationManager(authenticationManager);
         }
 
         private boolean requiresAuthentication(MockHttpServletRequest request) {

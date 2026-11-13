@@ -18,12 +18,16 @@ package dev.macula.cloud.iam.protocol.oauth2;
 
 import java.util.Objects;
 
+import dev.macula.cloud.system.security.OAuth2GrantPolicy;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2ErrorCodes;
+import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
+import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationGrantAuthenticationToken;
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2ClientAuthenticationToken;
+import org.springframework.security.oauth2.server.authorization.authentication.OAuth2RefreshTokenAuthenticationToken;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 
 /**
@@ -35,13 +39,13 @@ import org.springframework.security.oauth2.server.authorization.client.Registere
 public final class ProtocolBoundAuthenticationProvider implements AuthenticationProvider {
     private final AuthenticationProvider delegate;
     private final RegisteredClientRepository clients;
-    private final org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService authorizations;
+    private final OAuth2AuthorizationService authorizations;
 
     /**
      * 原生provider处理密码学与单次消费；授权服务只用于拒绝退役Refresh。
      */
     public ProtocolBoundAuthenticationProvider(AuthenticationProvider delegate, RegisteredClientRepository clients,
-            org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService authorizations) {
+            OAuth2AuthorizationService authorizations) {
         this.delegate = delegate;
         this.clients = clients;
         this.authorizations = Objects.requireNonNull(authorizations);
@@ -58,11 +62,11 @@ public final class ProtocolBoundAuthenticationProvider implements Authentication
                 throw new OAuth2AuthenticationException(OAuth2ErrorCodes.INVALID_CLIENT);
             }
             var actual = client.getRegisteredClient();
-            if (request instanceof org.springframework.security.oauth2.server.authorization.authentication.OAuth2RefreshTokenAuthenticationToken refresh) {
+            if (request instanceof OAuth2RefreshTokenAuthenticationToken refresh) {
                 var original = authorizations.findByToken(refresh.getRefreshToken(),
-                        org.springframework.security.oauth2.server.authorization.OAuth2TokenType.REFRESH_TOKEN);
+                        OAuth2TokenType.REFRESH_TOKEN);
                 if (original != null && actual.getId().equals(original.getRegisteredClientId())
-                        && dev.macula.cloud.system.security.OAuth2GrantPolicy.retired(
+                        && OAuth2GrantPolicy.retired(
                         original.getAuthorizationGrantType().getValue())) {
                     throw new OAuth2AuthenticationException(OAuth2ErrorCodes.INVALID_GRANT);
                 }

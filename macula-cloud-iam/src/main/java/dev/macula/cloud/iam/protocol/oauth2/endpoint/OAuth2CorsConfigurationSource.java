@@ -16,16 +16,17 @@
  */
 package dev.macula.cloud.iam.protocol.oauth2.endpoint;
 
+import dev.macula.boot.constants.GlobalConstants;
+import dev.macula.cloud.iam.protocol.oauth2.client.OAuth2ClientRegistrationService;
+import dev.macula.cloud.iam.protocol.oauth2.profile.ProfileController;
+import jakarta.servlet.http.HttpServletRequest;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
-
-import dev.macula.boot.constants.GlobalConstants;
-import dev.macula.cloud.iam.service.client.SysOAuth2ClientService;
-import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -47,7 +48,7 @@ public class OAuth2CorsConfigurationSource implements CorsConfigurationSource {
     private static final Set<String> METADATA_PATHS = Set.of(DISCOVERY_PATH, OAUTH_METADATA_PATH, JWKS_PATH);
     private static final Duration MAX_AGE = Duration.ofMinutes(10);
 
-    private final SysOAuth2ClientService clientService;
+    private final OAuth2ClientRegistrationService clientService;
     private final String tokenEndpoint;
 
     /**
@@ -56,7 +57,7 @@ public class OAuth2CorsConfigurationSource implements CorsConfigurationSource {
     @Override
     public CorsConfiguration getCorsConfiguration(HttpServletRequest request) {
         String path = applicationPath(request);
-        if (dev.macula.cloud.iam.protocol.oauth2.profile.ProfileController.PATH.equals(path)) {
+        if (ProfileController.PATH.equals(path)) {
             return profileConfiguration(request);
         }
         if (METADATA_PATHS.contains(path)) {
@@ -92,7 +93,7 @@ public class OAuth2CorsConfigurationSource implements CorsConfigurationSource {
                 || !(HttpMethod.GET.matches(request.getMethod()) || preflight)
                 || preflight && (!HttpMethod.GET.matches(request.getHeader(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD))
                 ||
-                requested != null && !Set.of("authorization").containsAll(java.util.Arrays.stream(requested.split(","))
+                requested != null && !Set.of("authorization").containsAll(Arrays.stream(requested.split(","))
                         .map(String::trim).map(value -> value.toLowerCase(Locale.ROOT)).toList()))) {
             return deniedConfiguration();
         }
@@ -157,7 +158,7 @@ public class OAuth2CorsConfigurationSource implements CorsConfigurationSource {
         if (requestedHeaders == null || requestedHeaders.isBlank()) {
             return true;
         }
-        Set<String> names = java.util.Arrays.stream(requestedHeaders.split(","))
+        Set<String> names = Arrays.stream(requestedHeaders.split(","))
                 .map(String::trim).map(value -> value.toLowerCase(Locale.ROOT)).collect(Collectors.toSet());
         Set<String> allowed = Set.of(HttpHeaders.CONTENT_TYPE.toLowerCase(Locale.ROOT),
                 HttpHeaders.AUTHORIZATION.toLowerCase(Locale.ROOT),

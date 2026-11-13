@@ -16,16 +16,19 @@
  */
 package dev.macula.cloud.iam.protocol.oauth2.grant.base;
 
-import java.security.Principal;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
-
+import dev.macula.cloud.iam.authentication.mfa.AuthenticationCheckpoint;
+import dev.macula.cloud.iam.authentication.mfa.MfaCompletionService;
 import dev.macula.cloud.iam.protocol.oauth2.ApplicationProtocolResolver;
 import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeClientSettings;
 import dev.macula.cloud.iam.service.userdetails.SysUserDetails;
 import dev.macula.cloud.system.enums.ExternalCodeType;
 import dev.macula.cloud.system.protocol.ApplicationProtocolRegistry;
+import java.security.Principal;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClaimAccessor;
@@ -60,8 +63,8 @@ public class OAuth2UserGrantTokenIssuer {
     private static final String ERROR_URI = "https://datatracker.ietf.org/doc/html/rfc6749#section-5.2";
     private final OAuth2AuthorizationService authorizationService;
     private final OAuth2TokenGenerator<? extends OAuth2Token> tokenGenerator;
-    private dev.macula.cloud.iam.authentication.mfa.MfaCompletionService mfaCompletion =
-            dev.macula.cloud.iam.authentication.mfa.MfaCompletionService.noOp();
+    private MfaCompletionService mfaCompletion =
+            MfaCompletionService.noOp();
     public OAuth2UserGrantTokenIssuer(OAuth2AuthorizationService authorizationService,
             OAuth2TokenGenerator<? extends OAuth2Token> tokenGenerator) {
         Assert.notNull(authorizationService, "authorizationService cannot be null");
@@ -75,7 +78,7 @@ public class OAuth2UserGrantTokenIssuer {
      */
     public OAuth2UserGrantTokenIssuer(OAuth2AuthorizationService authorizationService,
             OAuth2TokenGenerator<? extends OAuth2Token> tokenGenerator,
-            dev.macula.cloud.iam.authentication.mfa.MfaCompletionService completion) {
+            MfaCompletionService completion) {
         this(authorizationService, tokenGenerator);
         setMfaCompletion(completion);
     }
@@ -83,9 +86,9 @@ public class OAuth2UserGrantTokenIssuer {
     /**
      * Spring生产装配必须注入统一策略；显式构造的存储/生成器单测保留默认行为。
      */
-    @org.springframework.beans.factory.annotation.Autowired
-    public void setMfaCompletion(dev.macula.cloud.iam.authentication.mfa.MfaCompletionService completion) {
-        this.mfaCompletion = java.util.Objects.requireNonNull(completion);
+    @Autowired
+    public void setMfaCompletion(MfaCompletionService completion) {
+        this.mfaCompletion = Objects.requireNonNull(completion);
     }
 
     /**
@@ -95,9 +98,9 @@ public class OAuth2UserGrantTokenIssuer {
             OAuth2ClientAuthenticationToken clientPrincipal, Authentication userPrincipal,
             Authentication authorizationGrant, AuthorizationGrantType grantType, Set<String> authorizedScopes,
             boolean allowRefreshToken) {
-        var sourceProof = dev.macula.cloud.iam.authentication.mfa.MfaCompletionService.proof(userPrincipal);
+        var sourceProof = MfaCompletionService.proof(userPrincipal);
         mfaCompletion.checkToken(userPrincipal, registeredClient,
-                dev.macula.cloud.iam.authentication.mfa.AuthenticationCheckpoint.USER_TOKEN, grantType.getValue(),
+                AuthenticationCheckpoint.USER_TOKEN, grantType.getValue(),
                 sourceProof);
         boolean oidcExternal = ExternalCodeType.GRANT_TYPE.equals(grantType.getValue())
                 && ApplicationProtocolRegistry.OIDC.equals(registeredClient.getClientSettings().getSetting(
@@ -119,7 +122,7 @@ public class OAuth2UserGrantTokenIssuer {
                 .authorizationGrantType(grantType)
                 .authorizedScopes(authorizedScopes);
         if (!sourceProof.isEmpty()) {
-            authorizationBuilder.attribute(dev.macula.cloud.iam.authentication.mfa.MfaCompletionService.SOURCE_PROOF,
+            authorizationBuilder.attribute(MfaCompletionService.SOURCE_PROOF,
                     sourceProof);
         }
 

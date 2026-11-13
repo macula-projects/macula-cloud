@@ -24,6 +24,7 @@ import dev.macula.cloud.iam.authentication.thirdparty.provider.ThirdPartyProvide
 import dev.macula.cloud.iam.service.identity.IdentityProviderConfigService;
 import org.springframework.context.ApplicationContext;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.config.ObjectPostProcessor;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractAuthenticationFilterConfigurer;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -101,7 +102,7 @@ public final class ThirdPartyLoginFilterConfigurer
                 context.getBean(ThirdPartyIdentityResolutionService.class)));
         for (Entry entry : entries) {
             entry.setBuilder(http);
-            entry.addObjectPostProcessor(new org.springframework.security.config.ObjectPostProcessor<Object>() {
+            entry.addObjectPostProcessor(new ObjectPostProcessor<Object>() {
                 /** 共用外层Configurer已装配的对象后处理器。 */
                 @Override
                 public <O> O postProcess(O object) {

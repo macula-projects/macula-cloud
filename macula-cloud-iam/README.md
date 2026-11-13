@@ -3,6 +3,8 @@
 Macula Cloud IAM 是平台的身份认证与授权中心，为浏览器、移动应用、小程序和后端服务提供统一的登录及令牌服务。它基于 Spring
 Security 和 Spring Authorization Server，支持 OAuth 2.1 与 OpenID Connect，并将第三方身份映射为受控的本地账号。
 
+Web/SPA在创建时选择`webLoginMode=BROWSER|IN_APP`，创建成功后固定，草稿也不可修改。BROWSER使用普通登录与SSO；IN_APP固定一个平台能力并核验平台证明，不提供普通登录回退。Web保持服务端机密认证，SPA保持none。独立IN_APP应用类型已移除，不兼容或迁移旧记录。
+
 ## 能力
 
 - **统一登录**：账号密码、短信/邮箱验证码及 GitHub、企业微信、飞书、钉钉、微信登录，支持浏览器 SSO。
@@ -35,10 +37,20 @@ Maven 依赖引入。
 |--------------|-----------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------|
 | 登录认证     | 用户认证、浏览器 state、Session、CSRF 与登录请求恢复            | `authentication`、`DefaultSecurityConfiguration`                                                            |
 | 协议         | OAuth2/OIDC 端点、Client 认证、grant、授权存储、Token 与 Claims | `protocol/oauth2`、`ProtocolOAuth2Configuration`                                                            |
-| 公共应用服务 | 账号目录、Client 配置、身份源及绑定规则                         | `service/account`、`service/client`、`service/identity`                                                     |
+| 公共应用服务 | 账号目录、应用快照、身份源及绑定规则                         | `service/account`、`service/application`、`service/identity`                                                     |
 | 装配         | 按职责组合安全链与基础设施                                      | `config/DefaultSecurityConfiguration` 为登录装配，`config/oauth2` 为协议装配；根包保留共用 MFA 与密码编码器 |
 
 网页登录认证后建立会话，再由协议链完成授权；直接平台 Code 登录只返回协议结果，不建立浏览器 SSO。两条路径共用身份解析、目录准入和绑定规则。
+
+短信与邮箱共用 `VerificationCodeChannelService` 服务端口和 Filter/Provider 认证模板，分别保留通道适配及账号目录接口。缺少验证码内核或投递器时统一失败关闭；登录和身份绑定按可信 Client、通道与用途隔离。验证码 Token 的持久化类型保持兼容。
+
+## 应用与协议模型
+
+应用公共信息、单协议登记、身份源关联分别保存在`sys_iam_application`、`sys_iam_application_protocol_config`和`sys_iam_application_identity_provider`。协议凭据只属于登记，不进入公共应用快照。一个应用单选协议，当前可选OIDC或OAuth2.1；新增SAML2/CAS需实现独立策略及发布适配器。
+
+登录层通过`LoginApplicationResolver`取得受信应用，公共账号服务按内部应用ID加载目录；OAuth适配器负责解析受控授权请求并发布`RegisteredClient`，保留原公开Client ID和凭据哈希。来源绑定使用`sys_identity_provider_user_binding`，旧`sys_user_identity_binding`已退役，由V28删除；升级前归档其历史记录。
+
+V27需要IAM与System协同升级，旧版本不能混跑新结构；预检与失败恢复要求见[配置指南](docs/configuration.md)。配置缓存使用v7，授权和Session序列化合同保持。
 
 ## 接入方式
 
@@ -48,7 +60,7 @@ Maven 依赖引入。
 |-------------------|-----------------------------------------------------|--------------------------------------------|
 | Web / SPA         | `/oauth2/authorize` → IAM 登录 → 授权码换 Token     | S256 PKCE、精确回调；SPA 使用 `none`       |
 | 移动应用 / 小程序 | 平台 SDK Code → `/oauth2/token`，或系统浏览器授权码 | 固定来源与认证能力；内置登录入口需独立启用 |
-| 端内应用          | 企业微信/微信网页授权，或飞书/钉钉 JSAPI Code       | 只在配置的容器与能力下使用                 |
+| Web/SPA端内模式          | 企业微信/微信网页授权，或飞书/钉钉 JSAPI Code       | 只在配置的容器与能力下使用                 |
 | 后端服务          | `/oauth2/token` + `client_credentials`              | 机密客户端、业务 Scope；不代表用户身份     |
 
 ### 浏览器授权码
@@ -162,3 +174,18 @@ Code、平台权限和设备回跳需按[第三方接入说明](docs/third-party
 ## 版权
 
 Copyright © Macula。遵循仓库 [Apache License 2.0](../LICENSE) 授权。
+
+
+## 第三方登录排障
+
+浏览器的`authentication_unavailable`只代表认证链无法完成，不等同于凭据错误或缺少某个权限。先根据服务端日志确认具体阶段，再检查对应平台应用的权限及有效授权。
+
+- 钉钉：`provider=DINGTALK`记录`stage/status/errcode/subcode/requiredScopes`；旧接口顶层88可附带数字子码，不能仅凭88认定原因。
+- 飞书：`provider=FEISHU`区分`tenant_token`和`directory`，记录`status/code/requiredScopes`；缓存、网络和响应异常仅记录固定分类与异常类型。
+- 公共目录准入：`stage=admission`记录受控`status/required/tolerable/reason`。平台登录成功后仍可能被目录准入拒绝，不应通过关闭成员校验来掩盖问题。
+
+诊断只提取有界数字错误码及代码白名单内的权限标识，不输出原始响应、异常正文/堆栈、授权链接、Code、Token、Secret、用户身份或资料；未知字段和超限值忽略。日志不会改变目录策略、组织匹配、来源版本或账号绑定规则；需要补权限时，以平台实际返回和该应用的已生效授权为准。
+
+账号绑定失败时，`第三方账号绑定拒绝`记录`account/account_proof/binding_write`阶段、异常类型与已知IAM代码位置（类/方法/行号），用于定位统一包装前的拒绝分支；不记录账号、密码、外部身份、异常正文、文件路径或完整堆栈。验证失败次数、pending有效期/消费与绑定事务保持原语义。
+
+绑定事务通过身份源Mapper的专用主键`FOR UPDATE`查询读取当前行，使锁定配置沿用现有加密插件正确还原字段；禁止改成缓存回读、无锁读取或忽略加密JSON校验。来源能力、版本及目录证明继续使用该锁定行复核，不需要重写现有凭据或绑定。

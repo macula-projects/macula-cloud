@@ -3,14 +3,14 @@
     <el-input v-model="keyword" placeholder="搜索来源名称、厂商或接入类型" clearable />
     <el-alert v-if="error" :title="error" type="error" :closable="false" />
     <el-button link @click="$emit('reload')">刷新配置目录</el-button>
-    <p class="hint">{{ client.applicationType === 'IN_APP' ? '选择唯一端内能力；网页授权直接进入固定平台，JSAPI由业务前端取Code，无IAM标准登录页。' : '按应用类型选择登录能力；移动端只选一个SDK，小程序只选一个本平台注册。' }}</p>
+    <p class="hint">{{ isInApp(client) ? '选择唯一端内能力；网页授权直接进入固定平台，JSAPI由业务前端取Code，无IAM标准登录页。' : '按应用类型选择登录能力；移动端只选一个SDK，小程序只选一个本平台注册。' }}</p>
     <div v-loading="loading" class="source-options">
       <el-empty v-if="loaded && !sources.length" description="没有兼容的已配置身份源">
         <router-link to="/system/identity-provider">前往身份源管理</router-link>
       </el-empty>
       <article v-for="source in sources" :key="source.id" class="source-option">
         <strong>{{ source.name }}</strong><p class="hint">{{ source.label }} · {{ source.capabilities?.some(item => item.loginCapability) ? '按登录能力选择' : sceneLabels[source.scene] || source.scene }}</p>
-        <el-radio-group v-if="['NATIVE','IN_APP'].includes(client.applicationType)" :model-value="singleSelection" @update:model-value="value=>selectOne(source,value)">
+        <el-radio-group v-if="(client.applicationType === 'NATIVE' || isInApp(client))" :model-value="singleSelection" @update:model-value="value=>selectOne(source,value)">
           <el-radio v-for="item in choices(source)" :key="item.value" :value="source.id + ':' + item.value">{{ item.label }}</el-radio>
         </el-radio-group>
         <el-checkbox-group v-else :model-value="selected[source.id]" @update:model-value="value=>selectMany(source,value)">
@@ -26,6 +26,7 @@
   </el-dialog>
 </template>
 <script setup>
+import {isInApp} from '@/utils/identitySourceCompatibility';
 import {computed,ref} from 'vue';
 import {externalCodeAllowed,browserEnvironmentLabel,browserCapabilities,sourceSelectionIssue} from '@/utils/identitySourceCompatibility';
 import {enabledProtocolCodes,projectProtocol} from '@/utils/applicationProtocolRegistry';
@@ -36,7 +37,7 @@ const emit = defineEmits(['add','reload']);
 const keyword = ref(''), selected = ref({}), singleSelection = ref('');
 const sceneLabels = {BROWSER:'网页',WEBVIEW:'端内网页',APP:'SDK / 应用',MINIAPP:'小程序',CONFIGURATION:'仅凭据管理'};
 const oauth = computed(() => projectProtocol(props.client));
-const sdkAllowed = computed(() => (oauth.value.clientAuthenticationMethods === 'none' || props.client.applicationType === 'IN_APP') && enabledProtocolCodes(props.client).some(code=>['OIDC','OAUTH2_1'].includes(code)));
+const sdkAllowed = computed(() => (oauth.value.clientAuthenticationMethods === 'none' || isInApp(props.client)) && enabledProtocolCodes(props.client).some(code=>['OIDC','OAUTH2_1'].includes(code)));
 function capabilities(source) {
   return (source.capabilities || []).filter(capability => sdkAllowed.value && externalCodeAllowed(props.client,capability.codeType,source));
 }

@@ -17,12 +17,19 @@
 package dev.macula.cloud.iam.authentication.wechat;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 
+import dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures;
 import dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyAuthenticationToken;
+import dev.macula.cloud.iam.authentication.thirdparty.browser.ThirdPartyAuthenticationProvider;
 import dev.macula.cloud.iam.authentication.thirdparty.browser.ThirdPartyIdentityResolutionService;
+import dev.macula.cloud.iam.authentication.thirdparty.provider.ThirdPartyProviderAdapterRegistry;
 import dev.macula.cloud.iam.service.identity.IdentityProviderConfigService;
+import dev.macula.cloud.system.enums.IdentitySourceType;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.springframework.security.authentication.AuthenticationServiceException;
 import org.springframework.security.core.userdetails.User;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -42,28 +49,28 @@ class WechatProviderAdapterTest {
         WechatClient client = mock(WechatClient.class);
         IdentityProviderConfigService configs = mock(IdentityProviderConfigService.class);
         ThirdPartyIdentityResolutionService identities = mock(ThirdPartyIdentityResolutionService.class);
-        var config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(
-                dev.macula.cloud.system.enums.IdentitySourceType.WECHAT_WEBSITE, "WECHAT", "site", "site-secret",
+        var config = IdentitySourceTestFixtures.source(
+                IdentitySourceType.WECHAT_WEBSITE, "WECHAT", "site", "site-secret",
                 Map.of("appId", "site", "officialAccountAppId", "oa"),
                 Map.of("officialAccountAppSecret", "oa-secret"));
         when(configs.requireEnabledById(1L, "WECHAT")).thenReturn(config);
         for (WechatLoginMode mode : new WechatLoginMode[]{WechatLoginMode.BROWSER, WechatLoginMode.WEBVIEW}) {
-            config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(
+            config = IdentitySourceTestFixtures.source(
                     mode == WechatLoginMode.BROWSER
-                            ? dev.macula.cloud.system.enums.IdentitySourceType.WECHAT_WEBSITE
-                            : dev.macula.cloud.system.enums.IdentitySourceType.WECHAT_OFFICIAL_ACCOUNT,
+                            ? IdentitySourceType.WECHAT_WEBSITE
+                            : IdentitySourceType.WECHAT_OFFICIAL_ACCOUNT,
                     "WECHAT", "app", "secret", Map.of("appId", "app"));
             when(configs.requireEnabledById(1L, "WECHAT")).thenReturn(config);
-            var context = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.context("WECHAT",
+            var context = IdentitySourceTestFixtures.context("WECHAT",
                     mode.name(), "test-client", Instant.now(), "/");
             when(client.fetchOpenId(config, "code", mode)).thenReturn("union-01");
             when(identities.resolve(
-                    dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.browserIdentity(context,
+                    IdentitySourceTestFixtures.browserIdentity(context,
                             "union-01"), context))
                     .thenReturn(User.withUsername("sales").password("n/a").authorities("USER").build());
-            var result = new dev.macula.cloud.iam.authentication.thirdparty.browser.ThirdPartyAuthenticationProvider(
-                    new dev.macula.cloud.iam.authentication.thirdparty.provider.ThirdPartyProviderAdapterRegistry(
-                            java.util.List.of(new WechatProviderAdapter(client))), configs, identities).authenticate(
+            var result = new ThirdPartyAuthenticationProvider(
+                    new ThirdPartyProviderAdapterRegistry(
+                            List.of(new WechatProviderAdapter(client))), configs, identities).authenticate(
                     ThirdPartyAuthenticationToken.unauthenticated("WECHAT", "code", context,
                             "https://iam.example/login/wechat"));
             assertEquals("sales", result.getName());
@@ -75,13 +82,13 @@ class WechatProviderAdapterTest {
         WechatClient client = mock(WechatClient.class);
         IdentityProviderConfigService configs = mock(IdentityProviderConfigService.class);
         ThirdPartyIdentityResolutionService identities = mock(ThirdPartyIdentityResolutionService.class);
-        var context = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.context("DINGTALK",
+        var context = IdentitySourceTestFixtures.context("DINGTALK",
                 "BROWSER", "test-client", Instant.now(), "/");
-        org.junit.jupiter.api.Assertions.assertThrows(
-                org.springframework.security.authentication.AuthenticationServiceException.class,
-                () -> new dev.macula.cloud.iam.authentication.thirdparty.browser.ThirdPartyAuthenticationProvider(
-                        new dev.macula.cloud.iam.authentication.thirdparty.provider.ThirdPartyProviderAdapterRegistry(
-                                java.util.List.of(new WechatProviderAdapter(client))), configs,
+        Assertions.assertThrows(
+                AuthenticationServiceException.class,
+                () -> new ThirdPartyAuthenticationProvider(
+                        new ThirdPartyProviderAdapterRegistry(
+                                List.of(new WechatProviderAdapter(client))), configs,
                         identities).authenticate(
                         ThirdPartyAuthenticationToken.unauthenticated("DINGTALK", "code", context, "/login/dingtalk")));
         verifyNoInteractions(client, configs, identities);

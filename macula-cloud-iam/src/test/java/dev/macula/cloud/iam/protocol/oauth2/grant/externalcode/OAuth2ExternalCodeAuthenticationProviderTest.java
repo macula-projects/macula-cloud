@@ -16,13 +16,22 @@
  */
 package dev.macula.cloud.iam.protocol.oauth2.grant.externalcode;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures;
+import dev.macula.cloud.iam.protocol.oauth2.ApplicationProtocolResolver;
 import dev.macula.cloud.iam.protocol.oauth2.grant.base.OAuth2UserGrantTokenIssuer;
+import dev.macula.cloud.iam.service.identity.IdentityProviderConfigService;
 import dev.macula.cloud.system.enums.ExternalCodeType;
+import dev.macula.cloud.system.enums.IdentityDirectoryPolicy;
+import dev.macula.cloud.system.enums.IdentitySourceFlow;
+import dev.macula.cloud.system.enums.IdentitySourceType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentMatchers;
+import org.mockito.Mockito;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
@@ -59,8 +68,8 @@ class OAuth2ExternalCodeAuthenticationProviderTest {
     private final OAuth2AccessTokenAuthenticationToken issuedToken =
             mock(OAuth2AccessTokenAuthenticationToken.class);
 
-    private final dev.macula.cloud.iam.service.identity.IdentityProviderConfigService sources =
-            mock(dev.macula.cloud.iam.service.identity.IdentityProviderConfigService.class);
+    private final IdentityProviderConfigService sources =
+            mock(IdentityProviderConfigService.class);
     private final ExternalCodeRateLimiter limiter = mock(ExternalCodeRateLimiter.class);
     private OAuth2ExternalCodeAuthenticationProvider provider;
 
@@ -68,11 +77,11 @@ class OAuth2ExternalCodeAuthenticationProviderTest {
     void setUp() {
         provider = new OAuth2ExternalCodeAuthenticationProvider(verifiers, replayStore, accountResolver,
                 tokenIssuer, sources, limiter);
-        var source = new dev.macula.cloud.iam.service.identity.IdentityProviderConfigService.ProviderConfig(
-                REGISTRATION_ID, dev.macula.cloud.system.enums.IdentitySourceType.WECOM_MINIAPP, false, null, 1L,
+        var source = new IdentityProviderConfigService.ProviderConfig(
+                REGISTRATION_ID, IdentitySourceType.WECOM_MINIAPP, false, null, 1L,
                 "WECOM", "app", "fixture-secret", Map.of(), Map.of(), true,
-                dev.macula.cloud.system.enums.IdentitySourceFlow.WECOM_MINIAPP_V1,
-                dev.macula.cloud.system.enums.IdentityDirectoryPolicy.IDENTITY_ONLY, "corp", null);
+                IdentitySourceFlow.WECOM_MINIAPP_V1,
+                IdentityDirectoryPolicy.IDENTITY_ONLY, "corp", null);
         when(sources.requireEnabledById(REGISTRATION_ID, "WECOM")).thenReturn(source);
     }
 
@@ -104,7 +113,7 @@ class OAuth2ExternalCodeAuthenticationProviderTest {
         RegisteredClient client = client(Set.of(CODE_TYPE.name()), Set.of("profile"));
         OAuth2ExternalCodeAuthenticationToken grant = grant(client, Set.of("profile"));
         ExternalCodeVerification verification =
-                dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.sdkIdentity(
+                IdentitySourceTestFixtures.sdkIdentity(
                 "WECOM", "member-id");
         when(verifiers.require(CODE_TYPE)).thenReturn(verifier);
         when(verifier.verify(CODE_TYPE, REGISTRATION_ID, "short-code")).thenReturn(verification);
@@ -128,7 +137,7 @@ class OAuth2ExternalCodeAuthenticationProviderTest {
     void oidcRequiresOpenidBeforeVerificationAndKeepsFixedSource() {
         var base = client(Set.of(CODE_TYPE.name()), Set.of("openid", "profile"));
         var settings = ClientSettings.withSettings(base.getClientSettings().getSettings())
-                .setting(dev.macula.cloud.iam.protocol.oauth2.ApplicationProtocolResolver.EFFECTIVE_PROTOCOL, "OIDC")
+                .setting(ApplicationProtocolResolver.EFFECTIVE_PROTOCOL, "OIDC")
                 .build();
         var oidc = RegisteredClient.from(base).clientSettings(settings).build();
         var error = catchThrowableOfType(() -> provider.authenticate(grant(oidc, Set.of("profile"))),
@@ -136,7 +145,7 @@ class OAuth2ExternalCodeAuthenticationProviderTest {
         assertThat(error.getError().getErrorCode()).isEqualTo(OAuth2ErrorCodes.INVALID_SCOPE);
         verifyNoInteractions(verifiers, replayStore, accountResolver, tokenIssuer);
         var grant = grant(oidc, Set.of("openid", "profile"));
-        var verified = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.sdkIdentity("WECOM",
+        var verified = IdentitySourceTestFixtures.sdkIdentity("WECOM",
                 "oidc-member");
         when(verifiers.require(CODE_TYPE)).thenReturn(verifier);
         when(verifier.verify(CODE_TYPE, REGISTRATION_ID, "short-code")).thenReturn(verified);
@@ -173,14 +182,14 @@ class OAuth2ExternalCodeAuthenticationProviderTest {
         RegisteredClient client = client(Set.of(CODE_TYPE.name()), Set.of("profile"));
         when(verifiers.require(CODE_TYPE)).thenReturn(verifier);
         for (var state : Set.of(ExternalCodeConsumptionState.UNKNOWN, ExternalCodeConsumptionState.CONSUMED)) {
-            org.mockito.Mockito.doThrow(new ExternalCodeInfrastructureException(state)).when(verifier)
+            Mockito.doThrow(new ExternalCodeInfrastructureException(state)).when(verifier)
                     .verify(CODE_TYPE, REGISTRATION_ID, "short-code");
             var error = catchThrowableOfType(() -> provider.authenticate(grant(client, Set.of("profile"))),
                     OAuth2AuthenticationException.class);
             assertThat(error.getError().getErrorCode()).isEqualTo(OAuth2ErrorCodes.SERVER_ERROR);
         }
-        org.mockito.Mockito.verify(replayStore, org.mockito.Mockito.never())
-                .release(org.mockito.ArgumentMatchers.any());
+        Mockito.verify(replayStore, Mockito.never())
+                .release(ArgumentMatchers.any());
         verifyNoInteractions(accountResolver, tokenIssuer);
     }
 
@@ -191,7 +200,7 @@ class OAuth2ExternalCodeAuthenticationProviderTest {
     void accountResolutionFailureCannotReleaseVerifiedCode() {
         var client = client(Set.of(CODE_TYPE.name()), Set.of("profile"));
         when(verifiers.require(CODE_TYPE)).thenReturn(verifier);
-        var verified = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.sdkIdentity("WECOM",
+        var verified = IdentitySourceTestFixtures.sdkIdentity("WECOM",
                 "member");
         when(verifier.verify(CODE_TYPE, REGISTRATION_ID, "short-code")).thenReturn(verified);
         when(accountResolver.resolve(client, CODE_TYPE, verified)).thenThrow(
@@ -199,8 +208,8 @@ class OAuth2ExternalCodeAuthenticationProviderTest {
         var error = catchThrowableOfType(() -> provider.authenticate(grant(client, Set.of("profile"))),
                 OAuth2AuthenticationException.class);
         assertThat(error.getError().getErrorCode()).isEqualTo(OAuth2ErrorCodes.SERVER_ERROR);
-        org.mockito.Mockito.verify(replayStore, org.mockito.Mockito.never())
-                .release(org.mockito.ArgumentMatchers.any());
+        Mockito.verify(replayStore, Mockito.never())
+                .release(ArgumentMatchers.any());
         verifyNoInteractions(tokenIssuer);
     }
 
@@ -209,7 +218,7 @@ class OAuth2ExternalCodeAuthenticationProviderTest {
      */
     @Test
     void rejectsPersistedCrossTerminalPolicyBeforeAnyUpstreamCall() {
-        for (String type : java.util.List.of("NATIVE", "SPA", "WEB_SERVER", "SERVICE", "UNKNOWN")) {
+        for (String type : List.of("NATIVE", "SPA", "WEB_SERVER", "SERVICE", "IN_APP", "UNKNOWN")) {
             var original = client(Set.of(CODE_TYPE.name()), Set.of("profile"));
             var settings = ClientSettings.withSettings(original.getClientSettings().getSettings())
                     .setting(ExternalCodeClientSettings.APPLICATION_TYPE, type).build();
@@ -222,7 +231,8 @@ class OAuth2ExternalCodeAuthenticationProviderTest {
         var original = client(Set.of(CODE_TYPE.name()), Set.of("profile"));
         var settings = ClientSettings.withSettings(original.getClientSettings().getSettings())
                 .setting(ExternalCodeClientSettings.APPLICATION_TYPE, "MINIAPP")
-                .setting(ExternalCodeClientSettings.MINIAPP_PLATFORM, "WECHAT").build();
+
+                    .setting(ExternalCodeClientSettings.MINIAPP_PLATFORM, "WECHAT").build();
         var wrongPlatform = RegisteredClient.from(original).redirectUri("https://app.example/callback")
                 .clientSettings(settings).build();
         var failure = catchThrowableOfType(() -> provider.authenticate(grant(wrongPlatform, Set.of("profile"))),
@@ -236,16 +246,16 @@ class OAuth2ExternalCodeAuthenticationProviderTest {
      */
     @Test
     void appLinkRequiresProviderProofAndForwardsItToFixedSource() {
-        var sources = mock(dev.macula.cloud.iam.service.identity.IdentityProviderConfigService.class);
+        var sources = mock(IdentityProviderConfigService.class);
         var limiter = mock(ExternalCodeRateLimiter.class);
         var guarded = new OAuth2ExternalCodeAuthenticationProvider(verifiers, replayStore, accountResolver, tokenIssuer,
                 sources, limiter);
         var codeType = ExternalCodeType.FEISHU_APP_CODE;
-        var source = new dev.macula.cloud.iam.service.identity.IdentityProviderConfigService.ProviderConfig(
-                REGISTRATION_ID, dev.macula.cloud.system.enums.IdentitySourceType.FEISHU_WEB, false, null, 1L,
+        var source = new IdentityProviderConfigService.ProviderConfig(
+                REGISTRATION_ID, IdentitySourceType.FEISHU_WEB, false, null, 1L,
                 "FEISHU", "app", "fixture-secret", Map.of("appId", "app"), Map.of(), true,
-                dev.macula.cloud.system.enums.IdentitySourceFlow.FEISHU_OAUTH_V3,
-                dev.macula.cloud.system.enums.IdentityDirectoryPolicy.IDENTITY_ONLY, null,
+                IdentitySourceFlow.FEISHU_OAUTH_V3,
+                IdentityDirectoryPolicy.IDENTITY_ONLY, null,
                 "https://app.example/callback", null,
                 Map.of("FEISHU_WEB", "FEISHU_OAUTH_V3", "FEISHU_APPLINK", "FEISHU_APPLINK_V3"), "FEISHU_WEB");
         when(sources.requireEnabledById(REGISTRATION_ID, "FEISHU")).thenReturn(source);
@@ -268,7 +278,7 @@ class OAuth2ExternalCodeAuthenticationProviderTest {
         var missingFailure = catchThrowableOfType(() -> guarded.authenticate(missingRedirect),
                 OAuth2AuthenticationException.class);
         assertThat(missingFailure.getError().getErrorCode()).isEqualTo(OAuth2ErrorCodes.INVALID_REQUEST);
-        for (String redirect : java.util.List.of("https://other.example/callback", "https://app.example/callback/extra",
+        for (String redirect : List.of("https://other.example/callback", "https://app.example/callback/extra",
                 "http://app.example/callback", "https://user@app.example/callback",
                 "https://app.example/callback#fragment",
                 " https://app.example/callback", "https://app.example/" + "x".repeat(2048))) {
@@ -284,7 +294,7 @@ class OAuth2ExternalCodeAuthenticationProviderTest {
                 Map.of(OAuth2ExternalCodeParameterNames.PROVIDER_CODE_VERIFIER, proof,
                         OAuth2ExternalCodeParameterNames.PROVIDER_REDIRECT_URI, "https://app.example/callback"),
                 codeType, "code");
-        var verification = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.sdkIdentity(
+        var verification = IdentitySourceTestFixtures.sdkIdentity(
                 "FEISHU", "fixture-open-id");
         when(verifiers.require(codeType)).thenReturn(verifier);
         when(verifier.verify(codeType, REGISTRATION_ID, "code", proof, "https://app.example/callback")).thenReturn(
@@ -301,17 +311,18 @@ class OAuth2ExternalCodeAuthenticationProviderTest {
      */
     @Test
     void rejectsMultipleSdksAndCrossRegistrationMiniappCodesBeforeSideEffects() {
-        var scenarios = java.util.List.of(
+        var scenarios = List.of(
                 Map.of("WECOM_APP_CODE", 17L, "FEISHU_APP_CODE", 17L),
                 Map.of("WECHAT_MINIAPP_LOGIN_CODE", 17L, "WECHAT_MINIAPP_PHONE_CODE", 18L),
                 Map.of("FEISHU_WEBVIEW_CODE", 17L, "DINGTALK_WEBVIEW_CODE", 17L));
-        var types = java.util.List.of("NATIVE", "MINIAPP", "IN_APP");
-        var requests = java.util.List.of(ExternalCodeType.WECOM_APP_CODE, ExternalCodeType.WECHAT_MINIAPP_LOGIN_CODE,
+        var types = List.of("NATIVE", "MINIAPP", "SPA");
+        var requests = List.of(ExternalCodeType.WECOM_APP_CODE, ExternalCodeType.WECHAT_MINIAPP_LOGIN_CODE,
                 ExternalCodeType.FEISHU_WEBVIEW_CODE);
         for (int i = 0; i < scenarios.size(); i++) {
             var original = client(scenarios.get(i).keySet(), Set.of("profile"));
             var settings = ClientSettings.withSettings(original.getClientSettings().getSettings())
                     .setting(ExternalCodeClientSettings.APPLICATION_TYPE, types.get(i))
+
                     .setting(ExternalCodeClientSettings.MINIAPP_PLATFORM, "WECHAT")
                     .setting(ExternalCodeClientSettings.PROVIDER_BINDINGS, scenarios.get(i)).build();
             var typed = RegisteredClient.from(original).clientSettings(settings).build();
@@ -330,6 +341,8 @@ class OAuth2ExternalCodeAuthenticationProviderTest {
                 .clientAuthenticationMethod(ClientAuthenticationMethod.NONE)
                 .authorizationGrantType(OAuth2ExternalCodeAuthenticationToken.GRANT_TYPE)
                 .clientSettings(ClientSettings.builder().requireProofKey(true)
+                        .setting(ExternalCodeClientSettings.APPLICATION_TYPE, "MINIAPP")
+                        .setting(ExternalCodeClientSettings.MINIAPP_PLATFORM, "WECOM")
                         .setting(ExternalCodeClientSettings.CODE_TYPES, codeTypes)
                         .setting(ExternalCodeClientSettings.PROVIDER_BINDINGS,
                                 Map.of(CODE_TYPE.name(), REGISTRATION_ID)).build());

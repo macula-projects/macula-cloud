@@ -17,13 +17,16 @@
 package dev.macula.cloud.iam.protocol.oauth2.grant.externalcode;
 
 import java.time.Duration;
+import java.util.List;
 
 import dev.macula.cloud.system.enums.ExternalCodeType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Mockito;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2ErrorCodes;
 
@@ -90,8 +93,8 @@ class ExternalCodeReplayStoreTest {
 
         store.release(claim);
 
-        verify(redis).execute(any(org.springframework.data.redis.core.script.RedisScript.class),
-                eq(java.util.List.of("digest-key")), eq("owner-nonce"));
+        verify(redis).execute(any(RedisScript.class),
+                eq(List.of("digest-key")), eq("owner-nonce"));
     }
 
     /**
@@ -102,7 +105,7 @@ class ExternalCodeReplayStoreTest {
         when(values.setIfAbsent(anyString(), anyString(), any(Duration.class))).thenReturn(true);
         store.claim(ExternalCodeType.ALIYUN_MOBILE_TOKEN, "fixture-aliyun-code");
         verify(values).setIfAbsent(anyString(), anyString(), eq(Duration.ofMinutes(31)));
-        org.mockito.Mockito.clearInvocations(values);
+        Mockito.clearInvocations(values);
         properties.setReplayTtl(Duration.ofHours(1));
         store.claim(ExternalCodeType.ALIYUN_MOBILE_TOKEN, "another-fixture-code");
         verify(values).setIfAbsent(anyString(), anyString(), eq(Duration.ofHours(1)));

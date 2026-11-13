@@ -16,9 +16,12 @@
  */
 package dev.macula.cloud.iam.authentication.inapp;
 
+import dev.macula.cloud.iam.protocol.oauth2.client.OAuth2ClientRegistration;
+import dev.macula.cloud.iam.service.application.IamApplicationTestFixtures;
+import dev.macula.cloud.iam.service.application.LoginApplicationResolver;
+import jakarta.servlet.ServletException;
+import java.util.List;
 import java.util.Map;
-
-import dev.macula.cloud.iam.pojo.entity.SysOAuth2Client;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -55,12 +58,16 @@ class InAppAuthorizationRequestFilterTest {
     @Test
     void isolatesOrdinarySessionAndRestoresEvenOnFailure() throws Exception {
         var policy = mock(InAppLoginPolicyService.class);
-        var client = new SysOAuth2Client();
-        client.setApplicationType("IN_APP");
-        when(policy.current("container")).thenReturn(client);
+        var client = new OAuth2ClientRegistration();
+        client.setApplicationType("SPA");
+        client.setWebLoginMode("IN_APP");
+        client.setHostedLoginMethods("");
+        var selected = new LoginApplicationResolver.Selection("container", IamApplicationTestFixtures.snapshot(client));
+        when(policy.current("container")).thenReturn(selected);
+        when(policy.inApp(selected)).thenReturn(true);
         var filter = new InAppAuthorizationRequestFilter(policy, AuthorizationServerSettings.builder().build());
         var original = SecurityContextHolder.createEmptyContext();
-        var authentication = UsernamePasswordAuthenticationToken.authenticated("member", "", java.util.List.of());
+        var authentication = UsernamePasswordAuthenticationToken.authenticated("member", "", List.of());
         original.setAuthentication(authentication);
         SecurityContextHolder.setContext(original);
         var request = new MockHttpServletRequest("POST", "/oauth2/authorize");
@@ -69,10 +76,10 @@ class InAppAuthorizationRequestFilterTest {
                 (req, res) -> assertNull(SecurityContextHolder.getContext().getAuthentication()));
         assertSame(original, SecurityContextHolder.getContext());
         assertSame(authentication, original.getAuthentication());
-        assertThrows(jakarta.servlet.ServletException.class,
+        assertThrows(ServletException.class,
                 () -> filter.doFilter(newRequest(), new MockHttpServletResponse(), (req, res) -> {
                     assertNull(SecurityContextHolder.getContext().getAuthentication());
-                    throw new jakarta.servlet.ServletException("failure");
+                    throw new ServletException("failure");
                 }));
         assertSame(original, SecurityContextHolder.getContext());
         assertSame(authentication, original.getAuthentication());
@@ -84,13 +91,17 @@ class InAppAuthorizationRequestFilterTest {
     @Test
     void preservesVerifiedContext() throws Exception {
         var policy = mock(InAppLoginPolicyService.class);
-        var client = new SysOAuth2Client();
-        client.setApplicationType("IN_APP");
-        when(policy.current("container")).thenReturn(client);
+        var client = new OAuth2ClientRegistration();
+        client.setApplicationType("SPA");
+        client.setWebLoginMode("IN_APP");
+        client.setHostedLoginMethods("");
+        var selected = new LoginApplicationResolver.Selection("container", IamApplicationTestFixtures.snapshot(client));
+        when(policy.current("container")).thenReturn(selected);
+        when(policy.inApp(selected)).thenReturn(true);
         var original = SecurityContextHolder.getContext();
-        var authentication = UsernamePasswordAuthenticationToken.authenticated("member", "", java.util.List.of());
+        var authentication = UsernamePasswordAuthenticationToken.authenticated("member", "", List.of());
         original.setAuthentication(authentication);
-        when(policy.validProof(eq(client), eq(authentication), eq(Map.of()), eq("authorization_code"))).thenReturn(
+        when(policy.validProof(eq(selected), eq(authentication), eq(Map.of()), eq("authorization_code"))).thenReturn(
                 true);
         new InAppAuthorizationRequestFilter(policy, AuthorizationServerSettings.builder().build()).doFilter(
                 newRequest(), new MockHttpServletResponse(),

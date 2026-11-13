@@ -16,24 +16,29 @@
  */
 package dev.macula.cloud.iam.authentication.thirdparty;
 
+import java.io.Serializable;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import javax.crypto.Cipher;
-import javax.crypto.Mac;
-import javax.crypto.spec.GCMParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
 
 import dev.macula.cloud.iam.enums.UserTypeEnum;
 import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeSecurityProperties;
 import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeVerification;
+import javax.crypto.Cipher;
+import javax.crypto.Mac;
+import javax.crypto.spec.GCMParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -41,6 +46,7 @@ import org.springframework.security.crypto.keygen.Base64StringKeyGenerator;
 import org.springframework.security.crypto.keygen.StringKeyGenerator;
 import org.springframework.stereotype.Component;
 import org.springframework.util.Assert;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * 生成不可解析票据，并只以摘要作为 Redis key 保存已核验绑定材料。
@@ -122,7 +128,7 @@ public class ExternalBindingTicketStore {
         Assert.hasText(properties.getDigestKey(), "external-code digestKey cannot be empty");
         Assert.isTrue(!properties.getBindingTicketTtl().isNegative()
                         && !properties.getBindingTicketTtl().isZero()
-                        && properties.getBindingTicketTtl().compareTo(java.time.Duration.ofMinutes(5)) <= 0,
+                        && properties.getBindingTicketTtl().compareTo(Duration.ofMinutes(5)) <= 0,
                 "binding ticket TTL must be between zero and five minutes");
         Assert.isTrue(properties.getBindingTicketMaxAttempts() > 0,
                 "binding ticket max attempts must be positive");
@@ -153,9 +159,9 @@ public class ExternalBindingTicketStore {
         values.put(FIELD_USER_TYPE, userType.getType());
         values.put(FIELD_FAILED_ATTEMPTS, "0");
         values.put(FIELD_IDENTITY, encrypt(FIELD_IDENTITY,
-                tools.jackson.databind.json.JsonMapper.builder().build().writeValueAsString(verification.identity())));
-        values.put(FIELD_EXPIRES_AT, java.time.Instant.now().plus(properties.getBindingTicketTtl()).toString());
-        java.util.ArrayList<String> arguments = new java.util.ArrayList<>(values.size() * 2 + 1);
+                JsonMapper.builder().build().writeValueAsString(verification.identity())));
+        values.put(FIELD_EXPIRES_AT, Instant.now().plus(properties.getBindingTicketTtl()).toString());
+        ArrayList<String> arguments = new ArrayList<>(values.size() * 2 + 1);
         values.forEach((field, value) -> {
             arguments.add(field);
             arguments.add(value);
@@ -190,9 +196,9 @@ public class ExternalBindingTicketStore {
             }
             ExternalBindingTicket value = new ExternalBindingTicket(required(values, FIELD_CLIENT_ID),
                     Long.valueOf(required(values, FIELD_TENANT_ID)), userType(required(values, FIELD_USER_TYPE)),
-                    tools.jackson.databind.json.JsonMapper.builder().build().readValue(
+                    JsonMapper.builder().build().readValue(
                             decrypt(FIELD_IDENTITY, required(values, FIELD_IDENTITY)), VerifiedExternalIdentity.class),
-                    java.time.Instant.parse(required(values, FIELD_EXPIRES_AT)),
+                    Instant.parse(required(values, FIELD_EXPIRES_AT)),
                     Integer.parseInt(required(values, FIELD_FAILED_ATTEMPTS)));
             return new ClaimedTicket(key, owner, value);
         } catch (BadCredentialsException | IllegalArgumentException ex) {
@@ -227,7 +233,7 @@ public class ExternalBindingTicketStore {
     public void requireBrowserClaim(ClaimedTicket claimed) {
         Map<Object, Object> values = redis.opsForHash().entries(claimed.key());
         if (!"CLAIMED".equals(text(values, FIELD_STATE)) || !claimed.owner().equals(text(values, FIELD_OWNER))
-                || !claimed.value().expiresAt().isAfter(java.time.Instant.now())) {
+                || !claimed.value().expiresAt().isAfter(Instant.now())) {
             throw invalid();
         }
     }
@@ -331,8 +337,8 @@ public class ExternalBindingTicketStore {
             if (payload.length <= GCM_NONCE_BYTES) {
                 throw new GeneralSecurityException("invalid encrypted binding value");
             }
-            byte[] nonce = java.util.Arrays.copyOfRange(payload, 0, GCM_NONCE_BYTES);
-            byte[] ciphertext = java.util.Arrays.copyOfRange(payload, GCM_NONCE_BYTES, payload.length);
+            byte[] nonce = Arrays.copyOfRange(payload, 0, GCM_NONCE_BYTES);
+            byte[] ciphertext = Arrays.copyOfRange(payload, GCM_NONCE_BYTES, payload.length);
             Cipher cipher = Cipher.getInstance(CIPHER_ALGORITHM);
             cipher.init(Cipher.DECRYPT_MODE, encryptionKey(), new GCMParameterSpec(GCM_TAG_BITS, nonce));
             cipher.updateAAD(field.getBytes(StandardCharsets.UTF_8));
@@ -353,6 +359,6 @@ public class ExternalBindingTicketStore {
      *
      * @since 6.1.0
      */
-    public record ClaimedTicket(String key, String owner, ExternalBindingTicket value) implements java.io.Serializable {
+    public record ClaimedTicket(String key, String owner, ExternalBindingTicket value) implements Serializable {
     }
 }

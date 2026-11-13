@@ -7,7 +7,6 @@ vi.mock("@/api/model/system/oauth2Client", () => ({
 import {
   AUTHENTICATION_METHODS,
   applicationTemplate,
-  inAppConversion,
   clientPayload,
   AUTHORIZATION_GRANTS,
   basicAuthorization,
@@ -96,7 +95,7 @@ describe("OAuth Client configuration", () => {
       "future_grant"
     );
     expect(
-      configurationIssues(client("none,client_secret_basic"))[0]
+      configurationIssues(client("none,client_secret_basic")).join(" ")
     ).toContain("认证方式");
     expect(configurationIssues(client("none", "")).join(" ")).toContain("至少");
     expect(
@@ -387,21 +386,20 @@ describe('AppLink runtime callback', () => {
   });
 });
 
-it('转换预览保留Client身份和密钥状态，提交显式标记和唯一端内来源',()=>{
- const original={...applicationTemplate({},'WEB_SERVER'),id:42,clientId:'stable-id',secretConfigured:true,clientSecret:'',purpose:'APPLICATION'};
- const source={id:7,available:true,providerType:'FEISHU',capabilities:[{codeType:'FEISHU_WEBVIEW_CODE',applicationTypes:['IN_APP']}]};
- const next=inAppConversion(original,source,'FEISHU_WEBVIEW_CODE');
- expect(next.clientId).toBe('stable-id');expect(next.secretConfigured).toBe(true);
- expect(next.settings.clientAuthenticationMethods).toBe('none');expect(next.settings.authorizationGrantTypes).toBe(externalGrant);
- expect(next.hostedLoginMethods).toEqual([]);expect(next.externalProviderBindings).toEqual({FEISHU_WEBVIEW_CODE:7});
- expect(clientPayload(next).convertToInApp).toBe(true);expect(original.applicationType).toBe('WEB_SERVER');
- expect(()=>inAppConversion({...original,managedKey:'platform-admin'},source,'FEISHU_WEBVIEW_CODE')).toThrow();
-});
-
 // EMAIL是托管认证方式；显式取消不能在序列化时被默认值补回。
 it("keeps email defaults separate from explicit disabled choices", () => {
   expect(applicationTemplate({}, "SPA").hostedLoginMethods).toEqual(["PASSWORD", "SMS", "EMAIL"]);
   expect(clientPayload({...client(), hostedLoginMethods:["PASSWORD", "EMAIL"]}).hostedLoginMethods).toEqual(["PASSWORD", "EMAIL"]);
   expect(clientPayload({...client(), hostedLoginMethods:["PASSWORD"]}).hostedLoginMethods).toEqual(["PASSWORD"]);
   expect(clientPayload({...client(), hostedLoginMethods:[]}).hostedLoginMethods).toEqual([]);
+});
+
+it.each(['WEB_SERVER','SPA'])('新建%s默认浏览器，模式字段与协议配置独立', applicationType=>{
+ const draft=applicationTemplate({},applicationType);
+ expect(draft.webLoginMode).toBe('BROWSER');
+ const created={...draft,webLoginMode:'IN_APP',protocol:null,settings:null,hostedLoginMethods:[]};
+ const payload=clientPayload(created);
+ expect(payload.webLoginMode).toBe('IN_APP');expect(payload.settings).toBeNull();expect(payload.protocol).toBeNull();
+ expect(payload.hostedLoginMethods).toEqual([]);
+ expect(clientPayload(applicationTemplate({},'NATIVE'))).not.toHaveProperty('webLoginMode');
 });

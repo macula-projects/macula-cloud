@@ -18,6 +18,7 @@ package dev.macula.cloud.iam.authentication.thirdparty.directory;
 
 import java.time.Instant;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -34,8 +35,8 @@ public record ProviderDirectoryResult(Status status, String organizationId, Map<
      * 白名单资料只用于独立快照，不覆盖本地账号或角色。
      */
     public ProviderDirectoryResult {
-        java.util.Objects.requireNonNull(status);
-        java.util.Objects.requireNonNull(observedAt);
+        Objects.requireNonNull(status);
+        Objects.requireNonNull(observedAt);
         if (!FIELDS.containsAll(profile.keySet())) {
             throw new IllegalArgumentException("目录资料字段无效");
         }

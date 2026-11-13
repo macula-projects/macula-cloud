@@ -16,172 +16,131 @@
  */
 package dev.macula.cloud.system.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import dev.macula.cloud.system.config.PlatformOAuthClientProperties;
-import dev.macula.cloud.system.mapper.SysOAuth2ClientConfigMapper;
-import dev.macula.cloud.system.pojo.entity.SysOAuth2ClientConfig;
-import dev.macula.cloud.system.protocol.ApplicationProtocolConfiguration;
-import dev.macula.cloud.system.protocol.OAuth2ProtocolConfiguration;
-import dev.macula.cloud.system.security.OAuth2ResourcePolicy;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import dev.macula.cloud.system.config.PlatformOAuthClientProperties;
+import dev.macula.cloud.system.enums.IamWebLoginMode;
+import dev.macula.cloud.system.mapper.SysIamApplicationMapper;
+import dev.macula.cloud.system.pojo.entity.SysIamApplication;
+import dev.macula.cloud.system.protocol.OAuth2ProtocolConfiguration;
+import dev.macula.cloud.system.protocol.OAuth2ProtocolSettings;
+import dev.macula.cloud.system.security.OAuth2ResourcePolicy;
+import dev.macula.cloud.system.service.IamApplicationService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * 根据受信任配置认领已有平台身份，保留ID/Secret且不为其他应用补授权限。
+ * 受信启动配置显式认领平台身份；保留标识及凭据，幂等重跑不改用户配置。
  * @author Rain
  * @since 6.1.0
  */
 @Service
+@RequiredArgsConstructor
 public class PlatformOAuthClientProvisioningService {
-    private final SysOAuth2ClientConfigMapper clients;
-    private final ApplicationProtocolConfigurationService protocols;
-    private final org.springframework.cache.CacheManager cacheManager;
-    private final dev.macula.cloud.system.mapper.SysOAuth2ClientExternalProviderMapper externalProviders;
-    private final dev.macula.cloud.system.service.OAuth2ClientConfigurationCatalogService catalog;
+    private final SysIamApplicationMapper mapper;
+    private final IamApplicationService applications;
+    private final IamApplicationProtocolService protocols;
+    private final IamApplicationWireAdapter wire;
     private final JsonMapper json = JsonMapper.builder().build();
 
-    /** 平台初始化与普通配置写入共享行锁和协议存储。 */
-    public PlatformOAuthClientProvisioningService(SysOAuth2ClientConfigMapper clients, ApplicationProtocolConfigurationService protocols, org.springframework.cache.CacheManager cacheManager,
-        dev.macula.cloud.system.mapper.SysOAuth2ClientExternalProviderMapper externalProviders,
-        dev.macula.cloud.system.service.OAuth2ClientConfigurationCatalogService catalog) {
-        this.clients = clients;
-        this.protocols = protocols;
-        this.cacheManager = cacheManager;
-        this.externalProviders = externalProviders;
-        this.catalog = catalog;
-    }
-
-    /** 完整验证两个显式身份后原子更新；失败不猜测、不新建身份或密钥。 */
+    /** 固定Gateway/Admin锁序，所有改变仍经聚合事务保存与提交后缓存失效。 */
     @Transactional
     public void initialize(PlatformOAuthClientProperties properties) {
-        if (!properties.isEnabled()) { return; }
-        if (!StringUtils.hasText(properties.getAdminClientId()) || !StringUtils.hasText(properties.getGatewayClientId())
-            || properties.getAdminClientId().equals(properties.getGatewayClientId())) {
-            throw new IllegalStateException("请显式声明独立的Admin与Gateway客户端身份");
+        if (!properties.isEnabled()) {
+            return;
         }
+        require(StringUtils.hasText(properties.getAdminClientId()) && StringUtils.hasText(properties.getGatewayClientId())
+            && !properties.getAdminClientId().equals(properties.getGatewayClientId()), "请显式声明独立Admin/Gateway身份");
         var gateway = locked(properties.getGatewayClientId(), OAuth2ResourcePolicy.GATEWAY_MANAGED_KEY);
         var admin = locked(properties.getAdminClientId(), OAuth2ResourcePolicy.ADMIN_MANAGED_KEY);
-        var configurations = protocols.list(admin.getId());
-        if (configurations.size() != 1 || !"OIDC".equals(configurations.get(0).protocol())
-            || !"SPA".equals(admin.getApplicationType()) || admin.getTenantId() == null || !StringUtils.hasText(admin.getUserType())) {
-            throw new IllegalStateException("Admin必须先有明确的单OIDC配置和用户目录");
-        }
-        var settings = OAuth2ProtocolConfiguration.settings(configurations.get(0));
-        if (!"none".equals(settings.getClientAuthenticationMethods())
-            || !OAuth2ProtocolConfiguration.csv(settings.getAuthorizationGrantTypes()).contains("authorization_code")
-            || !Set.of("authorization_code", dev.macula.cloud.system.enums.ExternalCodeType.GRANT_TYPE)
-                .containsAll(OAuth2ProtocolConfiguration.csv(settings.getAuthorizationGrantTypes()))) {
-            throw new IllegalStateException("Admin认证或授权配置不符合声明");
-        }
-        // 管理端保留标准授权码入口，但显式SDK许可不能被初始化过程清除。
-        OAuth2ProtocolConfiguration.validateRuntime(configurations.get(0), "SPA");
-        if (OAuth2ProtocolConfiguration.csv(settings.getAuthorizationGrantTypes()).contains(
-            dev.macula.cloud.system.enums.ExternalCodeType.GRANT_TYPE)) {
-            validateSdkSources(admin);
-        }
-        String permissions = json.writeValueAsString(Map.of(OAuth2ResourcePolicy.PROFILE_SCOPE, OAuth2ResourcePolicy.PROFILE_RESOURCE,
-            OAuth2ResourcePolicy.SYSTEM_SCOPE, OAuth2ResourcePolicy.SYSTEM_RESOURCE));
-        Set<String> currentScopes = OAuth2ProtocolConfiguration.csv(settings.getScopes());
-        Set<String> requiredScopes = Set.of("openid", "profile", "system:access");
+        var adminView = applications.get(admin.getId());
+        require("OIDC".equals(adminView.getProtocol()) && "SPA".equals(admin.getApplicationType())
+            && IamWebLoginMode.resolve(admin.getApplicationType(), admin.getWebLoginMode()) == IamWebLoginMode.BROWSER
+            && admin.getTenantId() != null && StringUtils.hasText(admin.getUserType()), "Admin必须先有单OIDC和明确目录");
+        var settings = adminView.getSettings();
+        require(settings != null && "none".equals(settings.getClientAuthenticationMethods())
+            && Set.of("authorization_code").equals(OAuth2ProtocolConfiguration.csv(settings.getAuthorizationGrantTypes())), "Admin认证授权不符合声明");
+        require(adminView.getExternalCodeTypes().isEmpty() && adminView.getExternalProviderBindings().isEmpty(), "Admin浏览器模式不能配置平台Code来源");
+        Set<String> scopes = Set.of("openid", "profile", "system:access");
+        Map<String, String> permissions = Map.of(OAuth2ResourcePolicy.PROFILE_SCOPE, OAuth2ResourcePolicy.PROFILE_RESOURCE,
+            OAuth2ResourcePolicy.SYSTEM_SCOPE, OAuth2ResourcePolicy.SYSTEM_RESOURCE);
         boolean adminChanged = !OAuth2ResourcePolicy.ADMIN_MANAGED_KEY.equals(admin.getManagedKey())
-            || !currentScopes.equals(requiredScopes) || !json.readValue(permissions, Map.class).equals(
-                json.readValue(admin.getResourcePermissions() == null ? "{}" : admin.getResourcePermissions(), Map.class));
+            || !scopes.equals(OAuth2ProtocolConfiguration.csv(settings.getScopes()))
+            || !permissions.equals(json.readValue(admin.getResourcePermissions() == null ? "{}" : admin.getResourcePermissions(), Map.class));
         if (adminChanged) {
-            settings.setScopes(String.join(",", new TreeSet<>(requiredScopes)));
-            OAuth2ProtocolConfiguration.validateRuntime(new ApplicationProtocolConfiguration("OIDC", 1, true, settings), "SPA");
-            protocols.replace(admin.getId(), List.of(new ApplicationProtocolConfiguration("OIDC", 1, true, settings)));
-            admin.setManagedKey(OAuth2ResourcePolicy.ADMIN_MANAGED_KEY);
-            admin.setPurpose("APPLICATION");
-            admin.setConfigurationStatus("ENABLED");
-            admin.setResourcePermissions(permissions);
-            admin.setDefaultProtocol("OIDC");
-            admin.setAuthorizationVersion(next(admin));
-            if (clients.updateById(admin) != 1) { throw new IllegalStateException("Admin身份初始化发生并发变化"); }
+            settings.setScopes(String.join(",", new TreeSet<>(scopes)));
+            var form = wire.form(adminView);
+            form.setSettings(settings);
+            form.setProtocolConfigurations(List.of());
+            applications.save(admin.getId(), form);
+            var claim = new SysIamApplication();
+            claim.setId(admin.getId());
+            claim.setManagedKey(OAuth2ResourcePolicy.ADMIN_MANAGED_KEY);
+            // 只更新认领字段，不能用旧主表实体回写刚保存的用户策略。
+            mapper.update(null, new LambdaUpdateWrapper<SysIamApplication>()
+                .eq(SysIamApplication::getId, admin.getId()).set(SysIamApplication::getManagedKey, claim.getManagedKey()));
         }
-        String methods = gateway.getClientAuthenticationMethods();
-        var gatewayProfiles = protocols.list(gateway.getId());
-        if (!gatewayProfiles.isEmpty()) {
-            if (gatewayProfiles.size() != 1) { throw new IllegalStateException("Gateway旧协议存在歧义"); }
-            methods = OAuth2ProtocolConfiguration.settings(gatewayProfiles.get(0)).getClientAuthenticationMethods();
+        var gatewayState = protocols.state(gateway.getId(), true);
+        require(gatewayState.sources().isEmpty(), "Gateway不能隐式清除登录来源");
+        var gatewayView = applications.get(gateway.getId());
+        OAuth2ProtocolSettings authentication = gatewayView.getSettings();
+        if (authentication == null && gatewayState.protocol() != null && gatewayState.protocol().getSchemaVersion() == 0) {
+            authentication = new OAuth2ProtocolSettings();
+            var legacy = json.readTree(gatewayState.protocol().getConfiguration());
+            var methods = legacy.get("client_authentication_methods");
+            authentication.setClientAuthenticationMethods(methods == null || methods.isNull() ? null : methods.asString());
         }
-        if (!StringUtils.hasText(gateway.getClientSecret()) || OAuth2ProtocolConfiguration.csv(methods).isEmpty()
-            || !Set.of("client_secret_basic", "client_secret_post").containsAll(OAuth2ProtocolConfiguration.csv(methods))) {
-            throw new IllegalStateException("Gateway必须保留已有机密认证身份");
-        }
-        boolean gatewayChanged = !OAuth2ResourcePolicy.GATEWAY_MANAGED_KEY.equals(gateway.getManagedKey()) || !gatewayProfiles.isEmpty();
+        require(gatewayView.isSecretConfigured() && authentication != null
+            && !OAuth2ProtocolConfiguration.csv(authentication.getClientAuthenticationMethods()).isEmpty()
+            && Set.of("client_secret_basic", "client_secret_post").containsAll(OAuth2ProtocolConfiguration.csv(authentication.getClientAuthenticationMethods())), "Gateway必须保留已有机密认证");
+        boolean gatewayChanged = !OAuth2ResourcePolicy.GATEWAY_MANAGED_KEY.equals(gateway.getManagedKey())
+            || !"RESOURCE_SERVER".equals(gateway.getPurpose());
         if (gatewayChanged) {
+            var form = wire.form(gatewayView);
+            authentication.setAuthorizationGrantTypes("");
+            authentication.setScopes("");
+            authentication.setRedirectUris("");
+            authentication.setAllowedOrigins(Set.of());
+            form.setSettings(authentication);
+            form.setProtocol(null);
+            form.setProtocolConfigurations(List.of());
+            form.setEnabledProtocols(Set.of());
+            form.setDefaultProtocol(null);
+            form.setPurpose("RESOURCE_SERVER");
+            form.setApplicationType("SERVICE");
+            form.setWebLoginMode(null);
+            form.setConfigurationStatus("ENABLED");
+            form.setHostedLoginMethods(Set.of());
+            form.setExternalCodeTypes(Set.of());
             gateway.setManagedKey(OAuth2ResourcePolicy.GATEWAY_MANAGED_KEY);
             gateway.setPurpose("RESOURCE_SERVER");
-            gateway.setConfigurationStatus("ENABLED");
-            gateway.setClientAuthenticationMethods(methods);
-            gateway.setAuthorizationGrantTypes("");
-            gateway.setScopes("");
-            gateway.setRedirectUris("");
-            gateway.setTenantId(null);
-            gateway.setUserType(null);
+            gateway.setApplicationType("SERVICE");
             gateway.setResourcePermissions("{}");
-
-            gateway.setAuthorizationVersion(next(gateway));
-            protocols.replace(gateway.getId(), List.of());
-            if (clients.updateById(gateway) != 1) { throw new IllegalStateException("Gateway身份初始化发生并发变化"); }
-        }
-        if (adminChanged || gatewayChanged) { evictAfterCommit(); }
-    }
-
-    /** 显式SDK许可必须仍绑定可用的具体来源，启动认领不能重新授予或猜测来源。 */
-    private void validateSdkSources(SysOAuth2ClientConfig admin) {
-        Set<String> expected = OAuth2ProtocolConfiguration.csv(admin.getExternalCodeTypes());
-        var mappings = externalProviders.selectList(new LambdaQueryWrapper<dev.macula.cloud.system.pojo.entity.SysOAuth2ClientExternalProvider>()
-            .eq(dev.macula.cloud.system.pojo.entity.SysOAuth2ClientExternalProvider::getClientId, admin.getClientId()));
-        if (expected.isEmpty() || mappings.size() != expected.size()
-            || !mappings.stream().map(dev.macula.cloud.system.pojo.entity.SysOAuth2ClientExternalProvider::getCodeType)
-                .collect(java.util.stream.Collectors.toSet()).equals(expected)) {
-            throw new IllegalStateException("Admin第三方Code登录缺少明确来源许可");
-        }
-        var sources = catalog.catalog().sources();
-        for (var mapping : mappings) {
-            if (sources.stream().noneMatch(source -> source.available()
-                && java.util.Objects.equals(source.id(), mapping.getIdentityProviderId())
-                && source.capabilities().stream().anyMatch(capability -> mapping.getCodeType().equals(capability.codeType())))) {
-                throw new IllegalStateException("Admin第三方Code登录关联来源不可用");
-            }
+            require(mapper.updateById(gateway) == 1, "Gateway认领发生并发变化");
+            form.setConfigurationVersion(protocols.version(gateway, protocols.state(gateway.getId(), true)));
+            applications.save(gateway.getId(), form);
         }
     }
 
-    /** 初始化使用与普通保存相同的提交后缓存失效边界。 */
-    private void evictAfterCommit() {
-        var clientCache = cacheManager.getCache(dev.macula.boot.constants.CacheConstants.OAUTH2_CLIENT_CACHE_KEY);
-        var originCache = cacheManager.getCache(dev.macula.cloud.system.security.OAuth2ClientCacheNames.TOKEN_ORIGIN_INDEX);
-        if (clientCache == null || originCache == null) { throw new IllegalStateException("平台身份缓存不可用"); }
-        org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
-            new org.springframework.transaction.support.TransactionSynchronization() {
-                /** 只在两个身份均已提交后清理，回滚不能发布新身份。 */
-                @Override
-                public void afterCommit() {
-                    clientCache.invalidate();
-                    originCache.invalidate();
-                }
-            });
+    /** 只认领声明ID；唯一managedKey仍负责最终并发约束。 */
+    private SysIamApplication locked(String code, String managedKey) {
+        var app = mapper.selectOne(new LambdaQueryWrapper<SysIamApplication>().eq(SysIamApplication::getApplicationCode, code).last("FOR UPDATE"));
+        require(app != null && (app.getManagedKey() == null || managedKey.equals(app.getManagedKey())), "声明的平台身份不存在或归属冲突");
+        return app;
     }
 
-    /** managedKey不能被指向其他受管身份；唯一键仍是最终并发约束。 */
-    private SysOAuth2ClientConfig locked(String clientId, String managedKey) {
-        var client = clients.selectOne(new LambdaQueryWrapper<SysOAuth2ClientConfig>()
-            .eq(SysOAuth2ClientConfig::getClientId, clientId).last("FOR UPDATE"));
-        if (client == null || client.getManagedKey() != null && !managedKey.equals(client.getManagedKey())) {
-            throw new IllegalStateException("声明的平台身份不存在或归属冲突");
+    /** 受管配置错误只给有界诊断，不携带凭据或协议原文。 */
+    private void require(boolean condition, String reason) {
+        if (!condition) {
+            throw new IllegalStateException(reason);
         }
-        return client;
-    }
-
-    /** 初始化改变授权时旧会话必须重新认证。 */
-    private long next(SysOAuth2ClientConfig client) {
-        return client.getAuthorizationVersion() == null ? 1L : client.getAuthorizationVersion() + 1;
     }
 }

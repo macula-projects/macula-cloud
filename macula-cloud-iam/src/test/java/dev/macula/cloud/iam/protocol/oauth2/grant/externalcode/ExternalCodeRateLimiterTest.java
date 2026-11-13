@@ -21,10 +21,14 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import dev.macula.boot.starter.crypto.config.CryptoProperties;
+import dev.macula.boot.starter.crypto.core.CryptoManager;
 import dev.macula.cloud.iam.authentication.thirdparty.cache.ProviderCacheCipher;
+import dev.macula.cloud.iam.authentication.thirdparty.cache.ProviderCacheSecurityProperties;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -76,8 +80,8 @@ class ExternalCodeRateLimiterTest {
         properties.setClientRateLimit(3);
         properties.setIpRateLimit(100);
         limiter = new ExternalCodeRateLimiter(redis,
-                new ProviderCacheCipher(new dev.macula.boot.starter.crypto.core.CryptoManager(),
-                        new dev.macula.boot.starter.crypto.config.CryptoProperties(), cacheSecurity(properties)),
+                new ProviderCacheCipher(new CryptoManager(),
+                        new CryptoProperties(), cacheSecurity(properties)),
                 properties);
     }
 
@@ -103,7 +107,7 @@ class ExternalCodeRateLimiterTest {
         var pool = Executors.newFixedThreadPool(8);
         var passed = new AtomicInteger();
         try {
-            List<java.util.concurrent.Future<?>> futures = new ArrayList<>();
+            List<Future<?>> futures = new ArrayList<>();
             for (int index = 0; index < 12; index++) {
                 futures.add(pool.submit(() -> {
                     try {
@@ -154,9 +158,9 @@ class ExternalCodeRateLimiterTest {
     /**
      * 公共缓存保持原摘要密钥，只替换配置类型依赖。
      */
-    private dev.macula.cloud.iam.authentication.thirdparty.cache.ProviderCacheSecurityProperties cacheSecurity(
-            dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeSecurityProperties original) {
-        var result = new dev.macula.cloud.iam.authentication.thirdparty.cache.ProviderCacheSecurityProperties();
+    private ProviderCacheSecurityProperties cacheSecurity(
+            ExternalCodeSecurityProperties original) {
+        var result = new ProviderCacheSecurityProperties();
         result.setDigestKey(original.getDigestKey());
         return result;
     }

@@ -16,11 +16,10 @@
  */
 package dev.macula.cloud.iam.protocol.oauth2;
 
+import dev.macula.cloud.iam.protocol.oauth2.client.OAuth2ClientRegistration;
+import dev.macula.cloud.system.security.OAuth2ResourcePolicy;
 import java.util.Map;
 import java.util.Set;
-
-import dev.macula.cloud.iam.pojo.entity.SysOAuth2Client;
-import dev.macula.cloud.system.security.OAuth2ResourcePolicy;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2ErrorCodes;
 import org.springframework.security.oauth2.server.authorization.OAuth2Authorization;
@@ -47,7 +46,7 @@ public final class ResourceAuthorizationPolicy {
     /**
      * 数据仅由System受信任目录写入；损坏数据默认拒绝。
      */
-    public static Map<String, String> permissions(SysOAuth2Client client) {
+    public static Map<String, String> permissions(OAuth2ClientRegistration client) {
         if (client == null || client.getResourcePermissions() == null) {
             throw new OAuth2AuthenticationException(OAuth2ErrorCodes.UNAUTHORIZED_CLIENT);
         }
@@ -70,7 +69,7 @@ public final class ResourceAuthorizationPolicy {
     /**
      * 所有令牌读取都按当前服务端配置版本判断，不接受缺失绑定的旧授权。
      */
-    public static boolean current(OAuth2Authorization authorization, SysOAuth2Client client) {
+    public static boolean current(OAuth2Authorization authorization, OAuth2ClientRegistration client) {
         Number version = authorization.getAttribute(OAuth2ResourcePolicy.AUTHORIZATION_VERSION);
         Object accessVersion =
                 authorization.getAccessToken() == null || authorization.getAccessToken().getClaims() == null ? null

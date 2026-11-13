@@ -16,18 +16,20 @@
  */
 package dev.macula.cloud.iam.authentication.thirdparty.browser;
 
-import java.io.IOException;
-import java.net.URI;
-import java.time.Instant;
-import java.util.Locale;
-
 import dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyAuthenticationToken;
 import dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyLoginContext;
 import dev.macula.cloud.iam.authentication.thirdparty.provider.ThirdPartyProviderAdapter;
 import dev.macula.cloud.iam.service.identity.IdentityProviderConfigService;
 import dev.macula.cloud.system.enums.BrowserLoginProviderType;
+import dev.macula.cloud.system.enums.IamWebLoginMode;
+import dev.macula.cloud.system.enums.IdentityBrowserEnvironment;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.net.URI;
+import java.time.Instant;
+import java.util.Locale;
+import java.util.Objects;
 import org.springframework.security.authentication.AuthenticationServiceException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
@@ -105,15 +107,15 @@ public abstract class AbstractThirdPartyAuthenticationFilter extends AbstractAut
                     request, response, context.clientId(), provider());
             IdentityProviderConfigService.ProviderConfig source = clientPolicyService.requireSource(policy,
                     providerType, context.loginMode());
-            if ("IN_APP".equals(policy.applicationType()) &&
-                    !java.util.Objects.equals(policy.authorizationVersion(), context.clientAuthorizationVersion())
-                    || !java.util.Objects.equals(source.registrationId(), context.registrationId())
+            if (policy.applicationType() != null && IamWebLoginMode.isInApp(policy.applicationType(), policy.webLoginMode()) &&
+                    !Objects.equals(policy.authorizationVersion(), context.clientAuthorizationVersion())
+                    || !Objects.equals(source.registrationId(), context.registrationId())
                     || !source.sourceType().value().equals(context.sourceType())
-                    || !java.util.Objects.equals(source.loginCapability(), context.loginCapability())
-                    || !java.util.Objects.equals(source.version(), context.sourceVersion())
+                    || !Objects.equals(source.loginCapability(), context.loginCapability())
+                    || !Objects.equals(source.version(), context.sourceVersion())
                     || !source.flow().value().equals(context.flow())
                     || !callbackUri().equals(context.upstreamRedirectUri())
-                    || !java.util.Objects.equals(policy.tenantId(), context.tenantId()) ||
+                    || !Objects.equals(policy.tenantId(), context.tenantId()) ||
                     policy.userType() != context.userType()) {
                 throw new AuthenticationServiceException("身份源或应用路由已变更，请重新登录");
             }
@@ -133,7 +135,7 @@ public abstract class AbstractThirdPartyAuthenticationFilter extends AbstractAut
                 providerType, mode);
         validateMode(config, mode);
         // 仅限制新发起的交互；回调继续核对一次性state，不因UA变化切换兑换合同。
-        var environment = dev.macula.cloud.system.enums.IdentityBrowserEnvironment.fromUserAgent(
+        var environment = IdentityBrowserEnvironment.fromUserAgent(
                 request.getHeader("User-Agent"));
         if (!config.sourceType().supportsBrowserEnvironment(environment, mode)) {
             throw new AuthenticationServiceException("当前浏览器环境不支持该第三方登录，请使用适用入口");
@@ -173,7 +175,7 @@ public abstract class AbstractThirdPartyAuthenticationFilter extends AbstractAut
      * 装配已唯一注册的厂商策略，不接受请求动态指定适配器。
      */
     public void providerAdapter(ThirdPartyProviderAdapter adapter) {
-        this.adapter = java.util.Objects.requireNonNull(adapter);
+        this.adapter = Objects.requireNonNull(adapter);
     }
 
     protected String loginMode(HttpServletRequest request) {

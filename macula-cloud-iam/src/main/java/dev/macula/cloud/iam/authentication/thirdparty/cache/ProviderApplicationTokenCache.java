@@ -18,6 +18,7 @@ package dev.macula.cloud.iam.authentication.thirdparty.cache;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Supplier;
 
@@ -141,7 +142,7 @@ public class ProviderApplicationTokenCache {
     private void requireCurrent(ProviderConfig source) {
         ProviderConfig current = configs.requireEnabledById(source.registrationId(), source.providerType())
                 .forCapability(source.loginCapability());
-        if (!java.util.Objects.equals(current.version(), source.version()) || current.flow() != source.flow()) {
+        if (!Objects.equals(current.version(), source.version()) || current.flow() != source.flow()) {
             throw unavailable();
         }
     }

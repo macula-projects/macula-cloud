@@ -17,24 +17,32 @@
 
 package dev.macula.cloud.iam.protocol.oauth2.persistence;
 
+import cn.hutool.core.util.StrUtil;
+import dev.macula.boot.constants.CacheConstants;
+import dev.macula.cloud.iam.protocol.oauth2.OAuth2ClientProtocolPolicy;
+import dev.macula.cloud.iam.protocol.oauth2.OAuth2ClientProtocolValidator;
+import dev.macula.cloud.iam.protocol.oauth2.client.OAuth2ClientRegistration;
+import dev.macula.cloud.iam.protocol.oauth2.client.OAuth2ClientRegistrationService;
+import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeClientSettings;
+import dev.macula.cloud.system.enums.ExternalCodeType;
+import dev.macula.cloud.system.enums.IamWebLoginMode;
+import dev.macula.cloud.system.enums.OAuth2ProtocolMode;
+import dev.macula.cloud.system.protocol.ApplicationProtocolConfiguration;
+import dev.macula.cloud.system.protocol.OAuth2ProtocolConfiguration;
+import dev.macula.cloud.system.protocol.OAuth2ProtocolSettings;
+import dev.macula.cloud.system.security.OAuth2ClientCacheNames;
+import dev.macula.cloud.system.security.OAuth2ResourcePolicy;
 import java.time.Duration;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
-
-import cn.hutool.core.util.StrUtil;
-import dev.macula.boot.constants.CacheConstants;
-import dev.macula.cloud.iam.mapper.SysOAuth2ClientExternalProviderMapper;
-import dev.macula.cloud.iam.pojo.entity.SysOAuth2Client;
-import dev.macula.cloud.iam.protocol.oauth2.OAuth2ClientProtocolValidator;
-import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeClientSettings;
-import dev.macula.cloud.iam.service.client.SysOAuth2ClientService;
-import dev.macula.cloud.system.enums.ExternalCodeType;
-import dev.macula.cloud.system.enums.OAuth2ProtocolMode;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
+import org.springframework.beans.BeanUtils;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
@@ -72,9 +80,8 @@ public class MaculaRegisteredClientRepository implements RegisteredClientReposit
      */
     private final static Duration authorizationCodeValiditySeconds = Duration.ofMinutes(5);
 
-    private final SysOAuth2ClientService oauth2ClientService;
+    private final OAuth2ClientRegistrationService oauth2ClientService;
 
-    private final SysOAuth2ClientExternalProviderMapper externalProviderMapper;
 
     /**
      * Saves the registered client.
@@ -99,7 +106,7 @@ public class MaculaRegisteredClientRepository implements RegisteredClientReposit
      */
     @Override
     @Cacheable(value = CacheConstants.OAUTH2_CLIENT_CACHE_KEY, key = "'" +
-            dev.macula.cloud.system.security.OAuth2ClientCacheNames.CONFIGURATION_VERSION +
+            OAuth2ClientCacheNames.CONFIGURATION_VERSION +
             ":' + #id", unless = "#result == null")
     public RegisteredClient findById(String id) {
         return this.findByClientId(id);
@@ -114,11 +121,11 @@ public class MaculaRegisteredClientRepository implements RegisteredClientReposit
     @Override
     @SneakyThrows
     @Cacheable(value = CacheConstants.OAUTH2_CLIENT_CACHE_KEY, key = "'" +
-            dev.macula.cloud.system.security.OAuth2ClientCacheNames.CONFIGURATION_VERSION +
+            OAuth2ClientCacheNames.CONFIGURATION_VERSION +
             ":' + #clientId", unless = "#result == null")
     public RegisteredClient findByClientId(String clientId) {
         // @formatter:off
-        SysOAuth2Client oauth2Client = oauth2ClientService.getClientByClientId(clientId);
+        OAuth2ClientRegistration oauth2Client = oauth2ClientService.getClientByClientId(clientId);
         if (oauth2Client == null) {
             return null;
         }
@@ -129,17 +136,18 @@ public class MaculaRegisteredClientRepository implements RegisteredClientReposit
                 resourceSettings.jwkSetUrl(oauth2Client.getJwkSetUrl()).tokenEndpointAuthenticationSigningAlgorithm(
                     SignatureAlgorithm.from(oauth2Client.getSigningAlgorithm()));
             }
-            RegisteredClient.Builder resource = RegisteredClient.withId(clientId).clientId(clientId)
+            RegisteredClient.Builder resource = RegisteredClient.withId(oauth2Client.getClientId()).clientId(oauth2Client.getClientId())
+                .clientIdIssuedAt(oauth2Client.getClientIdIssuedAt())
                 .clientName(oauth2Client.getClientName()).clientSecret(oauth2Client.getClientSecret())
                 .clientSecretExpiresAt(oauth2Client.getClientSecretExpiresAt())
-                .authorizationGrantType(new AuthorizationGrantType(dev.macula.cloud.system.security.OAuth2ResourcePolicy.INTROSPECTION_CAPABILITY));
+                .authorizationGrantType(new AuthorizationGrantType(OAuth2ResourcePolicy.INTROSPECTION_CAPABILITY));
             immutableCsv(oauth2Client.getClientAuthenticationMethods()).forEach(method -> resource.clientAuthenticationMethod(new ClientAuthenticationMethod(method)));
             return resource.clientSettings(resourceSettings.build()).build();
         }
-        Set<OAuth2ProtocolMode> protocols = dev.macula.cloud.iam.protocol.oauth2.OAuth2ClientProtocolPolicy.protocols(oauth2Client);
-        java.util.List<dev.macula.cloud.system.protocol.OAuth2ProtocolSettings> settings = oauth2Client.getProtocolConfigurations().stream()
-            .filter(dev.macula.cloud.system.protocol.ApplicationProtocolConfiguration::enabled)
-            .map(dev.macula.cloud.system.protocol.OAuth2ProtocolConfiguration::settings).toList();
+        Set<OAuth2ProtocolMode> protocols = OAuth2ClientProtocolPolicy.protocols(oauth2Client);
+        List<OAuth2ProtocolSettings> settings = oauth2Client.getProtocolConfigurations().stream()
+            .filter(ApplicationProtocolConfiguration::enabled)
+            .map(OAuth2ProtocolConfiguration::settings).toList();
         // 基础对象只用于恢复持久化授权；运行时会在无缓存的请求视图中再次收窄。
         oauth2Client = copyForBase(oauth2Client, settings);
         RegisteredClient.Builder builder = RegisteredClient
@@ -183,12 +191,16 @@ public class MaculaRegisteredClientRepository implements RegisteredClientReposit
                 StringUtils.commaDelimitedListToSet(oauth2Client.getClientAuthenticationMethods()).contains("none"))
             .requireAuthorizationConsent(oauth2Client.isRequireAuthorizationConsent());
         clientSettingsBuilder.setting(OAuth2ClientProtocolValidator.ENABLED_PROTOCOLS,
-            protocols.stream().map(OAuth2ProtocolMode::value).collect(java.util.stream.Collectors.toUnmodifiableSet()));
+            protocols.stream().map(OAuth2ProtocolMode::value).collect(Collectors.toUnmodifiableSet()));
         clientSettingsBuilder.setting(OAuth2ClientProtocolValidator.DEFAULT_PROTOCOL, protocols.iterator().next().value());
         Set<String> externalCodeTypes = parseExternalCodeTypes(oauth2Client.getExternalCodeTypes());
         clientSettingsBuilder.setting(ExternalCodeClientSettings.CODE_TYPES, externalCodeTypes);
         if (oauth2Client.getApplicationType() != null) {
             clientSettingsBuilder.setting(ExternalCodeClientSettings.APPLICATION_TYPE, oauth2Client.getApplicationType());
+        }
+        var webMode = IamWebLoginMode.resolve(oauth2Client.getApplicationType(), oauth2Client.getWebLoginMode());
+        if (webMode != null) {
+            clientSettingsBuilder.setting(ExternalCodeClientSettings.WEB_LOGIN_MODE, webMode.value());
         }
         if (oauth2Client.getMiniappPlatform() != null) {
             clientSettingsBuilder.setting(ExternalCodeClientSettings.MINIAPP_PLATFORM, oauth2Client.getMiniappPlatform());
@@ -239,26 +251,26 @@ public class MaculaRegisteredClientRepository implements RegisteredClientReposit
     /**
      * 构造基础能力并集，保留原对象中的子配置，绝不写回数据库或请求缓存。
      */
-    private SysOAuth2Client copyForBase(SysOAuth2Client source,
-            java.util.List<dev.macula.cloud.system.protocol.OAuth2ProtocolSettings> settings) {
-        SysOAuth2Client result = new SysOAuth2Client();
-        org.springframework.beans.BeanUtils.copyProperties(source, result);
+    private OAuth2ClientRegistration copyForBase(OAuth2ClientRegistration source,
+            List<OAuth2ProtocolSettings> settings) {
+        OAuth2ClientRegistration result = new OAuth2ClientRegistration();
+        BeanUtils.copyProperties(source, result);
         result.setClientAuthenticationMethods(union(settings,
-                dev.macula.cloud.system.protocol.OAuth2ProtocolSettings::getClientAuthenticationMethods));
+                OAuth2ProtocolSettings::getClientAuthenticationMethods));
         result.setAuthorizationGrantTypes(
-                union(settings, dev.macula.cloud.system.protocol.OAuth2ProtocolSettings::getAuthorizationGrantTypes));
+                union(settings, OAuth2ProtocolSettings::getAuthorizationGrantTypes));
         result.setRedirectUris(
-                union(settings, dev.macula.cloud.system.protocol.OAuth2ProtocolSettings::getRedirectUris));
-        result.setScopes(union(settings, dev.macula.cloud.system.protocol.OAuth2ProtocolSettings::getScopes));
+                union(settings, OAuth2ProtocolSettings::getRedirectUris));
+        result.setScopes(union(settings, OAuth2ProtocolSettings::getScopes));
         result.setAllowedOrigins(
                 settings.stream().flatMap(value -> value.getAllowedOrigins().stream()).distinct().sorted()
-                        .collect(java.util.stream.Collectors.joining(",")));
+                        .collect(Collectors.joining(",")));
         // 这里只给序列化恢复一个合法默认；任何签发必须经协议视图选择真实设置。
         result.setRequireProofKey(true);
         result.setRequireAuthorizationConsent(false);
-        result.setAuthorizationCodeTimeToLive(java.time.Duration.ofSeconds(300));
-        result.setAccessTokenTimeToLive(java.time.Duration.ofSeconds(3600));
-        result.setRefreshTokenTimeToLive(java.time.Duration.ofSeconds(3600));
+        result.setAuthorizationCodeTimeToLive(Duration.ofSeconds(300));
+        result.setAccessTokenTimeToLive(Duration.ofSeconds(3600));
+        result.setRefreshTokenTimeToLive(Duration.ofSeconds(3600));
         result.setTokenFormat("reference");
         result.setReuseRefreshTokens(false);
         result.setIdTokenSignatureAlgorithm("RS256");
@@ -270,11 +282,11 @@ public class MaculaRegisteredClientRepository implements RegisteredClientReposit
     /**
      * 基础并集不授予额外协议权限，只用于框架反序列化所需字段。
      */
-    private String union(java.util.List<dev.macula.cloud.system.protocol.OAuth2ProtocolSettings> values,
-            java.util.function.Function<dev.macula.cloud.system.protocol.OAuth2ProtocolSettings, String> getter) {
+    private String union(List<OAuth2ProtocolSettings> values,
+            Function<OAuth2ProtocolSettings, String> getter) {
         return values.stream().flatMap(
-                        value -> dev.macula.cloud.system.protocol.OAuth2ProtocolConfiguration.csv(getter.apply(value)).stream())
-                .distinct().sorted().collect(java.util.stream.Collectors.joining(","));
+                        value -> OAuth2ProtocolConfiguration.csv(getter.apply(value)).stream())
+                .distinct().sorted().collect(Collectors.joining(","));
     }
 
     private Set<String> parseExternalCodeTypes(String value) {

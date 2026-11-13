@@ -23,7 +23,10 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.sun.net.httpserver.HttpServer;
+import dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures;
 import dev.macula.cloud.iam.service.identity.IdentityProviderConfigService.ProviderConfig;
+import dev.macula.cloud.system.enums.IdentitySourceType;
+import org.hamcrest.Matchers;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.boot.test.system.CapturedOutput;
@@ -53,15 +56,15 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 class WechatClientTest {
     @Test
     void bothIndependentBrowserModesReturnAppScopedOpenId() {
-        ProviderConfig config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(
-                dev.macula.cloud.system.enums.IdentitySourceType.WECHAT_WEBSITE, "WECHAT", "site", "site-secret",
+        ProviderConfig config = IdentitySourceTestFixtures.source(
+                IdentitySourceType.WECHAT_WEBSITE, "WECHAT", "site", "site-secret",
                 Map.of("appId", "site", "officialAccountAppId", "oa"),
                 Map.of("officialAccountAppSecret", "oa-secret"));
         for (WechatLoginMode mode : new WechatLoginMode[]{WechatLoginMode.BROWSER, WechatLoginMode.WEBVIEW}) {
             RestClient.Builder builder = RestClient.builder();
             MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
             WechatClient client = new WechatClient(builder.build());
-            server.expect(requestTo(org.hamcrest.Matchers.startsWith(
+            server.expect(requestTo(Matchers.startsWith(
                             "https://api.weixin.qq.com/sns/oauth2/access_token?")))
                     .andRespond(withSuccess("{\"access_token\":\"token\",\"openid\":\"open-01\"}",
                             MediaType.APPLICATION_JSON));
@@ -75,10 +78,10 @@ class WechatClientTest {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         WechatClient client = new WechatClient(builder.build());
-        ProviderConfig config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(
-                dev.macula.cloud.system.enums.IdentitySourceType.WECHAT_WEBSITE, "WECHAT", "site", "site-secret",
+        ProviderConfig config = IdentitySourceTestFixtures.source(
+                IdentitySourceType.WECHAT_WEBSITE, "WECHAT", "site", "site-secret",
                 Map.of("appId", "mobile-app"));
-        server.expect(requestTo(org.hamcrest.Matchers.startsWith(
+        server.expect(requestTo(Matchers.startsWith(
                         "https://api.weixin.qq.com/sns/oauth2/access_token?appid=mobile-app")))
                 .andRespond(withSuccess("{\"openid\":\"open-mobile\"}", MediaType.APPLICATION_JSON));
 
@@ -91,10 +94,10 @@ class WechatClientTest {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         WechatClient client = new WechatClient(builder.build());
-        ProviderConfig config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(
-                dev.macula.cloud.system.enums.IdentitySourceType.WECHAT_WEBSITE, "WECHAT", "site", "site-secret",
+        ProviderConfig config = IdentitySourceTestFixtures.source(
+                IdentitySourceType.WECHAT_WEBSITE, "WECHAT", "site", "site-secret",
                 Map.of("appId", "mini-app"));
-        server.expect(requestTo(org.hamcrest.Matchers.startsWith(
+        server.expect(requestTo(Matchers.startsWith(
                         "https://api.weixin.qq.com/sns/jscode2session?appid=mini-app")))
                 .andRespond(withSuccess("{\"openid\":\"open-mini\",\"unionid\":\"union-mini\"}",
                         MediaType.APPLICATION_JSON));
@@ -108,8 +111,8 @@ class WechatClientTest {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         WechatClient client = new WechatClient(builder.build());
-        ProviderConfig config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(
-                dev.macula.cloud.system.enums.IdentitySourceType.WECHAT_WEBSITE, "WECHAT", "site", "site-secret",
+        ProviderConfig config = IdentitySourceTestFixtures.source(
+                IdentitySourceType.WECHAT_WEBSITE, "WECHAT", "site", "site-secret",
                 Map.of("appId", "mini-app"));
         server.expect(requestTo("https://api.weixin.qq.com/cgi-bin/stable_token"))
                 .andRespond(withSuccess("{\"access_token\":\"mini-token\"}", MediaType.APPLICATION_JSON));
@@ -127,10 +130,10 @@ class WechatClientTest {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         WechatClient client = new WechatClient(builder.build());
-        ProviderConfig config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(
-                dev.macula.cloud.system.enums.IdentitySourceType.WECHAT_WEBSITE, "WECHAT", "site", "site-secret",
+        ProviderConfig config = IdentitySourceTestFixtures.source(
+                IdentitySourceType.WECHAT_WEBSITE, "WECHAT", "site", "site-secret",
                 Map.of("appId", "site"));
-        server.expect(requestTo(org.hamcrest.Matchers.startsWith(
+        server.expect(requestTo(Matchers.startsWith(
                         "https://api.weixin.qq.com/sns/oauth2/access_token?")))
                 .andRespond(withSuccess("{\"access_token\":\"token\",\"openid\":\"open-01\"}",
                         MediaType.APPLICATION_JSON));
@@ -142,11 +145,11 @@ class WechatClientTest {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         WechatClient client = new WechatClient(builder.build());
-        ProviderConfig config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(
-                dev.macula.cloud.system.enums.IdentitySourceType.WECHAT_WEBSITE, "WECHAT", "site",
+        ProviderConfig config = IdentitySourceTestFixtures.source(
+                IdentitySourceType.WECHAT_WEBSITE, "WECHAT", "site",
                 "client-secret-marker",
                 Map.of("appId", "site"));
-        server.expect(requestTo(org.hamcrest.Matchers.startsWith(
+        server.expect(requestTo(Matchers.startsWith(
                         "https://api.weixin.qq.com/sns/oauth2/access_token?")))
                 .andRespond(withSuccess("{\"errcode\":40029,\"errmsg\":\"provider-text-marker\"}",
                         MediaType.APPLICATION_JSON));
@@ -166,10 +169,10 @@ class WechatClientTest {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         WechatClient client = new WechatClient(builder.build());
-        ProviderConfig config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(
-                dev.macula.cloud.system.enums.IdentitySourceType.WECHAT_WEBSITE, "WECHAT", "site", "site-secret",
+        ProviderConfig config = IdentitySourceTestFixtures.source(
+                IdentitySourceType.WECHAT_WEBSITE, "WECHAT", "site", "site-secret",
                 Map.of("appId", "site"));
-        server.expect(requestTo(org.hamcrest.Matchers.startsWith(
+        server.expect(requestTo(Matchers.startsWith(
                         "https://api.weixin.qq.com/sns/oauth2/access_token?")))
                 .andRespond(withSuccess("not-json", MediaType.APPLICATION_JSON));
 
@@ -182,10 +185,10 @@ class WechatClientTest {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         WechatClient client = new WechatClient(builder.build());
-        ProviderConfig config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(
-                dev.macula.cloud.system.enums.IdentitySourceType.WECHAT_WEBSITE, "WECHAT", "site", "site-secret",
+        ProviderConfig config = IdentitySourceTestFixtures.source(
+                IdentitySourceType.WECHAT_WEBSITE, "WECHAT", "site", "site-secret",
                 Map.of("appId", "site"));
-        server.expect(requestTo(org.hamcrest.Matchers.startsWith(
+        server.expect(requestTo(Matchers.startsWith(
                         "https://api.weixin.qq.com/sns/oauth2/access_token?")))
                 .andRespond(withStatus(HttpStatus.BAD_GATEWAY));
 
@@ -199,8 +202,8 @@ class WechatClientTest {
             throw new SocketTimeoutException("timeout-message-marker");
         }).build();
         WechatClient client = new WechatClient(restClient);
-        ProviderConfig config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(
-                dev.macula.cloud.system.enums.IdentitySourceType.WECHAT_WEBSITE, "WECHAT", "site", "secret",
+        ProviderConfig config = IdentitySourceTestFixtures.source(
+                IdentitySourceType.WECHAT_WEBSITE, "WECHAT", "site", "secret",
                 Map.of("appId", "site"));
 
         assertThrows(AuthenticationServiceException.class,

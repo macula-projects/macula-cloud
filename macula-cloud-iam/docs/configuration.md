@@ -3,9 +3,11 @@
 本文介绍当前运行合同；逐平台接口及 Code 参数见[第三方接入说明](third-party-integration.md)
 ，模块概览见[IAM README](../README.md)。
 
+Web/SPA在创建时选择`webLoginMode=BROWSER|IN_APP`，创建成功后固定，草稿也不可修改。BROWSER使用普通登录与SSO；IN_APP固定一个平台能力并核验平台证明，不提供普通登录回退。Web保持服务端机密认证，SPA保持none。独立IN_APP应用类型已移除，不兼容或迁移旧记录。
+
 ## 应用与协议
 
-业务应用从 `WEB_SERVER`、`SPA`、`NATIVE`、`MINIAPP`、`IN_APP`、`SERVICE` 中选择终端类型，保存后类型固定。每个业务 Client
+业务应用从 `WEB_SERVER`、`SPA`、`NATIVE`、`MINIAPP`、`SERVICE` 中选择终端类型，保存后类型固定。每个业务 Client
 只配置一个协议：`OIDC` 或 `OAUTH2_1`。新应用为 `DRAFT`，完成所需参数后才能启用。
 
 | 应用       | 认证与入口                                                                            |
@@ -14,8 +16,12 @@
 | SPA        | `none`、授权码 + S256 PKCE，回调和 Origin 精确登记                                    |
 | NATIVE     | 可选一个 SDK/AppLink 来源；可独立启用 IAM 内置密码/短信/邮箱入口                      |
 | MINIAPP    | 固定本平台小程序来源，可配置登录 Code/手机号授权 Code；统一登录回传桥接由业务应用完成 |
-| IN_APP     | 固定一个端内能力；网页授权与 JSAPI Code 使用各自合同                                  |
+| Web/SPA · `IN_APP`模式 | 启用时恰一个端内能力；企微/公众号使用授权码，飞书/钉钉使用JSAPI Code；Web保留机密认证，SPA使用none |
 | SERVICE    | `client_credentials` 与业务 Scope，无用户登录来源或用户目录                           |
+
+`webLoginMode`是应用字段，不放在协议`settings`里。Web/SPA省略或历史NULL读取为BROWSER；更新省略保留原值，显式null、空值、未知值、重复JSON键和非Web配置均拒绝。端内草稿在创建时将`hostedLoginMethods`置为空集合；完整配置同样必须关闭内置登录，启用时恰好一个能力，网页授权与JSAPI不得混配。模式在创建成功后固定，详情只读，服务端更新只允许提交相同有效模式；无需清理或恢复旧模式配置。需要另一模式时新建应用，原Client ID、凭据、身份源实体和用户绑定保持。
+
+V26只新增`web_login_mode VARCHAR(16) NULL`。独立`applicationType=IN_APP`记录不转换、不迁移，运行时明确拒绝。升级须协调Schema、System、IAM与Admin；本代码变更不执行业务库迁移。
 
 客户端认证支持 `none`、`client_secret_basic`、`client_secret_post`、`private_key_jwt`。公共客户端不使用 Secret，也不支持
 Refresh Token 或服务凭据 grant。机密授权码客户端可配置 Refresh Token，默认不复用。
@@ -48,6 +54,10 @@ Bean名称。
 
 `hostedLoginMethods` 控制 `PASSWORD` / `SMS` / `EMAIL`：`null` 继承平台配置，`[]` 关闭全部本地方式，全局关闭优先。该策略控制新托管认证，不撤销已有
 SSO 会话。验证码发送与消费固定到同一个可信 Client；绑定短信使用独立的 `IDENTITY_BINDING` 用途。
+
+验证码通道由登录配置显式装配为 `smsCodeService` 与 `emailCodeService`，调用方通过具名 `@Qualifier` 依赖公共 `VerificationCodeChannelService`。内核或投递器缺失时使用共享不可用策略：不发码、不通过认证，绑定页也不显示可用的短信证明。设施已装配仍不代表供应商渠道已配置，发送提交失败不会激活验证码。
+
+两通道表单都只接受 POST、单值标识及六位数字验证码；允许首尾空白，拒绝歧义和越界字段。认证成功后检查账号状态、清除凭据，记录供 OIDC `auth_time` 使用的真实主认证时间，并继续经过 MFA 发布策略。
 
 Web/SPA 显示兼容的第三方网页入口。移动应用与小程序的 IAM 页面仅提供启用的内置密码/短信/邮箱；平台 SDK
 登录与内置登录开关独立。端内应用按已登记能力发起对应平台授权，不能仅凭 UA 或请求自报平台获得身份。
@@ -146,3 +156,27 @@ Scope，不能据此要求 UserInfo 发布邮箱。
 
 `/api/v1/oauth2/sms-codes`、`/api/v1/oauth2/email-codes`、`/api/v1/oauth2/login-challenges/captcha` 返回 HTTP 410
 `endpoint_retired`。托管 `/api/v1/sms-code`、`/api/v1/email-code` 与绑定 `/login/bind/sms-code` 维持各自用途和保护规则。
+
+## IAM应用模型升级与恢复
+
+V27把应用公共元数据、唯一协议登记和登录来源关联分别归入 `sys_iam_application`、`sys_iam_application_protocol_config`、`sys_iam_application_identity_provider`。`sys_identity_provider_user_binding`保存具体来源到本地用户的稳定绑定。V27保留旧 `sys_user_identity_binding`，后续V28将其退役；升级不推断其跨来源关系。
+
+升级必须使用匹配新模型的System/IAM版本协同切换，并在维护窗口阻止旧版本写入。先做数据库外部备份；不得只执行V27后继续运行旧表读写版本，也不承诺旧镜像滚动兼容。应用主键、公开Client ID、签发时间、编码凭据、身份源和有效绑定均应按升级验证结果核对，不重新生成凭据。
+
+迁移在DDL之前检查全部V26数据：未知字段/结构版本、多协议、来源歧义或孤儿关联、终端能力冲突和活动应用缺少凭据等情况直接停止。普通空草稿没有协议行；旧凭据/协议影子需要保留时使用 `protocol=NULL/schema_version=0/enabled=0` 的不可执行槽。资源服务器则登记内部OAuth管理认证，仍不开放业务登录和业务grant。
+
+| 失败位置 | 对象状态 | 恢复要求 |
+|---|---|---|
+| `PRECHECK` | 原业务表未改变，无新暂存对象 | 按有界问题代码核对数据；不得通过删记录消除歧义 |
+| `STAGING`、`COPY`、`PREPUBLICATION` | 原表保留，可能有 `v27_stage_*` | 备份并核对暂存对象；迁移拒绝自动覆盖已有对象 |
+| `PUBLICATION`及以后 | 需检查原子RENAME是否成功；新表及 `v27_old_*` 可能同时存在 | 停止业务写入，核对行数和内容、Flyway状态与备份后制定恢复步骤 |
+
+只有暂存内容逐值核对通过才发布四张表，发布后再次核对通过才清理旧表。MySQL DDL不会随事务回滚；失败后不能仅执行Flyway repair就假定升级完成。诊断仅包含阶段、恢复分类和固定问题代码或SQLState/数字错误码，不输出原始SQL异常、凭据或身份值。
+
+## V28：退役旧用户名绑定表
+
+当前登录与绑定只使用`sys_identity_provider_user_binding`。V28删除已无运行引用的`sys_user_identity_binding`，不会迁移或合并其中记录，也不改当前应用、协议凭据、身份源、用户或绑定。V1—V27保持。
+
+System自动迁移前必须将旧表结构和全部记录导出到受限的外部归档，并核对记录摘要及恢复可用性；归档不进入仓库，也不包含在普通日志中。核对自定义外键、视图、触发器及其他外部使用方已停用后再升级。新环境正常顺序执行全部版本，最终不保留旧表。
+
+MySQL DROP不可事务回滚。需要恢复历史记录时使用归档重建原表；这不代表旧认证逻辑重新启用，不通过Flyway repair伪造退回版本。当前绑定表和历史归档不能按厂商名称自动合并。

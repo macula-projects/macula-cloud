@@ -40,8 +40,8 @@ describe("IAM 应用配置", () => {
     configurationVersion:"fixture-version",
   };
   row.purpose=overrides.purpose || 'APPLICATION';
-  row.protocol=overrides.protocol || overrides.defaultProtocol || 'OIDC';
-  row.settings=overrides.settings || {...protocolDefaults(row,row.protocol),clientAuthenticationMethods:row.clientAuthenticationMethods,
+  row.protocol=Object.hasOwn(overrides,'protocol') ? overrides.protocol : overrides.defaultProtocol || 'OIDC';
+  row.settings=Object.hasOwn(overrides,'settings') ? overrides.settings : {...protocolDefaults(row,row.protocol),clientAuthenticationMethods:row.clientAuthenticationMethods,
     authorizationGrantTypes:row.authorizationGrantTypes,redirectUris:row.redirectUris,scopes:row.scopes,
     allowedOrigins:row.allowedOrigins,requireProofKey:row.requireProofKey,requireAuthorizationConsent:row.requireAuthorizationConsent,
     jwkSetUrl:row.jwkSetUrl || null,signingAlgorithm:row.signingAlgorithm || null,
@@ -74,17 +74,17 @@ describe("IAM 应用配置", () => {
               {id:8,name:"微信小程序源",providerType:"WECHAT",sourceType:"WECHAT_MINIAPP",label:"微信小程序",scene:"MINIAPP",
                 available:true,browser:false,capabilities:[{codeType:"WECHAT_MINIAPP_LOGIN_CODE",label:"身份登录",scene:"MINIAPP"}]},
               {id:9,name:"企微源一",providerType:"WECOM",sourceType:"WECOM_WEB",label:"企业微信网页",scene:"BROWSER",
-                available:true,browser:true,capabilities:[{browser:true,loginCapability:"WECOM_BROWSER",label:"浏览器网页登录",applicationTypes:["WEB_SERVER","SPA"]},{browser:true,loginCapability:"WECOM_WEBVIEW",label:"企微端内授权",applicationTypes:["IN_APP"]}]},
+                available:true,browser:true,capabilities:[{browser:true,loginCapability:"WECOM_BROWSER",label:"浏览器网页登录",applicationTypes:["WEB_SERVER","SPA"]},{browser:true,loginCapability:"WECOM_WEBVIEW",label:"企微端内授权",applicationTypes:["WEB_SERVER","SPA"],webLoginModes:["IN_APP"]}]},
               {id:10,name:"企微源二",providerType:"WECOM",sourceType:"WECOM_WEB",label:"企业微信网页",scene:"BROWSER",
-                available:true,browser:true,capabilities:[{browser:true,loginCapability:"WECOM_BROWSER",label:"浏览器网页登录",applicationTypes:["WEB_SERVER","SPA"]},{browser:true,loginCapability:"WECOM_WEBVIEW",label:"企微端内授权",applicationTypes:["IN_APP"]}]},
+                available:true,browser:true,capabilities:[{browser:true,loginCapability:"WECOM_BROWSER",label:"浏览器网页登录",applicationTypes:["WEB_SERVER","SPA"]},{browser:true,loginCapability:"WECOM_WEBVIEW",label:"企微端内授权",applicationTypes:["WEB_SERVER","SPA"],webLoginModes:["IN_APP"]}]},
               {id:11,name:"微信原生SDK源",providerType:"WECHAT",sourceType:"WECHAT_MOBILE_APP",label:"微信移动应用 SDK",scene:"APP",
                 available:true,browser:false,capabilities:[{codeType:"WECHAT_OPEN_APP_CODE",label:"原生授权",scene:"APP",applicationTypes:["NATIVE"]}]},
               {id:12,name:"钉钉端内免登源",providerType:"DINGTALK",sourceType:"DINGTALK_WEBVIEW",label:"钉钉端内网页",scene:"WEBVIEW",
-                available:true,browser:false,capabilities:[{codeType:"DINGTALK_WEBVIEW_CODE",label:"端内免登",scene:"WEBVIEW",applicationTypes:["IN_APP"]}]},
+                available:true,browser:false,capabilities:[{codeType:"DINGTALK_WEBVIEW_CODE",label:"端内免登",scene:"WEBVIEW",applicationTypes:["WEB_SERVER","SPA"],webLoginModes:["IN_APP"]}]},
               {id:14,name:"飞书AppLink源",providerType:"FEISHU",sourceType:"FEISHU_WEB",available:true,browser:false,
                 capabilities:[{codeType:"FEISHU_APP_CODE",loginCapability:"FEISHU_APPLINK",label:"移动AppLink授权",scene:"APP",flow:"FEISHU_APPLINK_V3",providerPkce:true,applicationTypes:["NATIVE"]}]},
               {id:13,name:"飞书端内Code源",providerType:"FEISHU",sourceType:"FEISHU_WEBVIEW",label:"飞书端内网页",scene:"WEBVIEW",flow:"FEISHU_WEBVIEW_V3",
-                available:true,browser:false,capabilities:[{codeType:"FEISHU_WEBVIEW_CODE",label:"端内免登",scene:"WEBVIEW",applicationTypes:["IN_APP"]}]}
+                available:true,browser:false,capabilities:[{codeType:"FEISHU_WEBVIEW_CODE",label:"端内免登",scene:"WEBVIEW",applicationTypes:["WEB_SERVER","SPA"],webLoginModes:["IN_APP"]}]}
             ],
           })
     ).as("catalog");
@@ -119,7 +119,7 @@ describe("IAM 应用配置", () => {
     }).as("update");
     cy.intercept("POST", "**/system/api/v1/oauth2-clients/drafts", (req) => {
       row = record({...req.body,id:42,clientId:"11111111-2222-4333-8444-555555555555",configurationStatus:"DRAFT",defaultProtocol:null,enabledProtocols:[],protocolConfigurations:[],authorizationGrantTypes:"",scopes:"",tenantId:null,userType:null});
-      row.protocol=null;row.settings=null;
+      row.protocol=null;row.settings=null;row.hostedLoginMethods=row.webLoginMode==='IN_APP'?[]:null;
       delete row.clientSecret;
       req.reply(ok(row));
     }).as("create");
@@ -199,7 +199,7 @@ describe("IAM 应用配置", () => {
     cy.contains('.el-form-item__label','登录回调 URI').should('not.exist');
     cy.get('.el-dialog').contains('button','创建').click();
     cy.wait('@create').then(({request}) => {
-      expect(request.body).to.deep.equal({clientName:'新应用',applicationType:'SPA',miniappPlatform:null,purpose:'APPLICATION'});
+      expect(request.body).to.deep.equal({clientName:'新应用',applicationType:'SPA',miniappPlatform:null,purpose:'APPLICATION',webLoginMode:'BROWSER'});
     });
     cy.contains('暂不可用于认证').should('be.visible');
     cy.contains('尚未选择接入协议').should('be.visible');
@@ -348,11 +348,11 @@ describe("IAM 应用配置", () => {
     cy.get("pre").should("not.exist");
   });
 
-  for (const type of ['SPA','NATIVE','MINIAPP','IN_APP']) {
+  for (const type of ['SPA','NATIVE','MINIAPP','SPA_IN_APP']) {
     it(`filters browser, native SDK and container codes for ${type}`,()=>{
-      open({applicationType:type,miniappPlatform:type==='MINIAPP'?'WECHAT':null});
+      open({applicationType:type==='SPA_IN_APP'?'SPA':type,webLoginMode:type==='SPA_IN_APP'?'IN_APP':null,hostedLoginMethods:type==='SPA_IN_APP'?[]:null,miniappPlatform:type==='MINIAPP'?'WECHAT':null});
       detail();tab('登录控制');cy.contains('button','添加身份源').click();
-      if(type==='IN_APP') {
+      if(type==='SPA_IN_APP') {
         cy.contains('.source-option','钉钉端内免登源').should('be.visible');
         cy.contains('.source-option','飞书端内Code源').should('be.visible');
         cy.contains('.source-option','微信原生SDK源').should('not.exist');
@@ -376,7 +376,7 @@ describe("IAM 应用配置", () => {
   }
 
   it('binds Feishu in-client Code only for an in-app application',()=>{
-    open({applicationType:'IN_APP',hostedLoginMethods:[]});detail();tab('登录控制');cy.contains('button','添加身份源').click();
+    open({applicationType:'SPA',webLoginMode:'IN_APP',hostedLoginMethods:[]});detail();tab('登录控制');cy.contains('button','添加身份源').click();
     cy.contains('.source-option','飞书端内Code源').contains('.el-radio','端内免登').click();
     cy.get('.el-dialog').contains('button','添加所选').click();
     cy.contains('.selected-source','飞书端内Code源').should('be.visible');
@@ -716,25 +716,71 @@ describe("IAM 应用配置", () => {
     });
   }
 
-  for(const width of [1440,390]) {
-    it(`previews an explicit web-to-container conversion without changing Client ID at ${width}px`,()=>{
-      cy.viewport(width,900);open({applicationType:'WEB_SERVER',secretConfigured:true,clientAuthenticationMethods:'client_secret_basic'});
-      detail();cy.contains('button','转换为端内应用').click();
-      cy.contains('.source-option','企微源一').contains('.el-radio','企微端内授权').click();
-      cy.get('.el-dialog').contains('button','添加所选').click();
-      cy.contains('.el-message-box','确认转换为端内应用').should('be.visible');
-      cy.get('.el-message-box').should('contain','保留：Client ID').should('contain','移除：其他网页与Code来源');
-      cy.get('.el-message-box').contains('button','准备转换').click();
-      cy.contains('已准备转换为端内应用').should('be.visible');tab('登录控制');
-      cy.contains('.el-form-item','统一登录入口').should('not.exist');cy.contains('.selected-source','企微源一').should('be.visible');
-      cy.contains('button','保存并启用').click();cy.wait('@update').then(({request})=>{
-        expect(request.body.clientId).to.equal('existing-client');expect(request.body.applicationType).to.equal('IN_APP');
-        expect(request.body.convertToInApp).to.equal(true);expect(request.body.hostedLoginMethods).to.deep.equal([]);
-        expect(request.body.browserCapabilityBindings).to.deep.equal({WECOM_WEBVIEW:9});
-        expect(request.body).not.to.have.property('clientSecret');
+  for (const type of ['NATIVE','MINIAPP']) {
+    it(`does not submit a web login mode when creating ${type}`,()=>{
+      open();cy.contains('button','创建应用').click();cy.get(`[data-application-type="${type}"]`).click();
+      cy.contains('.el-dialog .el-form-item__label','网页登录模式').should('not.exist');
+      field('应用名称').find('input').type('非Web应用');
+      cy.get('.el-dialog').contains('button','创建').click();cy.wait('@create').then(({request})=>{
+        expect(request.body.applicationType).to.equal(type);expect(request.body).not.to.have.property('webLoginMode');
       });
-      cy.screenshot(`application-conversion-${width}`,{capture:'viewport'});
     });
+  }
+  it('does not submit a residual web mode when creating a resource server',()=>{
+    open();cy.contains('button','创建应用').click();
+    cy.get('.el-dialog').contains('.el-radio','资源服务器').click();
+    cy.contains('.el-dialog .el-form-item__label','网页登录模式').should('not.exist');
+    cy.get('.el-dialog input.el-input__inner').type('资源服务器');
+    cy.get('.el-dialog').contains('button','创建').click();cy.wait('@create').then(({request})=>{
+      expect(request.body.purpose).to.equal('RESOURCE_SERVER');expect(request.body.applicationType).to.equal('SERVICE');
+      expect(request.body).not.to.have.property('webLoginMode');
+    });
+  });
+
+  for (const type of ['WEB_SERVER','SPA']) {
+    for (const mode of ['BROWSER','IN_APP']) {
+      it(`keeps an empty-protocol ${type}/${mode} draft read-only`,()=>{
+        open({applicationType:type,webLoginMode:mode,configurationStatus:'DRAFT',protocol:null,settings:null,
+          defaultProtocol:null,enabledProtocols:[],protocolConfigurations:[],hostedLoginMethods:mode==='IN_APP'?[]:null});
+        detail();field('网页登录模式').should('contain',mode==='IN_APP'?'端内':'浏览器').should('contain','创建后只读');
+        field('网页登录模式').find('input[type=radio]').should('not.exist');
+        cy.contains('button','保存草稿并停用').click();cy.wait('@update').then(({request})=>{
+          expect(request.body.webLoginMode).to.equal(mode);expect(request.body.settings).to.equal(null);
+        });
+        cy.reload();cy.wait('@detail');field('网页登录模式').should('contain','创建后只读');
+        cy.contains('Cannot set properties').should('not.exist');
+      });
+    }
+  }
+
+  for(const width of [1440,390]) {
+    for(const type of ['WEB_SERVER','SPA']) {
+      for(const mode of ['BROWSER','IN_APP']) {
+        it(`selects ${type}/${mode} at creation and locks it at ${width}px`,()=>{
+          cy.viewport(width,900);open();cy.contains('button','创建应用').click();
+          cy.get(`[data-application-type="${type}"]`).click();
+          field('应用名称').find('input').type('新应用');
+          if(mode==='IN_APP') {
+            field('网页登录模式').find('input[value=BROWSER]').focus();
+            cy.press(Cypress.Keyboard.Keys.RIGHT);
+          }
+          field('网页登录模式').find('.el-radio.is-checked').should('contain',mode==='IN_APP'?'端内':'浏览器');
+          cy.get('.el-dialog').contains('button','创建').click();cy.wait('@create').then(({request})=>{
+            expect(request.body.applicationType).to.equal(type);expect(request.body.webLoginMode).to.equal(mode);
+            expect(request.body).not.to.have.property('settings');
+          });
+          cy.contains('尚未选择接入协议').should('be.visible');tab('应用配置');
+          field('网页登录模式').should('contain','创建后只读').should('contain',mode==='IN_APP'?'端内':'浏览器');
+          field('网页登录模式').find('input[type=radio]').should('not.exist');
+          cy.reload();cy.wait('@detail');field('网页登录模式').should('contain','创建后只读');
+          tab('协议配置');cy.contains('.el-radio','OIDC').click();
+          cy.get('[data-testid=client-auth] .el-radio.is-checked').should('contain',type==='WEB_SERVER'?'client_secret_basic':'none');
+          cy.get('@update.all').should('have.length',0);
+          cy.document().should(doc=>expect(doc.documentElement.scrollWidth).to.be.at.most(width));
+          cy.screenshot(`immutable-login-mode-${type}-${mode}-${width}`,{capture:'viewport',scale:true});
+        });
+      }
+    }
   }
 
   for (const width of [1280, 390]) {

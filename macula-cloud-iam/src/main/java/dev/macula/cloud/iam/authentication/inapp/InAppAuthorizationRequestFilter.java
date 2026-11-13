@@ -16,13 +16,12 @@
  */
 package dev.macula.cloud.iam.authentication.inapp;
 
-import java.io.IOException;
-
 import dev.macula.cloud.iam.authentication.mfa.MfaCompletionService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -67,7 +66,7 @@ public final class InAppAuthorizationRequestFilter extends OncePerRequestFilter 
         }
         var client = policy.current(ids[0]);
         var original = SecurityContextHolder.getContext();
-        if (client == null || !"IN_APP".equals(client.getApplicationType())
+        if (!policy.inApp(client)
                 || policy.validProof(client, original.getAuthentication(),
                 MfaCompletionService.proof(original.getAuthentication()), "authorization_code")) {
             chain.doFilter(request, response);

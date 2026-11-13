@@ -116,8 +116,7 @@
               ><ClientApplication
                 v-model:client="draft"
                 :tenants="tenants"
-                :original-type="original?.applicationType" :catalog="catalog" :catalog-loaded="catalogLoaded"
-                @copy="copyText"
+                :original-type="original?.applicationType"
             /></template>
             <template v-else-if="activeTab === 'protocol'"
               ><ClientProtocol
@@ -219,6 +218,7 @@ import {
   clientPayload,
   configurationIssues,
 } from "@/utils/oauthClientConfiguration";
+import {isWebApplication} from '@/utils/identitySourceCompatibility';
 import ResourceServerSettings from "./components/ResourceServerSettings.vue";
 import ClientCreate from "./components/ClientCreate.vue";
 import ClientApplication from "./components/ClientApplication.vue";
@@ -429,7 +429,9 @@ async function createDraft() {
   if (saving.value || !form.clientName?.trim()) return ElMessage.warning('请输入应用名称');
   saving.value = true;
   try {
-    const value = unwrap(await api.createDraft({clientName:form.clientName.trim(),applicationType:form.applicationType,miniappPlatform:form.miniappPlatform,purpose:form.purpose}));
+    const payload = {clientName:form.clientName.trim(),applicationType:form.applicationType,miniappPlatform:form.miniappPlatform,purpose:form.purpose};
+    if (form.purpose !== 'RESOURCE_SERVER' && isWebApplication(form)) payload.webLoginMode = form.webLoginMode ?? 'BROWSER';
+    const value = unwrap(await api.createDraft(payload));
     // 创建请求已提交完成，允许现有离开守卫进入新详情。
     saving.value = false;
     await router.replace({query:{id:String(value.id),tab:'quickstart'}});

@@ -23,6 +23,7 @@ import java.util.Base64;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -50,7 +51,7 @@ class HttpSessionThirdPartyLoginStateRepositoryTest {
     void consumesStateExactlyOnce() {
         MockHttpServletRequest request = new MockHttpServletRequest();
         ThirdPartyLoginContext expected =
-                dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.context(
+                IdentitySourceTestFixtures.context(
                 "GITHUB", "", "test-client", NOW, "/");
         String state = repository.create(request, expected);
 
@@ -62,7 +63,7 @@ class HttpSessionThirdPartyLoginStateRepositoryTest {
     void createsRandomStateAndReplacesThePreviousProviderState() {
         MockHttpServletRequest request = new MockHttpServletRequest();
         ThirdPartyLoginContext context =
-                dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.context(
+                IdentitySourceTestFixtures.context(
                 "GITHUB", "", "test-client", NOW, "/");
 
         String first = repository.create(request, context);
@@ -77,13 +78,13 @@ class HttpSessionThirdPartyLoginStateRepositoryTest {
     void rejectsWrongProviderAndExpiredState() {
         MockHttpServletRequest request = new MockHttpServletRequest();
         String state = repository.create(request,
-                dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.context("GITHUB", "",
+                IdentitySourceTestFixtures.context("GITHUB", "",
                         "test-client", NOW.minusSeconds(301), "/"));
         assertThrows(BadCredentialsException.class, () -> repository.consume(request, "GITHUB", state));
 
         MockHttpServletRequest another = new MockHttpServletRequest();
         String anotherState = repository.create(another,
-                dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.context("GITHUB", "",
+                IdentitySourceTestFixtures.context("GITHUB", "",
                         "test-client", NOW, "/"));
         assertThrows(BadCredentialsException.class,
                 () -> repository.consume(another, "WECOM", anotherState));
@@ -95,7 +96,7 @@ class HttpSessionThirdPartyLoginStateRepositoryTest {
         MockHttpServletRequest createRequest = new MockHttpServletRequest();
         createRequest.setSession(session);
         String state = repository.create(createRequest,
-                dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.context("GITHUB", "",
+                IdentitySourceTestFixtures.context("GITHUB", "",
                         "test-client", NOW, "/"));
         MockHttpServletRequest first = new MockHttpServletRequest();
         first.setSession(session);
@@ -106,7 +107,7 @@ class HttpSessionThirdPartyLoginStateRepositoryTest {
         try {
             var firstResult = executor.submit(() -> consume(first, state));
             var secondResult = executor.submit(() -> consume(second, state));
-            assertEquals(1, java.util.stream.Stream.of(firstResult.get(), secondResult.get())
+            assertEquals(1, Stream.of(firstResult.get(), secondResult.get())
                     .filter(Boolean::booleanValue).count());
         } finally {
             executor.shutdownNow();

@@ -16,27 +16,21 @@
  */
 package dev.macula.cloud.iam.authentication.inapp;
 
-import java.net.URI;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-
-import dev.macula.cloud.iam.pojo.entity.SysOAuth2Client;
-import dev.macula.cloud.iam.service.client.SysOAuth2ClientService;
+import dev.macula.cloud.iam.service.application.LoginApplicationResolver;
+import dev.macula.cloud.iam.service.application.LoginApplicationResolver.Selection;
 import dev.macula.cloud.iam.service.identity.IdentityProviderConfigService;
 import dev.macula.cloud.iam.service.userdetails.SysUserDetails;
 import dev.macula.cloud.system.enums.ExternalCodeType;
+import dev.macula.cloud.system.enums.IamWebLoginMode;
 import dev.macula.cloud.system.enums.IdentityLoginCapability;
-import dev.macula.cloud.system.enums.OAuth2ClientApplicationType;
-import dev.macula.cloud.system.security.OAuth2ApplicationLoginPolicy;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationServiceException;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
-import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
-import org.springframework.security.web.savedrequest.SavedRequest;
 import org.springframework.stereotype.Service;
 
 /**
@@ -53,89 +47,67 @@ public class InAppLoginPolicyService {
     public static final String USER_ID = "userId";
     public static final String TENANT_ID = "tenantId";
     public static final String USER_TYPE = "userType";
-    private final SysOAuth2ClientService clients;
+    private final LoginApplicationResolver applications;
     private final IdentityProviderConfigService sources;
-    private final AuthorizationServerSettings settings;
-    private final tools.jackson.databind.json.JsonMapper json = tools.jackson.databind.json.JsonMapper.builder()
-            .enable(tools.jackson.core.StreamReadFeature.STRICT_DUPLICATE_DETECTION).build();
-    private final HttpSessionRequestCache requests = new HttpSessionRequestCache();
 
     /**
      * 只从Session中由授权链保存的请求恢复应用，不信任登录页的client_id参数。
      */
-    public Optional<SysOAuth2Client> savedClient(HttpServletRequest request, HttpServletResponse response) {
-        SavedRequest saved = requests.getRequest(request, response);
-        if (saved == null) {
-            return Optional.empty();
-        }
-        SysOAuth2Client client = clients.getClientByClientId(single(saved, "client_id"));
-        if (client == null || !"IN_APP".equals(client.getApplicationType())) {
-            return Optional.empty();
-        }
-        var uri = URI.create(saved.getRedirectUrl());
-        if (!(request.getContextPath() + settings.getAuthorizationEndpoint()).equals(uri.getRawPath())
-                || uri.getRawFragment() != null || !"code".equals(single(saved, "response_type"))) {
-            throw denied();
-        }
-        var configuration = dev.macula.cloud.iam.protocol.oauth2.OAuth2ClientProtocolPolicy.configuration(client,
-                dev.macula.cloud.iam.protocol.oauth2.ApplicationProtocolResolver.requested(
-                        java.util.Set.of(single(saved, "scope").trim().split("\\s+"))));
-        var configured = dev.macula.cloud.system.protocol.OAuth2ProtocolConfiguration.settings(configuration);
-        if (!dev.macula.cloud.system.protocol.OAuth2ProtocolConfiguration.csv(configured.getRedirectUris())
-                .contains(single(saved, "redirect_uri"))) {
-            throw denied();
-        }
-        return Optional.of(client);
+    public Optional<Selection> savedClient(HttpServletRequest request, HttpServletResponse response) {
+        return applications.resolve(request, response).filter(selection -> inApp(selection));
     }
 
-    /**
-     * 返回当前权威配置，过滤器只临时隔离其请求，不保存匿名Session。
-     */
-    public SysOAuth2Client current(String clientId) {
-        return clients.getClientByClientId(clientId);
+    /** 返回可信引用当前对应的应用；不保存匿名Session。 */
+    public Selection current(String reference) {
+        var app = applications.trusted(reference, null, false);
+        return app == null ? null : new Selection(reference, app);
     }
 
-    /**
-     * 必须恰好一个合法端内能力，且注册仍启用；不取第一条猜测默认。
-     */
-    public IdentityProviderConfigService.ProviderConfig source(SysOAuth2Client client) {
+    /** 必须恰好一个合法端内能力，且来源仍启用，不取第一条猜测默认。 */
+    public IdentityProviderConfigService.ProviderConfig source(Selection selection) {
         try {
-            Map<String, Long> browser = client.getBrowserCapabilityBindings() == null ? Map.of()
-                    : json.readValue(client.getBrowserCapabilityBindings(),
-                    new tools.jackson.core.type.TypeReference<Map<String, Long>>() {
-                    });
-            Map<String, Long> external = client.getExternalProviderBindings();
-            OAuth2ApplicationLoginPolicy.validate(OAuth2ClientApplicationType.IN_APP, null, browser, external, true);
-            IdentityLoginCapability capability;
-            Long registration;
-            if (!browser.isEmpty()) {
-                var entry = browser.entrySet().iterator().next();
-                capability = IdentityLoginCapability.fromValue(entry.getKey());
-                registration = entry.getValue();
-            } else {
-                var entry = external.entrySet().iterator().next();
-                capability = IdentityLoginCapability.forCode(ExternalCodeType.fromValue(entry.getKey()));
-                registration = entry.getValue();
+            var app = selection.application();
+            if (!inApp(selection) || !app.loginEnabled() || app.login().sources().size() != 1) {
+                throw denied();
             }
-            return sources.requireEnabledById(registration, capability.source().providerType())
-                    .forCapability(capability.value());
-        } catch (RuntimeException ex) {
+            var entry = app.login().sources().entrySet().iterator().next();
+            var capability = entry.getKey();
+            // 协议适配器复核该能力的grant许可，公共策略不解析OAuth设置。
+            var current = applications.trusted(selection.reference(), capability, false);
+            if (current == null || !Objects.equals(current.authorizationVersion(), app.authorizationVersion())
+                || !Objects.equals(current.login(), app.login())) {
+                throw denied();
+            }
+            return sources.requireEnabledById(entry.getValue(), capability.source().providerType())
+                .forCapability(capability.value());
+        } catch (RuntimeException error) {
             throw denied();
         }
+    }
+
+    /** 只允许Web/SPA创建时选定的端内模式。 */
+    public boolean inApp(Selection selection) {
+        if (selection == null) {
+            return false;
+        }
+        var login = selection.application().login();
+        return login.type() != null && IamWebLoginMode.isInApp(login.type().name(),
+            login.webLoginMode() == null ? null : login.webLoginMode().value());
     }
 
     /**
      * 每次授权和成果发布重查当前来源/Client版本，校验无副作用。
      */
-    public boolean validProof(SysOAuth2Client client, Authentication authentication, Map<String, Object> proof,
+    public boolean validProof(Selection selection, Authentication authentication, Map<String, Object> proof,
             String entryPoint) {
         try {
+            var client = selection.application();
             if (authentication == null || !authentication.isAuthenticated()
                     || !(authentication.getPrincipal() instanceof SysUserDetails user) || !user.isEnabled()
-                    || user.getUserId() == null || !Objects.equals(user.getTenantId(), client.getTenantId())) {
+                    || user.getUserId() == null || !Objects.equals(user.getTenantId(), client.tenantId())) {
                 return false;
             }
-            var source = source(client);
+            var source = source(selection);
             if (!(proof.get("registrationId") instanceof Number id) || id.longValue() != source.registrationId()
                     || !(proof.get("sourceVersion") instanceof Number version) ||
                     version.longValue() != source.version()
@@ -147,13 +119,13 @@ public class InAppLoginPolicyService {
                 return IdentityLoginCapability.fromValue(source.loginCapability()).code() != null;
             }
             return IdentityLoginCapability.fromValue(source.loginCapability()).browser()
-                    && client.getClientId().equals(proof.get(CLIENT_ID))
+                    && selection.reference().equals(proof.get(CLIENT_ID))
                     && proof.get(CLIENT_VERSION) instanceof Number clientVersion &&
-                    client.getAuthorizationVersion() != null
-                    && clientVersion.longValue() == client.getAuthorizationVersion()
+                    client.authorizationVersion() != null
+                    && clientVersion.longValue() == client.authorizationVersion()
                     && Objects.equals(user.getUserId(), proof.get(USER_ID)) &&
                     Objects.equals(user.getTenantId(), proof.get(TENANT_ID))
-                    && client.getUserType() != null && client.getUserType().name().equals(proof.get(USER_TYPE));
+                    && client.accountUserType() != null && client.accountUserType().name().equals(proof.get(USER_TYPE));
         } catch (RuntimeException ex) {
             return false;
         }
@@ -168,21 +140,10 @@ public class InAppLoginPolicyService {
             return;
         }
         var client = current(clientId);
-        if (client != null && "IN_APP".equals(client.getApplicationType()) &&
+        if (inApp(client) &&
                 !validProof(client, authentication, proof, entryPoint)) {
             throw denied();
         }
-    }
-
-    /**
-     * 缺失和重复参数不降级为普通门户。
-     */
-    private String single(SavedRequest saved, String key) {
-        String[] values = saved.getParameterValues(key);
-        if (values == null || values.length != 1 || values[0].isBlank()) {
-            throw denied();
-        }
-        return values[0];
     }
 
     /**

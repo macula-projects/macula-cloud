@@ -77,7 +77,7 @@ public class HostedUserDetailsService implements UserDetailsService, UserDetails
     private UserDetails load(String identifier, ClientAccountDetailsService.IdentifierType kind) {
         var context = HostedLoginClientPolicyService.context(getCurrentRequest());
         var client = context.client();
-        return accounts.loadForHostedLogin(context.clientId(), client == null ? 1L : client.getTenantId(),
-                client == null ? UserTypeEnum.EMPLOYEE : client.getUserType(), identifier, kind);
+        return accounts.loadForHostedLogin(context.clientId(), client == null ? 1L : client.tenantId(),
+                client == null ? UserTypeEnum.EMPLOYEE : client.accountUserType(), identifier, kind);
     }
 }

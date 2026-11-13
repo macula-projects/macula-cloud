@@ -16,15 +16,20 @@
  */
 package dev.macula.cloud.iam.authentication.verification;
 
+import java.io.IOException;
 import java.net.ServerSocket;
+import java.net.Socket;
 import java.nio.file.Files;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.Test;
 import org.redisson.Redisson;
+import org.redisson.api.RedissonClient;
 import org.redisson.config.Config;
 import org.redisson.spring.data.connection.RedissonConnectionFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -73,12 +78,12 @@ class VerificationCodeServiceTest {
         var log = Files.createTempFile("iam-email-redis-", ".log");
         Process process = new ProcessBuilder("redis-server", "--bind", "127.0.0.1", "--port", Integer.toString(port),
                 "--save", "", "--appendonly", "no").redirectErrorStream(true).redirectOutput(log.toFile()).start();
-        org.redisson.api.RedissonClient client = null;
+        RedissonClient client = null;
         try {
             for (int i = 0; i < 100; i++) {
-                try (var socket = new java.net.Socket("127.0.0.1", port)) {
+                try (var socket = new Socket("127.0.0.1", port)) {
                     break;
-                } catch (java.io.IOException ex) {
+                } catch (IOException ex) {
                     Thread.sleep(20);
                 }
             }
@@ -99,7 +104,7 @@ class VerificationCodeServiceTest {
             var start = new CountDownLatch(1);
             var executor = Executors.newFixedThreadPool(8);
             try {
-                var calls = new ArrayList<java.util.concurrent.Future<Boolean>>();
+                var calls = new ArrayList<Future<Boolean>>();
                 for (int i = 0; i < 8; i++) {
                     calls.add(executor.submit(() -> {
                         start.await();
@@ -131,7 +136,7 @@ class VerificationCodeServiceTest {
                 client.shutdown();
             }
             process.destroy();
-            if (!process.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)) {
+            if (!process.waitFor(5, TimeUnit.SECONDS)) {
                 process.destroyForcibly();
                 process.waitFor();
             }

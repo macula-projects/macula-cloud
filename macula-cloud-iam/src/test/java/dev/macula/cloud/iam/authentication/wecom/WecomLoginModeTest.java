@@ -18,6 +18,8 @@ package dev.macula.cloud.iam.authentication.wecom;
 
 import java.util.Map;
 
+import dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures;
+import dev.macula.cloud.system.enums.IdentitySourceType;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 
@@ -48,8 +50,8 @@ class WecomLoginModeTest {
     @Test
     void buildsCorpAppAndWebviewUrlsWithTheSameCallback() {
         WecomClient client = new WecomClient();
-        var config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(
-                dev.macula.cloud.system.enums.IdentitySourceType.WECOM_WEB,
+        var config = IdentitySourceTestFixtures.source(
+                IdentitySourceType.WECOM_WEB,
                 "WECOM", "corp", "secret", Map.of("corpId", "corp", "agentId", "agent"));
         String callback = "https://iam.example/login/wecom";
         String browser = client.authorizationUri(config, "state-value", callback, WecomLoginMode.BROWSER);

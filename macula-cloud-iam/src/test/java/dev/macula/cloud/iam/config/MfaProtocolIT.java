@@ -16,14 +16,62 @@
  */
 package dev.macula.cloud.iam.config;
 
+import dev.macula.cloud.iam.authentication.dingtalk.DingtalkClient;
+import dev.macula.cloud.iam.authentication.feishu.FeishuClient;
+import dev.macula.cloud.iam.authentication.github.GithubClient;
 import dev.macula.cloud.iam.authentication.mfa.AdditionalAuthenticationRequiredException;
 import dev.macula.cloud.iam.authentication.mfa.AuthenticationCheckpoint;
 import dev.macula.cloud.iam.authentication.mfa.AuthenticationCompletionContext;
+import dev.macula.cloud.iam.authentication.mfa.AuthenticationMethod;
 import dev.macula.cloud.iam.authentication.mfa.MfaCompletionPolicy;
+import dev.macula.cloud.iam.authentication.mfa.MfaCompletionService;
+import dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyLoginContext;
+import dev.macula.cloud.iam.authentication.thirdparty.VerifiedExternalIdentity;
+import dev.macula.cloud.iam.authentication.thirdparty.binding.ThirdPartyBindingService;
+import dev.macula.cloud.iam.authentication.thirdparty.browser.ThirdPartyIdentityResolutionService;
+import dev.macula.cloud.iam.authentication.verification.VerificationCodeChannelService;
+import dev.macula.cloud.iam.authentication.verification.VerificationCodeContext;
+import dev.macula.cloud.iam.authentication.wechat.WechatClient;
+import dev.macula.cloud.iam.authentication.wecom.WecomClient;
+import dev.macula.cloud.iam.enums.UserTypeEnum;
+import dev.macula.cloud.iam.mapper.SysIamApplicationIdentityProviderMapper;
+import dev.macula.cloud.iam.mapper.SysIdentityProviderMapper;
+import dev.macula.cloud.iam.pojo.entity.SysIamApplicationIdentityProvider;
+import dev.macula.cloud.iam.pojo.entity.SysIdentityProvider;
+import dev.macula.cloud.iam.pojo.entity.SysUser;
+import dev.macula.cloud.iam.protocol.oauth2.ProtocolTestFixtures;
+import dev.macula.cloud.iam.protocol.oauth2.client.OAuth2ClientRegistration;
+import dev.macula.cloud.iam.protocol.oauth2.client.OAuth2ClientRegistrationService;
+import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeAccountResolver;
+import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeVerification;
+import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeVerifier;
+import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeVerifierRegistry;
+import dev.macula.cloud.iam.service.account.ClientAwareAccountResolver;
+import dev.macula.cloud.iam.service.identity.IdentityProviderConfigService;
+import dev.macula.cloud.iam.service.userdetails.SysUserDetails;
+import dev.macula.cloud.system.enums.ExternalCodeType;
+import dev.macula.cloud.system.protocol.OAuth2ProtocolConfiguration;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentMatchers;
+import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.mock.web.MockHttpSession;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationCode;
+import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsentService;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
 import org.springframework.test.annotation.DirtiesContext;
@@ -34,6 +82,7 @@ import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.test.context.web.WebAppConfiguration;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.context.WebApplicationContext;
+import org.springframework.web.util.UriComponentsBuilder;
 import tools.jackson.databind.json.JsonMapper;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -70,22 +119,27 @@ import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppC
         "macula.cloud.iam.email-verification.digest-key=fixture-digest-key",
         "macula.cloud.iam.login-captcha.digest-key=fixture-digest-key"})
 class MfaProtocolIT {
+    @MockitoBean(name = "smsCodeService")
+    private VerificationCodeChannelService fixtureSmsCodes;
+    @MockitoBean(name = "emailCodeService")
+    private VerificationCodeChannelService fixtureEmailCodes;
+
     @Autowired
     private WebApplicationContext context;
     @MockitoBean
     private MfaCompletionPolicy policy;
     @MockitoBean
-    private dev.macula.cloud.iam.authentication.github.GithubClient github;
+    private GithubClient github;
     @MockitoBean
-    private dev.macula.cloud.iam.authentication.wecom.WecomClient wecom;
+    private WecomClient wecom;
     @MockitoBean
-    private dev.macula.cloud.iam.authentication.feishu.FeishuClient feishu;
+    private FeishuClient feishu;
     @MockitoBean
-    private dev.macula.cloud.iam.authentication.dingtalk.DingtalkClient dingtalk;
+    private DingtalkClient dingtalk;
     @MockitoBean
-    private dev.macula.cloud.iam.authentication.wechat.WechatClient wechat;
+    private WechatClient wechat;
     @MockitoBean
-    private dev.macula.cloud.iam.authentication.thirdparty.browser.ThirdPartyIdentityResolutionService identities;
+    private ThirdPartyIdentityResolutionService identities;
 
     private IamProtocolTest fixture;
     private MockMvc mvc;
@@ -145,7 +199,7 @@ class MfaProtocolIT {
         for (String client : new String[]{"public", "jwt"}) {
             reset(policy);
             String code = fixture.authorize(client, fixture.login());
-            var checks = new java.util.concurrent.atomic.AtomicInteger();
+            var checks = new AtomicInteger();
             doAnswer(call -> {
                 if (checks.incrementAndGet() == 2) {
                     throw new AdditionalAuthenticationRequiredException();
@@ -172,7 +226,7 @@ class MfaProtocolIT {
     void existingSsoCannotPublishNewAuthorizationCode() throws Exception {
         MockHttpSession session = fixture.login();
         fixture.authorize("public", session);
-        org.mockito.Mockito.clearInvocations(policy);
+        Mockito.clearInvocations(policy);
         doAnswer(call -> {
             AuthenticationCompletionContext completion = call.getArgument(0);
             if (completion.checkpoint() == AuthenticationCheckpoint.AUTHORIZATION_CODE) {
@@ -188,14 +242,14 @@ class MfaProtocolIT {
                 .andReturn();
         String location = result.getResponse().getRedirectedUrl();
         // Spring 7授权端点对无可续转上下文的发布失败使用sendError，不返回授权码。
-        org.mockito.Mockito.verify(policy).check(org.mockito.ArgumentMatchers.argThat(
+        Mockito.verify(policy).check(ArgumentMatchers.argThat(
                 completion -> completion.checkpoint() == AuthenticationCheckpoint.AUTHORIZATION_CODE));
         assertEquals(400, result.getResponse().getStatus());
         assertTrue(result.getResponse().getErrorMessage() != null
                         && result.getResponse().getErrorMessage().contains("server_error"),
                 result.getResponse().getErrorMessage());
         assertFalse(location != null && location.contains("code="));
-        org.mockito.Mockito.verify(policy).check(org.mockito.ArgumentMatchers.argThat(
+        Mockito.verify(policy).check(ArgumentMatchers.argThat(
                 completion -> completion.checkpoint() == AuthenticationCheckpoint.AUTHORIZATION_CODE));
         assertTrue(session.getAttribute("SPRING_SECURITY_CONTEXT") != null);
     }
@@ -223,29 +277,35 @@ class MfaProtocolIT {
     }
 
     /**
-     * 短信完成核验后仍经过相同会话门禁，不需要开启短信Token grant。
+     * 短信和邮箱完成核验后仍经过相同会话门禁，不开启验证码Token grant。
      */
-    @Test
-    void hostedSmsDenialDoesNotCreateSso() throws Exception {
-        var client = context.getBean(dev.macula.cloud.iam.service.client.SysOAuth2ClientService.class)
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void verificationCodeBrowserDenialDoesNotPublishSession(boolean email) throws Exception {
+        var client = context.getBean(OAuth2ClientRegistrationService.class)
                 .getClientByClientId("public");
-        client.setHostedLoginMethods("SMS");
-        org.mockito.Mockito.when(context.getBean(dev.macula.cloud.iam.authentication.sms.SmsService.class)
-                .verifyCode("13800000000", "fixture-code", "public")).thenReturn(true);
-        var account = new dev.macula.cloud.iam.pojo.entity.SysUser();
+        client.setHostedLoginMethods(email ? "EMAIL" : "SMS");
+        String target = email ? "alice@example.test" : "13800000000";
+        Mockito.when(context.getBean(email ? "emailCodeService" : "smsCodeService", VerificationCodeChannelService.class)
+                .verifyCode(target, "123456", VerificationCodeContext.login("public"))).thenReturn(true);
+        var account = new SysUser();
         account.setId(42L);
         account.setUsername("fixture-user");
-        org.mockito.Mockito.when(context.getBean(dev.macula.cloud.iam.service.account.ClientAwareAccountResolver.class)
-                        .findByMobile(dev.macula.cloud.iam.enums.UserTypeEnum.EMPLOYEE, "13800000000"))
-                .thenReturn(java.util.Optional.of(account));
+        Mockito.when(context.getBean(ClientAwareAccountResolver.class)
+                        .findByMobile(UserTypeEnum.EMPLOYEE, "13800000000"))
+                .thenReturn(Optional.of(account));
         doThrow(new AdditionalAuthenticationRequiredException()).when(policy).check(any());
-        var result = mvc.perform(post("/login/sms").session(fixture.browserAuthorizationSession()).with(csrf())
-                        .param("phone", "13800000000").param("code", "fixture-code"))
+        if (email) {
+            Mockito.when(context.getBean(ClientAwareAccountResolver.class).findByEmail(ArgumentMatchers.eq(UserTypeEnum.EMPLOYEE), any()))
+                    .thenReturn(Optional.of(account));
+        }
+        var result = mvc.perform(post(email ? "/login/email" : "/login/sms").session(fixture.browserAuthorizationSession()).with(csrf())
+                        .param(email ? "email" : "phone", target).param("code", "123456"))
                 .andExpect(status().isServiceUnavailable()).andReturn();
         assertNull(result.getRequest().getSession().getAttribute("SPRING_SECURITY_CONTEXT"));
-        org.mockito.Mockito.verify(policy).check(org.mockito.ArgumentMatchers.argThat(completion ->
+        Mockito.verify(policy).check(ArgumentMatchers.argThat(completion ->
                 completion.checkpoint() == AuthenticationCheckpoint.BROWSER_SESSION
-                        && completion.method() == dev.macula.cloud.iam.authentication.mfa.AuthenticationMethod.SMS));
+                        && completion.method() == (email ? AuthenticationMethod.EMAIL : AuthenticationMethod.SMS)));
     }
 
     /**
@@ -254,26 +314,26 @@ class MfaProtocolIT {
     @Test
     void everyBrowserProviderIsCheckedBeforeSessionPublication() throws Exception {
         var user = user();
-        org.mockito.Mockito.when(identities.resolve(any(), any())).thenReturn(user);
-        org.mockito.Mockito.when(github.authorizationUri(any(), any(), any()))
+        Mockito.when(identities.resolve(any(), any())).thenReturn(user);
+        Mockito.when(github.authorizationUri(any(), any(), any()))
                 .thenAnswer(call -> authorization(call.getArgument(1)));
-        org.mockito.Mockito.when(wecom.authorizationUri(any(), any(), any(), any()))
+        Mockito.when(wecom.authorizationUri(any(), any(), any(), any()))
                 .thenAnswer(call -> authorization(call.getArgument(1)));
-        org.mockito.Mockito.when(feishu.authorizationUri(any(), any(), any(), any()))
+        Mockito.when(feishu.authorizationUri(any(), any(), any(), any()))
                 .thenAnswer(call -> authorization(call.getArgument(1)));
-        org.mockito.Mockito.when(dingtalk.authorizationUri(any(), any(), any(), any()))
+        Mockito.when(dingtalk.authorizationUri(any(), any(), any(), any()))
                 .thenAnswer(call -> authorization(call.getArgument(1)));
-        org.mockito.Mockito.when(wechat.authorizationUri(any(), any(), any(), any()))
+        Mockito.when(wechat.authorizationUri(any(), any(), any(), any()))
                 .thenAnswer(call -> authorization(call.getArgument(1)));
-        org.mockito.Mockito.when(github.fetchSubject(any(), any(), any())).thenReturn("fixture-subject");
-        org.mockito.Mockito.when(wecom.fetchUserId(any(), any())).thenReturn("fixture-member");
-        org.mockito.Mockito.when(dingtalk.fetchUserId(any(), any(), any())).thenReturn("fixture-member");
-        org.mockito.Mockito.when(wechat.fetchOpenId(any(), any(), any())).thenReturn("fixture-open-id");
-        org.mockito.Mockito.when(feishu.fetchIdentity(any(), any(), any(), any(), any())).thenAnswer(call ->
-                dev.macula.cloud.iam.authentication.thirdparty.VerifiedExternalIdentity.of(call.getArgument(0),
-                        dev.macula.cloud.iam.authentication.thirdparty.VerifiedExternalIdentity.BROWSER,
-                        dev.macula.cloud.iam.authentication.thirdparty.VerifiedExternalIdentity.OPEN_ID,
-                        "fixture-open-id", java.util.Map.of()));
+        Mockito.when(github.fetchSubject(any(), any(), any())).thenReturn("fixture-subject");
+        Mockito.when(wecom.fetchUserId(any(), any())).thenReturn("fixture-member");
+        Mockito.when(dingtalk.fetchUserId(any(), any(), any())).thenReturn("fixture-member");
+        Mockito.when(wechat.fetchOpenId(any(), any(), any())).thenReturn("fixture-open-id");
+        Mockito.when(feishu.fetchIdentity(any(), any(), any(), any(), any())).thenAnswer(call ->
+                VerifiedExternalIdentity.of(call.getArgument(0),
+                        VerifiedExternalIdentity.BROWSER,
+                        VerifiedExternalIdentity.OPEN_ID,
+                        "fixture-open-id", Map.of()));
         doThrow(new AdditionalAuthenticationRequiredException()).when(policy).check(any());
         for (String provider : new String[]{"github", "wecom", "feishu", "dingtalk", "wechat"}) {
             var session = fixture.browserAuthorizationSession();
@@ -286,11 +346,11 @@ class MfaProtocolIT {
             assertNull(session.getAttribute("SPRING_SECURITY_CONTEXT"));
             assertNull(result.getResponse().getCookie("remember-me"));
         }
-        org.mockito.Mockito.verify(policy, org.mockito.Mockito.times(5))
-                .check(org.mockito.ArgumentMatchers.argThat(completion ->
+        Mockito.verify(policy, Mockito.times(5))
+                .check(ArgumentMatchers.argThat(completion ->
                         completion.checkpoint() == AuthenticationCheckpoint.BROWSER_SESSION
                                 && completion.method() ==
-                                dev.macula.cloud.iam.authentication.mfa.AuthenticationMethod.EXTERNAL
+                                AuthenticationMethod.EXTERNAL
                                 && completion.registrationId() != null));
     }
 
@@ -300,13 +360,13 @@ class MfaProtocolIT {
     @Test
     void bindingSessionIsGuardedAndSdkBindingDoesNotCreateSso() throws Exception {
         var binding = context.getBean(
-                dev.macula.cloud.iam.authentication.thirdparty.binding.ThirdPartyBindingService.class);
-        var external = new dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyLoginContext("GITHUB", "",
-                "public", java.time.Instant.now(), "/", 1L, "GITHUB_OAUTH", 1L,
-                dev.macula.cloud.iam.enums.UserTypeEnum.EMPLOYEE, 0L, "GITHUB_OAUTH_V1",
+                ThirdPartyBindingService.class);
+        var external = new ThirdPartyLoginContext("GITHUB", "",
+                "public", Instant.now(), "/", 1L, "GITHUB_OAUTH", 1L,
+                UserTypeEnum.EMPLOYEE, 0L, "GITHUB_OAUTH_V1",
                 "https://iam.example/login/github");
-        org.mockito.Mockito.when(binding.bind(any(), any(), any(), any(), any(), any(), any())).thenReturn(
-                new dev.macula.cloud.iam.authentication.thirdparty.binding.ThirdPartyBindingService.BoundAccount(user(),
+        Mockito.when(binding.bind(any(), any(), any(), any(), any(), any(), any())).thenReturn(
+                new ThirdPartyBindingService.BoundAccount(user(),
                         "/", false,
                         external, "password"));
         doThrow(new AdditionalAuthenticationRequiredException()).when(policy).check(any());
@@ -314,13 +374,13 @@ class MfaProtocolIT {
                         .param("method", "password").param("password", "fixture-password"))
                 .andExpect(status().isServiceUnavailable()).andReturn();
         assertNull(blocked.getRequest().getSession().getAttribute("SPRING_SECURITY_CONTEXT"));
-        org.mockito.Mockito.verify(policy).check(org.mockito.ArgumentMatchers.argThat(completion ->
+        Mockito.verify(policy).check(ArgumentMatchers.argThat(completion ->
                 completion.checkpoint() == AuthenticationCheckpoint.BINDING_SESSION
                         &&
-                        completion.method() == dev.macula.cloud.iam.authentication.mfa.AuthenticationMethod.PASSWORD));
+                        completion.method() == AuthenticationMethod.PASSWORD));
         reset(policy);
-        org.mockito.Mockito.when(binding.bind(any(), any(), any(), any(), any(), any(), any())).thenReturn(
-                new dev.macula.cloud.iam.authentication.thirdparty.binding.ThirdPartyBindingService.BoundAccount(user(),
+        Mockito.when(binding.bind(any(), any(), any(), any(), any(), any(), any())).thenReturn(
+                new ThirdPartyBindingService.BoundAccount(user(),
                         "/", true,
                         external, "password"));
         var sdk = mvc.perform(post("/login/bind").with(csrf()).param("username", "fixture-user")
@@ -337,7 +397,7 @@ class MfaProtocolIT {
     void consentCannotPublishAuthorizationCodeWhenMfaDenies() throws Exception {
         var session = fixture.login();
         var consents = context.getBean(
-                org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsentService.class);
+                OAuth2AuthorizationConsentService.class);
         var previous = consents.findById("public", "fixture-user");
         if (previous != null) {
             consents.remove(previous);
@@ -358,7 +418,7 @@ class MfaProtocolIT {
         var stored = context.getBean(OAuth2AuthorizationService.class).findByToken(state, new OAuth2TokenType("state"));
         assertTrue(stored != null);
         assertNull(stored.getToken(
-                org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationCode.class));
+                OAuth2AuthorizationCode.class));
         assertNull(stored.getAccessToken());
     }
 
@@ -367,8 +427,8 @@ class MfaProtocolIT {
      */
     @Test
     void sdkDirectGrantDenialIsTokenErrorWithoutSso() throws Exception {
-        var type = dev.macula.cloud.system.enums.ExternalCodeType.WECHAT_MINIAPP_LOGIN_CODE;
-        var source = new dev.macula.cloud.iam.pojo.entity.SysIdentityProvider();
+        var type = ExternalCodeType.WECHAT_MINIAPP_LOGIN_CODE;
+        var source = new SysIdentityProvider();
         source.setId(7L);
         source.setProviderType("WECHAT");
         source.setSourceType("WECHAT_MINIAPP");
@@ -377,53 +437,53 @@ class MfaProtocolIT {
         source.setAppId("fixture-miniapp");
         source.setAppSecret("fixture-secret");
         source.setConfigJson("{\"appId\":\"fixture-miniapp\"}");
-        org.mockito.Mockito.when(
-                        context.getBean(dev.macula.cloud.iam.mapper.SysIdentityProviderMapper.class).selectById(7L))
+        Mockito.when(
+                        context.getBean(SysIdentityProviderMapper.class).selectById(7L))
                 .thenReturn(source);
-        var client = context.getBean(dev.macula.cloud.iam.service.client.SysOAuth2ClientService.class)
+        var client = context.getBean(OAuth2ClientRegistrationService.class)
                 .getClientByClientId("public");
         client.setApplicationType("MINIAPP");
         client.setMiniappPlatform("WECHAT");
         client.setExternalCodeTypes(type.name());
-        client.setExternalProviderBindings(java.util.Map.of(type.name(), 7L));
-        var settings = dev.macula.cloud.system.protocol.OAuth2ProtocolConfiguration.settings(
+        client.setExternalProviderBindings(Map.of(type.name(), 7L));
+        var settings = OAuth2ProtocolConfiguration.settings(
                 client.getProtocolConfigurations().get(0));
-        settings.setAuthorizationGrantTypes(dev.macula.cloud.system.enums.ExternalCodeType.GRANT_TYPE);
+        settings.setAuthorizationGrantTypes(ExternalCodeType.GRANT_TYPE);
         settings.setRedirectUris("");
         client.setBrowserLoginProviderTypes("");
         client.setBrowserProviderBindings("{}");
-        var binding = new dev.macula.cloud.iam.pojo.entity.SysOAuth2ClientExternalProvider();
-        binding.setCodeType(type.name());
+        var binding = new SysIamApplicationIdentityProvider();
+        binding.setLoginCapability(type.name());
         binding.setIdentityProviderId(7L);
-        org.mockito.Mockito.when(
-                context.getBean(dev.macula.cloud.iam.mapper.SysOAuth2ClientExternalProviderMapper.class)
-                        .selectList(any())).thenReturn(java.util.List.of(binding));
-        var cfg = context.getBean(dev.macula.cloud.iam.service.identity.IdentityProviderConfigService.class)
+        Mockito.when(
+                context.getBean(SysIamApplicationIdentityProviderMapper.class)
+                        .selectList(any())).thenReturn(List.of(binding));
+        var cfg = context.getBean(IdentityProviderConfigService.class)
                 .requireEnabledById(7L, "WECHAT");
-        var verification = new dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeVerification(
-                dev.macula.cloud.iam.authentication.thirdparty.VerifiedExternalIdentity.of(cfg, type.name(),
-                        dev.macula.cloud.iam.authentication.thirdparty.VerifiedExternalIdentity.OPEN_ID,
-                        "fixture-open-id", java.util.Map.of()));
-        var verifier = org.mockito.Mockito.mock(
-                dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeVerifier.class);
-        org.mockito.Mockito.when(context.getBean(
-                        dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeVerifierRegistry.class)
+        var verification = new ExternalCodeVerification(
+                VerifiedExternalIdentity.of(cfg, type.name(),
+                        VerifiedExternalIdentity.OPEN_ID,
+                        "fixture-open-id", Map.of()));
+        var verifier = Mockito.mock(
+                ExternalCodeVerifier.class);
+        Mockito.when(context.getBean(
+                        ExternalCodeVerifierRegistry.class)
                 .require(type)).thenReturn(verifier);
-        org.mockito.Mockito.when(verifier.verify(type, 7L, "fixture-code")).thenReturn(verification);
+        Mockito.when(verifier.verify(type, 7L, "fixture-code")).thenReturn(verification);
         var user = user();
-        var principal = org.springframework.security.authentication.UsernamePasswordAuthenticationToken.authenticated(
+        var principal = UsernamePasswordAuthenticationToken.authenticated(
                 user, null, user.getAuthorities());
-        principal.setDetails(new java.util.HashMap<>(java.util.Map.of(
-                dev.macula.cloud.iam.authentication.mfa.MfaCompletionService.SOURCE_PROOF,
-                dev.macula.cloud.iam.authentication.mfa.MfaCompletionService.verifiedProof(verification.identity()))));
-        org.mockito.Mockito.when(context.getBean(
-                        dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeAccountResolver.class)
-                .resolve(any(), org.mockito.ArgumentMatchers.eq(type), any())).thenReturn(principal);
+        principal.setDetails(new HashMap<>(Map.of(
+                MfaCompletionService.SOURCE_PROOF,
+                MfaCompletionService.verifiedProof(verification.identity()))));
+        Mockito.when(context.getBean(
+                        ExternalCodeAccountResolver.class)
+                .resolve(any(), ArgumentMatchers.eq(type), any())).thenReturn(principal);
         doThrow(new AdditionalAuthenticationRequiredException()).when(policy).check(any());
         for (String format : new String[]{"reference", "self-contained"}) {
             settings.setTokenFormat(format);
             var result = mvc.perform(post("/oauth2/token").param("client_id", "public")
-                            .param("grant_type", dev.macula.cloud.system.enums.ExternalCodeType.GRANT_TYPE)
+                            .param("grant_type", ExternalCodeType.GRANT_TYPE)
                             .param("code_type", type.name()).param("code", "fixture-code").param("scope", "openid " +
                                     "profile")
                             .param("nonce", "fixture-nonce")).andExpect(status().isBadRequest())
@@ -441,10 +501,10 @@ class MfaProtocolIT {
      */
     @Test
     void browserSourceProofSurvivesAuthorizationWithoutLeakingClaims() throws Exception {
-        org.mockito.Mockito.when(github.authorizationUri(any(), any(), any()))
+        Mockito.when(github.authorizationUri(any(), any(), any()))
                 .thenAnswer(call -> authorization(call.getArgument(1)));
-        org.mockito.Mockito.when(github.fetchSubject(any(), any(), any())).thenReturn("fixture-subject");
-        org.mockito.Mockito.when(identities.resolve(any(), any())).thenReturn(user());
+        Mockito.when(github.fetchSubject(any(), any(), any())).thenReturn("fixture-subject");
+        Mockito.when(identities.resolve(any(), any())).thenReturn(user());
         var session = fixture.browserAuthorizationSession();
         var start = mvc.perform(get("/login/github").session(session)).andExpect(status().isFound()).andReturn();
         mvc.perform(get("/login/github").session(session)
@@ -455,14 +515,14 @@ class MfaProtocolIT {
         var result = mvc.perform(fixture.exchange("public", code, fixture.verifier)).andExpect(status().isOk())
                 .andReturn();
         var response = JsonMapper.builder().build().readTree(result.getResponse().getContentAsString());
-        var identity = context.getBean(org.springframework.security.oauth2.jwt.JwtDecoder.class)
+        var identity = context.getBean(JwtDecoder.class)
                 .decode(response.path("id_token").asText());
         assertFalse(identity.getClaims()
-                .containsKey(dev.macula.cloud.iam.authentication.mfa.MfaCompletionService.SOURCE_PROOF));
+                .containsKey(MfaCompletionService.SOURCE_PROOF));
         var stored = context.getBean(OAuth2AuthorizationService.class)
                 .findByToken(response.path("access_token").asText(), OAuth2TokenType.ACCESS_TOKEN);
-        java.util.Map<String, Object> proof = stored.getAttribute(
-                dev.macula.cloud.iam.authentication.mfa.MfaCompletionService.SOURCE_PROOF);
+        Map<String, Object> proof = stored.getAttribute(
+                MfaCompletionService.SOURCE_PROOF);
         assertEquals(1L, ((Number) proof.get("registrationId")).longValue());
     }
 
@@ -471,22 +531,22 @@ class MfaProtocolIT {
      */
     @Test
     void clientCredentialsDoesNotRunUserMfa() throws Exception {
-        var row = new dev.macula.cloud.iam.pojo.entity.SysOAuth2Client();
+        var row = new OAuth2ClientRegistration();
         row.setClientId("machine");
         row.setClientName("machine");
         row.setPurpose("APPLICATION");
         row.setApplicationType("SERVICE");
         row.setClientSecret("{bcrypt}" +
-                new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder().encode("fixture-secret"));
+                new BCryptPasswordEncoder().encode("fixture-secret"));
         row.setClientAuthenticationMethods("client_secret_basic");
         row.setAuthorizationGrantTypes("client_credentials");
         row.setScopes("api.read");
-        row.setEnabledProtocols("OAUTH2_1");
-        row.setDefaultProtocol("OAUTH2_1");
+        ProtocolTestFixtures.configure(row, "OAUTH2_1");
+
         row.setConfigurationStatus("ENABLED");
         row.setTokenFormat("reference");
-        dev.macula.cloud.iam.protocol.oauth2.ProtocolTestFixtures.configure(row);
-        org.mockito.Mockito.when(context.getBean(dev.macula.cloud.iam.service.client.SysOAuth2ClientService.class)
+        ProtocolTestFixtures.configure(row);
+        Mockito.when(context.getBean(OAuth2ClientRegistrationService.class)
                 .getClientByClientId("machine")).thenReturn(row);
         doThrow(new AdditionalAuthenticationRequiredException()).when(policy).check(any());
         mvc.perform(post("/oauth2/token").with(httpBasic("machine", "fixture-secret"))
@@ -499,8 +559,8 @@ class MfaProtocolIT {
     /**
      * 全部认证方式共用的稳定测试账号，不含真实账号或平台凭证。
      */
-    private dev.macula.cloud.iam.service.userdetails.SysUserDetails user() {
-        var user = new dev.macula.cloud.iam.service.userdetails.SysUserDetails();
+    private SysUserDetails user() {
+        var user = new SysUserDetails();
         user.setUserId(42L);
         user.setTenantId(1L);
         user.setUsername("fixture-user");
@@ -519,9 +579,9 @@ class MfaProtocolIT {
      * 只读取可信测试响应中的查询值，不输出Code或票据。
      */
     private String query(String uri, String name) {
-        String encoded = org.springframework.web.util.UriComponentsBuilder.fromUriString(uri).build().getQueryParams()
+        String encoded = UriComponentsBuilder.fromUriString(uri).build().getQueryParams()
                 .getFirst(name);
-        return encoded == null ? null : java.net.URLDecoder.decode(encoded, java.nio.charset.StandardCharsets.UTF_8);
+        return encoded == null ? null : URLDecoder.decode(encoded, StandardCharsets.UTF_8);
     }
 
 }

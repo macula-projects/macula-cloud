@@ -26,12 +26,18 @@ import dev.macula.cloud.iam.authentication.thirdparty.provider.ProviderIntegrati
 import dev.macula.cloud.iam.service.identity.IdentityProviderConfigService;
 import dev.macula.cloud.system.enums.IdentityDirectoryPolicy;
 import dev.macula.cloud.system.enums.IdentitySourceFlow;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.mockito.Mockito;
 import org.springframework.security.authentication.AuthenticationServiceException;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -47,6 +53,7 @@ import static org.mockito.Mockito.when;
  * @author Rain
  * @since 6.1.0
  */
+@ExtendWith(OutputCaptureExtension.class)
 class ProviderDirectoryPolicyServiceTest {
     private final IdentityProviderConfigService configs = mock(IdentityProviderConfigService.class);
     private final IdentityProviderConfigService.ProviderConfig source = mock(
@@ -120,6 +127,20 @@ class ProviderDirectoryPolicyServiceTest {
     }
 
     /**
+     * 准入拒绝可定位状态和策略，但不能暴露组织、主体或资料。
+     */
+    @Test
+    void rejectionLogsOnlyControlledPolicyFields(CapturedOutput output) {
+        when(source.directoryPolicy()).thenReturn(IdentityDirectoryPolicy.REQUIRED);
+        when(adapter.lookup(source, identity)).thenReturn(result(ProviderDirectoryResult.Status.PERMISSION_DENIED, true));
+        assertThrows(AuthenticationServiceException.class, () -> policy.check(identity));
+        assertTrue(output.toString().contains("status=PERMISSION_DENIED"));
+        assertTrue(output.toString().contains("required=true"));
+        assertFalse(output.toString().contains("fixture-corp"));
+        verifyNoInteractions(snapshots, refresh);
+    }
+
+    /**
      * 持有事务时不能调用外部目录，即使已有binding ticket也不能绕过。
      */
     @Test
@@ -157,13 +178,13 @@ class ProviderDirectoryPolicyServiceTest {
         when(adapter.lookup(source, identity)).thenReturn(new ProviderDirectoryResult(
                 ProviderDirectoryResult.Status.MEMBER, "fixture-corp", Map.of("employee_no", "staff-42"), Instant.now(),
                 false));
-        org.mockito.Mockito.doThrow(new IllegalStateException("fixture outage")).when(snapshots).save(any(), any());
+        Mockito.doThrow(new IllegalStateException("fixture outage")).when(snapshots).save(any(), any());
         var admission = policy.check(identity);
         var enriched = policy.enrich(identity, admission);
-        org.junit.jupiter.api.Assertions.assertEquals("staff-42", enriched.attributes().get("employee_no"));
-        org.junit.jupiter.api.Assertions.assertEquals(identity.identityValue(), enriched.identityValue());
-        org.junit.jupiter.api.Assertions.assertEquals(identity.registrationId(), enriched.registrationId());
-        org.junit.jupiter.api.Assertions.assertEquals(identity.sourceVersion(), enriched.sourceVersion());
+        Assertions.assertEquals("staff-42", enriched.attributes().get("employee_no"));
+        Assertions.assertEquals(identity.identityValue(), enriched.identityValue());
+        Assertions.assertEquals(identity.registrationId(), enriched.registrationId());
+        Assertions.assertEquals(identity.sourceVersion(), enriched.sourceVersion());
         var other = IdentitySourceTestFixtures.sdkIdentity("WECOM", "other-member").identity();
         assertThrows(AuthenticationServiceException.class, () -> policy.enrich(other, admission));
     }
@@ -179,7 +200,7 @@ class ProviderDirectoryPolicyServiceTest {
                 Instant.now(), false));
         var admission = policy.check(identity);
         assertTrue(admission.profile().isEmpty());
-        org.junit.jupiter.api.Assertions.assertSame(identity, policy.enrich(identity, admission));
+        Assertions.assertSame(identity, policy.enrich(identity, admission));
         verifyNoInteractions(adapter);
     }
 

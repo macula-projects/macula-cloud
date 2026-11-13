@@ -16,14 +16,16 @@
  */
 package dev.macula.cloud.iam.authentication.hosted;
 
-import java.io.IOException;
-import java.util.Set;
-
-import dev.macula.cloud.system.enums.OAuth2HostedLoginMethod;
+import dev.macula.cloud.iam.authentication.email.EmailCodeAuthenticationFilter;
+import dev.macula.cloud.iam.controller.EmailCodeController;
+import dev.macula.cloud.system.enums.HostedLoginMethod;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.util.Set;
+import org.springframework.security.authentication.AuthenticationServiceException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -35,9 +37,9 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * @since 6.1.0
  */
 public class HostedLoginPolicyFilter extends OncePerRequestFilter {
-    private static final String EMAIL_CODE_PATH = dev.macula.cloud.iam.controller.EmailCodeController.PATH;
+    private static final String EMAIL_CODE_PATH = EmailCodeController.PATH;
     private static final String EMAIL_LOGIN_PATH =
-            dev.macula.cloud.iam.authentication.email.EmailCodeAuthenticationFilter.PATH;
+            EmailCodeAuthenticationFilter.PATH;
     private static final String SMS_CODE_PATH = "/api/v1/sms-code";
     private static final Set<String> PATHS = Set.of("/login", "/login/sms", SMS_CODE_PATH, EMAIL_CODE_PATH,
             EMAIL_LOGIN_PATH);
@@ -75,12 +77,12 @@ public class HostedLoginPolicyFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
         try {
             HostedLoginClientPolicyService.Context context = policy.resolve(request, response);
-            OAuth2HostedLoginMethod method = "/login".equals(path(request))
-                    ? OAuth2HostedLoginMethod.PASSWORD :
+            HostedLoginMethod method = "/login".equals(path(request))
+                    ? HostedLoginMethod.PASSWORD :
                     EMAIL_LOGIN_PATH.equals(path(request)) || EMAIL_CODE_PATH.equals(path(request))
-                            ? OAuth2HostedLoginMethod.EMAIL : OAuth2HostedLoginMethod.SMS;
+                            ? HostedLoginMethod.EMAIL : HostedLoginMethod.SMS;
             if (!context.methods().contains(method)) {
-                throw new org.springframework.security.authentication.AuthenticationServiceException(
+                throw new AuthenticationServiceException(
                         "当前应用不允许该登录方式");
             }
             request.setAttribute(HostedLoginClientPolicyService.CONTEXT_ATTRIBUTE, context);

@@ -18,6 +18,7 @@ package dev.macula.cloud.iam.authentication.thirdparty;
 
 import java.util.Arrays;
 import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 import dev.macula.cloud.iam.enums.UserTypeEnum;
 import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeSecurityProperties;
@@ -41,7 +42,7 @@ class ExternalBindingTicketStoreTest {
             return Arrays.stream(values).flatMap(ExternalBindingTicketStoreTest::strings);
         }
         if (value instanceof Iterable<?> values) {
-            return java.util.stream.StreamSupport.stream(values.spliterator(), false)
+            return StreamSupport.stream(values.spliterator(), false)
                     .flatMap(ExternalBindingTicketStoreTest::strings);
         }
         return Stream.of(String.valueOf(value));
@@ -60,9 +61,9 @@ class ExternalBindingTicketStoreTest {
         ExternalBindingTicketStore store = new ExternalBindingTicketStore(redis, properties);
 
         String mobileTicket = store.issue("client-a", 1L, UserTypeEnum.EMPLOYEE,
-                dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.mobile("13800000000"));
+                IdentitySourceTestFixtures.mobile("13800000000"));
         String identityTicket = store.issue("client-a", 1L, UserTypeEnum.EMPLOYEE,
-                dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.sdkIdentity("WECOM",
+                IdentitySourceTestFixtures.sdkIdentity("WECOM",
                         "member-sensitive-subject"));
 
         String redisArguments = mockingDetails(redis).getInvocations().stream()

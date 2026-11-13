@@ -16,6 +16,9 @@
  */
 package dev.macula.cloud.iam.authentication.email;
 
+import dev.macula.cloud.iam.authentication.sms.SmsAuthenticationToken;
+import dev.macula.cloud.iam.authentication.verification.VerificationCodeChannelService;
+import dev.macula.cloud.iam.authentication.verification.VerificationCodeContext;
 import dev.macula.cloud.iam.service.userdetails.SysUserDetails;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -39,12 +42,12 @@ class EmailCodeAuthenticationProviderTest {
      */
     @Test
     void successClearsCredentialsAndChecksAccount() {
-        var codes = mock(EmailCodeService.class);
+        var codes = mock(VerificationCodeChannelService.class);
         var users = mock(EmailUserDetailsService.class);
         var principal = new SysUserDetails();
         principal.setUsername("alice");
         principal.setEnabled(true);
-        when(codes.verify("alice@example.test", "123456", "client-a")).thenReturn(true);
+        when(codes.verifyCode("alice@example.test", "123456", VerificationCodeContext.login("client-a"))).thenReturn(true);
         when(users.loadUserByEmail("alice@example.test")).thenReturn(principal);
         var provider = new EmailCodeAuthenticationProvider(codes, users);
         var result = provider.authenticate(
@@ -63,13 +66,13 @@ class EmailCodeAuthenticationProviderTest {
      */
     @Test
     void rejectsBeforeDirectoryLookup() {
-        var codes = mock(EmailCodeService.class);
+        var codes = mock(VerificationCodeChannelService.class);
         var users = mock(EmailUserDetailsService.class);
         var provider = new EmailCodeAuthenticationProvider(codes, users);
         assertThatThrownBy(() -> provider.authenticate(
                 new EmailCodeAuthenticationToken("alice@example.test", "000000", "client-b")))
                 .isInstanceOf(BadCredentialsException.class);
         verifyNoInteractions(users);
-        assertThat(provider.supports(dev.macula.cloud.iam.authentication.sms.SmsAuthenticationToken.class)).isFalse();
+        assertThat(provider.supports(SmsAuthenticationToken.class)).isFalse();
     }
 }

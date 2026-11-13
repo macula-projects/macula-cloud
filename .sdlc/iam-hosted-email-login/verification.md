@@ -1,6 +1,57 @@
-# Build 自检证据
+# 验证记录
 
-Status: Build自检已执行，用户已以YES确认实现完成；未自批正式Test或PR。这里记录实际执行，不构成Test/PR/上线签字。
+Status: Verification is green（邮件/SMS结构统一补充的批准范围）。用户yes确认Build后已执行本轮测试；未自批PR。历史记录单独保留。
+
+## 本轮Stage 4正式验证（2026-11-12）
+
+本补充不修改数据库迁移、管理端源码或第三方平台合同；验证覆盖计划的新增结构与安全边界。所有命令退出码为0，除下述已修复的测试夹具错误。没有真实短信/邮件外发或业务数据库写入；隔离数据库进程与浏览器预览进程已停止。
+
+| 命令/范围 | 实际输出与结论 | 原始日志 |
+| --- | --- | --- |
+| `mvn -o -pl macula-cloud-iam -am test -Plocal` | `Tests run: 404, Failures: 0, Errors: 0, Skipped: 0`（IAM首轮）及API21；后续补强后IAM为405。 | channel-tests.log |
+| 最终源码 `mvn -o test -Plocal` | `BUILD SUCCESS`；IAM `Tests run: 405, Failures: 0, Errors: 0, Skipped: 0`。全仓661项，660通过、1个环境门控。 | channel-reactor-final.log |
+| 专用空库 `mvn -o -pl macula-cloud-system -am test -Plocal -Dtest=SysUserUsernameUniqueMigrationTest -Dsurefire.failIfNoSpecifiedTests=false` | `Tests run: 1, Failures: 0, Errors: 0, Skipped: 0`，补跑上述唯一跳过项；本轮661个单元用例都有通过证据。 | channel-username-migration.log |
+| `mvn -o verify -Plocal -Dtest=NoTestsForFailsafe -Dsurefire.failIfNoSpecifiedTests=false` | `BUILD SUCCESS`；实际24项通过：MfaProtocolIT13、ProviderApplicationTokenCacheIT4、Gateway5、TinyID2。门控50项并未计作通过。 | channel-reactor-verify.log |
+| 专用MySQL/Redis历史映射迁移及绑定IT | 迁移 `Tests run: 1, Failures: 0, Errors: 0, Skipped: 0`；绑定 `Tests run: 17, Failures: 0, Errors: 0, Skipped: 0`。覆盖50项门控中的相关18项；合计42个集成用例实际通过。其余32项独立System数据库场景未改动，未列入本补充Proof，不宣称已执行。 | channel-isolated-migration-it.log、channel-isolated-binding-it.log |
+| `npm run test:unit -- --run` | `Test Files 23 passed (23)`；`Tests 213 passed (213)`。 | channel-admin-unit.log |
+| `npm run build` | `✓ built in 5.70s`；保留既有大chunk提示，构建退出0。 | channel-admin-build.log |
+| 全套Cypress，显式开启真实IAM模板预览 | `All specs passed!`；83/83通过，无跳过，含5项IAM真实Thymeleaf页面交互与320/390/1440px布局。 | channel-admin-cypress.log |
+| Checkstyle / diff / 残留扫描 | 155个变更Java文件通过；`git diff --check`通过；旧SmsService/SmsServiceImpl/UnavailableSmsService在生产/测试/资源调用中无残留。两Token与Redis内核没有本轮改动；补充名单外124个import文件逐字节保留。 | channel-checkstyle-final.log |
+
+数据库用例由临时channel_binding_runner.py/channel_username_runner.py创建随机本地端口的全新MySQL/Redis实例、空库及显式运行标记；测试只使用专用库，结束后停止自有进程。绑定用例先执行历史V23映射迁移，保持其schema guard，不把测试指向业务库。客户端无真实凭据。
+
+Cypress由临时channel_browser_runner.py执行，展开命令为：`npx --no-install start-server-and-test 'vite preview --host 127.0.0.1 --port <本轮空闲端口> --strictPort' http://127.0.0.1:<预览端口> 'cypress run --expose IAM_PREVIEW_URL=http://127.0.0.1:<模板端口>/login.html --config baseUrl=http://127.0.0.1:<预览端口>,screenshotsFolder=<临时输出目录>,video=false'`。模板静态服务只指向IAM的target/iam-preview，预览服务结束后均停止；未使用用户浏览器会话。
+
+### Proof逐项对应
+
+- 公共通道与失败关闭：VerificationCodeChannelServicesTest5项及SmsCodeServiceTest4项，证明缺内核/投递器、双Bean名称选择、发送失败不激活、受信显示名、邮件拒绝绑定、SMS用途/Client/browser域保留。邮件HTML转义仍由原LoginMailDispatcherTest证明。
+- 认证模板：VerificationCodeAuthenticationContractTest6项参数化覆盖两通道的输入、POST、重复/空白/长度/六位格式、受信Client、错误码不查目录、停用/锁定/账号过期/凭据过期、角色/details/真实OTT时间及无验证码成功载体。
+- 真实登录安全链：HostedSmsLoginFlowTest4项、HostedEmailLoginFlowTest5项；真实Redis、SavedRequest、Session、S256、nonce、auth_time、UserInfo、重放、跨Client、禁用、CSRF及MFA拒绝。只替换外发渠道和业务目录。
+- MFA与持久化：MfaProtocolIT13项包含两通道拒绝不建Session；MaculaOAuth2AuthorizationServiceTest14项覆盖当前两种Token因子及原SMS/旧email授权读写、撤销。精确类型允许规则不扩大。EmailCodeAuthenticationTokenSerializationTest2项与LegacyEmailPrincipalReaderTest3项通过。
+- 绑定：真实绑定服务单元与页面真实模板分别验证可用性传递/选项隐藏恢复；IdentitySourceBindingIT17项验证事务、锁、提交后消费、跨Client/用途隔离与旧SMS键/摘要合同。页面用例明确Mock绑定服务，不将其当成数据库绑定证明。
+- 本轮未修改CLAUDE.md、AGENTS.md、skill、hook、REVIEW.md或reviewer定义；无适用的保护配置eval变更，也未声称执行不存在的eval。
+
+### 失败与修正
+
+补强绑定页面用例首次出现真实输出：`Expected: a string containing "value=\"sms\""`。原因是该页面夹具Mock整个ThirdPartyBindingService，验证码端口Mock的返回值不会传递到页面。已将页面可用性Mock放到正确边界，同时增加真实ThirdPartyBindingService的能力传递合同。`channel-binding-ui-fixed.log`为`Tests run: 6, Failures: 0, Errors: 0, Skipped: 0`；之后重跑全仓，最终输出见上表。生产实现没有因此放宽。
+
+本轮原始日志和测试临时产物均位于`/private/tmp/macula-iam-review-20261111/`，不提交。Verification is green，下一阶段可进入sdlc-deploy审查；此结论不等于PR批准、推送、合并、部署或真实平台联调通过。端内Web/SPA新模型仍独立等待开关语义确认。
+
+## 本轮补充构建证据（2026-11-12）
+
+| 检查 | 实际结果 |
+| --- | --- |
+| `mvn -o -pl macula-cloud-iam -am clean test-compile -DskipTests -Plocal` | BUILD SUCCESS；清洁编译IAM及API的主代码与全部测试源码，没有执行测试。完整日志在临时channel-clean-compile.log。 |
+| Checkstyle | 当前155个变更Java文件通过，包含新增文件和此前import整理；未通过宽松排除绕过。 |
+| `git diff --check` | 通过。 |
+| 旧符号/装配引用 | IAM内无SmsService/SmsServiceImpl/UnavailableSmsService、旧便利重载或Service定位器残留；两个Token字段/类型未变。 |
+| 已有改动保留 | 补充名单外124个import整理文件与先前after快照逐字节一致；用户原有AbstractThirdPartyAuthenticationFilter改动保留。 |
+| 本轮运行测试 | 未执行。待人工确认Build完成后，运行双通道合同、IAM/API、隔离绑定/MFA/存储IT和全仓测试。不得沿用此前通过数冒充本轮证据。 |
+
+编译过程中新增断言的泛型约束和一个matcher引用错误已修正；最终clean编译通过。未修改POM或依赖声明，未操作运行中服务、业务库或真实邮件/短信渠道。
+
+## 此前实现的历史回归记录
+
 
 ## 后端
 

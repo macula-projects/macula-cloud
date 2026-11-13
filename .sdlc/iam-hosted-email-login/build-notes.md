@@ -1,6 +1,19 @@
 # Build 实施记录
 
-Status: implemented-human-confirmed。用户以YES确认Build实现完成；此确认不等于正式Test或PR人工批准。
+Status: supplement-implemented-human-confirmed。用户yes确认本轮Build完成；Stage 4实际验证已记录，未自批PR或执行远端操作。
+
+## 邮件/SMS统一补充（2026-11-12）
+
+- 公共端口为VerificationCodeChannelService，VerificationCodeContext只携带可信Client/用途/显示名；SmsCodeService与EmailCodeService组合共享内核，保留原Redis/HMAC/TTL/配额合同。Email不支持绑定，绑定SMS不能缺Client。
+- UnavailableVerificationCodeService统一设施缺失的失败关闭。删除旧SmsService、SmsServiceImpl、UnavailableSmsService及未用便利重载；绑定isSmsAvailable仍有效，原托管开关不替代绑定证明策略。
+- Filter模板统一POST、单值、trim、长度与六位验证码；Provider模板统一一次消费、账号状态、无凭据结果、details/角色与真实OTT时间。原Token的包名、字段、父类、UID和精确类型允许列表不变。
+- Configurer采用固定HttpSecurity及显式构造，删除ApplicationContext查询、伪泛型、可变setter、固定Converter/参数副本与无意义身份权限Mapper。两个Configurer保持独立，不互相覆盖，Provider只在登录链注册。
+- 新增双通道合同、设施缺失装配、真实Redis短信/OIDC与当前Token因子存储用例；现有绑定/MFA/托管测试按公共端口更新，旧短信服务测试迁包。这里只证明代码已编译，尚未证明用例运行通过。
+- README、架构类图及配置说明以当前职责更新。补充范围外124个已有import整理文件与先前快照一致，未生成package-info.java。
+- 无名单外变更。用户yes已通过本轮Build人工门；Stage 4结果以verification.md为准。端内应用新模型仍待策略语义确认，不夹带到本次已批准实现。
+
+## 此前已确认实现
+
 
 ## 实现边界
 
@@ -36,3 +49,7 @@ Status: implemented-human-confirmed。用户以YES确认Build实现完成；此�
 用户随后明确要求更新镜像，已构建并定向替换本机macula-cloud-dev的System、IAM、Admin，采用--no-deps --no-build --force-recreate --wait；其余11个运行容器ID保持。更新前对本地macula-system做0600临时备份，System从V24自动迁移到V25成功。没有远端部署、提交、推送或凭据轮换。
 
 实际镜像：System 99e23968d8e0、IAM 5e91f79986b0、Admin 09647d96bd58，标签均6.1.0-SNAPSHOT；运行容器镜像ID与新构建一致，全部healthy，聚焦启动日志无应用启动失败。Admin与IAM登录页HTTP200，System无Token菜单请求HTTP401。该记录是本地镜像/运行证据，不能代替真实厂商、设备或邮件送达验证。
+
+## 本轮Stage 4补强
+
+绑定页可用性断言明确区分页面的绑定服务Mock与真实绑定服务的端口能力传递，新增真实服务合同用例。初次错误夹具的失败输出已保留；定向用例与最终全仓测试通过，不以删断言掩盖问题。没有修改本轮计划之外的源文件，也没有修改Token字段、Redis/HMAC、协议grant、登录开关或平台身份校验。

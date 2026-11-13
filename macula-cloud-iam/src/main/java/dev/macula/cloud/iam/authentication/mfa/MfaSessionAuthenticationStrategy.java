@@ -16,6 +16,7 @@
  */
 package dev.macula.cloud.iam.authentication.mfa;
 
+import dev.macula.cloud.iam.authentication.email.EmailCodeAuthenticationToken;
 import dev.macula.cloud.iam.authentication.hosted.HostedLoginClientPolicyService;
 import dev.macula.cloud.iam.authentication.sms.SmsAuthenticationToken;
 import dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyAuthenticationToken;
@@ -55,7 +56,7 @@ public final class MfaSessionAuthenticationStrategy implements SessionAuthentica
             clientId = context.clientId();
         }
         AuthenticationMethod method =
-                authentication instanceof dev.macula.cloud.iam.authentication.email.EmailCodeAuthenticationToken ?
+                authentication instanceof EmailCodeAuthenticationToken ?
                         AuthenticationMethod.EMAIL
                         : authentication instanceof SmsAuthenticationToken ? AuthenticationMethod.SMS
                         : authentication instanceof ThirdPartyAuthenticationToken ? AuthenticationMethod.EXTERNAL

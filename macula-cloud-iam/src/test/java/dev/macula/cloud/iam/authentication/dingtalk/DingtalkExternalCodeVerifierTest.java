@@ -18,10 +18,12 @@ package dev.macula.cloud.iam.authentication.dingtalk;
 
 import java.util.Map;
 
+import dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures;
 import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeVerification;
 import dev.macula.cloud.iam.service.identity.IdentityProviderConfigService;
 import dev.macula.cloud.iam.service.identity.IdentityProviderConfigService.ProviderConfig;
 import dev.macula.cloud.system.enums.ExternalCodeType;
+import dev.macula.cloud.system.enums.IdentitySourceType;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -44,8 +46,8 @@ class DingtalkExternalCodeVerifierTest {
     void appCodeUsesNativeSdkExchange() {
         IdentityProviderConfigService configs = mock(IdentityProviderConfigService.class);
         DingtalkClient client = mock(DingtalkClient.class);
-        var base = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(
-                dev.macula.cloud.system.enums.IdentitySourceType.DINGTALK_WEB, "DINGTALK", "app", "secret",
+        var base = IdentitySourceTestFixtures.source(
+                IdentitySourceType.DINGTALK_WEB, "DINGTALK", "app", "secret",
                 Map.of("appKey", "app", "corpId", "corp"));
         ProviderConfig config = new ProviderConfig(9L, base.sourceType(), false, null, base.version(),
                 base.providerType(),

@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { createRouter, createMemoryHistory } from "vue-router";
 import ElementPlus from "element-plus";
+import ClientCreate from "@/views/system/oauth2Client/components/ClientCreate.vue";
+import ClientApplication from "@/views/system/oauth2Client/components/ClientApplication.vue";
 import Page from "@/views/system/oauth2Client/index.vue";
 import OAuthProtocolSettings from "@/views/system/oauth2Client/components/OAuthProtocolSettings.vue";
 import { protocolDefaults } from "@/utils/applicationProtocolRegistry";
@@ -198,4 +200,56 @@ it('shows the Client callback allowlist for AppLink without authorization_code',
   expect(application.settings.redirectUris).toBe('https://app.example/callback');
   expect(application.settings.authorizationGrantTypes).not.toContain('authorization_code');
   wrapper.unmount();
+});
+
+describe('Web login mode selection',()=>{
+ it('sends the same mode and draft after a failed save, then reloads the accepted mode',async()=>{
+  const row={...record(),webLoginMode:'IN_APP',hostedLoginMethods:[],configurationStatus:'DRAFT',browserCapabilityBindings:{},browserProviderBindings:{}};
+  row.settings.authorizationGrantTypes='';
+  api.get.mockResolvedValue(ok(row));api.update.mockResolvedValueOnce({success:false,msg:'配置已变化'}).mockResolvedValueOnce(ok(row));
+  const {wrapper}=await open();
+  const save=()=>wrapper.findAll('button').find(button=>button.text()==='保存草稿并停用').trigger('click');
+  await save();await flushPromises();
+  expect(api.update.mock.calls[0][1].webLoginMode).toBe('IN_APP');
+  await save();await flushPromises();
+  expect(api.update.mock.calls[1][1].webLoginMode).toBe('IN_APP');
+  expect(wrapper.findComponent(ClientApplication).text()).toContain('创建后只读');
+  expect(wrapper.findComponent(ClientApplication).findAll('input[type=radio]')).toHaveLength(0);
+  wrapper.unmount();
+ });
+});
+
+for (const applicationType of ['WEB_SERVER','SPA']) {
+ for (const mode of ['BROWSER','IN_APP']) {
+  it(`空协议${applicationType}/${mode}草稿显示固定模式且不生成配置`,async()=>{
+   const row={...record(),applicationType,webLoginMode:mode,configurationStatus:'DRAFT',protocol:null,settings:null,hostedLoginMethods:mode==='IN_APP'?[]:null};
+   const wrapper=mount(ClientApplication,{props:{client:row,originalType:applicationType},global:{plugins:[ElementPlus],mocks:{$t:key=>key}}});
+   await flushPromises();
+   expect(wrapper.text()).toContain('创建后只读');
+   expect(wrapper.text()).toContain(mode==='IN_APP'?'applicationBoundary.inAppMode':'applicationBoundary.browserMode');
+   expect(wrapper.findAll('input[type=radio]')).toHaveLength(0);
+   expect(wrapper.emitted('update:client')).toBeUndefined();expect(row.settings).toBeNull();expect(row.protocol).toBeNull();
+   wrapper.unmount();
+  });
+ }
+}
+
+it.each(['WEB_SERVER','SPA'])('创建%s时提交端内模式，创建后详情不再可切换',async applicationType=>{
+ const created={...record(),applicationType,webLoginMode:'IN_APP',configurationStatus:'DRAFT',protocol:null,settings:null,defaultProtocol:null,enabledProtocols:[],hostedLoginMethods:[]};
+ api.createDraft.mockResolvedValue(ok(created));api.get.mockResolvedValue(ok(created));
+ const {wrapper,router}=await open({id:'new'});
+ const creation=wrapper.findComponent(ClientCreate);
+ await creation.find(`[data-application-type="${applicationType}"]`).trigger('click');
+ await flushPromises();
+ await creation.find('input[placeholder="输入应用名称"]').setValue('端内草稿');
+ const radio=creation.findAllComponents({name:'ElRadioGroup'}).find(group=>group.props('modelValue')==='BROWSER');
+ radio.vm.$emit('change','IN_APP');await flushPromises();
+ await wrapper.findAllComponents({name:'ElButton'}).find(button=>button.text()==='创建').trigger('click');
+ await flushPromises();
+ expect(api.createDraft).toHaveBeenCalledWith(expect.objectContaining({applicationType,webLoginMode:'IN_APP',clientName:'端内草稿'}));
+ expect(api.createDraft.mock.calls[0][0]).not.toHaveProperty('settings');
+ await router.replace({query:{id:'42',tab:'application'}});await flushPromises();
+ expect(wrapper.findComponent(ClientApplication).text()).toContain('创建后只读');
+ expect(wrapper.findComponent(ClientApplication).findAll('input[type=radio]')).toHaveLength(0);
+ wrapper.unmount();
 });

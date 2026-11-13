@@ -35,3 +35,16 @@ describe('OIDC SDK application',()=>{
   expect(client.settings.authorizationGrantTypes).toBe(external);expect(client.settings.clientAuthenticationMethods).toBe('none');expect(client.settings.redirectUris).toBe('');expect(client.settings.scopes).toContain('openid');
  });
 });
+
+it('keeps Web confidential and SPA public when normalizing exclusive in-app JSAPI',()=>{
+ for (const applicationType of ['WEB_SERVER','SPA']) {
+  const client={applicationType,webLoginMode:'IN_APP',purpose:'APPLICATION'};
+  selectProtocol(client,'OIDC');
+  client.settings.authorizationGrantTypes='urn:macula:params:oauth:grant-type:external_code,refresh_token';
+  client.externalCodeTypes=['FEISHU_WEBVIEW_CODE'];client.externalProviderBindings={FEISHU_WEBVIEW_CODE:17};
+  normalizeProtocol(client);
+  expect(client.settings.clientAuthenticationMethods).toBe(applicationType==='WEB_SERVER'?'client_secret_basic':'none');
+  expect(client.settings.authorizationGrantTypes).toBe('urn:macula:params:oauth:grant-type:external_code');
+  expect(projectProtocol(client).webLoginMode).toBe('IN_APP');
+ }
+});

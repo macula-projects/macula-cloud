@@ -17,8 +17,24 @@
 
 package dev.macula.cloud.iam.protocol.oauth2.persistence;
 
+import dev.macula.boot.constants.CacheConstants;
+import dev.macula.cloud.iam.authentication.email.EmailCodeAuthenticationToken;
+import dev.macula.cloud.iam.authentication.mfa.AuthenticationCheckpoint;
+import dev.macula.cloud.iam.authentication.mfa.MfaCompletionService;
+import dev.macula.cloud.iam.authentication.sms.SmsAuthenticationToken;
+import dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyAuthenticationToken;
+import dev.macula.cloud.iam.jackson.LegacyEmailPrincipalReader;
+import dev.macula.cloud.iam.jackson.MaculaIamJacksonModule;
+import dev.macula.cloud.iam.pojo.dto.Authorization;
+import dev.macula.cloud.iam.protocol.oauth2.ApplicationProtocolResolver;
+import dev.macula.cloud.iam.protocol.oauth2.ResourceAuthorizationPolicy;
+import dev.macula.cloud.iam.protocol.oauth2.client.OAuth2ClientRegistrationService;
+import dev.macula.cloud.iam.service.userdetails.SysUserDetails;
+import dev.macula.cloud.system.security.OAuth2ResourcePolicy;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.Principal;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -28,19 +44,17 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
-
-import dev.macula.boot.constants.CacheConstants;
-import dev.macula.cloud.iam.authentication.sms.SmsAuthenticationToken;
-import dev.macula.cloud.iam.jackson.MaculaIamJacksonModule;
-import dev.macula.cloud.iam.pojo.dto.Authorization;
-import dev.macula.cloud.iam.service.userdetails.SysUserDetails;
 import org.jspecify.annotations.Nullable;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataRetrievalFailureException;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.jackson.SecurityJacksonModules;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.OAuth2AccessToken;
@@ -51,12 +65,14 @@ import org.springframework.security.oauth2.core.OAuth2ErrorCodes;
 import org.springframework.security.oauth2.core.OAuth2RefreshToken;
 import org.springframework.security.oauth2.core.OAuth2Token;
 import org.springframework.security.oauth2.core.OAuth2UserCode;
+import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest;
 import org.springframework.security.oauth2.core.endpoint.OAuth2ParameterNames;
 import org.springframework.security.oauth2.core.oidc.OidcIdToken;
 import org.springframework.security.oauth2.server.authorization.OAuth2Authorization;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationCode;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
+import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationCodeRequestAuthenticationException;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.util.Assert;
@@ -108,16 +124,16 @@ public class MaculaOAuth2AuthorizationService implements OAuth2AuthorizationServ
     private final RedisTemplate<String, Object> redisTemplate;
     private final RegisteredClientRepository registeredClientRepository;
     private final ObjectMapper objectMapper;
-    private dev.macula.cloud.iam.authentication.mfa.MfaCompletionService mfaCompletion =
-            dev.macula.cloud.iam.authentication.mfa.MfaCompletionService.noOp();
-    private dev.macula.cloud.iam.service.client.SysOAuth2ClientService clients;
+    private MfaCompletionService mfaCompletion =
+            MfaCompletionService.noOp();
+    private OAuth2ClientRegistrationService clients;
     /**
      * 生产装配绑定权威Client读取，测试用两参构造仅验证存储协议。
      */
     public MaculaOAuth2AuthorizationService(RedisTemplate<String, Object> redisTemplate,
-            RegisteredClientRepository repository, dev.macula.cloud.iam.service.client.SysOAuth2ClientService clients) {
+            RegisteredClientRepository repository, OAuth2ClientRegistrationService clients) {
         this(redisTemplate, repository);
-        this.clients = java.util.Objects.requireNonNull(clients);
+        this.clients = Objects.requireNonNull(clients);
     }
 
     public MaculaOAuth2AuthorizationService(RedisTemplate<String, Object> redisTemplate,
@@ -128,7 +144,7 @@ public class MaculaOAuth2AuthorizationService implements OAuth2AuthorizationServ
         this.strings = new StringRedisTemplate(Objects.requireNonNull(redisTemplate.getConnectionFactory()));
         ClassLoader classLoader = MaculaOAuth2AuthorizationService.class.getClassLoader();
         var allowedTypes = BasicPolymorphicTypeValidator.builder().allowIfSubType(SysUserDetails.class)
-                .allowIfSubType(dev.macula.cloud.iam.authentication.email.EmailCodeAuthenticationToken.class)
+                .allowIfSubType(EmailCodeAuthenticationToken.class)
                 .allowIfSubType(SmsAuthenticationToken.class).allowIfSubType(Long.class);
         // Includes OAuth2AuthorizationServerJacksonModule and its constrained type validator.
         this.objectMapper =
@@ -165,9 +181,9 @@ public class MaculaOAuth2AuthorizationService implements OAuth2AuthorizationServ
     /**
      * Spring生产装配必须注入统一策略；显式构造的存储/生成器单测保留默认行为。
      */
-    @org.springframework.beans.factory.annotation.Autowired
-    public void setMfaCompletion(dev.macula.cloud.iam.authentication.mfa.MfaCompletionService completion) {
-        this.mfaCompletion = java.util.Objects.requireNonNull(completion);
+    @Autowired
+    public void setMfaCompletion(MfaCompletionService completion) {
+        this.mfaCompletion = Objects.requireNonNull(completion);
     }
 
     @Override
@@ -200,40 +216,40 @@ public class MaculaOAuth2AuthorizationService implements OAuth2AuthorizationServ
     @Override
     public void save(OAuth2Authorization authorization) {
         Assert.notNull(authorization, "authorization cannot be null");
-        org.springframework.security.core.Authentication verifiedPrincipal = authorization.getAttribute(
-                java.security.Principal.class.getName());
-        if (verifiedPrincipal instanceof dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyAuthenticationToken) {
-            var proof = dev.macula.cloud.iam.authentication.mfa.MfaCompletionService.proof(verifiedPrincipal);
+        Authentication verifiedPrincipal = authorization.getAttribute(
+                Principal.class.getName());
+        if (verifiedPrincipal instanceof ThirdPartyAuthenticationToken) {
+            var proof = MfaCompletionService.proof(verifiedPrincipal);
             var canonical =
-                    org.springframework.security.authentication.UsernamePasswordAuthenticationToken.authenticated(
+                    UsernamePasswordAuthenticationToken.authenticated(
                     verifiedPrincipal.getPrincipal(), null, verifiedPrincipal.getAuthorities());
             canonical.setDetails(new HashMap<>(Map.of(
-                    dev.macula.cloud.iam.authentication.mfa.MfaCompletionService.SOURCE_PROOF, proof)));
+                    MfaCompletionService.SOURCE_PROOF, proof)));
             authorization = OAuth2Authorization.from(authorization)
-                    .attribute(java.security.Principal.class.getName(), canonical)
-                    .attribute(dev.macula.cloud.iam.authentication.mfa.MfaCompletionService.SOURCE_PROOF, proof)
+                    .attribute(Principal.class.getName(), canonical)
+                    .attribute(MfaCompletionService.SOURCE_PROOF, proof)
                     .build();
         }
         if (authorization.getAttribute(
-                dev.macula.cloud.iam.protocol.oauth2.ApplicationProtocolResolver.PROTOCOL_ATTRIBUTE) == null
+                ApplicationProtocolResolver.PROTOCOL_ATTRIBUTE) == null
                 && authorization.getAttribute(VERSION) == null) {
-            org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest request =
+            OAuth2AuthorizationRequest request =
                     authorization.getAttribute(
-                    org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest.class.getName());
-            java.util.Set<String> scopes = request == null ? authorization.getAuthorizedScopes() : request.getScopes();
+                    OAuth2AuthorizationRequest.class.getName());
+            Set<String> scopes = request == null ? authorization.getAuthorizedScopes() : request.getScopes();
             authorization = OAuth2Authorization.from(authorization)
-                    .attribute(dev.macula.cloud.iam.protocol.oauth2.ApplicationProtocolResolver.PROTOCOL_ATTRIBUTE,
-                            dev.macula.cloud.iam.protocol.oauth2.ApplicationProtocolResolver.requested(scopes))
-                    .attribute(dev.macula.cloud.iam.protocol.oauth2.ApplicationProtocolResolver.SCHEMA_ATTRIBUTE, 1)
+                    .attribute(ApplicationProtocolResolver.PROTOCOL_ATTRIBUTE,
+                            ApplicationProtocolResolver.requested(scopes))
+                    .attribute(ApplicationProtocolResolver.SCHEMA_ATTRIBUTE, 1)
                     .build();
         }
 
         if (clients != null) {
             var client = clients.getClientByClientId(authorization.getRegisteredClientId());
             if (authorization.getAttribute(
-                    dev.macula.cloud.system.security.OAuth2ResourcePolicy.AUTHORIZATION_VERSION) == null) {
+                    OAuth2ResourcePolicy.AUTHORIZATION_VERSION) == null) {
                 if (client == null || !"APPLICATION".equals(client.getPurpose())) {
-                    throw new org.springframework.security.oauth2.core.OAuth2AuthenticationException(
+                    throw new OAuth2AuthenticationException(
                             "unauthorized_client");
                 }
                 // 直接grant可能在凭据验证后发生配置变更，必须保留签发快照而非绑定新版本。
@@ -241,16 +257,16 @@ public class MaculaOAuth2AuthorizationService implements OAuth2AuthorizationServ
                         authorization.getAccessToken() == null || authorization.getAccessToken().getClaims() == null ?
                                 null
                                 : authorization.getAccessToken().getClaims()
-                                .get(dev.macula.cloud.system.security.OAuth2ResourcePolicy.AUTHORIZATION_VERSION);
+                                .get(OAuth2ResourcePolicy.AUTHORIZATION_VERSION);
                 long snapshot = issued instanceof Number number ? number.longValue() : client.getAuthorizationVersion();
                 if (snapshot != client.getAuthorizationVersion()) {
-                    throw new org.springframework.security.oauth2.core.OAuth2AuthenticationException("invalid_grant");
+                    throw new OAuth2AuthenticationException("invalid_grant");
                 }
                 authorization = OAuth2Authorization.from(authorization).attribute(
-                        dev.macula.cloud.system.security.OAuth2ResourcePolicy.AUTHORIZATION_VERSION, snapshot).build();
-            } else if (!dev.macula.cloud.iam.protocol.oauth2.ResourceAuthorizationPolicy.current(authorization,
+                        OAuth2ResourcePolicy.AUTHORIZATION_VERSION, snapshot).build();
+            } else if (!ResourceAuthorizationPolicy.current(authorization,
                     client)) {
-                throw new org.springframework.security.oauth2.core.OAuth2AuthenticationException("invalid_grant");
+                throw new OAuth2AuthenticationException("invalid_grant");
             }
         }
         Authorization previous = readRecord(authorization.getId());
@@ -261,29 +277,29 @@ public class MaculaOAuth2AuthorizationService implements OAuth2AuthorizationServ
                 || newUsableToken(authorization, before, OidcIdToken.class);
         if ((newCode || newUserToken) && !AuthorizationGrantType.CLIENT_CREDENTIALS.equals(
                 authorization.getAuthorizationGrantType())) {
-            org.springframework.security.core.Authentication principal = authorization.getAttribute(
-                    java.security.Principal.class.getName());
+            Authentication principal = authorization.getAttribute(
+                    Principal.class.getName());
             Map<String, Object> proof = authorization.getAttribute(
-                    dev.macula.cloud.iam.authentication.mfa.MfaCompletionService.SOURCE_PROOF);
+                    MfaCompletionService.SOURCE_PROOF);
             if (proof == null) {
-                proof = dev.macula.cloud.iam.authentication.mfa.MfaCompletionService.proof(principal);
+                proof = MfaCompletionService.proof(principal);
                 if (!proof.isEmpty()) {
                     authorization = OAuth2Authorization.from(authorization).attribute(
-                            dev.macula.cloud.iam.authentication.mfa.MfaCompletionService.SOURCE_PROOF, proof).build();
+                            MfaCompletionService.SOURCE_PROOF, proof).build();
                 }
             }
             try {
                 mfaCompletion.checkToken(principal,
                         registeredClientRepository.findById(authorization.getRegisteredClientId()),
-                        newCode ? dev.macula.cloud.iam.authentication.mfa.AuthenticationCheckpoint.AUTHORIZATION_CODE
+                        newCode ? AuthenticationCheckpoint.AUTHORIZATION_CODE
                                 : AuthorizationGrantType.REFRESH_TOKEN.equals(authorization.getAuthorizationGrantType())
-                                ? dev.macula.cloud.iam.authentication.mfa.AuthenticationCheckpoint.REFRESH_TOKEN
-                                : dev.macula.cloud.iam.authentication.mfa.AuthenticationCheckpoint.USER_TOKEN,
+                                ? AuthenticationCheckpoint.REFRESH_TOKEN
+                                : AuthenticationCheckpoint.USER_TOKEN,
                         authorization.getAuthorizationGrantType().getValue(), proof);
             } catch (OAuth2AuthenticationException ex) {
                 // 授权端点要求专用异常；无安全续转上下文时返回400 server_error。
                 if (newCode) {
-                    throw new org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationCodeRequestAuthenticationException(
+                    throw new OAuth2AuthorizationCodeRequestAuthenticationException(
                             ex.getError(), null);
                 }
                 throw ex;
@@ -385,7 +401,7 @@ public class MaculaOAuth2AuthorizationService implements OAuth2AuthorizationServ
      */
     private OAuth2Authorization current(OAuth2Authorization authorization) {
         return clients == null ||
-                dev.macula.cloud.iam.protocol.oauth2.ResourceAuthorizationPolicy.current(authorization,
+                ResourceAuthorizationPolicy.current(authorization,
                         clients.getClientByClientId(authorization.getRegisteredClientId())) ? authorization : null;
     }
 
@@ -468,7 +484,7 @@ public class MaculaOAuth2AuthorizationService implements OAuth2AuthorizationServ
         try {
             return HexFormat.of()
                     .formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8)));
-        } catch (java.security.NoSuchAlgorithmException ex) {
+        } catch (NoSuchAlgorithmException ex) {
             throw new IllegalStateException(ex);
         }
     }
@@ -489,7 +505,7 @@ public class MaculaOAuth2AuthorizationService implements OAuth2AuthorizationServ
                         .authorizationGrantType(resolveAuthorizationGrantType(entity.getAuthorizationGrantType()))
                         .attributes(attributes -> {
                             attributes.putAll(parseMap(
-                                    dev.macula.cloud.iam.jackson.LegacyEmailPrincipalReader.normalize(
+                                    LegacyEmailPrincipalReader.normalize(
                                             entity.getAttributes())));
                             attributes.put(VERSION, entity.getVersion());
                             if (entity.getStateExpiresAt() != null) {

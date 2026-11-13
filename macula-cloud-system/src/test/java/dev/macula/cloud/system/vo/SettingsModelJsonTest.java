@@ -16,17 +16,24 @@
  */
 package dev.macula.cloud.system.vo;
 
-import dev.macula.cloud.system.controller.OAuth2ClientConfigController.SecretResetForm;
+import dev.macula.cloud.system.form.IamApplicationDraftForm;
+import java.util.List;
+
+import dev.macula.cloud.system.controller.IamApplicationController.SecretResetForm;
+import dev.macula.cloud.system.form.IdentityProviderForm;
 import dev.macula.cloud.system.form.MessageTemplateForm;
 import dev.macula.cloud.system.form.MessageTestForm;
+import dev.macula.cloud.system.form.IamApplicationForm;
 import dev.macula.cloud.system.message.MailTestSender.MailOptions;
 import dev.macula.cloud.system.message.TencentSmsTestSender.TencentOptions;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
 
-import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * 普通 Java Bean 与既有管理端 JSON 字段名保持兼容。
@@ -70,46 +77,60 @@ class SettingsModelJsonTest {
     /** 真实Jackson3必须保留省略、显式null与实际值的区别，内部标记不进入响应。 */
     @Test
     void mappingFieldsPreserveJsonPresenceWithoutExposingFlags() {
-        var omitted = json.readValue("{}", dev.macula.cloud.system.form.IdentityProviderForm.class);
+        var omitted = json.readValue("{}", IdentityProviderForm.class);
         assertFalse(omitted.isBindingSourceFieldPresent());
-        var cleared = json.readValue("{\"bindingSourceField\":null,\"bindingTargetField\":null}", dev.macula.cloud.system.form.IdentityProviderForm.class);
+        var cleared = json.readValue("{\"bindingSourceField\":null,\"bindingTargetField\":null}", IdentityProviderForm.class);
         assertTrue(cleared.isBindingSourceFieldPresent());
         assertTrue(cleared.isBindingTargetFieldPresent());
         assertNull(cleared.getBindingSourceField());
-        var configured = json.readValue("{\"bindingSourceField\":\"email\",\"bindingTargetField\":\"email\"}", dev.macula.cloud.system.form.IdentityProviderForm.class);
+        var configured = json.readValue("{\"bindingSourceField\":\"email\",\"bindingTargetField\":\"email\"}", IdentityProviderForm.class);
         assertEquals("email", configured.getBindingSourceField());
         assertFalse(json.writeValueAsString(configured).contains("FieldPresent"));
         assertThrows(RuntimeException.class, () -> json.readValue("{\"bindingSourceField\":\"email\",\"bindingSourceField\":\"mobile\"}",
-            dev.macula.cloud.system.form.IdentityProviderForm.class));
+            IdentityProviderForm.class));
         assertThrows(RuntimeException.class, () -> json.readValue("{\"arbitraryColumn\":\"password\"}",
-            dev.macula.cloud.system.form.IdentityProviderForm.class));
+            IdentityProviderForm.class));
     }
 
     /** 请求省略与显式清空不同；顶层及嵌套重复键和未知字段都应被拒绝。 */
     @Test
     void bindingArrayKeepsPresenceAndRejectsAmbiguousJson() {
-        var omitted = json.readValue("{}", dev.macula.cloud.system.form.IdentityProviderForm.class);
+        var omitted = json.readValue("{}", IdentityProviderForm.class);
         assertFalse(omitted.isBindingMappingsPresent());
-        var empty = json.readValue("{\"bindingMappings\":[]}", dev.macula.cloud.system.form.IdentityProviderForm.class);
+        var empty = json.readValue("{\"bindingMappings\":[]}", IdentityProviderForm.class);
         assertTrue(empty.isBindingMappingsPresent());
         assertTrue(empty.getBindingMappings().isEmpty());
-        for (String value : java.util.List.of("{\"bindingMappings\":[],\"bindingMappings\":[]}",
+        for (String value : List.of("{\"bindingMappings\":[],\"bindingMappings\":[]}",
             "{\"bindingMappings\":[{\"sourceField\":\"mobile\",\"sourceField\":\"email\",\"targetField\":\"email\"}]}",
             "{\"bindingMappings\":[{\"sourceField\":\"mobile\",\"targetField\":\"mobile\",\"sql\":\"id\"}]}")) {
-            assertThrows(RuntimeException.class, () -> json.readValue(value, dev.macula.cloud.system.form.IdentityProviderForm.class));
+            assertThrows(RuntimeException.class, () -> json.readValue(value, IdentityProviderForm.class));
         }
     }
 
-    /** 转换标记只接受明确Boolean，不接受字符串、null或重复键。 */
+    /** 模式必须是单值精确字符串；内部缺省与HTTP显式null保持区别。 */
     @Test
-    void conversionRequiresExplicitBoolean() {
-        var type=dev.macula.cloud.system.form.OAuth2ClientForm.class;
-        assertFalse(json.readValue("{}",type).isConvertToInApp());
-        assertTrue(json.readValue("{\"convertToInApp\":true}",type).isConvertToInApp());
-        assertFalse(json.writeValueAsString(json.readValue("{\"convertToInApp\":true}",type)).contains("convertToInApp"));
-        for(String value:List.of("{\"convertToInApp\":null}","{\"convertToInApp\":\"true\"}","{\"convertToInApp\":true,\"convertToInApp\":false}")) {
-            assertThrows(RuntimeException.class,()->json.readValue(value,type));
+    void webModeRequiresSingleExactString() {
+        var type=IamApplicationForm.class;
+        assertFalse(json.readValue("{}",type).isWebLoginModePresent());
+        assertTrue(json.readValue("{\"webLoginMode\":\"IN_APP\"}",type).isWebLoginModePresent());
+        for(String value:List.of("null", "true", "1", "[]", "{}", "\"\"", "\"browser\"", "\"OTHER\"")) {
+            assertThrows(RuntimeException.class,()->json.readValue("{\"webLoginMode\":"+value+"}",type));
         }
+        assertThrows(RuntimeException.class,()->json.readValue("{\"webLoginMode\":\"BROWSER\",\"webLoginMode\":\"IN_APP\"}",type));
+    }
+
+    /** 创建白名单显式接收模式；输入要求与完整Form一致，不能用null或重复键绕过。 */
+    @Test
+    void draftWebModeRequiresSingleExactString() {
+        var type = IamApplicationDraftForm.class;
+        assertFalse(json.readValue("{}", type).isWebLoginModePresent());
+        for (String mode : List.of("BROWSER", "IN_APP")) {
+            assertEquals(mode, json.readValue("{\"webLoginMode\":\"" + mode + "\"}", type).getWebLoginMode());
+        }
+        for (String value : List.of("null", "true", "1", "[]", "{}", "\"\"", "\"browser\"", "\"OTHER\"")) {
+            assertThrows(RuntimeException.class, () -> json.readValue("{\"webLoginMode\":" + value + "}", type));
+        }
+        assertThrows(RuntimeException.class, () -> json.readValue("{\"webLoginMode\":\"BROWSER\",\"webLoginMode\":\"IN_APP\"}", type));
     }
 
 }

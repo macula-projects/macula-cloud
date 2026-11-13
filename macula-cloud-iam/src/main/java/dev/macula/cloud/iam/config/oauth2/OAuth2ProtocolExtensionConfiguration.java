@@ -17,6 +17,7 @@
 package dev.macula.cloud.iam.config.oauth2;
 
 import dev.macula.cloud.iam.authentication.mfa.MfaCompletionService;
+import dev.macula.cloud.iam.protocol.oauth2.client.OAuth2ClientRegistrationService;
 import dev.macula.cloud.iam.protocol.oauth2.configuration.AuthorizationEndpointExtension;
 import dev.macula.cloud.iam.protocol.oauth2.configuration.AuthorizationServerExtension;
 import dev.macula.cloud.iam.protocol.oauth2.configuration.ClientAuthenticationExtension;
@@ -27,8 +28,9 @@ import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeRateL
 import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeReplayStore;
 import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeVerifierRegistry;
 import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.OAuth2ExternalCodeAuthenticationProvider;
-import dev.macula.cloud.iam.service.client.SysOAuth2ClientService;
 import dev.macula.cloud.iam.service.identity.IdentityProviderConfigService;
+import dev.macula.cloud.system.protocol.IamApplicationProtocolRegistry;
+import dev.macula.cloud.system.protocol.OAuth2ProtocolDefinition;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -46,13 +48,19 @@ import org.springframework.security.oauth2.server.authorization.token.OAuth2Toke
  */
 @Configuration(proxyBeanMethods = false)
 public class OAuth2ProtocolExtensionConfiguration {
+    /** 只由协议装配层选择已实现策略，公共应用服务不依赖OAuth具体类型。 */
+    @Bean
+    IamApplicationProtocolRegistry iamApplicationProtocolRegistry() {
+        return OAuth2ProtocolDefinition.registry();
+    }
+
     /**
      * 客户端认证使用请求视图，内省恢复使用明确限定的基础仓库。
      */
     @Bean
     AuthorizationServerExtension clientAuthenticationExtension(RegisteredClientRepository clients,
             @Qualifier("baseRegisteredClientRepository") RegisteredClientRepository base,
-            OAuth2AuthorizationService authorizations, SysOAuth2ClientService clientService,
+            OAuth2AuthorizationService authorizations, OAuth2ClientRegistrationService clientService,
             AuthorizationServerSettings settings) {
         return new ClientAuthenticationExtension(clients, base, authorizations, clientService, settings);
     }

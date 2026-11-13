@@ -86,7 +86,7 @@ class ExternalCodeAccountResolverTest {
     @Test
     void mismatchedRegistrationIsRejected() {
         var identity = new VerifiedExternalIdentity(2L, "WECOM", "WECOM_SDK", 0L,
-                dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.flow("WECOM_SDK"),
+                IdentitySourceTestFixtures.flow("WECOM_SDK"),
                 "WECOM_APP_CODE", "MEMBER_ID", "member", Map.of());
         assertThrows(OAuth2AuthenticationException.class,
                 () -> resolver.resolve(client(ExternalCodeType.WECOM_APP_CODE),

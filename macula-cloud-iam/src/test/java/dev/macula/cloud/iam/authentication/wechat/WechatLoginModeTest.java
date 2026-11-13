@@ -18,7 +18,9 @@ package dev.macula.cloud.iam.authentication.wechat;
 
 import java.util.Map;
 
+import dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures;
 import dev.macula.cloud.iam.service.identity.IdentityProviderConfigService.ProviderConfig;
+import dev.macula.cloud.system.enums.IdentitySourceType;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 
@@ -47,8 +49,8 @@ class WechatLoginModeTest {
     @Test
     void bothModesUseTheSameFixedCallback() {
         WechatClient client = new WechatClient();
-        ProviderConfig config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(
-                dev.macula.cloud.system.enums.IdentitySourceType.WECHAT_WEBSITE, "WECHAT", "site-app", "site-secret",
+        ProviderConfig config = IdentitySourceTestFixtures.source(
+                IdentitySourceType.WECHAT_WEBSITE, "WECHAT", "site-app", "site-secret",
                 Map.of("appId", "site-app", "officialAccountAppId", "oa-app"),
                 Map.of("officialAccountAppSecret", "oa-secret"));
         String callback = "https://iam.example/login/wechat";

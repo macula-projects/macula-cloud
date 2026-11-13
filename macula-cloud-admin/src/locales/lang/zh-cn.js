@@ -244,6 +244,7 @@ export default {
 		language: '语言',
 		language_msg: '翻译进行中，暂翻译了本视图的文本'
 	},
- applicationBoundary: {inApp: '端内应用只能选择一个端内登录能力，不提供IAM标准登录页。', native: '移动客户端只能选择一个SDK或AppLink来源，可同时启用IAM内置登录。', miniapp: '小程序只能关联一个本平台来源；微信登录Code与手机号Code可同源并存。'}
+ applicationBoundary: {
+    webLoginMode: '网页登录模式', browserMode: '浏览器', inAppMode: '端内',inApp: '端内应用只能选择一个端内登录能力，不提供IAM标准登录页。', native: '移动客户端只能选择一个SDK或AppLink来源，可同时启用IAM内置登录。', miniapp: '小程序只能关联一个本平台来源；微信登录Code与手机号Code可同源并存。'}
 
 }

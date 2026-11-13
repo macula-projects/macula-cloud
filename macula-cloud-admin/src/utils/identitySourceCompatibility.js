@@ -1,3 +1,7 @@
+/** 架构和登录模式独立；未知/旧架构不被解释为端内。 */
+export const isWebApplication = client => ['WEB_SERVER','SPA'].includes(client.applicationType);
+export const isInApp = client => isWebApplication(client) && client.webLoginMode === 'IN_APP';
+export const webLoginMode = client => isWebApplication(client) ? client.webLoginMode ?? 'BROWSER' : null;
 // 目录元数据由System共享白名单生成；旧目录回退只识别已知Code，不能按任意后缀猜能力。
 const codeScenes = Object.freeze({
   FEISHU_APP_CODE:'APP', WECOM_APP_CODE:'APP', DINGTALK_APP_CODE:'APP',
@@ -14,7 +18,7 @@ export function externalCodeAllowed(client, codeType, source) {
   if (capability?.available === false) return false;
   if (capability?.applicationTypes && !capability.applicationTypes.includes(type)) return false;
   if (type === 'NATIVE') return scene === 'APP';
-  if (type === 'IN_APP') return scene === 'WEBVIEW';
+  if (isInApp(client)) return scene === 'WEBVIEW' && (!source || capability?.webLoginModes?.includes('IN_APP') === true);
   if (type === 'MINIAPP') return scene === 'MINIAPP' &&
     (client.miniappPlatform === 'WECHAT' ? ['WECHAT_MINIAPP_LOGIN_CODE','WECHAT_MINIAPP_PHONE_CODE'].includes(codeType)
       : client.miniappPlatform === 'WECOM' && codeType === 'WECOM_MINIAPP_CODE');
@@ -24,7 +28,7 @@ export function browserSourceAllowed(client, source) {
   if (!source?.browser) return false;
   const type = client.applicationType;
   if (!type) return true;
-  if (!['WEB_SERVER','SPA','IN_APP'].includes(type)) return false;
+  if (!['WEB_SERVER','SPA'].includes(type)) return false;
   return browserCapabilitiesForType(client,source).length > 0;
 }
 const environmentLabels = Object.freeze({DESKTOP_BROWSER:'桌面浏览器',MOBILE_BROWSER:'手机浏览器',
@@ -40,21 +44,21 @@ function browserCapabilitiesForType(client,source) {
   const type = client.applicationType;
   const explicit = (source.capabilities || []).filter(item => item.browser && item.loginCapability && item.available !== false);
   if (!type) return explicit;
-  const allowed = type === 'IN_APP' ? inAppCapabilities : ['WEB_SERVER','SPA'].includes(type) ? webCapabilities : new Set();
-  return explicit.filter(item => allowed.has(item.loginCapability) && (!item.applicationTypes || item.applicationTypes.includes(type)));
+  const allowed = isInApp(client) ? inAppCapabilities : ['WEB_SERVER','SPA'].includes(type) ? webCapabilities : new Set();
+  return explicit.filter(item => (!isInApp(client) || item.webLoginModes?.includes('IN_APP')) && (!item.webLoginModes?.length || item.webLoginModes.includes(webLoginMode(client))) && allowed.has(item.loginCapability) && (!item.applicationTypes || item.applicationTypes.includes(type)));
 }
 export function browserCapabilities(client,source) {
   if (!source?.browser) return [];
   const result = browserCapabilitiesForType(client,source);
   if (result.length || source.capabilities?.some(item => item.loginCapability)) return result;
   // 旧目录没有能力标识时只保留通用网页，不猜端内入口。
-  return !client.applicationType || ['WEB_SERVER','SPA'].includes(client.applicationType) ? [{loginCapability:'BROWSER',label:'IAM网页登录'}] : [];
+  return !isInApp(client) && (!client.applicationType || ['WEB_SERVER','SPA'].includes(client.applicationType)) ? [{loginCapability:'BROWSER',label:'IAM网页登录'}] : [];
 }
-export const singleSourceApplication = client => ['NATIVE','MINIAPP','IN_APP'].includes(client.applicationType);
+export const singleSourceApplication = client => (['NATIVE','MINIAPP'].includes(client.applicationType) || isInApp(client));
 /** 数量按注册来源计算；微信小程序两个Code可共同指向同一注册。 */
 export function sourceSelectionIssue(client, additions) {
   if (!singleSourceApplication(client)) return '';
   if (new Set(additions.map(item => String(item.source.id))).size > 1) return '当前应用只能选择一个身份源';
-  if (['NATIVE','IN_APP'].includes(client.applicationType) && additions.length > 1) return '当前应用只能选择一个登录能力';
+  if ((client.applicationType === 'NATIVE' || isInApp(client)) && additions.length > 1) return '当前应用只能选择一个登录能力';
   return '';
 }

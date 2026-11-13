@@ -16,14 +16,14 @@
  */
 package dev.macula.cloud.iam.controller;
 
-import java.util.Map;
-
-import dev.macula.cloud.iam.authentication.email.EmailCodeService;
 import dev.macula.cloud.iam.authentication.hosted.HostedLoginClientPolicyService;
+import dev.macula.cloud.iam.authentication.verification.VerificationCodeChannelService;
+import dev.macula.cloud.iam.authentication.verification.VerificationCodeContext;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Size;
-import lombok.RequiredArgsConstructor;
+import java.util.Map;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -38,11 +38,15 @@ import org.springframework.web.server.ResponseStatusException;
  * @since 6.1.0
  */
 @RestController
-@RequiredArgsConstructor
 @Validated
 public class EmailCodeController {
     public static final String PATH = "/api/v1/email-code";
-    private final EmailCodeService codes;
+    private final VerificationCodeChannelService codes;
+
+    /** 通道依赖以名称显式注入，避免公共接口存在两个Bean时发生误选。 */
+    public EmailCodeController(@Qualifier("emailCodeService") VerificationCodeChannelService codes) {
+        this.codes = codes;
+    }
 
     /**
      * 合法地址按SMS同样提交，不通过响应暴露账号是否存在。
@@ -52,8 +56,8 @@ public class EmailCodeController {
             HttpServletRequest request) {
         var context = HostedLoginClientPolicyService.context(request);
         try {
-            codes.send(email, request.getRemoteAddr(), context.clientId(),
-                    context.client() == null ? "Macula" : context.client().getClientName());
+            codes.sendCode(email, request.getRemoteAddr(), VerificationCodeContext.login(context.clientId(),
+                    context.client() == null ? "Macula" : context.client().applicationName()));
         } catch (RuntimeException ex) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "验证码暂时无法发送");
         }

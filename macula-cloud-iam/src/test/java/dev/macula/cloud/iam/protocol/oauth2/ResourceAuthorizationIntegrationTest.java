@@ -16,14 +16,13 @@
  */
 package dev.macula.cloud.iam.protocol.oauth2;
 
+import dev.macula.cloud.iam.protocol.oauth2.client.OAuth2ClientRegistration;
+import dev.macula.cloud.iam.protocol.oauth2.client.OAuth2ClientRegistrationService;
+import dev.macula.cloud.system.security.OAuth2ResourcePolicy;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.Set;
-
-import dev.macula.cloud.iam.pojo.entity.SysOAuth2Client;
-import dev.macula.cloud.iam.service.client.SysOAuth2ClientService;
-import dev.macula.cloud.system.security.OAuth2ResourcePolicy;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
@@ -35,6 +34,7 @@ import org.springframework.security.oauth2.server.authorization.authentication.O
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2TokenIntrospectionAuthenticationToken;
 import org.springframework.security.oauth2.server.authorization.client.InMemoryRegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
+import org.springframework.security.oauth2.server.authorization.settings.ClientSettings;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -82,7 +82,7 @@ class ResourceAuthorizationIntegrationTest {
         var authorization = OAuth2Authorization.withRegisteredClient(registered).principalName("user")
                 .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
                 .attribute(OAuth2ResourcePolicy.AUTHORIZATION_VERSION, 1L).build();
-        var owner = new SysOAuth2Client();
+        var owner = new OAuth2ClientRegistration();
         owner.setPurpose("APPLICATION");
         owner.setConfigurationStatus("ENABLED");
         owner.setAuthorizationVersion(1L);
@@ -100,14 +100,14 @@ class ResourceAuthorizationIntegrationTest {
     private OAuth2TokenIntrospectionAuthenticationToken introspect(Set<String> scopes, String purpose) {
         var owner = client("owner");
         var caller = client("resource");
-        var clients = mock(SysOAuth2ClientService.class);
-        var resource = new SysOAuth2Client();
+        var clients = mock(OAuth2ClientRegistrationService.class);
+        var resource = new OAuth2ClientRegistration();
         resource.setPurpose(purpose);
         resource.setAuthorizationVersion(1L);
         resource.setClientSecret(caller.getClientSecret());
 
         when(clients.getClientByClientId("resource")).thenReturn(resource);
-        var target = new SysOAuth2Client();
+        var target = new OAuth2ClientRegistration();
         target.setResourcePermissions(
                 "{\"profile\":\"urn:macula:iam:profile\",\"system:access\":\"urn:macula:system\"}");
         target.setAuthorizationVersion(1L);
@@ -139,7 +139,7 @@ class ResourceAuthorizationIntegrationTest {
                 .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
                 .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
                 .clientSettings(
-                        org.springframework.security.oauth2.server.authorization.settings.ClientSettings.builder()
+                        ClientSettings.builder()
                                 .setting(OAuth2ResourcePolicy.AUTHORIZATION_VERSION, 1L).build()).build();
     }
 }

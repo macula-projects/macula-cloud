@@ -17,12 +17,17 @@
 package dev.macula.cloud.iam.authentication.thirdparty.browser;
 
 import java.time.Instant;
+import java.util.Map;
+import java.util.Set;
 
 import dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures;
 import dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyAuthenticationToken;
 import dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyLoginContext;
+import dev.macula.cloud.iam.authentication.wecom.WecomAuthenticationFilter;
 import dev.macula.cloud.iam.service.identity.IdentityProviderConfigService;
 import dev.macula.cloud.system.enums.BrowserLoginProviderType;
+import dev.macula.cloud.system.enums.IdentitySourceType;
+import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -76,8 +81,8 @@ class ThirdPartyAuthenticationFlowTest {
         saveAuthorizationRequest(session, "other-client", "other-state");
         when(fixture.policies.requireAllowed(any(), any(), eq(BrowserLoginProviderType.GITHUB)))
                 .thenReturn(
-                        dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.policy("other-client",
-                                java.util.Set.of(BrowserLoginProviderType.GITHUB), null));
+                        IdentitySourceTestFixtures.policy("other-client",
+                                Set.of(BrowserLoginProviderType.GITHUB), null));
 
         MockHttpServletRequest request = loginRequest(session, "portal");
         fixture.filter.attemptAuthentication(request, new MockHttpServletResponse());
@@ -118,13 +123,13 @@ class ThirdPartyAuthenticationFlowTest {
         ThirdPartyLoginStateRepository states = mock(ThirdPartyLoginStateRepository.class);
         BrowserLoginClientPolicyService policies = mock(BrowserLoginClientPolicyService.class);
         when(policies.requireSource(any(), eq("FEISHU"), eq("BROWSER"))).thenReturn(
-                dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(
-                        dev.macula.cloud.system.enums.IdentitySourceType.FEISHU_WEB,
-                        "FEISHU", "app", "secret", java.util.Map.of()));
+                IdentitySourceTestFixtures.source(
+                        IdentitySourceType.FEISHU_WEB,
+                        "FEISHU", "app", "secret", Map.of()));
         UnknownFixtureFilter filter = new UnknownFixtureFilter();
         when(policies.requireAllowed(any(), any(), eq(BrowserLoginProviderType.FEISHU)))
-                .thenReturn(dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.policy("portal",
-                        java.util.Set.of(BrowserLoginProviderType.FEISHU), null));
+                .thenReturn(IdentitySourceTestFixtures.policy("portal",
+                        Set.of(BrowserLoginProviderType.FEISHU), null));
         filter.configure(configs, policies, states, "https://iam.example");
         filter.setAuthenticationManager(mock(AuthenticationManager.class));
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/login/feishu");
@@ -201,7 +206,7 @@ class ThirdPartyAuthenticationFlowTest {
         MockHttpSession session = new MockHttpSession();
         saveAuthorizationRequest(session, "other-client", "other-state");
         ThirdPartyLoginContext context =
-                dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.context(
+                IdentitySourceTestFixtures.context(
                 "GITHUB", "", "portal", Instant.now(),
                 "/oauth2/authorize?response_type=code&client_id=portal&state=original-state");
         when(fixture.states.consume(any(), eq("GITHUB"), eq("valid-state"))).thenReturn(context);
@@ -242,18 +247,18 @@ class ThirdPartyAuthenticationFlowTest {
     void rejectsDesktopOnlyInitiationOnMobileBeforeCreatingState() {
         var policies = mock(BrowserLoginClientPolicyService.class);
         var states = mock(ThirdPartyLoginStateRepository.class);
-        var filter = new dev.macula.cloud.iam.authentication.wecom.WecomAuthenticationFilter();
-        var policy = IdentitySourceTestFixtures.policy("portal", java.util.Set.of(BrowserLoginProviderType.WECOM),
+        var filter = new WecomAuthenticationFilter();
+        var policy = IdentitySourceTestFixtures.policy("portal", Set.of(BrowserLoginProviderType.WECOM),
                 null);
         when(policies.requireAllowed(any(), any(), eq(BrowserLoginProviderType.WECOM))).thenReturn(policy);
         when(policies.requireSource(policy, "WECOM", "BROWSER")).thenReturn(IdentitySourceTestFixtures.source(
-                dev.macula.cloud.system.enums.IdentitySourceType.WECOM_WEB, "WECOM", "corp", "fixture-secret",
-                java.util.Map.of("corpId", "corp", "agentId", "agent")));
+                IdentitySourceType.WECOM_WEB, "WECOM", "corp", "fixture-secret",
+                Map.of("corpId", "corp", "agentId", "agent")));
         filter.configure(mock(IdentityProviderConfigService.class), policies, states, "https://iam.example");
         filter.setAuthenticationManager(mock(AuthenticationManager.class));
         var request = new MockHttpServletRequest("GET", "/login/wecom/browser");
         request.addHeader("User-Agent", "iPhone Mobile Safari");
-        assertThrows(org.springframework.security.authentication.AuthenticationServiceException.class,
+        assertThrows(AuthenticationServiceException.class,
                 () -> filter.attemptAuthentication(request, new MockHttpServletResponse()));
         verifyNoInteractions(states);
     }
@@ -263,16 +268,16 @@ class ThirdPartyAuthenticationFlowTest {
         ThirdPartyLoginStateRepository states = mock(ThirdPartyLoginStateRepository.class);
         BrowserLoginClientPolicyService policies = mock(BrowserLoginClientPolicyService.class);
         when(policies.requireSource(any(), eq("GITHUB"), eq(""))).thenReturn(
-                dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(
-                        dev.macula.cloud.system.enums.IdentitySourceType.GITHUB_OAUTH, "GITHUB", "id", "secret",
-                        java.util.Map.of("clientId", "id")));
+                IdentitySourceTestFixtures.source(
+                        IdentitySourceType.GITHUB_OAUTH, "GITHUB", "id", "secret",
+                        Map.of("clientId", "id")));
         when(states.create(any(), any())).thenReturn("generated-state");
         when(policies.requireAllowed(any(), any(), eq(BrowserLoginProviderType.GITHUB)))
-                .thenReturn(dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.policy("portal",
-                        java.util.Set.of(BrowserLoginProviderType.GITHUB), null));
+                .thenReturn(IdentitySourceTestFixtures.policy("portal",
+                        Set.of(BrowserLoginProviderType.GITHUB), null));
         when(policies.requireAllowed(any(), any(), eq("portal"), eq(BrowserLoginProviderType.GITHUB)))
-                .thenReturn(dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.policy("portal",
-                        java.util.Set.of(BrowserLoginProviderType.GITHUB), null));
+                .thenReturn(IdentitySourceTestFixtures.policy("portal",
+                        Set.of(BrowserLoginProviderType.GITHUB), null));
         FixtureFilter filter = new FixtureFilter();
         filter.configure(configs, policies, states, "https://iam.example");
         AuthenticationManager authenticationManager = mock(AuthenticationManager.class);
@@ -361,7 +366,7 @@ class ThirdPartyAuthenticationFlowTest {
         }
 
         @Override
-        protected String loginMode(jakarta.servlet.http.HttpServletRequest request) {
+        protected String loginMode(HttpServletRequest request) {
             return null;
         }
 

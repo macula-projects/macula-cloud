@@ -20,8 +20,12 @@ import java.util.List;
 
 import dev.macula.cloud.iam.mapper.SysIdentityProviderMapper;
 import dev.macula.cloud.iam.pojo.entity.SysIdentityProvider;
+import dev.macula.cloud.system.enums.ExternalCodeType;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import org.springframework.security.authentication.AuthenticationServiceException;
+import tools.jackson.databind.json.JsonMapper;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -137,7 +141,7 @@ class IdentityProviderConfigServiceTest {
         SysIdentityProvider source = provider("secret", "{\"clientId\":\"one\"}");
         when(providers.selectById(1L)).thenReturn(source);
         assertEquals(1L, service.requireEnabledById(1L, "GITHUB").registrationId());
-        org.mockito.Mockito.verify(providers, org.mockito.Mockito.never()).selectList(any());
+        Mockito.verify(providers, Mockito.never()).selectList(any());
     }
 
     private SysIdentityProvider provider(String secret, String json) {
@@ -148,10 +152,10 @@ class IdentityProviderConfigServiceTest {
         provider.setAppId("id");
         if (json.contains("clientId")) {
             provider.setAppId(
-                    tools.jackson.databind.json.JsonMapper.builder().build().readTree(json).path("clientId").asText());
+                    JsonMapper.builder().build().readTree(json).path("clientId").asText());
         } else if (json.contains("appId")) {
             provider.setAppId(
-                    tools.jackson.databind.json.JsonMapper.builder().build().readTree(json).path("appId").asText());
+                    JsonMapper.builder().build().readTree(json).path("appId").asText());
         }
         provider.setEnabled(true);
         provider.setVersion(0L);
@@ -177,7 +181,7 @@ class IdentityProviderConfigServiceTest {
         var result = service.requireEnabledById(1L, "FEISHU");
         assertEquals("email", result.bindingMapping().source().value());
         assertEquals("username", result.bindingMapping().target().value());
-        org.junit.jupiter.api.Assertions.assertNull(result.bindingRule());
+        Assertions.assertNull(result.bindingRule());
     }
 
     /**
@@ -199,7 +203,7 @@ class IdentityProviderConfigServiceTest {
         row.setCapabilitiesJson("{\"WECOM_BROWSER\":\"WECOM_WEB_V1\",\"WECOM_MINIAPP\":\"WECOM_MINIAPP_V1\"}");
         when(providers.selectById(8L)).thenReturn(row);
         var mini = service.requireEnabledById(8L, "WECOM")
-                .forCode(dev.macula.cloud.system.enums.ExternalCodeType.WECOM_MINIAPP_CODE);
+                .forCode(ExternalCodeType.WECOM_MINIAPP_CODE);
         assertEquals("WECOM_MINIAPP", mini.sourceType().value());
         assertEquals("WECOM_MINIAPP_V1", mini.flow().value());
         assertEquals(8L, mini.registrationId());
@@ -238,7 +242,7 @@ class IdentityProviderConfigServiceTest {
         assertEquals(2, config.bindingMappings().size());
         assertEquals(config.bindingMappings(), config.forCapability("FEISHU_APPLINK").bindingMappings());
         assertEquals(config.bindingMappings(), config.forCapability("FEISHU_WEBVIEW").bindingMappings());
-        org.junit.jupiter.api.Assertions.assertNull(config.bindingMapping());
+        Assertions.assertNull(config.bindingMapping());
         assertThrows(UnsupportedOperationException.class, () -> config.bindingMappings().clear());
         row.setBindingMappingsJson("[]");
         assertThrows(AuthenticationServiceException.class, () -> service.requireEnabledById(8L, "FEISHU"));

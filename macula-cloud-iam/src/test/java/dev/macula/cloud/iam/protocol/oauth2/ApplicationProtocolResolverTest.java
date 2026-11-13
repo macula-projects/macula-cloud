@@ -16,9 +16,8 @@
  */
 package dev.macula.cloud.iam.protocol.oauth2;
 
+import dev.macula.cloud.iam.protocol.oauth2.client.OAuth2ClientRegistration;
 import java.util.Set;
-
-import dev.macula.cloud.iam.pojo.entity.SysOAuth2Client;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
@@ -65,7 +64,7 @@ class ApplicationProtocolResolverTest {
         request.addParameter("grant_type", "refresh_token");
         request.addParameter("refresh_token", "refresh");
         request.addParameter("scope", "api.read");
-        client.setDefaultProtocol("OAUTH2_1");
+
         assertEquals("OIDC", resolver.resolve(client, request).protocol());
         var old = OAuth2Authorization.from(authorization)
                 .attributes(values -> values.remove(ApplicationProtocolResolver.SCHEMA_ATTRIBUTE)).build();
@@ -84,7 +83,7 @@ class ApplicationProtocolResolverTest {
         request.addParameter("token", "target-oidc-token");
         request.addParameter("protocol", "OIDC");
         assertEquals("OIDC", resolver.resolve(client, request).protocol());
-        client.setDefaultProtocol("OAUTH2_1");
+
         assertEquals("OIDC", resolver.resolve(client, request).protocol());
         verifyNoInteractions(authorizations);
     }
@@ -102,11 +101,11 @@ class ApplicationProtocolResolverTest {
     /**
      * 真实能力规则下的两份独立策略。
      */
-    private SysOAuth2Client client() {
-        var row = new SysOAuth2Client();
+    private OAuth2ClientRegistration client() {
+        var row = new OAuth2ClientRegistration();
         row.setClientId("client");
-        row.setEnabledProtocols("OIDC,OAUTH2_1");
-        row.setDefaultProtocol("OIDC");
+        ProtocolTestFixtures.configure(row, "OIDC,OAUTH2_1");
+
         row.setAuthorizationGrantTypes("authorization_code,refresh_token");
         return ProtocolTestFixtures.configure(row);
     }

@@ -16,40 +16,62 @@
  */
 package dev.macula.cloud.iam.controller;
 
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.security.MessageDigest;
-import java.util.Base64;
-import java.util.HashMap;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Optional;
-
+import dev.macula.boot.constants.SecurityConstants;
 import dev.macula.cloud.iam.authentication.email.EmailCodeAuthenticationToken;
+import dev.macula.cloud.iam.authentication.email.EmailCodeService;
+import dev.macula.cloud.iam.authentication.mfa.AdditionalAuthenticationRequiredException;
+import dev.macula.cloud.iam.authentication.mfa.AuthenticationCheckpoint;
+import dev.macula.cloud.iam.authentication.mfa.AuthenticationMethod;
+import dev.macula.cloud.iam.authentication.mfa.MfaCompletionPolicy;
 import dev.macula.cloud.iam.config.IamProtocolTest;
 import dev.macula.cloud.iam.enums.UserTypeEnum;
 import dev.macula.cloud.iam.message.mail.LoginMailDispatcher;
-import dev.macula.cloud.iam.pojo.entity.SysOAuth2Client;
 import dev.macula.cloud.iam.pojo.entity.SysUser;
 import dev.macula.cloud.iam.protocol.oauth2.ProtocolTestFixtures;
+import dev.macula.cloud.iam.protocol.oauth2.client.OAuth2ClientRegistration;
+import dev.macula.cloud.iam.protocol.oauth2.client.OAuth2ClientRegistrationService;
 import dev.macula.cloud.iam.service.account.ClientAwareAccountResolver;
-import dev.macula.cloud.iam.service.client.SysOAuth2ClientService;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.security.MessageDigest;
+import java.util.Base64;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
+import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
+import org.springframework.security.web.csrf.DefaultCsrfToken;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.test.context.web.WebAppConfiguration;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.context.WebApplicationContext;
 import org.springframework.web.util.UriComponentsBuilder;
+import org.thymeleaf.context.WebContext;
+import org.thymeleaf.spring6.SpringTemplateEngine;
+import org.thymeleaf.web.servlet.JakartaServletWebApplication;
+import tools.jackson.databind.json.JsonMapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -89,10 +111,10 @@ class HostedEmailLoginFlowTest {
     private static final String VERIFIER = "e".repeat(43);
     @Autowired
     private WebApplicationContext context;
-    @org.springframework.test.context.bean.override.mockito.MockitoBean
-    private dev.macula.cloud.iam.authentication.mfa.MfaCompletionPolicy completionPolicy;
+    @MockitoBean
+    private MfaCompletionPolicy completionPolicy;
     private MockMvc mvc;
-    private SysOAuth2Client client;
+    private OAuth2ClientRegistration client;
     private LoginMailDispatcher mail;
 
     /**
@@ -105,8 +127,8 @@ class HostedEmailLoginFlowTest {
         mail = context.getBean(LoginMailDispatcher.class);
         clearInvocations(mail);
         client = client("public");
-        when(context.getBean(SysOAuth2ClientService.class).getClientByClientId("public")).thenReturn(client);
-        when(context.getBean(SysOAuth2ClientService.class).getClientByClientId("public-other")).thenReturn(
+        when(context.getBean(OAuth2ClientRegistrationService.class).getClientByClientId("public")).thenReturn(client);
+        when(context.getBean(OAuth2ClientRegistrationService.class).getClientByClientId("public-other")).thenReturn(
                 client("public-other"));
         var user = new SysUser();
         user.setId(42L);
@@ -130,7 +152,8 @@ class HostedEmailLoginFlowTest {
                 HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY);
         assertThat(security.getAuthentication()).isInstanceOf(EmailCodeAuthenticationToken.class);
         assertThat(security.getAuthentication().getCredentials()).isNull();
-        var authorized = mvc.perform(get(java.net.URI.create(login.getResponse().getRedirectedUrl())).session(session))
+        assertThat(context.getBean("emailCodeService")).isInstanceOf(EmailCodeService.class);
+        var authorized = mvc.perform(get(URI.create(login.getResponse().getRedirectedUrl())).session(session))
                 .andExpect(status().is3xxRedirection()).andReturn();
         String location = authorized.getResponse().getRedirectedUrl();
         if (location != null && location.contains("/oauth2/consent")) {
@@ -139,7 +162,7 @@ class HostedEmailLoginFlowTest {
                             .param("state", state).param("scope", "openid", "profile"))
                     .andExpect(status().is3xxRedirection()).andReturn().getResponse().getRedirectedUrl();
         }
-        String authorizationCode = UriComponentsBuilder.fromUriString(java.util.Objects.requireNonNull(location))
+        String authorizationCode = UriComponentsBuilder.fromUriString(Objects.requireNonNull(location))
                 .build().getQueryParams().getFirst("code");
         assertThat(authorizationCode).isNotBlank();
         var token = mvc.perform(
@@ -148,19 +171,19 @@ class HostedEmailLoginFlowTest {
                                         authorizationCode)
                                 .param("code_verifier", VERIFIER))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.id_token").isString()).andReturn();
-        var json = tools.jackson.databind.json.JsonMapper.builder().build()
+        var json = JsonMapper.builder().build()
                 .readTree(token.getResponse().getContentAsString());
-        var jwt = context.getBean(org.springframework.security.oauth2.jwt.JwtDecoder.class)
+        var jwt = context.getBean(JwtDecoder.class)
                 .decode(json.get("id_token").asString());
         assertThat(jwt.getClaimAsString("nonce")).isEqualTo("email-nonce");
         assertThat(jwt.getClaimAsInstant("auth_time")).isNotNull();
         var stored = context.getBean(
-                        org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService.class)
+                        OAuth2AuthorizationService.class)
                 .findByToken(json.get("access_token").asString(),
-                        org.springframework.security.oauth2.server.authorization.OAuth2TokenType.ACCESS_TOKEN);
+                        OAuth2TokenType.ACCESS_TOKEN);
         // 当前授权只有openid/profile，不应发布业务权限或框架认证因子。
         assertThat(stored.getAccessToken().getClaims()).doesNotContainKey(
-                dev.macula.boot.constants.SecurityConstants.AUTHORITIES_KEY);
+                SecurityConstants.AUTHORITIES_KEY);
         mvc.perform(get("/userinfo").header("Authorization", "Bearer " + json.get("access_token").asString()))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.sub").isString());
         mvc.perform(post("/login/email").session(authorization("public")).with(csrf()).param("email", EMAIL)
@@ -175,15 +198,15 @@ class HostedEmailLoginFlowTest {
     void emailDenialDoesNotEstablishSession() throws Exception {
         var session = authorization("public");
         String code = send(session);
-        doThrow(new dev.macula.cloud.iam.authentication.mfa.AdditionalAuthenticationRequiredException())
+        doThrow(new AdditionalAuthenticationRequiredException())
                 .when(completionPolicy).check(any());
         var response = mvc.perform(
                         post("/login/email").session(session).with(csrf()).param("email", EMAIL).param("code", code))
                 .andExpect(status().isServiceUnavailable()).andReturn();
         verify(completionPolicy).check(argThat(completion ->
-                completion.method() == dev.macula.cloud.iam.authentication.mfa.AuthenticationMethod.EMAIL
+                completion.method() == AuthenticationMethod.EMAIL
                         && completion.checkpoint() ==
-                        dev.macula.cloud.iam.authentication.mfa.AuthenticationCheckpoint.BROWSER_SESSION));
+                        AuthenticationCheckpoint.BROWSER_SESSION));
         assertThat(session.getAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY)).isNull();
         assertThat(response.getResponse().getCookie("remember-me")).isNull();
     }
@@ -231,34 +254,34 @@ class HostedEmailLoginFlowTest {
      */
     @Test
     void rendersAllFiveIconsAndEmailForBrowserVerification() throws Exception {
-        var request = new org.springframework.mock.web.MockHttpServletRequest(context.getServletContext());
-        var response = new org.springframework.mock.web.MockHttpServletResponse();
-        var application = org.thymeleaf.web.servlet.JakartaServletWebApplication.buildApplication(
+        var request = new MockHttpServletRequest(context.getServletContext());
+        var response = new MockHttpServletResponse();
+        var application = JakartaServletWebApplication.buildApplication(
                 context.getServletContext());
         Map<String, Object> model = new HashMap<>();
         model.put("enablePasswordLogin", true);
         model.put("enableSmsLogin", true);
         model.put("enableEmailLogin", true);
         model.put("_csrf",
-                new org.springframework.security.web.csrf.DefaultCsrfToken("X-CSRF-TOKEN", "_csrf", "fixture-csrf"));
-        for (String provider : java.util.List.of("github", "wecom", "feishu", "dingtalk", "wechat")) {
+                new DefaultCsrfToken("X-CSRF-TOKEN", "_csrf", "fixture-csrf"));
+        for (String provider : List.of("github", "wecom", "feishu", "dingtalk", "wechat")) {
             model.put(provider + "LoginEnabled", true);
             model.put(provider + "LoginPath", "/login/" + provider);
         }
-        var web = new org.thymeleaf.context.WebContext(application.buildExchange(request, response),
+        var web = new WebContext(application.buildExchange(request, response),
                 Locale.SIMPLIFIED_CHINESE, model);
-        String html = context.getBean(org.thymeleaf.spring6.SpringTemplateEngine.class).process("login", web);
+        String html = context.getBean(SpringTemplateEngine.class).process("login", web);
         assertThat(html).contains("id=\"email-login\"", "aria-label=\"使用飞书登录\"", "/iam/icons/wecom.svg");
         Path output = Path.of("target", "iam-preview", "login.html");
         Files.createDirectories(output.getParent());
         Files.writeString(output, html);
         // 预览使用与线上相同的本地静态资源；所有生成物只写模块target。
-        for (String asset : java.util.List.of("auth.css", "auth.js", "icons/github.svg", "icons/wecom.svg",
+        for (String asset : List.of("auth.css", "auth.js", "icons/github.svg", "icons/wecom.svg",
                 "icons/feishu.svg", "icons/dingtalk.svg", "icons/wechat.svg")) {
             Path target = output.getParent().resolve("iam").resolve(asset);
             Files.createDirectories(target.getParent());
-            try (var resource = new org.springframework.core.io.ClassPathResource("static/iam/" + asset).getInputStream()) {
-                Files.copy(resource, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            try (var resource = new ClassPathResource("static/iam/" + asset).getInputStream()) {
+                Files.copy(resource, target, StandardCopyOption.REPLACE_EXISTING);
             }
         }
     }
@@ -268,8 +291,8 @@ class HostedEmailLoginFlowTest {
      */
     private String send(MockHttpSession session) throws Exception {
         // 各测试使用独立Redis状态键，避免发送窗口互相影响。
-        context.getBean(org.springframework.data.redis.core.StringRedisTemplate.class).delete(
-                context.getBean(org.springframework.data.redis.core.StringRedisTemplate.class)
+        context.getBean(StringRedisTemplate.class).delete(
+                context.getBean(StringRedisTemplate.class)
                         .keys("iam:email-login:send:*"));
         mvc.perform(post("/api/v1/email-code").session(session).with(csrf()).param("email", EMAIL))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("submitted"));
@@ -296,8 +319,8 @@ class HostedEmailLoginFlowTest {
     /**
      * 只提供当前用例允许的EMAIl方式，不依赖生产Client或真实账号。
      */
-    private SysOAuth2Client client(String id) {
-        var result = new SysOAuth2Client();
+    private OAuth2ClientRegistration client(String id) {
+        var result = new OAuth2ClientRegistration();
         result.setClientId(id);
         result.setClientName("Email fixture");
         result.setApplicationType("SPA");

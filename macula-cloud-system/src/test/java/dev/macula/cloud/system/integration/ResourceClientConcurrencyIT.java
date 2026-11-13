@@ -16,22 +16,22 @@
  */
 package dev.macula.cloud.system.integration;
 
+import dev.macula.cloud.system.protocol.OAuth2ProtocolDefinition;
+import dev.macula.cloud.system.service.impl.ProtocolConfigurationTestFixtures;
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.spring.MybatisSqlSessionFactoryBean;
 import dev.macula.boot.constants.CacheConstants;
 import dev.macula.cloud.system.config.OAuth2ScopeCatalogProperties;
-import dev.macula.cloud.system.form.OAuth2ClientForm;
-import dev.macula.cloud.system.mapper.SysApplicationProtocolConfigMapper;
+import dev.macula.cloud.system.form.IamApplicationForm;
+import dev.macula.cloud.system.mapper.SysIamApplicationProtocolConfigMapper;
 import dev.macula.cloud.system.mapper.SysIdentityProviderMapper;
-import dev.macula.cloud.system.mapper.SysOAuth2ClientConfigMapper;
-import dev.macula.cloud.system.mapper.SysOAuth2ClientExternalProviderMapper;
+import dev.macula.cloud.system.mapper.SysIamApplicationMapper;
+import dev.macula.cloud.system.mapper.SysIamApplicationIdentityProviderMapper;
 import dev.macula.cloud.system.mapper.SysTenantInfoMapper;
-import dev.macula.cloud.system.pojo.entity.SysOAuth2ClientConfig;
+import dev.macula.cloud.system.pojo.entity.SysIamApplication;
 import dev.macula.cloud.system.protocol.OAuth2ProtocolSettings;
 import dev.macula.cloud.system.security.OAuth2ClientCacheNames;
-import dev.macula.cloud.system.service.impl.ApplicationProtocolConfigurationService;
-import dev.macula.cloud.system.service.impl.OAuth2ClientConfigServiceImpl;
-import dev.macula.cloud.system.service.impl.OAuth2ClientConfigurationCatalogServiceImpl;
+import dev.macula.cloud.system.service.impl.IamApplicationCatalogServiceImpl;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -71,32 +71,32 @@ class ResourceClientConcurrencyIT {
         admin.execute("CREATE DATABASE " + database + " CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
         try {
             var ds = new DriverManagerDataSource(rootUrl.replace("/mysql?", "/" + database + "?"), System.getenv("IAM_RESOURCE_IT_USER"), System.getenv("IAM_RESOURCE_IT_PASSWORD"));
-            Flyway.configure().dataSource(ds).locations("classpath:db/migration").load().migrate();
+            Flyway.configure().dataSource(ds).locations("classpath:db/migration").target("26").load().migrate();
             var jdbc = new JdbcTemplate(ds);
             Long id = jdbc.queryForObject("SELECT MIN(id) FROM sys_oauth2_client", Long.class);
             jdbc.update("DELETE FROM sys_application_protocol_config WHERE application_id=?", id);
-            jdbc.update("UPDATE sys_oauth2_client SET purpose='RESOURCE_SERVER',managed_key=NULL,configuration_status='ENABLED', "
+            jdbc.update("UPDATE sys_oauth2_client SET purpose='RESOURCE_SERVER',application_type='SERVICE',managed_key=NULL,configuration_status='ENABLED', "
                 + "client_authentication_methods='client_secret_basic',authorization_grant_types='',scopes='',redirect_uris='', "
                 + "client_secret='original-test-hash',tenant_id=NULL,user_type=NULL WHERE id=?", id);
+            Flyway.configure().dataSource(ds).locations("classpath:db/migration").target("27").load().migrate();
             var configuration = new MybatisConfiguration();
             configuration.setMapUnderscoreToCamelCase(true);
             var factory = new MybatisSqlSessionFactoryBean();
             factory.setDataSource(ds);
             factory.setConfiguration(configuration);
             var sql = factory.getObject();
-            for (Class<?> type : List.of(SysOAuth2ClientConfigMapper.class, SysApplicationProtocolConfigMapper.class, SysOAuth2ClientExternalProviderMapper.class)) {
+            for (Class<?> type : List.of(SysIamApplicationMapper.class, SysIamApplicationProtocolConfigMapper.class, SysIamApplicationIdentityProviderMapper.class)) {
                 sql.getConfiguration().addMapper(type);
             }
             var session = new SqlSessionTemplate(sql);
-            var mapper = session.getMapper(SysOAuth2ClientConfigMapper.class);
-            var sources = session.getMapper(SysOAuth2ClientExternalProviderMapper.class);
-            var protocols = new ApplicationProtocolConfigurationService(session.getMapper(SysApplicationProtocolConfigMapper.class), sources);
+            var mapper = session.getMapper(SysIamApplicationMapper.class);
+            var sources = session.getMapper(SysIamApplicationIdentityProviderMapper.class);
+            var protocols = ProtocolConfigurationTestFixtures.protocols(session.getMapper(SysIamApplicationProtocolConfigMapper.class), sources);
             var caches = new SimpleCacheManager();
             caches.setCaches(List.of(new ConcurrentMapCache(CacheConstants.OAUTH2_CLIENT_CACHE_KEY), new ConcurrentMapCache(OAuth2ClientCacheNames.TOKEN_ORIGIN_INDEX)));
             caches.initializeCaches();
             var providers = mock(SysIdentityProviderMapper.class);
-            var service = new OAuth2ClientConfigServiceImpl(mapper, sources, providers, mock(SysTenantInfoMapper.class),
-                new BCryptPasswordEncoder(), caches, new OAuth2ClientConfigurationCatalogServiceImpl(new OAuth2ScopeCatalogProperties(), providers), protocols);
+            var service = ProtocolConfigurationTestFixtures.service(mapper, sources, session.getMapper(SysIamApplicationProtocolConfigMapper.class), providers, mock(SysTenantInfoMapper.class), new BCryptPasswordEncoder(), caches, new IamApplicationCatalogServiceImpl(new OAuth2ScopeCatalogProperties(), providers, OAuth2ProtocolDefinition.registry()));
             var transaction = new TransactionTemplate(new DataSourceTransactionManager(ds));
             var initial = service.get(id);
             var firstForm = form(initial.getClientId(), initial.getConfigurationVersion(), "first");
@@ -106,8 +106,8 @@ class ResourceClientConcurrencyIT {
             var executor = Executors.newFixedThreadPool(2);
             try {
                 var first = executor.submit(() -> transaction.executeWithoutResult(status -> {
-                    mapper.selectOne(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<SysOAuth2ClientConfig>()
-                        .eq(SysOAuth2ClientConfig::getId, id).last("FOR UPDATE"));
+                    mapper.selectOne(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<SysIamApplication>()
+                        .eq(SysIamApplication::getId, id).last("FOR UPDATE"));
                     locked.countDown();
                     try { assertTrue(attempted.await(5, TimeUnit.SECONDS)); }
                     catch (InterruptedException error) {
@@ -129,7 +129,7 @@ class ResourceClientConcurrencyIT {
                 second.get(15, TimeUnit.SECONDS);
             } finally { executor.shutdownNow(); }
             assertEquals("first", service.get(id).getClientName());
-            assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM sys_application_protocol_config WHERE application_id=?", Integer.class, id));
+            assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM sys_iam_application_protocol_config WHERE application_id=?", Integer.class, id));
             var beforeReset = service.get(id);
             transaction.executeWithoutResult(status -> service.resetSecret(id, "synthetic-test-secret-rotation", beforeReset.getConfigurationVersion()));
             assertThrows(ResponseStatusException.class, () -> transaction.executeWithoutResult(status -> service.save(id,
@@ -140,7 +140,7 @@ class ResourceClientConcurrencyIT {
                 throw new IllegalStateException("fixture rollback");
             }));
             assertEquals(beforeRollback.getConfigurationVersion(), service.get(id).getConfigurationVersion());
-            jdbc.update("UPDATE sys_oauth2_client SET managed_key='platform-fixture' WHERE id=?", id);
+            jdbc.update("UPDATE sys_iam_application SET managed_key='platform-fixture' WHERE id=?", id);
             var managed = service.get(id);
             assertThrows(ResponseStatusException.class, () -> transaction.executeWithoutResult(status -> service.delete(id, managed.getConfigurationVersion())));
             var disabled = form(managed.getClientId(), managed.getConfigurationVersion(), "disabled");
@@ -149,18 +149,19 @@ class ResourceClientConcurrencyIT {
             var changedPurpose = form(managed.getClientId(), managed.getConfigurationVersion(), "changed-purpose");
             changedPurpose.setPurpose("APPLICATION");
             assertThrows(ResponseStatusException.class, () -> transaction.executeWithoutResult(status -> service.save(id, changedPurpose)));
-            assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM sys_oauth2_client WHERE id=?", Integer.class, id));
+            assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM sys_iam_application WHERE id=?", Integer.class, id));
         } finally {
             if (database.matches("macula_identity_binding_it_resource_[a-f0-9]{24}")) { admin.execute("DROP DATABASE IF EXISTS " + database); }
         }
     }
 
     /** 资源服务器表单没有协议、grant、租户或用户类型。 */
-    private OAuth2ClientForm form(String clientId, String version, String name) {
-        var form = new OAuth2ClientForm();
+    private IamApplicationForm form(String clientId, String version, String name) {
+        var form = new IamApplicationForm();
         form.setClientId(clientId);
         form.setClientName(name);
         form.setPurpose("RESOURCE_SERVER");
+        form.setApplicationType("SERVICE");
         form.setConfigurationStatus("ENABLED");
         form.setConfigurationVersion(version);
 

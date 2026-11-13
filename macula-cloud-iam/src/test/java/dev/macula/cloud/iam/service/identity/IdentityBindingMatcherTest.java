@@ -16,12 +16,17 @@
  */
 package dev.macula.cloud.iam.service.identity;
 
+import java.util.List;
 import java.util.Map;
 
 import dev.macula.cloud.iam.authentication.thirdparty.VerifiedExternalIdentity;
 import dev.macula.cloud.iam.mapper.SysUserMapper;
+import dev.macula.cloud.iam.pojo.entity.SysUser;
 import dev.macula.cloud.system.enums.IdentityBindingMapping;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -69,30 +74,30 @@ class IdentityBindingMatcherTest {
     @Test
     void requiresAllMatchingRulesToAgreeOnOneAccount() {
         var users = mock(SysUserMapper.class);
-        var first = new dev.macula.cloud.iam.pojo.entity.SysUser();
+        var first = new SysUser();
         first.setId(1L);
-        var second = new dev.macula.cloud.iam.pojo.entity.SysUser();
+        var second = new SysUser();
         second.setId(2L);
         var identity = new VerifiedExternalIdentity(1L, "FEISHU", "FEISHU_WEB", 0L, "FEISHU_OAUTH_V3",
                 "BROWSER", "OPEN_ID", "fixture", Map.of("mobile", "13800000001", "email", "person@example.test"));
-        var rules = java.util.List.of(IdentityBindingMapping.of("mobile", "mobile"),
+        var rules = List.of(IdentityBindingMapping.of("mobile", "mobile"),
                 IdentityBindingMapping.of("email", "email"));
         var matcher = new IdentityBindingMatcher(users);
-        org.mockito.Mockito.when(users.findIdentityBindingCandidates(eq("mobile"), any(), any(), any(), eq(false)))
-                .thenReturn(java.util.List.of(first));
-        org.mockito.Mockito.when(users.findIdentityBindingCandidates(eq("email"), any(), any(), any(), eq(false)))
-                .thenReturn(java.util.List.of());
-        org.junit.jupiter.api.Assertions.assertEquals(java.util.List.of(first),
+        Mockito.when(users.findIdentityBindingCandidates(eq("mobile"), any(), any(), any(), eq(false)))
+                .thenReturn(List.of(first));
+        Mockito.when(users.findIdentityBindingCandidates(eq("email"), any(), any(), any(), eq(false)))
+                .thenReturn(List.of());
+        Assertions.assertEquals(List.of(first),
                 matcher.candidates(rules, identity, false));
-        org.mockito.Mockito.when(users.findIdentityBindingCandidates(eq("email"), any(), any(), any(), eq(false)))
-                .thenReturn(java.util.List.of(first));
-        org.junit.jupiter.api.Assertions.assertEquals(java.util.List.of(first),
+        Mockito.when(users.findIdentityBindingCandidates(eq("email"), any(), any(), any(), eq(false)))
+                .thenReturn(List.of(first));
+        Assertions.assertEquals(List.of(first),
                 matcher.candidates(rules, identity, false));
-        org.mockito.Mockito.when(users.findIdentityBindingCandidates(eq("email"), any(), any(), any(), eq(false)))
-                .thenReturn(java.util.List.of(second));
+        Mockito.when(users.findIdentityBindingCandidates(eq("email"), any(), any(), any(), eq(false)))
+                .thenReturn(List.of(second));
         assertTrue(matcher.candidates(rules, identity, false).isEmpty());
-        org.mockito.Mockito.when(users.findIdentityBindingCandidates(eq("email"), any(), any(), any(), eq(false)))
-                .thenReturn(java.util.List.of(first, second));
+        Mockito.when(users.findIdentityBindingCandidates(eq("email"), any(), any(), any(), eq(false)))
+                .thenReturn(List.of(first, second));
         assertTrue(matcher.candidates(rules, identity, false).isEmpty());
     }
 
@@ -102,26 +107,26 @@ class IdentityBindingMatcherTest {
     @Test
     void repeatsEveryRuleUnderTransactionLocks() {
         var users = mock(SysUserMapper.class);
-        var first = new dev.macula.cloud.iam.pojo.entity.SysUser();
+        var first = new SysUser();
         first.setId(1L);
-        var second = new dev.macula.cloud.iam.pojo.entity.SysUser();
+        var second = new SysUser();
         second.setId(2L);
-        org.mockito.Mockito.when(users.identityBindingIsolation()).thenReturn("REPEATABLE-READ");
-        org.mockito.Mockito.when(users.findIdentityBindingCandidates(eq("mobile"), any(), any(), any(), eq(true)))
-                .thenReturn(java.util.List.of(first));
-        org.mockito.Mockito.when(users.findIdentityBindingCandidates(eq("email"), any(), any(), any(), eq(true)))
-                .thenReturn(java.util.List.of(second));
+        Mockito.when(users.identityBindingIsolation()).thenReturn("REPEATABLE-READ");
+        Mockito.when(users.findIdentityBindingCandidates(eq("mobile"), any(), any(), any(), eq(true)))
+                .thenReturn(List.of(first));
+        Mockito.when(users.findIdentityBindingCandidates(eq("email"), any(), any(), any(), eq(true)))
+                .thenReturn(List.of(second));
         var identity = new VerifiedExternalIdentity(1L, "FEISHU", "FEISHU_WEB", 0L, "FEISHU_OAUTH_V3",
                 "BROWSER", "OPEN_ID", "fixture", Map.of("mobile", "13800000001", "email", "person@example.test"));
-        org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(true);
+        TransactionSynchronizationManager.setActualTransactionActive(true);
         try {
             assertTrue(new IdentityBindingMatcher(users).candidates(
-                    java.util.List.of(IdentityBindingMapping.of("mobile", "mobile"),
+                    List.of(IdentityBindingMapping.of("mobile", "mobile"),
                             IdentityBindingMapping.of("email", "email")), identity, true).isEmpty());
             verify(users).findIdentityBindingCandidates(eq("mobile"), any(), any(), any(), eq(true));
             verify(users).findIdentityBindingCandidates(eq("email"), any(), any(), any(), eq(true));
         } finally {
-            org.springframework.transaction.support.TransactionSynchronizationManager.clear();
+            TransactionSynchronizationManager.clear();
         }
     }
 

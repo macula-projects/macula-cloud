@@ -20,8 +20,10 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
+import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -34,14 +36,14 @@ import java.util.concurrent.TimeUnit;
  */
 public final class FakeSmtpServer implements AutoCloseable {
     private final ServerSocket server;
-    private final java.util.concurrent.ExecutorService executor = Executors.newSingleThreadExecutor();
+    private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final Future<String> captured;
 
     /**
      * 使用系统分配端口，不复用邮件服务或业务凭据。
      */
     public FakeSmtpServer() throws Exception {
-        server = new ServerSocket(0, 1, java.net.InetAddress.getLoopbackAddress());
+        server = new ServerSocket(0, 1, InetAddress.getLoopbackAddress());
         captured = executor.submit(this::receive);
     }
 

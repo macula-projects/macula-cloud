@@ -125,3 +125,15 @@ Verification is green。
 - 未修改CLAUDE.md、AGENTS.md、REVIEW.md、技能或hooks，无适用配置eval变化；既有前端/数据库/厂商能力代码不变，不把原有外部验证成绩重新算作本轮执行。
 
 Verification is green。独立审查仅覆盖本轮差异，不重报此前已关闭的Plan问题；此结论不构成人工风险接受。
+
+
+## IAM全模块显式import整理自检（2026-11-11）
+
+用户明确要求扫描整个macula-cloud-iam，将全限定类型尽量改为import。扫描src下317个生产/测试Java文件，修改135文件（生产62、测试73），替换1536处类型/静态方法引用；不改变注释、字符串或序列化标识。保留原有AbstractThirdPartyAuthenticationFilter未提交修改，写入前核对各文件摘要。
+
+- 全部135个文件按各自显式/同包/Java隐式导入还原类型和静态方法后，Java token流与本轮写入前快照一致（135/135）；所有注释和字符串片段逐项相同。
+- 最终不限制包名前缀的词法扫描只剩1处代码限定：MaculaOAuth2AuthorizationServiceTest内tools.jackson.databind.ObjectMapper，与该测试用于旧格式夹具的com.fasterxml.jackson.databind.ObjectMapper同名，保留必要限定。生产代码剩余0处，注释和字符串中的包名不计入。
+- `mvn -pl macula-cloud-iam -am test -Plocal`：`BUILD SUCCESS`；API21项、IAM387项，408项全部通过，无失败/错误/跳过，退出码0。
+- 135个修改Java文件Checkstyle退出码0，`git diff --check`通过；没有新增package-info.java或新类型/依赖/接口。
+
+本轮原始快照、扫描清单、等同性检查及测试/规范日志仅存本地`/private/tmp/macula-iam-review-20261111/module-import-cleanup/`，不提交生成物。此处为本地整理自检，不代表新增远端发布或部署。

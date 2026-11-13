@@ -16,7 +16,9 @@
  */
 package dev.macula.cloud.iam.authentication.email;
 
-import org.springframework.context.ApplicationContext;
+import java.util.Objects;
+
+import dev.macula.cloud.iam.authentication.verification.VerificationCodeChannelService;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractAuthenticationFilterConfigurer;
@@ -28,35 +30,32 @@ import static org.springframework.security.config.annotation.web.builders.Filter
 import static org.springframework.security.config.annotation.web.builders.FilterOrderRegUtils.registryFilterOrder;
 
 /**
- * 复用框架认证生命周期，将邮箱Provider仅注册到托管登录链。
+ * Email登录链装配；使用独立Configurer类型，避免两通道在HttpSecurity中互相覆盖。
  *
  * @author Macula
  * @since 6.1.0
  */
-public class EmailLoginFilterConfigurer extends AbstractAuthenticationFilterConfigurer<HttpSecurity,
+public final class EmailLoginFilterConfigurer extends AbstractAuthenticationFilterConfigurer<HttpSecurity,
         EmailLoginFilterConfigurer, EmailCodeAuthenticationFilter> {
-    /**
-     * 使用独立认证入口，不复用旧协议邮箱端点。
-     */
-    public EmailLoginFilterConfigurer() {
+    private final VerificationCodeChannelService codes;
+    private final EmailUserDetailsService users;
+
+    /** 显式接收依赖，不隐式查询ApplicationContext。 */
+    public EmailLoginFilterConfigurer(VerificationCodeChannelService codes, EmailUserDetailsService users) {
         super(new EmailCodeAuthenticationFilter(), EmailCodeAuthenticationFilter.PATH);
+        this.codes = Objects.requireNonNull(codes);
+        this.users = Objects.requireNonNull(users);
     }
 
-    /**
-     * 框架继续处理SecurityContext、Session固定保护与成功续转。
-     */
+    /** 仅注册到登录链；由框架处理Session保护、上下文保存及成功续转。 */
     @Override
     public void init(HttpSecurity http) {
-        ApplicationContext context = http.getSharedObject(ApplicationContext.class);
-        http.authenticationProvider(postProcess(new EmailCodeAuthenticationProvider(
-                context.getBean(EmailCodeService.class), context.getBean(EmailUserDetailsService.class))));
+        http.authenticationProvider(postProcess(new EmailCodeAuthenticationProvider(codes, users)));
         registryFilterOrder(http, getAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class, AFTER);
         super.init(http);
     }
 
-    /**
-     * 认证副作用仅允许POST。
-     */
+    /** 认证副作用只允许POST。 */
     @Override
     protected RequestMatcher createLoginProcessingUrlMatcher(String path) {
         return PathPatternRequestMatcher.pathPattern(HttpMethod.POST, path);

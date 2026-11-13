@@ -16,16 +16,22 @@
  */
 package dev.macula.cloud.iam.jackson;
 
+import java.nio.charset.StandardCharsets;
 import java.security.Principal;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.function.Consumer;
 
 import dev.macula.cloud.iam.service.userdetails.SysUserDetails;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.jackson.SecurityJacksonModules;
+import org.springframework.security.web.authentication.WebAuthenticationDetails;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
+import tools.jackson.databind.node.ObjectNode;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -57,7 +63,7 @@ class LegacyEmailPrincipalReaderTest {
             assertThat(((SysUserDetails) principal.getPrincipal()).getUserId()).isEqualTo(42L);
             assertThat(principal.getAuthorities()).extracting("authority").containsExactly("USER");
             assertThat(principal.getDetails()).isInstanceOf(
-                    org.springframework.security.web.authentication.WebAuthenticationDetails.class);
+                    WebAuthenticationDetails.class);
         }
     }
 
@@ -67,13 +73,13 @@ class LegacyEmailPrincipalReaderTest {
     @Test
     void rejectsUntrustedLegacyShapes() throws Exception {
         var json = JsonMapper.builder().build();
-        java.util.List<java.util.function.Consumer<tools.jackson.databind.node.ObjectNode>> mutations = java.util.List.of(
+        List<Consumer<ObjectNode>> mutations = List.of(
                 principal -> principal.put("authenticated", false),
                 principal -> principal.put("credentials", "synthetic-code"),
                 principal -> principal.put("unexpected", true));
         for (var mutate : mutations) {
             var attributes = json.readTree(fixture("3"));
-            var principal = (tools.jackson.databind.node.ObjectNode) attributes.get(Principal.class.getName());
+            var principal = (ObjectNode) attributes.get(Principal.class.getName());
             mutate.accept(principal);
             String invalid = json.writeValueAsString(attributes);
             assertThatThrownBy(() -> read(invalid)).isInstanceOf(IllegalArgumentException.class);
@@ -107,8 +113,8 @@ class LegacyEmailPrincipalReaderTest {
     private String fixture(String version) throws Exception {
         try (var input = getClass().getResourceAsStream(
                 "/authorization/legacy-email-jackson" + version + "-attributes.json")) {
-            return new String(java.util.Objects.requireNonNull(input).readAllBytes(),
-                    java.nio.charset.StandardCharsets.UTF_8);
+            return new String(Objects.requireNonNull(input).readAllBytes(),
+                    StandardCharsets.UTF_8);
         }
     }
 }

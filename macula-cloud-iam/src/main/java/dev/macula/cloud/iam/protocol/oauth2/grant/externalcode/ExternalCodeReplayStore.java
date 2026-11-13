@@ -18,13 +18,15 @@ package dev.macula.cloud.iam.protocol.oauth2.grant.externalcode;
 
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
+import java.time.Duration;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
 
 import dev.macula.cloud.system.enums.ExternalCodeType;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
@@ -43,17 +45,17 @@ import org.springframework.util.Assert;
 public class ExternalCodeReplayStore {
     private static final String HMAC_ALGORITHM = "HmacSHA256";
     private static final String KEY_PREFIX = "iam:external-code:replay:";
-    private static final java.util.Map<ExternalCodeType, java.time.Duration> MINIMUM_TTLS = java.util.Map.of(
-            ExternalCodeType.FEISHU_APP_CODE, java.time.Duration.ofMinutes(10),
-            ExternalCodeType.WECOM_APP_CODE, java.time.Duration.ofMinutes(10),
-            ExternalCodeType.DINGTALK_APP_CODE, java.time.Duration.ofMinutes(10),
-            ExternalCodeType.WECHAT_OPEN_APP_CODE, java.time.Duration.ofMinutes(10),
-            ExternalCodeType.ALIYUN_MOBILE_TOKEN, java.time.Duration.ofMinutes(31),
-            ExternalCodeType.WECHAT_MINIAPP_LOGIN_CODE, java.time.Duration.ofMinutes(10),
-            ExternalCodeType.WECHAT_MINIAPP_PHONE_CODE, java.time.Duration.ofMinutes(10),
-            ExternalCodeType.WECOM_MINIAPP_CODE, java.time.Duration.ofMinutes(10),
-            ExternalCodeType.FEISHU_WEBVIEW_CODE, java.time.Duration.ofMinutes(10),
-            ExternalCodeType.DINGTALK_WEBVIEW_CODE, java.time.Duration.ofMinutes(10));
+    private static final Map<ExternalCodeType, Duration> MINIMUM_TTLS = Map.of(
+            ExternalCodeType.FEISHU_APP_CODE, Duration.ofMinutes(10),
+            ExternalCodeType.WECOM_APP_CODE, Duration.ofMinutes(10),
+            ExternalCodeType.DINGTALK_APP_CODE, Duration.ofMinutes(10),
+            ExternalCodeType.WECHAT_OPEN_APP_CODE, Duration.ofMinutes(10),
+            ExternalCodeType.ALIYUN_MOBILE_TOKEN, Duration.ofMinutes(31),
+            ExternalCodeType.WECHAT_MINIAPP_LOGIN_CODE, Duration.ofMinutes(10),
+            ExternalCodeType.WECHAT_MINIAPP_PHONE_CODE, Duration.ofMinutes(10),
+            ExternalCodeType.WECOM_MINIAPP_CODE, Duration.ofMinutes(10),
+            ExternalCodeType.FEISHU_WEBVIEW_CODE, Duration.ofMinutes(10),
+            ExternalCodeType.DINGTALK_WEBVIEW_CODE, Duration.ofMinutes(10));
     private static final DefaultRedisScript<Long> RELEASE = new DefaultRedisScript<>(
             "if redis.call('get',KEYS[1])==ARGV[1] then return redis.call('del',KEYS[1]) else return 0 end",
             Long.class);
@@ -70,16 +72,16 @@ public class ExternalCodeReplayStore {
     public ReplayClaim claim(ExternalCodeType codeType, String code) {
         String key = KEY_PREFIX + digest(codeType, code);
         String owner = UUID.randomUUID().toString();
-        java.time.Duration configured = properties.getReplayTtl();
+        Duration configured = properties.getReplayTtl();
         if (configured == null || configured.isNegative() || configured.isZero()
-                || configured.compareTo(java.time.Duration.ofDays(1)) > 0) {
+                || configured.compareTo(Duration.ofDays(1)) > 0) {
             throw new OAuth2AuthenticationException(OAuth2ErrorCodes.SERVER_ERROR);
         }
-        java.time.Duration floor = MINIMUM_TTLS.get(codeType);
+        Duration floor = MINIMUM_TTLS.get(codeType);
         if (floor == null) {
             throw new OAuth2AuthenticationException(OAuth2ErrorCodes.UNAUTHORIZED_CLIENT);
         }
-        java.time.Duration ttl = configured.compareTo(floor) < 0 ? floor : configured;
+        Duration ttl = configured.compareTo(floor) < 0 ? floor : configured;
         try {
             if (!Boolean.TRUE.equals(redis.opsForValue().setIfAbsent(key, owner, ttl))) {
                 throw new OAuth2AuthenticationException(new OAuth2Error(OAuth2ErrorCodes.INVALID_GRANT,

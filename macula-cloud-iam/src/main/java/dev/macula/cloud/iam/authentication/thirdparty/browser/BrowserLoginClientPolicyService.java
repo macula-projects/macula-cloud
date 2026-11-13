@@ -16,33 +16,28 @@
  */
 package dev.macula.cloud.iam.authentication.thirdparty.browser;
 
-import java.net.URI;
-import java.util.Arrays;
+import dev.macula.cloud.iam.enums.UserTypeEnum;
+import dev.macula.cloud.iam.service.application.LoginApplicationResolver;
+import dev.macula.cloud.iam.service.identity.IdentityProviderConfigService;
+import dev.macula.cloud.system.enums.BrowserLoginProviderType;
+import dev.macula.cloud.system.enums.IamApplicationType;
+import dev.macula.cloud.system.enums.IamWebLoginMode;
+import dev.macula.cloud.system.enums.IdentityBrowserEnvironment;
+import dev.macula.cloud.system.enums.IdentityLoginCapability;
+import dev.macula.cloud.system.enums.IdentitySourceType;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
-
-import dev.macula.cloud.iam.pojo.entity.SysOAuth2Client;
-import dev.macula.cloud.iam.service.client.SysOAuth2ClientService;
-import dev.macula.cloud.iam.service.identity.IdentityProviderConfigService;
-import dev.macula.cloud.system.enums.BrowserLoginProviderType;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationServiceException;
-import org.springframework.security.oauth2.core.AuthorizationGrantType;
-import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationResponseType;
-import org.springframework.security.oauth2.core.endpoint.OAuth2ParameterNames;
-import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
-import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
-import org.springframework.security.web.savedrequest.RequestCache;
-import org.springframework.security.web.savedrequest.SavedRequest;
 import org.springframework.stereotype.Service;
-import org.springframework.util.StringUtils;
 
 /**
- * 从受控授权请求恢复 OAuth Client 的浏览器第三方登录策略。
+ * 从协议解析端口恢复应用的浏览器第三方登录策略。
  *
  * @author Rain
  * @since 6.1.0
@@ -50,12 +45,8 @@ import org.springframework.util.StringUtils;
 @Service
 @RequiredArgsConstructor
 public class BrowserLoginClientPolicyService {
-    private final SysOAuth2ClientService clientService;
-    private final AuthorizationServerSettings authorizationServerSettings;
+    private final LoginApplicationResolver applications;
     private final IdentityProviderConfigService configs;
-    private final tools.jackson.databind.json.JsonMapper json = tools.jackson.databind.json.JsonMapper.builder()
-            .build();
-    private final RequestCache requestCache = new HttpSessionRequestCache();
 
     /**
      * 从当前 Session 的 SavedRequest 解析登录策略。
@@ -65,68 +56,28 @@ public class BrowserLoginClientPolicyService {
      * @return 没有受控授权请求时为空
      */
     public Optional<ClientPolicy> resolve(HttpServletRequest request, HttpServletResponse response) {
-        SavedRequest savedRequest = requestCache.getRequest(request, response);
-        if (savedRequest == null) {
-            return Optional.empty();
-        }
-        validateAuthorizationRequest(request, savedRequest);
-        String[] clientIds = savedRequest.getParameterValues(OAuth2ParameterNames.CLIENT_ID);
-        String[] responseTypes = savedRequest.getParameterValues(OAuth2ParameterNames.RESPONSE_TYPE);
-        if (clientIds == null || clientIds.length != 1 || !StringUtils.hasText(clientIds[0])
-                || responseTypes == null || responseTypes.length != 1
-                || !OAuth2AuthorizationResponseType.CODE.getValue().equals(responseTypes[0])) {
-            throw unavailable();
-        }
-        SysOAuth2Client client;
-        try {
-            client = clientService.getClientByClientId(clientIds[0]);
-        } catch (RuntimeException ex) {
-            throw unavailable();
-        }
-        if (client == null) {
-            throw unavailable();
-        }
-        String[] savedScopes = savedRequest.getParameterValues("scope");
-        if (savedScopes == null || savedScopes.length != 1 || savedScopes[0].isBlank()) {
-            throw unavailable();
-        }
-        dev.macula.cloud.system.protocol.OAuth2ProtocolSettings settings;
-        try {
-            var configuration = dev.macula.cloud.iam.protocol.oauth2.OAuth2ClientProtocolPolicy.configuration(client,
-                    dev.macula.cloud.iam.protocol.oauth2.ApplicationProtocolResolver.requested(
-                            Set.of(savedScopes[0].trim().split("\\s+"))));
-            settings = dev.macula.cloud.system.protocol.OAuth2ProtocolConfiguration.settings(configuration);
-        } catch (RuntimeException ex) {
-            throw unavailable();
-        }
-        if (!csv(settings.getAuthorizationGrantTypes()).contains(
-                AuthorizationGrantType.AUTHORIZATION_CODE.getValue()) ||
-                !StringUtils.hasText(settings.getRedirectUris())) {
-            throw unavailable();
-        }
-        if (java.util.Set.of("NATIVE", "MINIAPP", "SERVICE")
-                .contains(client.getApplicationType() == null ? "" : client.getApplicationType())) {
-            return Optional.of(new ClientPolicy(client.getClientId(), Set.of(), null, Map.of(), client.getTenantId(),
-                    client.getUserType(), client.getApplicationType(), Map.of(), client.getAuthorizationVersion()));
-        }
-        Set<BrowserLoginProviderType> allowedProviders = browserProviders(
-                client.getBrowserLoginProviderTypes());
-        BrowserLoginProviderType directProvider = directProvider(
-                client.getDirectLoginProviderType(), allowedProviders);
-        Map<String, Long> fixed = client.getBrowserProviderBindings() == null ? Map.of()
-                : json.readValue(client.getBrowserProviderBindings(), new tools.jackson.core.type.TypeReference<>() {
+        return applications.resolve(request, response).map(selection -> {
+            var app = selection.application();
+            var login = app.login();
+            Map<String, Long> capabilities = new HashMap<>();
+            Map<String, Long> providers = new HashMap<>();
+            login.sources().forEach((capability, sourceId) -> {
+                if (capability.browser()) {
+                    capabilities.put(capability.value(), sourceId);
+                    providers.put(capability.source().providerType(), sourceId);
+                }
+            });
+            Set<BrowserLoginProviderType> allowed = providers.keySet().stream()
+                .map(BrowserLoginProviderType::fromValue).collect(Collectors.toUnmodifiableSet());
+            BrowserLoginProviderType direct = login.directCapability() == null ? null
+                : BrowserLoginProviderType.fromValue(login.directCapability().source().providerType());
+            if (direct != null && !allowed.contains(direct)) {
+                throw unavailable();
+            }
+            return new ClientPolicy(selection.reference(), allowed, direct, providers, app.tenantId(),
+                app.accountUserType(), login.type() == null ? null : login.type().name(), capabilities,
+                app.authorizationVersion(), login.webLoginMode() == null ? null : login.webLoginMode().value());
         });
-        if (client.getBrowserCapabilityBindings() == null
-                && !fixed.keySet().equals(allowedProviders.stream().map(Enum::name).collect(Collectors.toSet()))
-                || !dev.macula.cloud.iam.protocol.oauth2.OAuth2ClientProtocolPolicy.enabled(client)) {
-            throw unavailable();
-        }
-        return Optional.of(new ClientPolicy(client.getClientId(), allowedProviders, directProvider,
-                Map.copyOf(fixed), client.getTenantId(), client.getUserType(), client.getApplicationType(),
-                client.getBrowserCapabilityBindings() == null ? Map.of() :
-                        json.readValue(client.getBrowserCapabilityBindings(),
-                                new tools.jackson.core.type.TypeReference<Map<String, Long>>() {
-                                }), client.getAuthorizationVersion()));
     }
 
     /**
@@ -175,8 +126,8 @@ public class BrowserLoginClientPolicyService {
         }
         if (policy.applicationType() != null) {
             try {
-                if (!dev.macula.cloud.system.enums.OAuth2ClientApplicationType.valueOf(policy.applicationType())
-                        .supportsBrowserSource(source.sourceType())) {
+                if (!IamApplicationType.valueOf(policy.applicationType())
+                        .supportsBrowserSource(source.sourceType(), policy.webLoginMode())) {
                     throw unavailable();
                 }
             } catch (IllegalArgumentException ex) {
@@ -194,21 +145,21 @@ public class BrowserLoginClientPolicyService {
         if (!policy.allowed(BrowserLoginProviderType.fromValue(providerType))) {
             throw unavailable();
         }
-        if ("IN_APP".equals(policy.applicationType()) && policy.capabilitySources().size() != 1) {
+        if (policy.applicationType() != null && IamWebLoginMode.isInApp(policy.applicationType(), policy.webLoginMode()) && policy.capabilitySources().size() != 1) {
             throw unavailable();
         }
         if (policy.capabilitySources().isEmpty()) {
             var legacy = requireSource(policy, providerType).forBrowser(mode);
             if (policy.applicationType() != null &&
-                    !dev.macula.cloud.system.enums.OAuth2ClientApplicationType.valueOf(policy.applicationType())
-                            .supportsBrowserCapability(dev.macula.cloud.system.enums.IdentityLoginCapability.fromValue(
-                                    legacy.loginCapability()))) {
+                    !IamApplicationType.valueOf(policy.applicationType())
+                            .supportsBrowserCapability(IdentityLoginCapability.fromValue(
+                                    legacy.loginCapability()), policy.webLoginMode())) {
                 throw unavailable();
             }
             return legacy;
         }
         var candidates = policy.capabilitySources().entrySet().stream().filter(entry -> {
-            var capability = dev.macula.cloud.system.enums.IdentityLoginCapability.fromValue(entry.getKey());
+            var capability = IdentityLoginCapability.fromValue(entry.getKey());
             return capability.browser() && capability.source().providerType().equals(providerType) &&
                     capability.mode().equals(mode);
         }).toList();
@@ -217,9 +168,9 @@ public class BrowserLoginClientPolicyService {
         }
         var candidate = candidates.get(0);
         var source = configs.requireEnabledById(candidate.getValue(), providerType).forCapability(candidate.getKey());
-        if (policy.applicationType() != null && !dev.macula.cloud.system.enums.OAuth2ClientApplicationType.valueOf(
+        if (policy.applicationType() != null && !IamApplicationType.valueOf(
                 policy.applicationType()).supportsBrowserCapability(
-                dev.macula.cloud.system.enums.IdentityLoginCapability.fromValue(source.loginCapability()))) {
+                IdentityLoginCapability.fromValue(source.loginCapability()), policy.webLoginMode())) {
             throw unavailable();
         }
         return source;
@@ -230,21 +181,21 @@ public class BrowserLoginClientPolicyService {
      */
     public IdentityProviderConfigService.ProviderConfig requireSourceForEnvironment(ClientPolicy policy,
             String providerType,
-            dev.macula.cloud.system.enums.IdentityBrowserEnvironment environment) {
+            IdentityBrowserEnvironment environment) {
         if (policy.capabilitySources().isEmpty()) {
             var source = requireSource(policy, providerType);
-            String mode = source.sourceType() == dev.macula.cloud.system.enums.IdentitySourceType.WECOM_WEB
+            String mode = source.sourceType() == IdentitySourceType.WECOM_WEB
                     ?
-                    environment == dev.macula.cloud.system.enums.IdentityBrowserEnvironment.WECOM_WEBVIEW ? "WEBVIEW" :
+                    environment == IdentityBrowserEnvironment.WECOM_WEBVIEW ? "WEBVIEW" :
                             "BROWSER"
-                    : source.sourceType() == dev.macula.cloud.system.enums.IdentitySourceType.WECHAT_OFFICIAL_ACCOUNT ?
+                    : source.sourceType() == IdentitySourceType.WECHAT_OFFICIAL_ACCOUNT ?
                     "WEBVIEW"
-                    : source.sourceType() == dev.macula.cloud.system.enums.IdentitySourceType.GITHUB_OAUTH ? "" :
+                    : source.sourceType() == IdentitySourceType.GITHUB_OAUTH ? "" :
                     "BROWSER";
             return requireSource(policy, providerType, mode);
         }
         var candidates = policy.capabilitySources().keySet().stream()
-                .map(dev.macula.cloud.system.enums.IdentityLoginCapability::fromValue)
+                .map(IdentityLoginCapability::fromValue)
                 .filter(item -> item.browser() && item.source().providerType().equals(providerType) &&
                         item.environments().contains(environment)).toList();
         if (candidates.size() != 1) {
@@ -253,51 +204,7 @@ public class BrowserLoginClientPolicyService {
         return requireSource(policy, providerType, candidates.get(0).mode());
     }
 
-    private void validateAuthorizationRequest(HttpServletRequest request, SavedRequest savedRequest) {
-        try {
-            URI uri = URI.create(savedRequest.getRedirectUrl());
-            String expectedPath = request.getContextPath() + authorizationServerSettings.getAuthorizationEndpoint();
-            if (!expectedPath.equals(uri.getRawPath()) || uri.getRawFragment() != null) {
-                throw unavailable();
-            }
-        } catch (IllegalArgumentException ex) {
-            throw unavailable();
-        }
-    }
-
-    private Set<String> csv(String value) {
-        if (!StringUtils.hasText(value)) {
-            return Set.of();
-        }
-        return Arrays.stream(value.split(",")).map(String::trim).filter(StringUtils::hasText)
-                .collect(Collectors.toUnmodifiableSet());
-    }
-
-    private Set<BrowserLoginProviderType> browserProviders(String value) {
-        try {
-            return csv(value).stream().map(BrowserLoginProviderType::fromValue)
-                    .collect(Collectors.toUnmodifiableSet());
-        } catch (IllegalArgumentException ex) {
-            throw unavailable();
-        }
-    }
-
-    private BrowserLoginProviderType directProvider(String value,
-            Set<BrowserLoginProviderType> allowedProviders) {
-        if (!StringUtils.hasText(value)) {
-            return null;
-        }
-        try {
-            BrowserLoginProviderType direct = BrowserLoginProviderType.fromValue(value);
-            if (!allowedProviders.contains(direct)) {
-                throw unavailable();
-            }
-            return direct;
-        } catch (IllegalArgumentException ex) {
-            throw unavailable();
-        }
-    }
-
+    /** 来源策略错误使用固定提示，不泄露内部配置。 */
     private AuthenticationServiceException unavailable() {
         return new AuthenticationServiceException("当前应用不允许该第三方登录方式");
     }
@@ -309,17 +216,24 @@ public class BrowserLoginClientPolicyService {
      */
     public record ClientPolicy(String clientId, Set<BrowserLoginProviderType> allowedProviders,
                                BrowserLoginProviderType directProvider, Map<String, Long> sources, Long tenantId,
-                               dev.macula.cloud.iam.enums.UserTypeEnum userType, String applicationType,
-                               Map<String, Long> capabilitySources, Long authorizationVersion) {
+                               UserTypeEnum userType, String applicationType,
+                               Map<String, Long> capabilitySources, Long authorizationVersion, String webLoginMode) {
+        /** 历史内部构造缺省为浏览器；生产始终投影受信任Client模式。 */
+        public ClientPolicy(String clientId, Set<BrowserLoginProviderType> allowedProviders,
+                BrowserLoginProviderType directProvider, Map<String, Long> sources, Long tenantId,
+                UserTypeEnum userType, String applicationType, Map<String, Long> capabilitySources, Long authorizationVersion) {
+            this(clientId, allowedProviders, directProvider, sources, tenantId, userType, applicationType,
+                capabilitySources, authorizationVersion, null);
+        }
         /**
          * 兼容原显式能力策略构造；缺少授权版本的证明不得用于新端内会话。
          */
         public ClientPolicy(String clientId, Set<BrowserLoginProviderType> allowedProviders,
                 BrowserLoginProviderType directProvider,
-                Map<String, Long> sources, Long tenantId, dev.macula.cloud.iam.enums.UserTypeEnum userType,
+                Map<String, Long> sources, Long tenantId, UserTypeEnum userType,
                 String applicationType, Map<String, Long> capabilitySources) {
             this(clientId, allowedProviders, directProvider, sources, tenantId, userType, applicationType,
-                    capabilitySources, null);
+                    capabilitySources, null, null);
         }
 
         /**
@@ -327,7 +241,7 @@ public class BrowserLoginClientPolicyService {
          */
         public ClientPolicy(String clientId, Set<BrowserLoginProviderType> allowedProviders,
                 BrowserLoginProviderType directProvider, Map<String, Long> sources, Long tenantId,
-                dev.macula.cloud.iam.enums.UserTypeEnum userType, String applicationType) {
+                UserTypeEnum userType, String applicationType) {
             this(clientId, allowedProviders, directProvider, sources, tenantId, userType, applicationType, Map.of());
         }
 
@@ -336,7 +250,7 @@ public class BrowserLoginClientPolicyService {
          */
         public ClientPolicy(String clientId, Set<BrowserLoginProviderType> allowedProviders,
                 BrowserLoginProviderType directProvider, Map<String, Long> sources, Long tenantId,
-                dev.macula.cloud.iam.enums.UserTypeEnum userType) {
+                UserTypeEnum userType) {
             this(clientId, allowedProviders, directProvider, sources, tenantId, userType, null);
         }
 

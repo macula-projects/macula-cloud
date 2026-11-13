@@ -16,20 +16,19 @@
  */
 package dev.macula.cloud.iam.config.oauth2;
 
-import java.util.List;
-
 import dev.macula.cloud.iam.authentication.inapp.InAppAuthorizationRequestFilter;
 import dev.macula.cloud.iam.authentication.inapp.InAppLoginPolicyService;
 import dev.macula.cloud.iam.config.MfaExtensionConfiguration;
 import dev.macula.cloud.iam.protocol.oauth2.LocalAccessTokenIntrospector;
 import dev.macula.cloud.iam.protocol.oauth2.binding.ExternalIdentityBindingController;
+import dev.macula.cloud.iam.protocol.oauth2.client.OAuth2ClientRegistrationService;
 import dev.macula.cloud.iam.protocol.oauth2.configuration.AuthorizationServerExtension;
 import dev.macula.cloud.iam.protocol.oauth2.endpoint.OAuth2CorsConfigurationSource;
 import dev.macula.cloud.iam.protocol.oauth2.endpoint.OAuth2ProtocolAuthenticationEntryPoint;
 import dev.macula.cloud.iam.protocol.oauth2.endpoint.OAuth2TokenOriginFilter;
 import dev.macula.cloud.iam.protocol.oauth2.endpoint.RetiredLoginEndpointFilter;
 import dev.macula.cloud.iam.protocol.oauth2.profile.ProfileController;
-import dev.macula.cloud.iam.service.client.SysOAuth2ClientService;
+import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -70,7 +69,7 @@ public class ProtocolOAuth2Configuration {
     @Order(Ordered.HIGHEST_PRECEDENCE)
     SecurityFilterChain authorizationServerSecurityFilterChain(HttpSecurity http,
             List<AuthorizationServerExtension> extensions, AuthorizationServerSettings settings,
-            OAuth2AuthorizationService authorizations, SysOAuth2ClientService clients,
+            OAuth2AuthorizationService authorizations, OAuth2ClientRegistrationService clients,
             InAppLoginPolicyService inApp, RequestCache browserRequestCache,
             OAuth2CorsConfigurationSource cors) throws Exception {
         var server = new OAuth2AuthorizationServerConfigurer();
@@ -126,7 +125,7 @@ public class ProtocolOAuth2Configuration {
      */
     @Bean
     OAuth2CorsConfigurationSource protocolCorsConfigurationSource(AuthorizationServerSettings settings,
-            SysOAuth2ClientService clients) {
+            OAuth2ClientRegistrationService clients) {
         return new OAuth2CorsConfigurationSource(clients, settings.getTokenEndpoint());
     }
 }

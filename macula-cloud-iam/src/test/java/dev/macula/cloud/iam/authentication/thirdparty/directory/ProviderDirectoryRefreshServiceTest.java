@@ -32,6 +32,7 @@ import dev.macula.boot.starter.crypto.enums.AlgorithmType;
 import dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures;
 import dev.macula.cloud.iam.authentication.thirdparty.VerifiedExternalIdentity;
 import dev.macula.cloud.iam.authentication.thirdparty.cache.ProviderCacheCipher;
+import dev.macula.cloud.iam.authentication.thirdparty.cache.ProviderCacheSecurityProperties;
 import dev.macula.cloud.iam.authentication.thirdparty.provider.ProviderIntegrationProperties;
 import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeSecurityProperties;
 import dev.macula.cloud.iam.service.identity.IdentityProviderConfigService;
@@ -240,9 +241,9 @@ class ProviderDirectoryRefreshServiceTest {
     /**
      * 公共缓存保持原摘要密钥，只替换配置类型依赖。
      */
-    private dev.macula.cloud.iam.authentication.thirdparty.cache.ProviderCacheSecurityProperties cacheSecurity(
-            dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeSecurityProperties original) {
-        var result = new dev.macula.cloud.iam.authentication.thirdparty.cache.ProviderCacheSecurityProperties();
+    private ProviderCacheSecurityProperties cacheSecurity(
+            ExternalCodeSecurityProperties original) {
+        var result = new ProviderCacheSecurityProperties();
         result.setDigestKey(original.getDigestKey());
         return result;
     }

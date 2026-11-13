@@ -18,9 +18,9 @@
         >
       </div></el-form-item
     >
-    <div v-if="['NATIVE','MINIAPP','IN_APP'].includes(application.applicationType)" class="sdk-login">
+    <div v-if="(['NATIVE','MINIAPP'].includes(application.applicationType) || isInApp(application))" class="sdk-login">
       <h4>第三方Code登录</h4>
-      <p class="hint">支持飞书、企业微信等SDK及小程序的一次性Code；关联具体身份源后自动启用，客户端认证使用none。</p>
+      <p class="hint">支持飞书、企业微信等SDK及小程序的一次性Code；关联具体身份源后自动启用；SPA/App使用none，Web必须由业务后端保管客户端凭据。</p>
       <el-tag :type="selected.includes(EXTERNAL_CODE_GRANT) ? 'success' : 'info'">{{ selected.includes(EXTERNAL_CODE_GRANT) ? '已启用' : '尚未关联SDK身份源' }}</el-tag>
       <el-button link type="primary" @click="$emit('manage-sources')">添加或管理身份源</el-button>
     </div>
@@ -108,6 +108,7 @@
     </div>
 </section></template>
 <script setup>
+import {isInApp} from '@/utils/identitySourceCompatibility';
 import {computed,watch} from 'vue'
 import {ElMessage} from 'element-plus'
 import ClientCredentials from './ClientCredentials.vue'
@@ -119,7 +120,7 @@ defineEmits(['reload','manage-sources','copy'])
 const settings=computed(()=>ensureProtocol(props.application,props.protocol).settings)
 const client=computed(()=>projectProtocol(props.application,props.protocol))
 const algorithms=['RS256','RS384','RS512']
-const mainGrants=computed(()=>AUTHORIZATION_GRANTS.slice(0,3).filter(item=>props.application.applicationType==='SERVICE'?item.value==='client_credentials':item.value!=='client_credentials' && (props.application.applicationType!=='IN_APP' || item.value==='authorization_code')))
+const mainGrants=computed(()=>AUTHORIZATION_GRANTS.slice(0,3).filter(item=>props.application.applicationType==='SERVICE'?item.value==='client_credentials':item.value!=='client_credentials' && (!isInApp(props.application) || item.value==='authorization_code')))
 const selected=computed(()=>csvValues(settings.value.authorizationGrantTypes))
 const unknownGrants=computed(()=>selected.value.filter(value=>!AUTHORIZATION_GRANTS.some(item=>item.value===value)))
 const availableScopes=computed(()=>(props.catalog.scopes||[]).filter(scope=>(!scope.oidcOnly || props.protocol==='OIDC') &&

@@ -24,6 +24,8 @@ package dev.macula.cloud.iam.protocol.oauth2.grant.externalcode;
  */
 public final class ExternalCodeClientSettings {
     public static final String APPLICATION_TYPE = "macula.external-code.application-type";
+    /** 与应用类型分离的Web/SPA登录模式，只从当前Client投影。 */
+    public static final String WEB_LOGIN_MODE = "macula.external-code.web-login-mode";
     public static final String MINIAPP_PLATFORM = "macula.external-code.miniapp-platform";
     public static final String CODE_TYPES = "macula.external-code.types";
     public static final String PROVIDER_BINDINGS = "macula.external-code.provider-bindings";

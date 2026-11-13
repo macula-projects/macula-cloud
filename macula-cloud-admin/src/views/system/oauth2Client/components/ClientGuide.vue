@@ -7,7 +7,8 @@
     <p>接入协议：{{client.protocol==='OIDC'?'OIDC':'OAuth 2.1'}}</p>
     <el-alert v-if="hasRetiredGrant" type="error" :closable="false" title="配置包含已退役授权，请先显式整改；接入示例暂停复制。" />
     <p v-if="grant===EXTERNAL_CODE_GRANT" class="hint">{{ $t('identitySourceIntegration.codeTypeHelp') }}</p>
-    <p v-if="client.applicationType === 'IN_APP'" class="hint">端内应用只使用固定平台能力。企业微信、微信公众号在对应容器直接进入平台授权；飞书、钉钉由业务前端JSAPI取Code后换取Token。不提供IAM标准登录页。</p>
+    <p v-if="isInApp(client)" class="hint">端内应用只使用固定平台能力。企业微信、微信公众号在对应容器直接进入平台授权；飞书、钉钉由业务前端JSAPI取Code后换取Token。不提供IAM标准登录页。</p>
+    <p v-if="isInApp(client) && client.applicationType === 'WEB_SERVER'" class="hint">JSAPI取得Code后交给业务后端；后端使用本应用配置的机密认证调用IAM。密钥及私钥不得进入网页。</p>
     <p v-if="['NATIVE','MINIAPP'].includes(client.applicationType)" class="hint">第三方直接登录只使用已关联的唯一来源。另开IAM登录页时仅提供内置账号密码、短信登录。</p>
     <h4>接入步骤</h4>
     <p v-if="selectedProtocol==='OIDC' && grant===EXTERNAL_CODE_GRANT">此流程为Macula第三方Code扩展登录：请求openid返回ID Token和Access Token。验证ID Token签名、issuer、client_id audience与有效期；请求携带nonce时必须匹配。该Code不是IAM授权码，不使用授权码PKCE参数，也不建立浏览器SSO会话。</p>
@@ -75,6 +76,7 @@
   </section>
 </template>
 <script setup>
+import {isInApp} from '@/utils/identitySourceCompatibility';
 import { RETIRED_GRANTS } from '@/utils/applicationProtocolRegistry';
 import {externalCodeAllowed} from "@/utils/identitySourceCompatibility";
 import { computed, ref, watch, onBeforeUnmount, onDeactivated } from "vue";

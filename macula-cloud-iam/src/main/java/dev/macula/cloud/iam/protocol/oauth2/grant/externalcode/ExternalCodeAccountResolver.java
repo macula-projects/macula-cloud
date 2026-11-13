@@ -16,8 +16,11 @@
  */
 package dev.macula.cloud.iam.protocol.oauth2.grant.externalcode;
 
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Map;
 
+import dev.macula.cloud.iam.authentication.mfa.MfaCompletionService;
 import dev.macula.cloud.iam.authentication.thirdparty.ExternalBindingTicketStore;
 import dev.macula.cloud.iam.enums.UserTypeEnum;
 import dev.macula.cloud.iam.service.identity.IdentitySourceBindingPolicyService;
@@ -61,16 +64,16 @@ public class ExternalCodeAccountResolver {
                 || (codeType.resultType() == ExternalCodeType.ResultType.MOBILE) != (verification.mobile() != null)) {
             throw invalid();
         }
-        UserTypeEnum userType = java.util.Arrays.stream(UserTypeEnum.values()).filter(v -> v.getType().equals(type))
+        UserTypeEnum userType = Arrays.stream(UserTypeEnum.values()).filter(v -> v.getType().equals(type))
                 .findFirst().orElseThrow(this::invalid);
         UserDetails principal = policy.resolve(client.getClientId(), tenant.longValue(), userType,
                         verification.identity())
                 .orElseThrow(() -> new ExternalBindingRequiredException(
                         tickets.issue(client.getClientId(), tenant.longValue(), userType, verification)));
         var result = UsernamePasswordAuthenticationToken.authenticated(principal, null, principal.getAuthorities());
-        result.setDetails(new java.util.HashMap<>(Map.of(
-                dev.macula.cloud.iam.authentication.mfa.MfaCompletionService.SOURCE_PROOF,
-                dev.macula.cloud.iam.authentication.mfa.MfaCompletionService.verifiedProof(verification.identity()))));
+        result.setDetails(new HashMap<>(Map.of(
+                MfaCompletionService.SOURCE_PROOF,
+                MfaCompletionService.verifiedProof(verification.identity()))));
         return result;
     }
 

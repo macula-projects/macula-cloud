@@ -16,20 +16,21 @@
  */
 package dev.macula.cloud.iam.protocol.oauth2.binding;
 
-import java.security.Principal;
-import java.util.Objects;
-import java.util.Set;
-
 import dev.macula.cloud.iam.authentication.thirdparty.ExternalBindingTicket;
 import dev.macula.cloud.iam.authentication.thirdparty.ExternalBindingTicketStore;
 import dev.macula.cloud.iam.authentication.thirdparty.ExternalBindingTicketStore.ClaimedTicket;
 import dev.macula.cloud.iam.pojo.entity.SysUser;
 import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeClientSettings;
 import dev.macula.cloud.iam.service.account.SysUserService;
-import dev.macula.cloud.iam.service.identity.RegistrationIdentityBindingService;
+import dev.macula.cloud.iam.service.identity.IdentityProviderUserBindingService;
 import dev.macula.cloud.iam.service.identity.directory.IdentityDirectoryService;
 import dev.macula.cloud.iam.service.userdetails.SysUserDetails;
+import java.security.Principal;
+import java.util.Objects;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.Authentication;
@@ -41,8 +42,10 @@ import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.util.StringUtils;
 
 /**
@@ -59,28 +62,28 @@ public class ExternalIdentityBindingService {
 
     private final ExternalBindingTicketStore tickets;
     private final OAuth2AuthorizationService authorizations;
-    @org.springframework.beans.factory.annotation.Qualifier("baseRegisteredClientRepository")
+    @Qualifier("baseRegisteredClientRepository")
     private final RegisteredClientRepository clients;
     private final SysUserService users;
-    private final RegistrationIdentityBindingService bindings;
+    private final IdentityProviderUserBindingService bindings;
     private final IdentityDirectoryService directory;
-    private final org.springframework.transaction.support.TransactionTemplate transactions;
+    private final TransactionTemplate transactions;
 
     /**
      * 显式事务与目录依赖保证所有绑定执行相同安全边界。
      */
     public ExternalIdentityBindingService(ExternalBindingTicketStore tickets, OAuth2AuthorizationService authorizations,
-            @org.springframework.beans.factory.annotation.Qualifier("baseRegisteredClientRepository") RegisteredClientRepository clients,
-            SysUserService users, RegistrationIdentityBindingService bindings, IdentityDirectoryService directory,
-            org.springframework.transaction.PlatformTransactionManager manager) {
+            @Qualifier("baseRegisteredClientRepository") RegisteredClientRepository clients,
+            SysUserService users, IdentityProviderUserBindingService bindings, IdentityDirectoryService directory,
+            PlatformTransactionManager manager) {
         this.tickets = tickets;
         this.authorizations = authorizations;
         this.clients = clients;
         this.users = users;
         this.bindings = bindings;
-        this.directory = java.util.Objects.requireNonNull(directory);
-        this.transactions = new org.springframework.transaction.support.TransactionTemplate(
-                java.util.Objects.requireNonNull(manager));
+        this.directory = Objects.requireNonNull(directory);
+        this.transactions = new TransactionTemplate(
+                Objects.requireNonNull(manager));
     }
 
     /**
@@ -88,7 +91,7 @@ public class ExternalIdentityBindingService {
      */
     public void bind(String accessToken, String bindingTicket) {
         ClaimedTicket claimed = tickets.claim(bindingTicket);
-        var failureRecorded = new java.util.concurrent.atomic.AtomicBoolean();
+        var failureRecorded = new AtomicBoolean();
         try {
             BindingAccount account = validateAccessToken(accessToken, claimed.value());
             var admission = directory.check(claimed.value().identity());

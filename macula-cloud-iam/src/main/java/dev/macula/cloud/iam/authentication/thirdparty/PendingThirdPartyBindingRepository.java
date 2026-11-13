@@ -24,6 +24,7 @@ import java.time.Instant;
 import dev.macula.cloud.iam.authentication.thirdparty.browser.ThirdPartyIdentityResolutionService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.stereotype.Component;
 
@@ -52,7 +53,7 @@ public class PendingThirdPartyBindingRepository {
     /**
      * 注入SDK票据存储，浏览器pending仍使用会话有效期。
      */
-    @org.springframework.beans.factory.annotation.Autowired
+    @Autowired
     public void setTickets(ExternalBindingTicketStore tickets) {
         this.tickets = tickets;
     }

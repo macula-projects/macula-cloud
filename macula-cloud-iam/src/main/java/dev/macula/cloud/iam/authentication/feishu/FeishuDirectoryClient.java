@@ -25,7 +25,12 @@ import dev.macula.cloud.iam.authentication.thirdparty.VerifiedExternalIdentity;
 import dev.macula.cloud.iam.authentication.thirdparty.cache.ProviderApplicationTokenCache;
 import dev.macula.cloud.iam.authentication.thirdparty.directory.ProviderDirectoryAdapter;
 import dev.macula.cloud.iam.authentication.thirdparty.directory.ProviderDirectoryResult;
+import dev.macula.cloud.iam.authentication.thirdparty.provider.ProviderFailureDiagnostics;
+import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeInfrastructureException;
 import dev.macula.cloud.iam.service.identity.IdentityProviderConfigService.ProviderConfig;
+import dev.macula.cloud.system.security.UserIdentifierNormalizer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -44,6 +49,7 @@ import tools.jackson.databind.json.JsonMapper;
  */
 @Component
 public class FeishuDirectoryClient implements ProviderDirectoryAdapter {
+    private static final Logger LOGGER = LoggerFactory.getLogger(FeishuDirectoryClient.class);
     private static final String TENANT_TOKEN = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal";
     private static final String USER = "https://open.feishu.cn/open-apis/contact/v3/users";
     private static final String TOKEN_PURPOSE = "feishu-tenant-token-v3-internal";
@@ -85,13 +91,18 @@ public class FeishuDirectoryClient implements ProviderDirectoryAdapter {
                 || !source.organizationId().equals(identity.attributes().get("tenant_key"))) {
             return ProviderDirectoryResult.unavailable(false);
         }
+        String stage = "tenant_token";
         try {
             String token = tokens.get(source, TOKEN_PURPOSE, () -> loadTenantToken(source));
+            stage = "directory";
             String body = rest.get().uri(UriComponentsBuilder.fromUriString(USER).pathSegment(identity.identityValue())
                             .queryParam("user_id_type", "open_id").build().encode().toUri())
                     .headers(headers -> headers.setBearerAuth(token)).retrieve().body(String.class);
             JsonNode response = json.readTree(body);
             int code = response.path("code").asInt(-1);
+            if (code != 0) {
+                ProviderFailureDiagnostics.feishu(LOGGER, stage, 200, response);
+            }
             // 41050经官方通用错误码和contact-v3文档确认是权限范围，不是非成员。
             if (code == 41050) {
                 return result(ProviderDirectoryResult.Status.PERMISSION_DENIED, source, Map.of(), true);
@@ -113,7 +124,7 @@ public class FeishuDirectoryClient implements ProviderDirectoryAdapter {
                 return result(ProviderDirectoryResult.Status.DISABLED, source, Map.of(), false);
             }
             Map<String, String> profile = new HashMap<>();
-            var normalizer = new dev.macula.cloud.system.security.UserIdentifierNormalizer();
+            var normalizer = new UserIdentifierNormalizer();
             String directoryMember = member.path("user_id").asText();
             if (!directoryMember.isBlank() && directoryMember.length() <= 255) {
                 profile.put("member_id", directoryMember);
@@ -126,6 +137,8 @@ public class FeishuDirectoryClient implements ProviderDirectoryAdapter {
             normalizer.email(member.path("email").asText()).ifPresent(value -> profile.put("email", value));
             return result(ProviderDirectoryResult.Status.MEMBER, source, profile, false);
         } catch (RestClientResponseException ex) {
+            ProviderFailureDiagnostics.feishu(LOGGER, stage, ex.getStatusCode().value(),
+                    ProviderFailureDiagnostics.response(ex.getResponseBodyAsString()));
             try {
                 if (json.readTree(ex.getResponseBodyAsString()).path("code").asInt(-1) == 41050) {
                     return result(ProviderDirectoryResult.Status.PERMISSION_DENIED, source, Map.of(), true);
@@ -134,13 +147,22 @@ public class FeishuDirectoryClient implements ProviderDirectoryAdapter {
             return ex.getStatusCode().value() == 403
                     ? result(ProviderDirectoryResult.Status.PERMISSION_DENIED, source, Map.of(), true)
                     : ProviderDirectoryResult.unavailable(ex.getStatusCode().is5xxServerError());
-        } catch (dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeInfrastructureException ex) {
+        } catch (ExternalCodeInfrastructureException ex) {
+            logFailure(stage, "infrastructure", ex);
             return ProviderDirectoryResult.unavailable(true);
         } catch (RestClientException ex) {
+            logFailure(stage, "transport", ex);
             return ProviderDirectoryResult.unavailable(true);
         } catch (RuntimeException ex) {
+            logFailure(stage, "invalid_response_or_cache", ex);
             return ProviderDirectoryResult.unavailable(false);
         }
+    }
+
+    /** 异常只记录类型，不能把HTTP URL、响应或缓存密文随message/stack带入日志。 */
+    private void logFailure(String stage, String category, RuntimeException exception) {
+        LOGGER.warn("第三方目录失败 provider=FEISHU stage={} category={} exception={}",
+                stage, category, exception.getClass().getSimpleName());
     }
 
     /**
@@ -152,6 +174,7 @@ public class FeishuDirectoryClient implements ProviderDirectoryAdapter {
                 .retrieve().body(String.class);
         JsonNode response = json.readTree(body);
         if (response.path("code").asInt(-1) != 0 || response.path("tenant_access_token").asText().isBlank()) {
+            ProviderFailureDiagnostics.feishu(LOGGER, "tenant_token", 200, response);
             throw new IllegalStateException("飞书应用Token不可用");
         }
         return new ProviderApplicationTokenCache.TokenValue(response.path("tenant_access_token").asText(),

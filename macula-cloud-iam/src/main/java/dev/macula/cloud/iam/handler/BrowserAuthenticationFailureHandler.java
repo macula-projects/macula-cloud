@@ -18,6 +18,7 @@ package dev.macula.cloud.iam.handler;
 
 import java.io.IOException;
 
+import dev.macula.cloud.iam.authentication.mfa.AdditionalAuthenticationRequiredException;
 import dev.macula.cloud.iam.authentication.thirdparty.PendingThirdPartyBindingRepository;
 import dev.macula.cloud.iam.authentication.thirdparty.browser.ThirdPartyIdentityResolutionService.BindingRequiredException;
 import jakarta.servlet.ServletException;
@@ -54,7 +55,7 @@ public class BrowserAuthenticationFailureHandler implements AuthenticationFailur
     @Override
     public void onAuthenticationFailure(HttpServletRequest request, HttpServletResponse response,
             AuthenticationException exception) throws IOException, ServletException {
-        if (exception instanceof dev.macula.cloud.iam.authentication.mfa.AdditionalAuthenticationRequiredException) {
+        if (exception instanceof AdditionalAuthenticationRequiredException) {
             response.sendError(HttpServletResponse.SC_SERVICE_UNAVAILABLE, "Authentication unavailable");
             return;
         }

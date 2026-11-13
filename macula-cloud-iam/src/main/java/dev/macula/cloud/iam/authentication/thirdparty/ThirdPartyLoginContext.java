@@ -20,6 +20,8 @@ import java.io.Serializable;
 import java.time.Instant;
 
 import dev.macula.cloud.iam.enums.UserTypeEnum;
+import dev.macula.cloud.system.enums.IdentityLoginCapability;
+import dev.macula.cloud.system.enums.IdentitySourceType;
 
 /**
  * 一次性state固定具体来源和Client用户路由，旧缺字段状态必须重新发起。
@@ -52,8 +54,8 @@ public record ThirdPartyLoginContext(String providerType, String loginMode, Stri
         this(providerType, loginMode, clientId, createdAt, savedRequestTarget, registrationId, sourceType,
                 tenantId, userType, sourceVersion, flow, upstreamRedirectUri,
                 sourceType == null || loginMode == null ? null :
-                        dev.macula.cloud.system.enums.IdentityLoginCapability.browser(
-                                        dev.macula.cloud.system.enums.IdentitySourceType.fromValue(sourceType),
+                        IdentityLoginCapability.browser(
+                                        IdentitySourceType.fromValue(sourceType),
                                         loginMode)
                                 .value());
     }

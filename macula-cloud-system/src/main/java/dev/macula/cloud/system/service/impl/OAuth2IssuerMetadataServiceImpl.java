@@ -16,6 +16,11 @@
  */
 package dev.macula.cloud.system.service.impl;
 
+import dev.macula.cloud.system.protocol.ApplicationProtocolRegistry;
+import java.util.HashMap;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
+
 import dev.macula.cloud.system.config.OAuth2IssuerMetadataProperties;
 import dev.macula.cloud.system.service.OAuth2IssuerMetadataService;
 import dev.macula.cloud.system.vo.OAuth2IssuerMetadataVO;
@@ -44,7 +49,7 @@ public class OAuth2IssuerMetadataServiceImpl implements OAuth2IssuerMetadataServ
     private final OAuth2IssuerMetadataProperties properties;
     private final RestClient client;
     private final JsonMapper json = JsonMapper.builder().build();
-    private final Map<String, CachedMetadata> cache = new java.util.HashMap<>();
+    private final Map<String, CachedMetadata> cache = new HashMap<>();
 
     /** 单协议缓存，另一协议不可用不能污染已有成功结果。 @since 6.1.0 */
     private record CachedMetadata(OAuth2IssuerMetadataVO value, long expiresAt) { }
@@ -59,8 +64,8 @@ public class OAuth2IssuerMetadataServiceImpl implements OAuth2IssuerMetadataServ
     /** 元数据不可用时返回受控状态；不用过期缓存伪装成功。 */
     @Override
     public synchronized OAuth2IssuerMetadataVO get(String protocol) {
-        if (!dev.macula.cloud.system.protocol.ApplicationProtocolRegistry.PROTOCOLS.contains(protocol)) {
-            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST, "不支持的协议");
+        if (!ApplicationProtocolRegistry.PROTOCOLS.contains(protocol)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "不支持的协议");
         }
         CachedMetadata cached = cache.get(protocol);
         if (cached != null && System.currentTimeMillis() < cached.expiresAt()) {

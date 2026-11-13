@@ -27,8 +27,7 @@ import com.baomidou.mybatisplus.spring.MybatisSqlSessionFactoryBean;
 import dev.macula.cloud.system.converter.IdentityProviderConverter;
 import dev.macula.cloud.system.form.IdentityProviderForm;
 import dev.macula.cloud.system.mapper.SysIdentityProviderMapper;
-import dev.macula.cloud.system.mapper.SysOAuth2ClientConfigMapper;
-import dev.macula.cloud.system.mapper.SysOAuth2ClientExternalProviderMapper;
+import dev.macula.cloud.system.mapper.SysIamApplicationIdentityProviderMapper;
 import dev.macula.cloud.system.service.impl.IdentityProviderServiceImpl;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.junit.jupiter.api.Test;
@@ -82,7 +81,7 @@ class IdentitySourceCapabilitiesConcurrencyIT {
         return row;
         })
             .when(mapper).selectById(96900L);
-        var service=new IdentityProviderServiceImpl(mapper,Mappers.getMapper(IdentityProviderConverter.class),mock(SysOAuth2ClientConfigMapper.class),mock(SysOAuth2ClientExternalProviderMapper.class));
+        var service=new IdentityProviderServiceImpl(mapper,Mappers.getMapper(IdentityProviderConverter.class),mock(SysIamApplicationIdentityProviderMapper.class));
         var transactions=new TransactionTemplate(new DataSourceTransactionManager(ds));
         var executor=Executors.newFixedThreadPool(2);
         try {

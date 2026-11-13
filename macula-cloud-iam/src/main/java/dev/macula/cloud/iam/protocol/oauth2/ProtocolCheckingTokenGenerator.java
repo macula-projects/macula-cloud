@@ -16,10 +16,15 @@
  */
 package dev.macula.cloud.iam.protocol.oauth2;
 
+import dev.macula.cloud.iam.authentication.mfa.AuthenticationCheckpoint;
+import dev.macula.cloud.iam.authentication.mfa.MfaCompletionService;
+import dev.macula.cloud.iam.protocol.oauth2.client.OAuth2ClientRegistrationService;
+import dev.macula.cloud.system.security.OAuth2ResourcePolicy;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
-
-import dev.macula.cloud.iam.service.client.SysOAuth2ClientService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2Token;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenContext;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenGenerator;
@@ -32,13 +37,13 @@ import org.springframework.security.oauth2.server.authorization.token.OAuth2Toke
  */
 public final class ProtocolCheckingTokenGenerator implements OAuth2TokenGenerator<OAuth2Token> {
     private final OAuth2TokenGenerator<OAuth2Token> delegate;
-    private final SysOAuth2ClientService clients;
-    private dev.macula.cloud.iam.authentication.mfa.MfaCompletionService mfaCompletion =
-            dev.macula.cloud.iam.authentication.mfa.MfaCompletionService.noOp();
+    private final OAuth2ClientRegistrationService clients;
+    private MfaCompletionService mfaCompletion =
+            MfaCompletionService.noOp();
     /**
      * 保留框架生成器，仅增加当前配置边界。
      */
-    public ProtocolCheckingTokenGenerator(OAuth2TokenGenerator<OAuth2Token> delegate, SysOAuth2ClientService clients) {
+    public ProtocolCheckingTokenGenerator(OAuth2TokenGenerator<OAuth2Token> delegate, OAuth2ClientRegistrationService clients) {
         this.delegate = delegate;
         this.clients = clients;
     }
@@ -46,9 +51,9 @@ public final class ProtocolCheckingTokenGenerator implements OAuth2TokenGenerato
     /**
      * Spring生产装配必须注入统一策略；显式构造的存储/生成器单测保留默认行为。
      */
-    @org.springframework.beans.factory.annotation.Autowired
-    public void setMfaCompletion(dev.macula.cloud.iam.authentication.mfa.MfaCompletionService completion) {
-        this.mfaCompletion = java.util.Objects.requireNonNull(completion);
+    @Autowired
+    public void setMfaCompletion(MfaCompletionService completion) {
+        this.mfaCompletion = Objects.requireNonNull(completion);
     }
 
     /**
@@ -62,29 +67,29 @@ public final class ProtocolCheckingTokenGenerator implements OAuth2TokenGenerato
         var current = clients.getClientByClientId(context.getRegisteredClient().getClientId());
         OAuth2ClientProtocolPolicy.require(current, scopes, grant);
         Number snapshotVersion = context.getRegisteredClient().getClientSettings().getSetting(
-                dev.macula.cloud.system.security.OAuth2ResourcePolicy.AUTHORIZATION_VERSION);
+                OAuth2ResourcePolicy.AUTHORIZATION_VERSION);
         if (snapshotVersion == null || current.getAuthorizationVersion() == null
                 || snapshotVersion.longValue() != current.getAuthorizationVersion()
                 || context.getAuthorization() != null
                 && (context.getAuthorization()
-                .getAttribute(dev.macula.cloud.system.security.OAuth2ResourcePolicy.AUTHORIZATION_VERSION) != null
+                .getAttribute(OAuth2ResourcePolicy.AUTHORIZATION_VERSION) != null
                 || Set.of("authorization_code", "refresh_token").contains(grant))
                 && !ResourceAuthorizationPolicy.current(context.getAuthorization(), current)) {
-            throw new org.springframework.security.oauth2.core.OAuth2AuthenticationException("invalid_grant");
+            throw new OAuth2AuthenticationException("invalid_grant");
         }
         ResourceAuthorizationPolicy.audiences(context.getRegisteredClient(), context.getAuthorizedScopes());
-        var proof = dev.macula.cloud.iam.authentication.mfa.MfaCompletionService.proof(context.getPrincipal());
+        var proof = MfaCompletionService.proof(context.getPrincipal());
         if (proof.isEmpty() && context.getAuthorization() != null) {
             Map<String, Object> stored = context.getAuthorization().getAttribute(
-                    dev.macula.cloud.iam.authentication.mfa.MfaCompletionService.SOURCE_PROOF);
+                    MfaCompletionService.SOURCE_PROOF);
             if (stored != null) {
                 proof = stored;
             }
         }
         mfaCompletion.checkToken(context.getPrincipal(), context.getRegisteredClient(),
                 "refresh_token".equals(grant)
-                        ? dev.macula.cloud.iam.authentication.mfa.AuthenticationCheckpoint.REFRESH_TOKEN
-                        : dev.macula.cloud.iam.authentication.mfa.AuthenticationCheckpoint.USER_TOKEN, grant, proof);
+                        ? AuthenticationCheckpoint.REFRESH_TOKEN
+                        : AuthenticationCheckpoint.USER_TOKEN, grant, proof);
         return delegate.generate(context);
     }
 }

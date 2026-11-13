@@ -16,7 +16,10 @@
  */
 package dev.macula.cloud.iam.protocol.oauth2.grant.externalcode;
 
+import java.util.List;
+
 import dev.macula.cloud.system.enums.ExternalCodeType;
+import jakarta.servlet.http.HttpServletRequestWrapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -27,6 +30,7 @@ import org.springframework.security.oauth2.core.endpoint.OAuth2ParameterNames;
 import org.springframework.security.oauth2.core.endpoint.PkceParameterNames;
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2ClientAuthenticationToken;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
+import org.springframework.security.web.authentication.WebAuthenticationDetails;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -129,7 +133,7 @@ class OAuth2ExternalCodeAuthenticationConverterTest {
         var token = (OAuth2ExternalCodeAuthenticationToken) converter.convert(request);
         assertThat(token.getAdditionalParameters().get(OAuth2ExternalCodeParameterNames.PROVIDER_CODE_VERIFIER))
                 .isEqualTo("a".repeat(43));
-        assertThat(((org.springframework.security.web.authentication.WebAuthenticationDetails) token.getDetails())
+        assertThat(((WebAuthenticationDetails) token.getDetails())
                 .getRemoteAddress()).isEqualTo("192.0.2.1");
         request.addParameter(OAuth2ExternalCodeParameterNames.PROVIDER_CODE_VERIFIER, "b".repeat(43));
         assertThatThrownBy(() -> converter.convert(request)).isInstanceOf(OAuth2AuthenticationException.class);
@@ -143,7 +147,7 @@ class OAuth2ExternalCodeAuthenticationConverterTest {
         authenticateClient();
         MockHttpServletRequest request = request();
         request.setRemoteAddr("192.0.2.1");
-        var wrapped = new jakarta.servlet.http.HttpServletRequestWrapper(request) {
+        var wrapped = new HttpServletRequestWrapper(request) {
             /** 模拟任意ForwardedHeaderFilter根据请求头生成的地址。 */
             @Override
             public String getRemoteAddr() {
@@ -151,7 +155,7 @@ class OAuth2ExternalCodeAuthenticationConverterTest {
             }
         };
         var token = (OAuth2ExternalCodeAuthenticationToken) converter.convert(wrapped);
-        assertThat(((org.springframework.security.web.authentication.WebAuthenticationDetails) token.getDetails())
+        assertThat(((WebAuthenticationDetails) token.getDetails())
                 .getRemoteAddress()).isEqualTo("192.0.2.1");
     }
 
@@ -178,12 +182,38 @@ class OAuth2ExternalCodeAuthenticationConverterTest {
         var token = (OAuth2ExternalCodeAuthenticationToken) converter.convert(valid);
         assertThat(token.getAdditionalParameters()).containsEntry(
                 OAuth2ExternalCodeParameterNames.PROVIDER_REDIRECT_URI, "https://app.example/callback");
-        for (String[] values : java.util.List.of(new String[]{""}, new String[]{"x".repeat(2049)},
+        for (String[] values : List.of(new String[]{""}, new String[]{"x".repeat(2049)},
                 new String[]{"https://a.example", "https://b.example"})) {
             var invalid = request();
             invalid.setParameter(OAuth2ExternalCodeParameterNames.PROVIDER_REDIRECT_URI, values);
             assertThatThrownBy(() -> converter.convert(invalid)).isInstanceOf(OAuth2AuthenticationException.class);
         }
+    }
+
+    /** 只有已认证方法能携带对应认证字段，凭据不进入Token附加参数。 */
+    @Test
+    void acceptsAuthenticatedConfidentialParametersWithoutRetainingCredentials() {
+        for (var method : List.of(ClientAuthenticationMethod.CLIENT_SECRET_POST, ClientAuthenticationMethod.PRIVATE_KEY_JWT)) {
+            var client = RegisteredClient.withId("web").clientId("web").clientAuthenticationMethod(method)
+                .authorizationGrantType(OAuth2ExternalCodeAuthenticationToken.GRANT_TYPE).build();
+            SecurityContextHolder.getContext().setAuthentication(new OAuth2ClientAuthenticationToken(client, method, null));
+            var valid = request();
+            if (method.equals(ClientAuthenticationMethod.CLIENT_SECRET_POST)) {
+                valid.setParameter("client_secret", "fixture-secret");
+            } else {
+                valid.setParameter("client_assertion", "fixture-assertion");
+                valid.setParameter("client_assertion_type", "urn:ietf:params:oauth:client-assertion-type:jwt-bearer");
+            }
+            var token = (OAuth2ExternalCodeAuthenticationToken) converter.convert(valid);
+            assertThat(token.getAdditionalParameters()).doesNotContainKeys("client_secret", "client_assertion", "client_assertion_type");
+            var duplicate = request();
+            duplicate.setParameter(method.equals(ClientAuthenticationMethod.CLIENT_SECRET_POST) ? "client_secret" : "client_assertion", "one", "two");
+            assertThatThrownBy(() -> converter.convert(duplicate)).isInstanceOf(OAuth2AuthenticationException.class);
+        }
+        authenticateClient();
+        var publicRequest = request();
+        publicRequest.setParameter("client_secret", "must-not-travel");
+        assertThatThrownBy(() -> converter.convert(publicRequest)).isInstanceOf(OAuth2AuthenticationException.class);
     }
 
 }

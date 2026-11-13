@@ -16,6 +16,12 @@
  */
 package dev.macula.cloud.system.service.impl;
 
+import dev.macula.cloud.system.enums.IdentityBindingMappings;
+import dev.macula.cloud.system.mapper.SysIamApplicationIdentityProviderMapper;
+import java.util.List;
+import java.util.Set;
+import org.mockito.ArgumentCaptor;
+
 import dev.macula.cloud.system.converter.IdentityProviderConverter;
 import dev.macula.cloud.system.form.IdentityProviderForm;
 import dev.macula.cloud.system.mapper.SysIdentityProviderMapper;
@@ -55,15 +61,14 @@ class IdentityProviderServiceImplTest {
     private final SysIdentityProviderMapper mapper = mock(SysIdentityProviderMapper.class);
     private final IdentityProviderServiceImpl service = new IdentityProviderServiceImpl(mapper,
         Mappers.getMapper(IdentityProviderConverter.class),
-        mock(dev.macula.cloud.system.mapper.SysOAuth2ClientConfigMapper.class),
-        mock(dev.macula.cloud.system.mapper.SysOAuth2ClientExternalProviderMapper.class));
+        mock(SysIamApplicationIdentityProviderMapper.class));
 
     @Test
     void catalogIsTheSourceOfProviderCodesAndValidationFields() {
         var catalog = service.catalog();
-        assertEquals(java.util.List.of("social", "enterprise", "mobile"),
+        assertEquals(List.of("social", "enterprise", "mobile"),
             catalog.getCategories().stream().map(category -> category.getCode()).toList());
-        assertEquals(java.util.List.of("GITHUB", "ALIPAY", "WECHAT", "WECOM", "FEISHU", "DINGTALK",
+        assertEquals(List.of("GITHUB", "ALIPAY", "WECHAT", "WECOM", "FEISHU", "DINGTALK",
                 "ALIYUN_MOBILE"),
             catalog.getProviders().stream().map(provider -> provider.getCode()).toList());
         assertTrue(catalog.getProviders().stream().allMatch(provider ->
@@ -197,12 +202,12 @@ class IdentityProviderServiceImplTest {
         existing.setConfigJson("{\"clientId\":\"github-id\"}");
         when(mapper.selectById(10L)).thenReturn(existing);
         var page = new com.baomidou.mybatisplus.extension.plugins.pagination.Page<SysIdentityProvider>(1, 20);
-        page.setRecords(java.util.List.of(existing));
+        page.setRecords(List.of(existing));
         page.setTotal(1);
         when(mapper.selectPage(any(), any())).thenReturn(page);
         for (String empty : new String[] {null, "null", "{}"}) {
             existing.setSecretConfigJson(empty);
-            page.setRecords(java.util.List.of(existing));
+            page.setRecords(List.of(existing));
             assertEquals(Map.of("clientSecret", true), service.get(10L).getConfiguredSecrets());
             assertEquals(1, service.page(1, 20, null, null, "social").getRecords().size());
         }
@@ -439,7 +444,7 @@ class IdentityProviderServiceImplTest {
         assertEquals("AUTO", saved.getDirectoryPolicy());
         assertEquals("email", saved.getBindingSourceField());
         assertNull(saved.getBindingRule());
-        var captured = org.mockito.ArgumentCaptor.forClass(SysIdentityProvider.class);
+        var captured = ArgumentCaptor.forClass(SysIdentityProvider.class);
         verify(mapper).insert(captured.capture());
         var stored = captured.getValue();
         stored.setId(7L);
@@ -494,11 +499,11 @@ class IdentityProviderServiceImplTest {
         when(mapper.selectCount(any())).thenReturn(0L);
         var input = form("WECOM", "enterprise", Map.of("corpId", "corp", "agentId", "1001", "appSecret", "secret"));
         input.setCredentialType("WECOM_APPLICATION");
-        input.setLoginCapabilities(java.util.Set.of("WECOM_BROWSER", "WECOM_WEBVIEW", "WECOM_MINIAPP"));
+        input.setLoginCapabilities(Set.of("WECOM_BROWSER", "WECOM_WEBVIEW", "WECOM_MINIAPP"));
         var saved = service.save(null, input);
         assertEquals("WECOM_APPLICATION", saved.getCredentialType());
         assertEquals(input.getLoginCapabilities(), saved.getLoginCapabilities());
-        var capture = org.mockito.ArgumentCaptor.forClass(SysIdentityProvider.class);
+        var capture = ArgumentCaptor.forClass(SysIdentityProvider.class);
         verify(mapper).insert(capture.capture());
         var stored = capture.getValue();
          stored.setId(7L);
@@ -510,7 +515,7 @@ class IdentityProviderServiceImplTest {
         assertEquals(input.getLoginCapabilities(), service.save(7L, oldPut).getLoginCapabilities());
         var disabled = form("WECOM", "enterprise", Map.of("corpId", "corp", "agentId", "1001", "appSecret", ""));
         disabled.setVersion(stored.getVersion());
-         disabled.setLoginCapabilities(java.util.Set.of());
+         disabled.setLoginCapabilities(Set.of());
         assertTrue(service.save(7L, disabled).getLoginCapabilities().isEmpty());
     }
 
@@ -519,15 +524,15 @@ class IdentityProviderServiceImplTest {
     void rejectsCrossWechatRegistrationAndSharesDingtalkSdkCredentials() {
         var website = form("WECHAT", "social", Map.of("appId", "site", "appSecret", "secret"));
         website.setSourceType("WECHAT_WEBSITE");
-        website.setLoginCapabilities(java.util.Set.of("WECHAT_MOBILE_APP"));
+        website.setLoginCapabilities(Set.of("WECHAT_MOBILE_APP"));
         assertThrows(ResponseStatusException.class, () -> service.save(null, website));
         var ding = form("DINGTALK", "enterprise", Map.of("appKey", "ding", "corpId", "corp", "appSecret", "secret"));
         when(mapper.selectCount(any())).thenReturn(0L);
-        ding.setLoginCapabilities(java.util.Set.of("DINGTALK_WEB", "DINGTALK_SDK", "DINGTALK_WEBVIEW"));
+        ding.setLoginCapabilities(Set.of("DINGTALK_WEB", "DINGTALK_SDK", "DINGTALK_WEBVIEW"));
         var saved = service.save(null, ding);
         assertEquals("DINGTALK_APPLICATION", saved.getCredentialType());
         assertEquals(ding.getLoginCapabilities(), saved.getLoginCapabilities());
-        var captured = org.mockito.ArgumentCaptor.forClass(SysIdentityProvider.class);
+        var captured = ArgumentCaptor.forClass(SysIdentityProvider.class);
         verify(mapper).insert(captured.capture());
         assertEquals("ding", captured.getValue().getAppId());
         assertEquals("secret", captured.getValue().getAppSecret());
@@ -549,11 +554,11 @@ class IdentityProviderServiceImplTest {
         var saved = service.save(null, input);
         assertEquals(2, saved.getBindingMappings().size());
         assertNull(saved.getBindingSourceField());
-        var captured = org.mockito.ArgumentCaptor.forClass(SysIdentityProvider.class);
+        var captured = ArgumentCaptor.forClass(SysIdentityProvider.class);
         verify(mapper).insert(captured.capture());
         var stored = captured.getValue();
-        assertEquals(saved.getBindingMappings(), dev.macula.cloud.system.enums.IdentityBindingMappings.toWire(
-            dev.macula.cloud.system.enums.IdentityBindingMappings.decode(stored.getBindingMappingsJson(), null, null, null)));
+        assertEquals(saved.getBindingMappings(), IdentityBindingMappings.toWire(
+            IdentityBindingMappings.decode(stored.getBindingMappingsJson(), null, null, null)));
         stored.setId(7L);
         when(mapper.selectById(7L)).thenReturn(stored);
         when(mapper.update(any(SysIdentityProvider.class), any(com.baomidou.mybatisplus.core.conditions.Wrapper.class))).thenReturn(1);
@@ -566,7 +571,7 @@ class IdentityProviderServiceImplTest {
         update.setBindingSourceField("email");
         update.setBindingTargetField("email");
         assertThrows(ResponseStatusException.class, () -> service.save(7L, update));
-        update.setBindingMappings(java.util.List.of());
+        update.setBindingMappings(List.of());
         update.setBindingSourceField(null);
         update.setBindingTargetField(null);
         update.setAutoBindEnabled(false);
@@ -580,7 +585,7 @@ class IdentityProviderServiceImplTest {
         var input = form("FEISHU", "enterprise", Map.of("appId", "app", "appSecret", "secret"));
         input.setSourceType("FEISHU_WEB");
         input.setOrganizationId("tenant-fixed");
-        input.setLoginCapabilities(java.util.Set.of("FEISHU_WEB", "FEISHU_APPLINK", "FEISHU_WEBVIEW"));
+        input.setLoginCapabilities(Set.of("FEISHU_WEB", "FEISHU_APPLINK", "FEISHU_WEBVIEW"));
         var saved = service.save(null, input);
         assertTrue(saved.getLoginCapabilities().contains("FEISHU_APPLINK"));
         assertNull(saved.getOauthRedirectUri());

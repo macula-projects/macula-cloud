@@ -16,13 +16,22 @@
  */
 package dev.macula.cloud.iam.protocol.oauth2;
 
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
+import org.springframework.security.oauth2.server.authorization.OAuth2Authorization;
+import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
+import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationGrantAuthenticationToken;
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2ClientAuthenticationToken;
+import org.springframework.security.oauth2.server.authorization.authentication.OAuth2RefreshTokenAuthenticationToken;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 
@@ -43,30 +52,30 @@ class ProtocolBoundAuthenticationProviderTest {
      */
     @Test
     void refusesRefreshFromEveryRetiredGrant() {
-        for (String retired : java.util.List.of("password", "sms", "email")) {
+        for (String retired : List.of("password", "sms", "email")) {
             var client = RegisteredClient.withId("client").clientId("client")
                     .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
                     .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN).scope("api.read").build();
             var clients = mock(RegisteredClientRepository.class);
             var delegate = mock(AuthenticationProvider.class);
             var authorizations = mock(
-                    org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService.class);
+                    OAuth2AuthorizationService.class);
             var original =
-                    org.springframework.security.oauth2.server.authorization.OAuth2Authorization.withRegisteredClient(
+                    OAuth2Authorization.withRegisteredClient(
                             client)
                     .principalName("fixture-user").authorizationGrantType(new AuthorizationGrantType(retired)).build();
             when(authorizations.findByToken("old-refresh",
-                    org.springframework.security.oauth2.server.authorization.OAuth2TokenType.REFRESH_TOKEN)).thenReturn(
+                    OAuth2TokenType.REFRESH_TOKEN)).thenReturn(
                     original);
             var principal = new OAuth2ClientAuthenticationToken(client, ClientAuthenticationMethod.CLIENT_SECRET_BASIC,
                     "synthetic");
             var request =
-                    new org.springframework.security.oauth2.server.authorization.authentication.OAuth2RefreshTokenAuthenticationToken(
-                    "old-refresh", principal, java.util.Set.of(), java.util.Map.of());
+                    new OAuth2RefreshTokenAuthenticationToken(
+                    "old-refresh", principal, Set.of(), Map.of());
             var error = assertThrows(OAuth2AuthenticationException.class,
                     () -> new ProtocolBoundAuthenticationProvider(delegate, clients, authorizations).authenticate(
                             request));
-            org.junit.jupiter.api.Assertions.assertEquals("invalid_grant", error.getError().getErrorCode());
+            Assertions.assertEquals("invalid_grant", error.getError().getErrorCode());
             verifyNoInteractions(delegate);
         }
     }
@@ -92,7 +101,7 @@ class ProtocolBoundAuthenticationProviderTest {
         when(grant.getGrantType()).thenReturn(AuthorizationGrantType.AUTHORIZATION_CODE);
         assertThrows(OAuth2AuthenticationException.class,
                 () -> new ProtocolBoundAuthenticationProvider(delegate, clients,
-                        mock(org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService.class)).authenticate(
+                        mock(OAuth2AuthorizationService.class)).authenticate(
                         grant));
         verifyNoInteractions(delegate);
     }

@@ -24,11 +24,13 @@ import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.JWSHeader;
 import com.nimbusds.jose.crypto.RSASSASigner;
 import com.nimbusds.jose.jwk.JWKSet;
+import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator;
 import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 import org.junit.jupiter.api.Test;
+import org.springframework.security.oauth2.jwt.JwtException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -49,16 +51,16 @@ class IamJwtDecoderFactoryTest {
         var decoder = IamJwtDecoderFactory.create(new ImmutableJWKSet<>(new JWKSet(key.toPublicJWK())));
         assertThat(decoder.decode(sign(key, Instant.now().plusSeconds(300))).getSubject()).isEqualTo("fixture-user");
         assertThatThrownBy(() -> decoder.decode(sign(key, Instant.now().minusSeconds(300))))
-                .isInstanceOf(org.springframework.security.oauth2.jwt.JwtException.class);
+                .isInstanceOf(JwtException.class);
         var wrong = new RSAKeyGenerator(2048).keyID("synthetic-key").generate();
         assertThatThrownBy(() -> decoder.decode(sign(wrong, Instant.now().plusSeconds(300))))
-                .isInstanceOf(org.springframework.security.oauth2.jwt.JwtException.class);
+                .isInstanceOf(JwtException.class);
     }
 
     /**
      * 合成令牌只在测试内签发，不复用生产材料。
      */
-    private String sign(com.nimbusds.jose.jwk.RSAKey key, Instant expiry) throws Exception {
+    private String sign(RSAKey key, Instant expiry) throws Exception {
         var jwt = new SignedJWT(
                 new JWSHeader.Builder(JWSAlgorithm.RS256).type(JOSEObjectType.JWT).keyID(key.getKeyID()).build(),
                 new JWTClaimsSet.Builder().subject("fixture-user").issueTime(Date.from(Instant.now().minusSeconds(600)))

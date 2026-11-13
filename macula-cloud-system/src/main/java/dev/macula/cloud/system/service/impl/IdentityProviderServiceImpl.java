@@ -16,6 +16,11 @@
  */
 package dev.macula.cloud.system.service.impl;
 
+import dev.macula.cloud.system.enums.IdentityBindingMappings;
+import dev.macula.cloud.system.enums.IdentityBindingTargetField;
+import dev.macula.cloud.system.enums.IdentityDirectoryPolicy;
+import dev.macula.cloud.system.enums.IdentitySourceFlow;
+
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -29,10 +34,7 @@ import dev.macula.cloud.system.enums.IdentityBindingMapping;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import java.util.Objects;
 import java.util.stream.Collectors;
-import dev.macula.cloud.system.mapper.SysOAuth2ClientConfigMapper;
-import dev.macula.cloud.system.mapper.SysOAuth2ClientExternalProviderMapper;
-import dev.macula.cloud.system.pojo.entity.SysOAuth2ClientConfig;
-import dev.macula.cloud.system.pojo.entity.SysOAuth2ClientExternalProvider;
+import dev.macula.cloud.system.mapper.SysIamApplicationIdentityProviderMapper;
 import dev.macula.cloud.system.form.IdentityProviderForm;
 import dev.macula.cloud.system.mapper.SysIdentityProviderMapper;
 import dev.macula.cloud.system.pojo.entity.SysIdentityProvider;
@@ -68,8 +70,7 @@ public class IdentityProviderServiceImpl implements IdentityProviderService {
 
     private final SysIdentityProviderMapper mapper;
     private final IdentityProviderConverter converter;
-    private final SysOAuth2ClientConfigMapper clients;
-    private final SysOAuth2ClientExternalProviderMapper clientSources;
+    private final SysIamApplicationIdentityProviderMapper clientSources;
     private final JsonMapper json = JsonMapper.builder().build();
 
     @Override
@@ -93,19 +94,19 @@ public class IdentityProviderServiceImpl implements IdentityProviderService {
                 source.bindingRules().isEmpty() ? "当前适配器没有可核验的本地账号匹配属性，首次登录需手动绑定。" : null);
             descriptor.setBindingMappings(source.bindingSourceFields().stream().flatMap(field ->
                 IdentityBindingMapping.targets(field).stream().filter(target -> source.enterprise()
-                    || target == dev.macula.cloud.system.enums.IdentityBindingTargetField.MOBILE)
+                    || target == IdentityBindingTargetField.MOBILE)
                     .map(target -> new IdentityProviderCatalogVO.BindingMapping(field.value(), field.label(),
                         target.value(), target.label(), "需要该应用的成员及所选字段读取权限"))).toList());
             descriptor.setDefaultAvailable("CONFIGURATION".equals(source.scene()) || Arrays.stream(
-                dev.macula.cloud.system.enums.IdentitySourceFlow.values()).filter(item -> item.supports(source) && item.implemented()).count() == 1);
+                IdentitySourceFlow.values()).filter(item -> item.supports(source) && item.implemented()).count() == 1);
             descriptor.setUnavailableReason(descriptor.isDefaultAvailable() ? null : "该接入方式的客户端合同尚待核实，暂不可启用");
-            descriptor.setFlows(Arrays.stream(dev.macula.cloud.system.enums.IdentitySourceFlow.values())
+            descriptor.setFlows(Arrays.stream(IdentitySourceFlow.values())
                 .filter(flowItem -> flowItem.supports(source)).map(flowItem -> new IdentityProviderCatalogVO.Flow(
                     flowItem.value(), flowItem.value(), flowItem.implemented(), flowItem.providerPkce(),
                     flowItem.implemented() ? null : "该客户端flow官方合同尚待核实")).toList());
             descriptor.setDirectoryPolicies(Set.of("WECOM", "FEISHU", "DINGTALK").contains(source.providerType())
-                ? Arrays.stream(dev.macula.cloud.system.enums.IdentityDirectoryPolicy.values()).map(dev.macula.cloud.system.enums.IdentityDirectoryPolicy::value).collect(Collectors.toSet())
-                : Set.of(dev.macula.cloud.system.enums.IdentityDirectoryPolicy.IDENTITY_ONLY.value()));
+                ? Arrays.stream(IdentityDirectoryPolicy.values()).map(IdentityDirectoryPolicy::value).collect(Collectors.toSet())
+                : Set.of(IdentityDirectoryPolicy.IDENTITY_ONLY.value()));
             return descriptor;
         }).toList();
         var catalog = new IdentityProviderCatalogVO(categories, providers, sources);
@@ -199,29 +200,29 @@ public class IdentityProviderServiceImpl implements IdentityProviderService {
             if (form.getOrganizationId() == null) { form.setOrganizationId(entity.getOrganizationId()); }
             if (form.getOauthRedirectUri() == null) { form.setOauthRedirectUri(entity.getOauthRedirectUri()); }
         } else if (source.enterprise() && form.getDirectoryPolicy() == null) {
-            form.setDirectoryPolicy(dev.macula.cloud.system.enums.IdentityDirectoryPolicy.AUTO.value());
+            form.setDirectoryPolicy(IdentityDirectoryPolicy.AUTO.value());
         }
         if (!StringUtils.hasText(form.getOrganizationId()) && source.enterprise() && form.getConfig() != null
             && form.getConfig().get("corpId") instanceof String corpId) { form.setOrganizationId(corpId.trim()); }
-        dev.macula.cloud.system.enums.IdentitySourceFlow flow = null;
-        dev.macula.cloud.system.enums.IdentityDirectoryPolicy directoryPolicy;
+        IdentitySourceFlow flow = null;
+        IdentityDirectoryPolicy directoryPolicy;
         try {
             if (!"CONFIGURATION".equals(source.scene())) {
                 if (Boolean.TRUE.equals(form.getEnabled()) || StringUtils.hasText(form.getIdentityFlow())
                     || !source.providerType().equals("FEISHU")) {
                     flow = form.getIdentityFlow() == null && Boolean.TRUE.equals(form.getEnabled())
-                        ? dev.macula.cloud.system.enums.IdentitySourceFlow.defaultFor(source)
+                        ? IdentitySourceFlow.defaultFor(source)
                         : Boolean.TRUE.equals(form.getEnabled())
-                            ? dev.macula.cloud.system.enums.IdentitySourceFlow.resolve(source, form.getIdentityFlow())
-                            : dev.macula.cloud.system.enums.IdentitySourceFlow.declared(source, form.getIdentityFlow());
+                            ? IdentitySourceFlow.resolve(source, form.getIdentityFlow())
+                            : IdentitySourceFlow.declared(source, form.getIdentityFlow());
                 }
             }
-            directoryPolicy = dev.macula.cloud.system.enums.IdentityDirectoryPolicy.fromValue(form.getDirectoryPolicy());
+            directoryPolicy = IdentityDirectoryPolicy.fromValue(form.getDirectoryPolicy());
             if (Boolean.TRUE.equals(form.getEnabled()) && "FEISHU".equals(source.providerType())
                 && Boolean.TRUE.equals(form.getAutoBindEnabled()) && !StringUtils.hasText(form.getOrganizationId())) {
                 bad("飞书员工编号自动绑定必须配置固定tenant_key，避免跨企业编号相同而误绑定");
             }
-            if (directoryPolicy != dev.macula.cloud.system.enums.IdentityDirectoryPolicy.IDENTITY_ONLY
+            if (directoryPolicy != IdentityDirectoryPolicy.IDENTITY_ONLY
                 && (!Set.of("WECOM", "FEISHU", "DINGTALK").contains(source.providerType())
                     || !StringUtils.hasText(form.getOrganizationId()))) {
                 bad("通讯录策略需要适用的企业来源及明确组织标识");
@@ -232,7 +233,7 @@ public class IdentityProviderServiceImpl implements IdentityProviderService {
             for (String capability : capabilities.keySet()) {
                 var selected = IdentityLoginCapability.fromValue(capability);
                 if (!"CONFIGURATION".equals(selected.source().scene())) {
-                    var contract = dev.macula.cloud.system.enums.IdentitySourceFlow.resolve(selected.source(), capabilities.get(capability));
+                    var contract = IdentitySourceFlow.resolve(selected.source(), capabilities.get(capability));
 
                 }
                 for (var item : mappings) { item.validateFor(selected.source()); }
@@ -326,7 +327,7 @@ public class IdentityProviderServiceImpl implements IdentityProviderService {
         entity.setCredentialType(credentialType.value());
         entity.setCapabilitiesJson(IdentityLoginCapability.encode(capabilities));
         entity.setAutoBindEnabled(Boolean.TRUE.equals(form.getAutoBindEnabled()));
-        entity.setBindingMappingsJson(dev.macula.cloud.system.enums.IdentityBindingMappings.encode(mappings));
+        entity.setBindingMappingsJson(IdentityBindingMappings.encode(mappings));
         entity.setBindingRule(mapping == null ? null : mapping.legacyValue());
         entity.setBindingSourceField(mapping == null ? null : mapping.source().value());
         entity.setBindingTargetField(mapping == null ? null : mapping.target().value());
@@ -359,15 +360,10 @@ public class IdentityProviderServiceImpl implements IdentityProviderService {
     @Override
     @Transactional
     public void delete(Long id) {
-        long references = clientSources.selectCount(new LambdaQueryWrapper<SysOAuth2ClientExternalProvider>()
-            .eq(SysOAuth2ClientExternalProvider::getIdentityProviderId, id));
-        references += clients.selectCount(new LambdaQueryWrapper<SysOAuth2ClientConfig>()
-            .isNotNull(SysOAuth2ClientConfig::getBrowserProviderBindings)
-            .apply("JSON_CONTAINS(JSON_EXTRACT(browser_provider_bindings, '$.*'), CAST({0} AS JSON))", id.toString()));
-        references += clients.selectCount(new LambdaQueryWrapper<SysOAuth2ClientConfig>()
-            .isNotNull(SysOAuth2ClientConfig::getBrowserCapabilityBindings)
-            .apply("JSON_CONTAINS(JSON_EXTRACT(browser_capability_bindings, '$.*'), CAST({0} AS JSON))", id.toString()));
-        if (references > 0) {
+        if (mapper.selectByIdForUpdate(id) == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "身份提供商不存在");
+        }
+        if (!clientSources.selectByProviderIdForUpdate(id).isEmpty()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "请先解除应用的身份源关联");
         }
         if (mapper.deleteById(id) == 0) {
@@ -392,11 +388,11 @@ public class IdentityProviderServiceImpl implements IdentityProviderService {
      * @param updating 是否更新
      * @return 本次完整映射集合，关闭自动绑定时为空集合
      */
-    private java.util.List<IdentityBindingMapping> bindingMappings(IdentityProviderForm form, SysIdentityProvider entity,
+    private List<IdentityBindingMapping> bindingMappings(IdentityProviderForm form, SysIdentityProvider entity,
         IdentitySourceType source, boolean updating) {
         try {
-            var previous = updating ? dev.macula.cloud.system.enums.IdentityBindingMappings.decode(entity.getBindingMappingsJson(),
-                entity.getBindingSourceField(), entity.getBindingTargetField(), entity.getBindingRule()) : java.util.List.<IdentityBindingMapping>of();
+            var previous = updating ? IdentityBindingMappings.decode(entity.getBindingMappingsJson(),
+                entity.getBindingSourceField(), entity.getBindingTargetField(), entity.getBindingRule()) : List.<IdentityBindingMapping>of();
             boolean explicit = form.isBindingSourceFieldPresent() || form.isBindingTargetFieldPresent();
             boolean legacy = explicit || form.isBindingRulePresent();
             if (form.isBindingSourceFieldPresent() != form.isBindingTargetFieldPresent()) {
@@ -405,9 +401,9 @@ public class IdentityProviderServiceImpl implements IdentityProviderService {
             if (explicit && form.getBindingSourceField() == null && form.getBindingTargetField() == null
                 && form.getBindingRule() != null) { throw new IllegalArgumentException("新旧账号绑定规则不一致"); }
             var single = legacy ? IdentityBindingMapping.resolve(form.getBindingSourceField(), form.getBindingTargetField(), form.getBindingRule()) : null;
-            java.util.List<IdentityBindingMapping> mappings;
+            List<IdentityBindingMapping> mappings;
             if (form.isBindingMappingsPresent()) {
-                mappings = dev.macula.cloud.system.enums.IdentityBindingMappings.fromWire(form.getBindingMappings());
+                mappings = IdentityBindingMappings.fromWire(form.getBindingMappings());
                 if (legacy && (single == null ? !mappings.isEmpty() : mappings.size() != 1 || !single.equals(mappings.get(0)))) {
                     throw new IllegalArgumentException("新旧账号绑定规则不一致");
                 }
@@ -417,13 +413,13 @@ public class IdentityProviderServiceImpl implements IdentityProviderService {
                     && Boolean.TRUE.equals(form.getAutoBindEnabled())) {
                     throw new IllegalArgumentException("旧客户端无法修改此映射，请使用新版管理端");
                 }
-                mappings = single == null ? java.util.List.of() : java.util.List.of(single);
+                mappings = single == null ? List.of() : List.of(single);
             } else { mappings = previous; }
             if (!Boolean.TRUE.equals(form.getAutoBindEnabled())) {
                 if (!mappings.isEmpty() && (legacy || form.isBindingMappingsPresent())) {
                     throw new IllegalArgumentException("关闭自动绑定时请清空字段映射");
                 }
-                return java.util.List.of();
+                return List.of();
             }
             if (mappings.isEmpty()) { throw new IllegalArgumentException("请选择身份源和IAM匹配字段"); }
             for (var mapping : mappings) { mapping.validateFor(source); }
@@ -433,7 +429,7 @@ public class IdentityProviderServiceImpl implements IdentityProviderService {
 
     /** 明确多选能力的固定合同；旧PUT和旧显式flow都不被默认值重置。 */
     private Map<String, String> capabilitySettings(IdentityProviderForm form, SysIdentityProvider entity,
-        IdentitySourceType source, dev.macula.cloud.system.enums.IdentitySourceFlow flow, boolean existing) {
+        IdentitySourceType source, IdentitySourceFlow flow, boolean existing) {
         try {
             var old = existing ? IdentityLoginCapability.decode(entity.getCapabilitiesJson(), source, entity.getIdentityFlow())
                 : Map.<String, String>of();
@@ -450,7 +446,7 @@ public class IdentityProviderServiceImpl implements IdentityProviderService {
                 if (contract == null) {
                     contract = "CONFIGURATION".equals(capability.source().scene()) ? ""
                         : capability.source() == source && flow != null ? flow.value()
-                        : dev.macula.cloud.system.enums.IdentitySourceFlow.defaultFor(capability.source()).value();
+                        : IdentitySourceFlow.defaultFor(capability.source()).value();
                 }
                 result.put(key, contract);
             }
@@ -493,8 +489,8 @@ public class IdentityProviderServiceImpl implements IdentityProviderService {
                 vo.setCallbackUrl(type.callbackUrl());
             }
         }
-        vo.setBindingMappings(dev.macula.cloud.system.enums.IdentityBindingMappings.toWire(
-            dev.macula.cloud.system.enums.IdentityBindingMappings.decode(entity.getBindingMappingsJson(),
+        vo.setBindingMappings(IdentityBindingMappings.toWire(
+            IdentityBindingMappings.decode(entity.getBindingMappingsJson(),
                 entity.getBindingSourceField(), entity.getBindingTargetField(), entity.getBindingRule())));
         return vo;
     }

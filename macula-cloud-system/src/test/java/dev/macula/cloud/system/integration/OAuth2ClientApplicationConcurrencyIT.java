@@ -16,16 +16,26 @@
  */
 package dev.macula.cloud.system.integration;
 
+import dev.macula.cloud.system.protocol.OAuth2ProtocolDefinition;
+import dev.macula.boot.starter.mp.config.MyBatisPlusProperties;
+import dev.macula.boot.starter.mp.handler.AuditMetaObjectHandler;
+import dev.macula.cloud.system.config.OAuth2ScopeCatalogProperties;
+import dev.macula.cloud.system.mapper.SysIamApplicationProtocolConfigMapper;
+import dev.macula.cloud.system.pojo.entity.SysIamApplicationIdentityProvider;
+import dev.macula.cloud.system.service.impl.IamApplicationCatalogServiceImpl;
+import dev.macula.cloud.system.service.impl.ProtocolConfigurationTestFixtures;
+import java.util.Set;
+import org.mockito.ArgumentMatchers;
+
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.spring.MybatisSqlSessionFactoryBean;
 import dev.macula.boot.constants.CacheConstants;
-import dev.macula.cloud.system.form.OAuth2ClientForm;
+import dev.macula.cloud.system.form.IamApplicationForm;
 import dev.macula.cloud.system.mapper.SysIdentityProviderMapper;
-import dev.macula.cloud.system.mapper.SysOAuth2ClientConfigMapper;
-import dev.macula.cloud.system.mapper.SysOAuth2ClientExternalProviderMapper;
+import dev.macula.cloud.system.mapper.SysIamApplicationMapper;
+import dev.macula.cloud.system.mapper.SysIamApplicationIdentityProviderMapper;
 import dev.macula.cloud.system.mapper.SysTenantInfoMapper;
 import dev.macula.cloud.system.security.OAuth2ClientCacheNames;
-import dev.macula.cloud.system.service.impl.OAuth2ClientConfigServiceImpl;
 import java.net.URI;
 import java.sql.DriverManager;
 import java.util.concurrent.CountDownLatch;
@@ -48,7 +58,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.AdditionalAnswers.delegatesTo;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -87,24 +96,22 @@ class OAuth2ClientApplicationConcurrencyIT {
         factory.setDataSource(dataSource);
         factory.setConfiguration(configuration);
         var global = new com.baomidou.mybatisplus.core.config.GlobalConfig();
-        global.setMetaObjectHandler(new dev.macula.boot.starter.mp.handler.AuditMetaObjectHandler(
-            new dev.macula.boot.starter.mp.config.MyBatisPlusProperties().getAudit()));
+        global.setMetaObjectHandler(new AuditMetaObjectHandler(
+            new MyBatisPlusProperties().getAudit()));
         factory.setGlobalConfig(global);
         var sqlFactory = factory.getObject();
-        for (Class<?> mapper : new Class<?>[] {SysOAuth2ClientConfigMapper.class,dev.macula.cloud.system.mapper.SysApplicationProtocolConfigMapper.class, SysOAuth2ClientExternalProviderMapper.class,
+        for (Class<?> mapper : new Class<?>[] {SysIamApplicationMapper.class,SysIamApplicationProtocolConfigMapper.class, SysIamApplicationIdentityProviderMapper.class,
             SysIdentityProviderMapper.class, SysTenantInfoMapper.class}) {
             sqlFactory.getConfiguration().addMapper(mapper);
         }
         var session = new SqlSessionTemplate(sqlFactory);
-        var realMapper = session.getMapper(SysOAuth2ClientConfigMapper.class);
-        var bindings = mock(SysOAuth2ClientExternalProviderMapper.class,
-            delegatesTo(session.getMapper(SysOAuth2ClientExternalProviderMapper.class)));
+        var realMapper = session.getMapper(SysIamApplicationMapper.class);
+        var bindings = mock(SysIamApplicationIdentityProviderMapper.class,
+            delegatesTo(session.getMapper(SysIamApplicationIdentityProviderMapper.class)));
         for (int scenario = 0; scenario < 3; scenario++) {
-            jdbc.update("UPDATE sys_oauth2_client SET application_type='SPA', protocol_mode='OIDC', miniapp_platform=NULL, hosted_login_methods=NULL, "
-                + "client_name='before', client_authentication_methods='none', client_secret=NULL, "
-                + "authorization_grant_types='authorization_code', require_proof_key=1, "
-                + "redirect_uris='https://client.example/callback' WHERE id=1");
-            var mapper = mock(SysOAuth2ClientConfigMapper.class, delegatesTo(realMapper));
+            jdbc.update("UPDATE sys_iam_application SET application_type='SPA',web_login_mode='BROWSER',miniapp_platform=NULL,hosted_login_methods=NULL,application_name='before',configuration_status='DRAFT' WHERE id=1");
+            jdbc.update("DELETE FROM sys_iam_application_protocol_config WHERE application_id=1");
+            var mapper = mock(SysIamApplicationMapper.class, delegatesTo(realMapper));
             CountDownLatch bothRead = new CountDownLatch(2), winnerCommitted = new CountDownLatch(1), firstRead = new CountDownLatch(1);
             AtomicInteger reads = new AtomicInteger();
             doAnswer(invocation -> {
@@ -115,29 +122,22 @@ class OAuth2ClientApplicationConcurrencyIT {
                 if (index == 1) {
                     assertTrue(winnerCommitted.await(10, TimeUnit.SECONDS));
                 }
-                return realMapper.selectOne(invocation.getArgument(0));
-            }).when(mapper).selectOne(any());
+                return realMapper.selectByIdForUpdate(invocation.getArgument(0));
+            }).when(mapper).selectByIdForUpdate(ArgumentMatchers.anyLong());
             var cache = mock(Cache.class);
             var cacheManager = mock(CacheManager.class);
             when(cacheManager.getCache(CacheConstants.OAUTH2_CLIENT_CACHE_KEY)).thenReturn(cache);
             when(cacheManager.getCache(OAuth2ClientCacheNames.TOKEN_ORIGIN_INDEX)).thenReturn(mock(Cache.class));
-            var service = new OAuth2ClientConfigServiceImpl(mapper, bindings,
-                session.getMapper(SysIdentityProviderMapper.class), session.getMapper(SysTenantInfoMapper.class),
-                mock(PasswordEncoder.class), cacheManager,
-                new dev.macula.cloud.system.service.impl.OAuth2ClientConfigurationCatalogServiceImpl(
-                    new dev.macula.cloud.system.config.OAuth2ScopeCatalogProperties(),
-                    session.getMapper(SysIdentityProviderMapper.class)), new dev.macula.cloud.system.service.impl.ApplicationProtocolConfigurationService(session.getMapper(dev.macula.cloud.system.mapper.SysApplicationProtocolConfigMapper.class), session.getMapper(SysOAuth2ClientExternalProviderMapper.class)));
-            OAuth2ClientForm first = form("SPA", "winner");
-            OAuth2ClientForm second = form("SPA", "loser");
-            first.setHostedLoginMethods(java.util.Set.of("EMAIL"));
-            second.setHostedLoginMethods(java.util.Set.of("PASSWORD"));
-            String version = new dev.macula.cloud.system.service.impl.ApplicationProtocolConfigurationService(
-                session.getMapper(dev.macula.cloud.system.mapper.SysApplicationProtocolConfigMapper.class),
-                session.getMapper(SysOAuth2ClientExternalProviderMapper.class)).version(realMapper.selectById(1L));
+            var service = ProtocolConfigurationTestFixtures.service(mapper, bindings, session.getMapper(SysIamApplicationProtocolConfigMapper.class), session.getMapper(SysIdentityProviderMapper.class), session.getMapper(SysTenantInfoMapper.class), mock(PasswordEncoder.class), cacheManager, new IamApplicationCatalogServiceImpl(new OAuth2ScopeCatalogProperties(), session.getMapper(SysIdentityProviderMapper.class), OAuth2ProtocolDefinition.registry()));
+            IamApplicationForm first = form("SPA", "winner");
+            IamApplicationForm second = form("SPA", "loser");
+            first.setHostedLoginMethods(Set.of("EMAIL"));
+            second.setHostedLoginMethods(Set.of("PASSWORD"));
+            String version = ProtocolConfigurationTestFixtures.protocols(session.getMapper(SysIamApplicationProtocolConfigMapper.class), session.getMapper(SysIamApplicationIdentityProviderMapper.class)).version(realMapper.selectById(1L));
             first.setConfigurationVersion(version);
             second.setConfigurationVersion(version);
-            dev.macula.cloud.system.service.impl.ProtocolConfigurationTestFixtures.configure(first);
-            dev.macula.cloud.system.service.impl.ProtocolConfigurationTestFixtures.configure(second);
+            ProtocolConfigurationTestFixtures.configure(first);
+            ProtocolConfigurationTestFixtures.configure(second);
             var executor = Executors.newFixedThreadPool(2);
             try {
                 var winner = executor.submit(() -> {
@@ -159,24 +159,24 @@ class OAuth2ClientApplicationConcurrencyIT {
                 });
                 assertEquals("winner", winner.get(15, TimeUnit.SECONDS).getClientName());
                 assertEquals(409, loser.get(15, TimeUnit.SECONDS));
-                assertEquals(first.getApplicationType(), jdbc.queryForObject("SELECT application_type FROM sys_oauth2_client WHERE id=1", String.class));
-                assertEquals("winner", jdbc.queryForObject("SELECT client_name FROM sys_oauth2_client WHERE id=1", String.class));
-                assertEquals("EMAIL", jdbc.queryForObject("SELECT hosted_login_methods FROM sys_oauth2_client WHERE id=1", String.class));
+                assertEquals(first.getApplicationType(), jdbc.queryForObject("SELECT application_type FROM sys_iam_application WHERE id=1", String.class));
+                assertEquals("winner", jdbc.queryForObject("SELECT application_name FROM sys_iam_application WHERE id=1", String.class));
+                assertEquals("EMAIL", jdbc.queryForObject("SELECT hosted_login_methods FROM sys_iam_application WHERE id=1", String.class));
                 verify(cache, times(1)).invalidate();
             } finally {
                 executor.shutdownNow();
             }
         }
-        verify(bindings, times(3)).delete(org.mockito.ArgumentMatchers.<com.baomidou.mybatisplus.core.conditions.Wrapper<dev.macula.cloud.system.pojo.entity.SysOAuth2ClientExternalProvider>>any());
+        verify(bindings, times(3)).delete(ArgumentMatchers.<com.baomidou.mybatisplus.core.conditions.Wrapper<SysIamApplicationIdentityProvider>>any());
     }
 
     /** 完整新模型不依赖缺失字段合并；public客户端只启用授权码。 */
-    private OAuth2ClientForm form(String type, String name) {
-        OAuth2ClientForm form = new OAuth2ClientForm();
+    private IamApplicationForm form(String type, String name) {
+        IamApplicationForm form = new IamApplicationForm();
         form.setClientId("e2fa7e64-249b-46f0-ae1d-797610e88615");
         form.setClientName(name);
         form.setProtocolMode("OIDC");
-        form.setEnabledProtocols(java.util.Set.of("OIDC"));
+        form.setEnabledProtocols(Set.of("OIDC"));
         form.setDefaultProtocol("OIDC");
         form.setConfigurationStatus("ENABLED");
         if (type != null) {

@@ -16,11 +16,11 @@
  */
 package dev.macula.cloud.iam.protocol.oauth2.endpoint;
 
-import java.util.Set;
-
+import dev.macula.cloud.iam.protocol.oauth2.client.OAuth2ClientRegistrationService;
 import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeClientSettings;
-import dev.macula.cloud.iam.service.client.SysOAuth2ClientService;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -45,7 +45,7 @@ import static org.mockito.Mockito.when;
 class OAuth2CorsConfigurationSourceTest {
     private static final String ORIGIN = "https://app.example.test";
     private final RegisteredClientRepository clients = mock(RegisteredClientRepository.class);
-    private final SysOAuth2ClientService clientService = mock(SysOAuth2ClientService.class);
+    private final OAuth2ClientRegistrationService clientService = mock(OAuth2ClientRegistrationService.class);
     private final OAuth2CorsConfigurationSource source =
             new OAuth2CorsConfigurationSource(clientService, "/oauth2/token");
 
@@ -86,7 +86,7 @@ class OAuth2CorsConfigurationSourceTest {
         var request = new MockHttpServletRequest("POST", "/api/v1/oauth2/sms-codes");
         request.addHeader(HttpHeaders.ORIGIN, "https://app.example");
         assertThat(source.getCorsConfiguration(request)).isNull();
-        org.mockito.Mockito.verifyNoInteractions(clients);
+        Mockito.verifyNoInteractions(clients);
     }
 
     @Test
@@ -94,7 +94,7 @@ class OAuth2CorsConfigurationSourceTest {
         var request = new MockHttpServletRequest("POST", "/api/v1/oauth2/sms-codes");
         request.addHeader(HttpHeaders.ORIGIN, "https://app.example");
         assertThat(source.getCorsConfiguration(request)).isNull();
-        org.mockito.Mockito.verifyNoInteractions(clients);
+        Mockito.verifyNoInteractions(clients);
     }
 
     @Test

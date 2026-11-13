@@ -18,7 +18,10 @@ package dev.macula.cloud.iam.authentication.wecom;
 
 import java.util.Map;
 
+import dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures;
 import dev.macula.cloud.iam.service.identity.IdentityProviderConfigService.ProviderConfig;
+import dev.macula.cloud.system.enums.IdentitySourceType;
+import org.hamcrest.Matchers;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AuthenticationServiceException;
@@ -43,14 +46,14 @@ class WecomClientTest {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         WecomClient client = new WecomClient(builder.build());
-        ProviderConfig config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(
-                dev.macula.cloud.system.enums.IdentitySourceType.WECOM_WEB, "WECOM", "corp", "secret",
+        ProviderConfig config = IdentitySourceTestFixtures.source(
+                IdentitySourceType.WECOM_WEB, "WECOM", "corp", "secret",
                 Map.of("corpId", "corp", "agentId", "agent"));
-        server.expect(requestTo(org.hamcrest.Matchers.startsWith(
+        server.expect(requestTo(Matchers.startsWith(
                         "https://qyapi.weixin.qq.com/cgi-bin/gettoken?")))
                 .andRespond(withSuccess("{\"errcode\":0,\"access_token\":\"access-token\"}",
                         MediaType.APPLICATION_JSON));
-        server.expect(requestTo(org.hamcrest.Matchers.startsWith(
+        server.expect(requestTo(Matchers.startsWith(
                         "https://qyapi.weixin.qq.com/cgi-bin/user/getuserinfo?")))
                 .andExpect(queryParam("access_token", "access-token"))
                 .andExpect(queryParam("code", "app-code"))
@@ -66,14 +69,14 @@ class WecomClientTest {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         WecomClient client = new WecomClient(builder.build());
-        ProviderConfig config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(
-                dev.macula.cloud.system.enums.IdentitySourceType.WECOM_WEB, "WECOM", "corp", "secret",
+        ProviderConfig config = IdentitySourceTestFixtures.source(
+                IdentitySourceType.WECOM_WEB, "WECOM", "corp", "secret",
                 Map.of("corpId", "corp", "agentId", "agent"));
-        server.expect(requestTo(org.hamcrest.Matchers.startsWith(
+        server.expect(requestTo(Matchers.startsWith(
                         "https://qyapi.weixin.qq.com/cgi-bin/gettoken?")))
                 .andRespond(withSuccess("{\"errcode\":0,\"access_token\":\"access-token\"}",
                         MediaType.APPLICATION_JSON));
-        server.expect(requestTo(org.hamcrest.Matchers.startsWith(
+        server.expect(requestTo(Matchers.startsWith(
                         "https://qyapi.weixin.qq.com/cgi-bin/auth/getuserinfo?")))
                 .andRespond(withSuccess("{\"errcode\":0,\"userid\":\"member01\"}",
                         MediaType.APPLICATION_JSON));
@@ -87,14 +90,14 @@ class WecomClientTest {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         WecomClient client = new WecomClient(builder.build());
-        ProviderConfig config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(
-                dev.macula.cloud.system.enums.IdentitySourceType.WECOM_WEB, "WECOM", "corp", "secret",
+        ProviderConfig config = IdentitySourceTestFixtures.source(
+                IdentitySourceType.WECOM_WEB, "WECOM", "corp", "secret",
                 Map.of("corpId", "corp", "agentId", "agent"));
-        server.expect(requestTo(org.hamcrest.Matchers.startsWith(
+        server.expect(requestTo(Matchers.startsWith(
                         "https://qyapi.weixin.qq.com/cgi-bin/gettoken?")))
                 .andRespond(withSuccess("{\"errcode\":0,\"access_token\":\"access-token\"}",
                         MediaType.APPLICATION_JSON));
-        server.expect(requestTo(org.hamcrest.Matchers.startsWith(
+        server.expect(requestTo(Matchers.startsWith(
                         "https://qyapi.weixin.qq.com/cgi-bin/auth/getuserinfo?")))
                 .andRespond(withSuccess("{\"errcode\":0,\"UserId\":\"member01\"}",
                         MediaType.APPLICATION_JSON));
@@ -108,14 +111,14 @@ class WecomClientTest {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         WecomClient client = new WecomClient(builder.build());
-        ProviderConfig config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(
-                dev.macula.cloud.system.enums.IdentitySourceType.WECOM_WEB, "WECOM", "corp", "secret",
+        ProviderConfig config = IdentitySourceTestFixtures.source(
+                IdentitySourceType.WECOM_WEB, "WECOM", "corp", "secret",
                 Map.of("corpId", "corp", "agentId", "agent"));
-        server.expect(requestTo(org.hamcrest.Matchers.startsWith(
+        server.expect(requestTo(Matchers.startsWith(
                         "https://qyapi.weixin.qq.com/cgi-bin/gettoken?")))
                 .andRespond(withSuccess("{\"errcode\":0,\"access_token\":\"access-token\"}",
                         MediaType.APPLICATION_JSON));
-        server.expect(requestTo(org.hamcrest.Matchers.startsWith(
+        server.expect(requestTo(Matchers.startsWith(
                         "https://qyapi.weixin.qq.com/cgi-bin/miniprogram/jscode2session?")))
                 .andExpect(queryParam("access_token", "access-token"))
                 .andExpect(queryParam("js_code", "miniapp-code"))

@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -130,7 +131,7 @@ class ProviderApplicationTokenCacheIT {
         var calls = new AtomicInteger();
         var ready = new CountDownLatch(1);
         try {
-            var futures = new ArrayList<java.util.concurrent.Future<String>>();
+            var futures = new ArrayList<Future<String>>();
             for (int i = 0; i < 12; i++) {
                 futures.add(executor.submit(() -> {
                     ready.await();
@@ -242,9 +243,9 @@ class ProviderApplicationTokenCacheIT {
     /**
      * 公共缓存保持原摘要密钥，只替换配置类型依赖。
      */
-    private dev.macula.cloud.iam.authentication.thirdparty.cache.ProviderCacheSecurityProperties cacheSecurity(
-            dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeSecurityProperties original) {
-        var result = new dev.macula.cloud.iam.authentication.thirdparty.cache.ProviderCacheSecurityProperties();
+    private ProviderCacheSecurityProperties cacheSecurity(
+            ExternalCodeSecurityProperties original) {
+        var result = new ProviderCacheSecurityProperties();
         result.setDigestKey(original.getDigestKey());
         return result;
     }

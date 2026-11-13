@@ -16,11 +16,18 @@
  */
 package dev.macula.cloud.iam.protocol.oauth2.grant.externalcode;
 
+import dev.macula.cloud.iam.protocol.oauth2.ApplicationProtocolResolver;
+import dev.macula.cloud.iam.protocol.oauth2.grant.base.OAuth2UserGrantTokenIssuer;
+import dev.macula.cloud.iam.service.identity.IdentityProviderConfigService;
+import dev.macula.cloud.system.enums.ExternalCodeType;
+import dev.macula.cloud.system.enums.IamApplicationType;
+import dev.macula.cloud.system.enums.IamWebLoginMode;
+import dev.macula.cloud.system.security.IamApplicationLoginPolicy;
+import java.net.URI;
 import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
-
-import dev.macula.cloud.iam.protocol.oauth2.grant.base.OAuth2UserGrantTokenIssuer;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.springframework.security.authentication.AuthenticationProvider;
@@ -33,6 +40,7 @@ import org.springframework.security.oauth2.core.OAuth2ErrorCodes;
 import org.springframework.security.oauth2.core.oidc.OidcScopes;
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2ClientAuthenticationToken;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
+import org.springframework.security.web.authentication.WebAuthenticationDetails;
 import org.springframework.util.CollectionUtils;
 
 /**
@@ -47,7 +55,7 @@ public class OAuth2ExternalCodeAuthenticationProvider implements AuthenticationP
     private final ExternalCodeReplayStore replayStore;
     private final ExternalCodeAccountResolver accountResolver;
     private final OAuth2UserGrantTokenIssuer tokenIssuer;
-    private final dev.macula.cloud.iam.service.identity.IdentityProviderConfigService sources;
+    private final IdentityProviderConfigService sources;
     private final ExternalCodeRateLimiter limiter;
 
     /**
@@ -56,14 +64,14 @@ public class OAuth2ExternalCodeAuthenticationProvider implements AuthenticationP
     public OAuth2ExternalCodeAuthenticationProvider(ExternalCodeVerifierRegistry verifiers,
             ExternalCodeReplayStore replayStore, ExternalCodeAccountResolver accountResolver,
             OAuth2UserGrantTokenIssuer tokenIssuer,
-            dev.macula.cloud.iam.service.identity.IdentityProviderConfigService sources,
+            IdentityProviderConfigService sources,
             ExternalCodeRateLimiter limiter) {
         this.verifiers = verifiers;
         this.replayStore = replayStore;
         this.accountResolver = accountResolver;
         this.tokenIssuer = tokenIssuer;
-        this.sources = java.util.Objects.requireNonNull(sources);
-        this.limiter = java.util.Objects.requireNonNull(limiter);
+        this.sources = Objects.requireNonNull(sources);
+        this.limiter = Objects.requireNonNull(limiter);
     }
 
     /**
@@ -79,7 +87,7 @@ public class OAuth2ExternalCodeAuthenticationProvider implements AuthenticationP
         Set<String> scopes = validateScopes(registeredClient, grant.getScopes());
         String providerVerifier = validateSourceAndFlow(registeredClient, registrationId, grant);
         String remote =
-                grant.getDetails() instanceof org.springframework.security.web.authentication.WebAuthenticationDetails details
+                grant.getDetails() instanceof WebAuthenticationDetails details
                         ? details.getRemoteAddress() : null;
         limiter.check(registeredClient.getClientId(), remote);
         ExternalCodeReplayStore.ReplayClaim replayClaim = replayStore.claim(grant.getCodeType(), grant.getCode());
@@ -146,7 +154,7 @@ public class OAuth2ExternalCodeAuthenticationProvider implements AuthenticationP
                 throw error(OAuth2ErrorCodes.UNAUTHORIZED_CLIENT, "External source is not allowed.");
             }
             boolean pkce = source.flow().providerPkce();
-            if (pkce && (grant.getCodeType() != dev.macula.cloud.system.enums.ExternalCodeType.FEISHU_APP_CODE
+            if (pkce && (grant.getCodeType() != ExternalCodeType.FEISHU_APP_CODE
                     || verifier == null || !verifier.matches("[A-Za-z0-9._~-]{43,128}")
                     || !validProviderRedirect(redirect) || !client.getRedirectUris().contains(redirect))
                     || !pkce && (raw != null || rawRedirect != null)) {
@@ -168,7 +176,7 @@ public class OAuth2ExternalCodeAuthenticationProvider implements AuthenticationP
             return false;
         }
         try {
-            var uri = java.net.URI.create(value);
+            var uri = URI.create(value);
             return "https".equalsIgnoreCase(uri.getScheme()) && uri.getHost() != null
                     && uri.getRawUserInfo() == null && uri.getRawFragment() == null;
         } catch (IllegalArgumentException ex) {
@@ -193,31 +201,35 @@ public class OAuth2ExternalCodeAuthenticationProvider implements AuthenticationP
      */
     private void validateClient(OAuth2ClientAuthenticationToken principal, RegisteredClient client,
             OAuth2ExternalCodeAuthenticationToken grant) {
-        if (client == null || !ClientAuthenticationMethod.NONE.equals(principal.getClientAuthenticationMethod())) {
-            throw error(OAuth2ErrorCodes.UNAUTHORIZED_CLIENT, "OAuth client is not allowed to use this grant.");
-        }
-        if (!client.getClientAuthenticationMethods().equals(Set.of(ClientAuthenticationMethod.NONE))
+        if (client == null || !client.getClientAuthenticationMethods().contains(principal.getClientAuthenticationMethod())
                 || !client.getClientSettings().isRequireProofKey()
                 || !client.getAuthorizationGrantTypes().contains(OAuth2ExternalCodeAuthenticationToken.GRANT_TYPE)) {
             throw error(OAuth2ErrorCodes.UNAUTHORIZED_CLIENT, "OAuth client is not allowed to use this grant.");
         }
-        String applicationType = client.getClientSettings().getSetting(ExternalCodeClientSettings.APPLICATION_TYPE);
-        if (applicationType != null) {
-            try {
-                var type = dev.macula.cloud.system.enums.OAuth2ClientApplicationType.valueOf(applicationType);
-                String platform = client.getClientSettings().getSetting(ExternalCodeClientSettings.MINIAPP_PLATFORM);
-                Map<String, Long> bindings = client.getClientSettings()
-                        .getSetting(ExternalCodeClientSettings.PROVIDER_BINDINGS);
-                dev.macula.cloud.system.security.OAuth2ApplicationLoginPolicy.validate(type, platform, Map.of(),
-                        bindings == null ? Map.of() : bindings, true);
-                if (!type.supportsExternalCode(grant.getCodeType(), platform)) {
-                    throw error(OAuth2ErrorCodes.UNAUTHORIZED_CLIENT, "External credential scene is not allowed.");
-                }
-            } catch (IllegalArgumentException ex) {
-                throw error(OAuth2ErrorCodes.UNAUTHORIZED_CLIENT, "Application type is invalid.");
+        try {
+            String applicationType = client.getClientSettings().getSetting(ExternalCodeClientSettings.APPLICATION_TYPE);
+            String mode = client.getClientSettings().getSetting(ExternalCodeClientSettings.WEB_LOGIN_MODE);
+            var type = IamApplicationType.valueOf(applicationType);
+            boolean confidentialWeb = type == IamApplicationType.WEB_SERVER
+                && IamWebLoginMode.isInApp(applicationType, mode);
+            var method = principal.getClientAuthenticationMethod();
+            if (confidentialWeb ? !Set.of(ClientAuthenticationMethod.CLIENT_SECRET_BASIC,
+                    ClientAuthenticationMethod.CLIENT_SECRET_POST, ClientAuthenticationMethod.PRIVATE_KEY_JWT).contains(method)
+                : !ClientAuthenticationMethod.NONE.equals(method)
+                    || !client.getClientAuthenticationMethods().equals(Set.of(ClientAuthenticationMethod.NONE))) {
+                throw error(OAuth2ErrorCodes.UNAUTHORIZED_CLIENT, "Client authentication method is not allowed.");
             }
+            String platform = client.getClientSettings().getSetting(ExternalCodeClientSettings.MINIAPP_PLATFORM);
+            Map<String, Long> bindings = client.getClientSettings().getSetting(ExternalCodeClientSettings.PROVIDER_BINDINGS);
+            IamApplicationLoginPolicy.validate(type, platform, mode, Map.of(),
+                bindings == null ? Map.of() : bindings, true);
+            if (!type.supportsExternalCode(grant.getCodeType(), platform, mode)) {
+                throw error(OAuth2ErrorCodes.UNAUTHORIZED_CLIENT, "External credential scene is not allowed.");
+            }
+        } catch (IllegalArgumentException | NullPointerException ex) {
+            throw error(OAuth2ErrorCodes.UNAUTHORIZED_CLIENT, "Application type or login mode is invalid.");
         }
-        // 未分类历史Client保留原白名单，不从其Code反推架构或回填业务数据。
+        // 明确Code白名单与固定注册仍须同时通过，机密认证不代表拥有任意平台能力。
         Set<String> allowedTypes = stringSet(client, ExternalCodeClientSettings.CODE_TYPES);
         if (allowedTypes.isEmpty() || !allowedTypes.contains(grant.getCodeType().name())) {
             throw error(OAuth2ErrorCodes.UNAUTHORIZED_CLIENT, "External credential type is not allowed.");
@@ -229,7 +241,7 @@ public class OAuth2ExternalCodeAuthenticationProvider implements AuthenticationP
      */
     private Set<String> validateScopes(RegisteredClient client, Set<String> requestedScopes) {
         boolean oidc = "OIDC".equals(client.getClientSettings().getSetting(
-                dev.macula.cloud.iam.protocol.oauth2.ApplicationProtocolResolver.EFFECTIVE_PROTOCOL));
+                ApplicationProtocolResolver.EFFECTIVE_PROTOCOL));
         if (CollectionUtils.isEmpty(requestedScopes) || oidc != requestedScopes.contains(OidcScopes.OPENID)) {
             throw error(OAuth2ErrorCodes.INVALID_SCOPE, "Requested scope is invalid.");
         }
@@ -242,7 +254,7 @@ public class OAuth2ExternalCodeAuthenticationProvider implements AuthenticationP
     }
 
     private Long providerRegistration(RegisteredClient client,
-            dev.macula.cloud.system.enums.ExternalCodeType codeType) {
+            ExternalCodeType codeType) {
         Object value = client.getClientSettings().getSetting(ExternalCodeClientSettings.PROVIDER_BINDINGS);
         if (!(value instanceof Map<?, ?> bindings)) {
             throw error(OAuth2ErrorCodes.UNAUTHORIZED_CLIENT, "External provider binding is not configured.");

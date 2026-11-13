@@ -17,12 +17,18 @@
 package dev.macula.cloud.iam.authentication.wecom;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 
+import dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures;
 import dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyAuthenticationToken;
+import dev.macula.cloud.iam.authentication.thirdparty.browser.ThirdPartyAuthenticationProvider;
 import dev.macula.cloud.iam.authentication.thirdparty.browser.ThirdPartyIdentityResolutionService;
+import dev.macula.cloud.iam.authentication.thirdparty.provider.ThirdPartyProviderAdapterRegistry;
 import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeInfrastructureException;
 import dev.macula.cloud.iam.service.identity.IdentityProviderConfigService;
+import dev.macula.cloud.system.enums.IdentitySourceType;
+import org.hamcrest.Matchers;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.boot.test.system.CapturedOutput;
@@ -33,6 +39,7 @@ import org.springframework.security.core.userdetails.User;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
@@ -56,28 +63,28 @@ class WecomProviderAdapterTest {
         WecomClient wecom = mock(WecomClient.class);
         IdentityProviderConfigService configs = mock(IdentityProviderConfigService.class);
         ThirdPartyIdentityResolutionService identities = mock(ThirdPartyIdentityResolutionService.class);
-        var config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(
-                dev.macula.cloud.system.enums.IdentitySourceType.WECOM_WEB, "WECOM", "corp", "secret",
+        var config = IdentitySourceTestFixtures.source(
+                IdentitySourceType.WECOM_WEB, "WECOM", "corp", "secret",
                 Map.of("corpId", "corp", "agentId", "agent"));
-        var context = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.context("WECOM",
+        var context = IdentitySourceTestFixtures.context("WECOM",
                 "BROWSER", "test-client", Instant.now(), "/");
         when(configs.requireEnabledById(1L, "WECOM")).thenReturn(config);
         when(wecom.fetchUserId(config, "code")).thenReturn("zhangsan");
         when(identities.resolve(
-                dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.browserIdentity(context,
+                IdentitySourceTestFixtures.browserIdentity(context,
                         "zhangsan"), context))
                 .thenReturn(User.withUsername("zhangsan").password("n/a").authorities("USER").build());
 
-        var result = new dev.macula.cloud.iam.authentication.thirdparty.browser.ThirdPartyAuthenticationProvider(
-                new dev.macula.cloud.iam.authentication.thirdparty.provider.ThirdPartyProviderAdapterRegistry(
-                        java.util.List.of(new WecomProviderAdapter(wecom))), configs, identities).authenticate(
+        var result = new ThirdPartyAuthenticationProvider(
+                new ThirdPartyProviderAdapterRegistry(
+                        List.of(new WecomProviderAdapter(wecom))), configs, identities).authenticate(
                 ThirdPartyAuthenticationToken.unauthenticated("WECOM", "code", context,
                         "https://iam.example/login/wecom"));
 
         assertEquals("zhangsan", result.getName());
         assertEquals("WECOM", ((ThirdPartyAuthenticationToken) result).getProviderType());
         verify(identities).resolve(
-                dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.browserIdentity(context,
+                IdentitySourceTestFixtures.browserIdentity(context,
                         "zhangsan"), context);
     }
 
@@ -86,14 +93,14 @@ class WecomProviderAdapterTest {
         WecomClient wecom = mock(WecomClient.class);
         IdentityProviderConfigService configs = mock(IdentityProviderConfigService.class);
         ThirdPartyIdentityResolutionService identities = mock(ThirdPartyIdentityResolutionService.class);
-        var context = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.context("GITHUB", "",
+        var context = IdentitySourceTestFixtures.context("GITHUB", "",
                 "test-client", Instant.now(), "/");
 
-        org.junit.jupiter.api.Assertions.assertThrows(
-                org.springframework.security.authentication.AuthenticationServiceException.class,
-                () -> new dev.macula.cloud.iam.authentication.thirdparty.browser.ThirdPartyAuthenticationProvider(
-                        new dev.macula.cloud.iam.authentication.thirdparty.provider.ThirdPartyProviderAdapterRegistry(
-                                java.util.List.of(new WecomProviderAdapter(wecom))), configs, identities).authenticate(
+        assertThrows(
+                AuthenticationServiceException.class,
+                () -> new ThirdPartyAuthenticationProvider(
+                        new ThirdPartyProviderAdapterRegistry(
+                                List.of(new WecomProviderAdapter(wecom))), configs, identities).authenticate(
                         ThirdPartyAuthenticationToken.unauthenticated("GITHUB", "code", context,
                                 "https://iam.example/login/github")));
         verifyNoInteractions(wecom, configs, identities);
@@ -101,16 +108,16 @@ class WecomProviderAdapterTest {
 
     @Test
     void clientAcceptsOnlyMemberUserId(CapturedOutput output) {
-        var config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(
-                dev.macula.cloud.system.enums.IdentitySourceType.WECOM_WEB, "WECOM", "corp", "secret",
+        var config = IdentitySourceTestFixtures.source(
+                IdentitySourceType.WECOM_WEB, "WECOM", "corp", "secret",
                 Map.of("corpId", "corp", "agentId", "agent"));
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         WecomClient client = new WecomClient(builder.build());
-        server.expect(requestTo(org.hamcrest.Matchers.startsWith(
+        server.expect(requestTo(Matchers.startsWith(
                         "https://qyapi.weixin.qq.com/cgi-bin/gettoken?")))
                 .andRespond(withSuccess("{\"errcode\":0,\"access_token\":\"token\"}", MediaType.APPLICATION_JSON));
-        server.expect(requestTo(org.hamcrest.Matchers.startsWith(
+        server.expect(requestTo(Matchers.startsWith(
                         "https://qyapi.weixin.qq.com/cgi-bin/auth/getuserinfo?")))
                 .andRespond(withSuccess("{\"errcode\":0,\"userid\":\"zhangsan\"}", MediaType.APPLICATION_JSON));
         assertEquals("zhangsan", client.fetchUserId(config, "code"));
@@ -119,17 +126,17 @@ class WecomProviderAdapterTest {
         RestClient.Builder outsiderBuilder = RestClient.builder();
         MockRestServiceServer outsiderServer = MockRestServiceServer.bindTo(outsiderBuilder).build();
         WecomClient outsiderClient = new WecomClient(outsiderBuilder.build());
-        outsiderServer.expect(requestTo(org.hamcrest.Matchers.startsWith(
+        outsiderServer.expect(requestTo(Matchers.startsWith(
                         "https://qyapi.weixin.qq.com/cgi-bin/gettoken?")))
                 .andRespond(withSuccess("{\"errcode\":0,\"access_token\":\"token\"}", MediaType.APPLICATION_JSON));
-        outsiderServer.expect(requestTo(org.hamcrest.Matchers.startsWith(
+        outsiderServer.expect(requestTo(Matchers.startsWith(
                         "https://qyapi.weixin.qq.com/cgi-bin/auth/getuserinfo?")))
                 .andRespond(withSuccess("{\"errcode\":0,\"openid\":\"external\"}", MediaType.APPLICATION_JSON));
         assertThrows(AuthenticationServiceException.class, () -> outsiderClient.fetchUserId(config, "code"));
         outsiderServer.verify();
 
         String authorize = client.authorizationUri(config, "state-value", "https://iam.example/login/wecom");
-        org.assertj.core.api.Assertions.assertThat(authorize)
+        assertThat(authorize)
                 .startsWith("https://open.weixin.qq.com/connect/oauth2/authorize?")
                 .contains("appid=corp", "scope=snsapi_base", "agentid=agent", "state=state-value",
                         "redirect_uri=https://iam.example/login/wecom")
@@ -138,12 +145,12 @@ class WecomProviderAdapterTest {
         RestClient.Builder failedBuilder = RestClient.builder();
         MockRestServiceServer failedServer = MockRestServiceServer.bindTo(failedBuilder).build();
         WecomClient failedClient = new WecomClient(failedBuilder.build());
-        failedServer.expect(requestTo(org.hamcrest.Matchers.startsWith(
+        failedServer.expect(requestTo(Matchers.startsWith(
                         "https://qyapi.weixin.qq.com/cgi-bin/gettoken?")))
                 .andRespond(withServerError());
         assertThrows(ExternalCodeInfrastructureException.class,
                 () -> failedClient.fetchUserId(config, "sensitive-code"));
-        org.assertj.core.api.Assertions.assertThat(output)
+        assertThat(output)
                 .contains("provider=WECOM", "stage=token", "status=500")
                 .doesNotContain("sensitive-code", "secret");
         failedServer.verify();
@@ -151,17 +158,17 @@ class WecomProviderAdapterTest {
 
     @Test
     void logsWecomErrorCodeWithoutProviderTextOrCredentials(CapturedOutput output) {
-        var config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(
-                dev.macula.cloud.system.enums.IdentitySourceType.WECOM_WEB, "WECOM", "corp", "corp-secret-marker",
+        var config = IdentitySourceTestFixtures.source(
+                IdentitySourceType.WECOM_WEB, "WECOM", "corp", "corp-secret-marker",
                 Map.of("corpId", "corp", "agentId", "agent"));
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         WecomClient client = new WecomClient(builder.build());
-        server.expect(requestTo(org.hamcrest.Matchers.startsWith(
+        server.expect(requestTo(Matchers.startsWith(
                         "https://qyapi.weixin.qq.com/cgi-bin/gettoken?")))
                 .andRespond(withSuccess("{\"errcode\":0,\"access_token\":\"access-token-marker\"}",
                         MediaType.APPLICATION_JSON));
-        server.expect(requestTo(org.hamcrest.Matchers.startsWith(
+        server.expect(requestTo(Matchers.startsWith(
                         "https://qyapi.weixin.qq.com/cgi-bin/auth/getuserinfo?")))
                 .andRespond(withSuccess("{\"errcode\":40029,\"errmsg\":\"sensitive-provider-text\"}",
                         MediaType.APPLICATION_JSON));
@@ -170,7 +177,7 @@ class WecomProviderAdapterTest {
                 () -> client.fetchUserId(config, "authorization-code-marker"));
 
         assertEquals("企业微信身份校验失败", failure.getMessage());
-        org.assertj.core.api.Assertions.assertThat(output)
+        assertThat(output)
                 .contains("provider=WECOM", "stage=user", "failure=provider_error", "errcode=40029")
                 .doesNotContain("sensitive-provider-text", "authorization-code-marker",
                         "access-token-marker", "corp-secret-marker");
