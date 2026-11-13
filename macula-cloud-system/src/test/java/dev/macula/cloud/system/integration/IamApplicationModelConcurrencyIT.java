@@ -16,7 +16,7 @@
  */
 package dev.macula.cloud.system.integration;
 
-import dev.macula.cloud.system.protocol.OAuth2ProtocolDefinition;
+import dev.macula.cloud.system.protocol.oauth2.OAuth2ProtocolDefinition;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -39,7 +39,7 @@ import dev.macula.cloud.system.mapper.SysIamApplicationIdentityProviderMapper;
 import dev.macula.cloud.system.mapper.SysIamApplicationProtocolConfigMapper;
 import dev.macula.cloud.system.mapper.SysIdentityProviderMapper;
 import dev.macula.cloud.system.mapper.SysTenantInfoMapper;
-import dev.macula.cloud.system.protocol.OAuth2ProtocolSettings;
+import dev.macula.cloud.system.protocol.oauth2.OAuth2ProtocolSettings;
 import dev.macula.cloud.system.security.OAuth2ClientCacheNames;
 import dev.macula.cloud.system.service.impl.IamApplicationCatalogServiceImpl;
 import dev.macula.cloud.system.service.impl.IamApplicationServiceImpl;

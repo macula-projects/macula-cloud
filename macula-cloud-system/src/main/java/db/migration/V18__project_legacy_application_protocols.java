@@ -19,7 +19,7 @@ package db.migration;
 import dev.macula.cloud.system.protocol.ApplicationProtocolConfiguration;
 import dev.macula.cloud.system.protocol.ApplicationProtocolRegistry;
 import dev.macula.cloud.system.protocol.OAuth2ProtocolConfiguration;
-import dev.macula.cloud.system.protocol.OAuth2ProtocolSettings;
+import dev.macula.cloud.system.protocol.oauth2.OAuth2ProtocolSettings;
 import org.flywaydb.core.api.migration.BaseJavaMigration;
 import org.flywaydb.core.api.migration.Context;
 import tools.jackson.databind.json.JsonMapper;

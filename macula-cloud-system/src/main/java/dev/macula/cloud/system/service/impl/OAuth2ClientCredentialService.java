@@ -22,7 +22,7 @@ import dev.macula.cloud.system.pojo.entity.SysIamApplication;
 import dev.macula.cloud.system.pojo.entity.SysIamApplicationProtocolConfig;
 import dev.macula.cloud.system.protocol.IamApplicationProtocolRegistration;
 import dev.macula.cloud.system.protocol.OAuth2ApplicationProtocolSettings;
-import dev.macula.cloud.system.protocol.OAuth2ProtocolDefinition;
+import dev.macula.cloud.system.protocol.oauth2.OAuth2ProtocolDefinition;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;

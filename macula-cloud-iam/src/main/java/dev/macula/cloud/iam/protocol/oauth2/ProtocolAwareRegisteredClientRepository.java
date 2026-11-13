@@ -21,7 +21,7 @@ import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeClien
 import dev.macula.cloud.system.enums.IamWebLoginMode;
 import dev.macula.cloud.system.protocol.ApplicationProtocolConfiguration;
 import dev.macula.cloud.system.protocol.OAuth2ProtocolConfiguration;
-import dev.macula.cloud.system.protocol.OAuth2ProtocolSettings;
+import dev.macula.cloud.system.protocol.oauth2.OAuth2ProtocolSettings;
 import dev.macula.cloud.system.security.OAuth2ResourcePolicy;
 import java.time.Duration;
 import java.util.Set;

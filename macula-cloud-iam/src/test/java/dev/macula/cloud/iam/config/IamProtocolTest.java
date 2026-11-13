@@ -46,7 +46,7 @@ import dev.macula.cloud.iam.authentication.thirdparty.browser.BrowserLoginClient
 import dev.macula.cloud.iam.authentication.thirdparty.browser.ThirdPartyAuthenticationProvider;
 import dev.macula.cloud.iam.authentication.thirdparty.browser.ThirdPartyIdentityResolutionService;
 import dev.macula.cloud.iam.authentication.thirdparty.provider.ThirdPartyProviderAdapterRegistry;
-import dev.macula.cloud.iam.authentication.verification.RedisVerificationCodeStore;
+import dev.macula.cloud.iam.authentication.verification.redis.RedisVerificationCodeStore;
 import dev.macula.cloud.iam.authentication.verification.VerificationCodeChannelService;
 import dev.macula.cloud.iam.authentication.verification.VerificationCodeContext;
 import dev.macula.cloud.iam.authentication.verification.VerificationCodeService;
@@ -86,7 +86,7 @@ import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.OAuth2ExternalCod
 import dev.macula.cloud.iam.protocol.oauth2.profile.ProfileController;
 import dev.macula.cloud.iam.protocol.oauth2.profile.ProfileService;
 import dev.macula.cloud.iam.service.account.ClientAwareAccountResolver;
-import dev.macula.cloud.iam.service.account.DefaultClientAccountDetailsService;
+import dev.macula.cloud.iam.service.account.impl.DefaultClientAccountDetailsService;
 import dev.macula.cloud.iam.service.account.SysUserService;
 import dev.macula.cloud.iam.service.application.IamApplicationService;
 import dev.macula.cloud.iam.service.application.IamApplicationTestFixtures;

@@ -42,7 +42,7 @@ import dev.macula.cloud.system.mapper.SysIamApplicationMapper;
 import dev.macula.cloud.system.mapper.SysIdentityProviderMapper;
 import dev.macula.cloud.system.pojo.entity.SysIamApplication;
 import dev.macula.cloud.system.pojo.entity.SysIamApplicationIdentityProvider;
-import dev.macula.cloud.system.protocol.OAuth2ProtocolSettings;
+import dev.macula.cloud.system.protocol.oauth2.OAuth2ProtocolSettings;
 import dev.macula.cloud.system.protocol.OAuth2ProtocolConfiguration;
 import dev.macula.cloud.system.security.OAuth2ClientCacheNames;
 import dev.macula.cloud.system.security.OAuth2ResourcePolicy;

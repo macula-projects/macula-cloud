@@ -24,7 +24,7 @@ import java.util.Set;
 import dev.macula.boot.constants.GlobalConstants;
 import dev.macula.boot.constants.SecurityConstants;
 import dev.macula.cloud.iam.protocol.oauth2.token.claims.AccessTokenClaimsService;
-import dev.macula.cloud.iam.protocol.oauth2.token.claims.DefaultAccessTokenClaimsService;
+import dev.macula.cloud.iam.protocol.oauth2.token.claims.impl.DefaultAccessTokenClaimsService;
 import dev.macula.cloud.iam.service.userdetails.SysUserDetails;
 import dev.macula.cloud.system.security.OAuth2ResourcePolicy;
 import org.junit.jupiter.api.Test;

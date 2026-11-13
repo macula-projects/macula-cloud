@@ -29,7 +29,7 @@ import dev.macula.cloud.system.form.ApplicationApiKeyForm;
 import dev.macula.cloud.system.mapper.SysApplicationApiKeyMapper;
 import dev.macula.cloud.system.mapper.SysApplicationMapper;
 import dev.macula.cloud.system.pojo.entity.SysTenantInfo;
-import dev.macula.cloud.system.service.ApplicationCredentialCacheService;
+import dev.macula.cloud.system.service.cache.ApplicationCredentialCacheService;
 import dev.macula.cloud.system.service.SysTenantService;
 import dev.macula.cloud.system.service.impl.SysApplicationApiKeyServiceImpl;
 import dev.macula.cloud.system.service.impl.SysApplicationServiceImpl;
@@ -83,7 +83,7 @@ class ApplicationApiKeyIntegrationIT {
     private static SysApplicationServiceImpl applications;
     private static ApplicationCredentialCacheService cache;
     private static RedisTemplate<String, Object> redis;
-    private static dev.macula.cloud.system.service.MenuRouteTenantContext tenantContext;
+    private static dev.macula.cloud.system.service.cache.MenuRouteTenantContext tenantContext;
     private static RedissonConnectionFactory connections;
     private static RedissonClient redisson;
 
@@ -144,7 +144,7 @@ class ApplicationApiKeyIntegrationIT {
         when(tenants.list()).thenReturn(List.of(tenant));
         cache = new ApplicationCredentialCacheService(apps, keys, tenants, redis, redisson,
             new DataSourceTransactionManager(dataSource));
-        tenantContext = new dev.macula.cloud.system.service.MenuRouteTenantContext(
+        tenantContext = new dev.macula.cloud.system.service.cache.MenuRouteTenantContext(
             mock(dev.macula.cloud.system.mapper.SysUserMapper.class),
             mock(dev.macula.cloud.system.mapper.SysTenantUserMapper.class),
             session.getMapper(dev.macula.cloud.system.mapper.SysTenantInfoMapper.class));

@@ -16,6 +16,8 @@
  */
 package dev.macula.cloud.system.protocol;
 
+import dev.macula.cloud.system.protocol.oauth2.OAuth2ProtocolSettings;
+
 import java.util.Set;
 
 import com.fasterxml.jackson.annotation.JsonAnySetter;

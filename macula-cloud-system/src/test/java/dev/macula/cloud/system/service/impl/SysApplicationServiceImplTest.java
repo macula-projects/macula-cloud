@@ -26,7 +26,7 @@ import dev.macula.cloud.system.converter.ApplicationConverter;
 import dev.macula.cloud.system.form.ApplicationForm;
 import dev.macula.cloud.system.mapper.SysApplicationMapper;
 import dev.macula.cloud.system.mapper.SysApplicationApiKeyMapper;
-import dev.macula.cloud.system.service.ApplicationCredentialCacheService;
+import dev.macula.cloud.system.service.cache.ApplicationCredentialCacheService;
 import dev.macula.cloud.system.pojo.entity.SysApplication;
 import dev.macula.cloud.system.pojo.entity.SysApplicationApiKey;
 import dev.macula.cloud.system.pojo.entity.SysTenantInfo;
@@ -63,13 +63,13 @@ class SysApplicationServiceImplTest {
     private final SysApplicationMapper mapper = mock(SysApplicationMapper.class);
     private final ApplicationCredentialCacheService cache = mock(ApplicationCredentialCacheService.class);
     private final SysApplicationApiKeyMapper keys = mock(SysApplicationApiKeyMapper.class);
-    private final dev.macula.cloud.system.service.MenuRouteTenantContext tenantContext =
-        mock(dev.macula.cloud.system.service.MenuRouteTenantContext.class);
+    private final dev.macula.cloud.system.service.cache.MenuRouteTenantContext tenantContext =
+        mock(dev.macula.cloud.system.service.cache.MenuRouteTenantContext.class);
     private final SysApplicationServiceImpl service = spy(new SysApplicationServiceImpl(converter, tenants, cache, keys, tenantContext));
 
     @BeforeEach
     void setup() {
-        var trusted = mock(dev.macula.cloud.system.service.MenuRouteTenantContext.TrustedTenant.class);
+        var trusted = mock(dev.macula.cloud.system.service.cache.MenuRouteTenantContext.TrustedTenant.class);
         when(trusted.tenantId()).thenReturn(12L);
         when(tenantContext.resolve()).thenReturn(trusted);
         TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), SysApplication.class);

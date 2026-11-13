@@ -171,6 +171,11 @@ mvn -pl macula-cloud-iam -am verify -Plocal \
 数据库绑定集成测试需独立的 MySQL/Redis 测试环境；执行条件见 `IdentitySourceBindingIT`。厂商
 Code、平台权限和设备回跳需按[第三方接入说明](docs/third-party-integration.md)单独联调。
 
+
+## 接口与实现包约定
+
+接口保留在对应职责包，具体实现放入 `impl` 或技术子包：`service/application/impl`、`service/account/impl`、`protocol/oauth2/client/impl`、`protocol/oauth2/configuration/impl`、`protocol/oauth2/token/claims/impl`；验证码 Redis 存储位于 `authentication/verification/redis`，不可用回退位于 `authentication/verification/impl`，密钥库实现位于 `protocol/oauth2/jwt/keys/keystore`。第三方提供者继续按具体平台组织。包移动保留 Bean 名称、事务和授权/Session 持久化格式。
+
 ## 版权
 
 Copyright © Macula。遵循仓库 [Apache License 2.0](../LICENSE) 授权。

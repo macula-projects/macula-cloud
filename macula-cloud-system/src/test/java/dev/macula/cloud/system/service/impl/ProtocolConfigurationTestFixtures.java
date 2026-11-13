@@ -27,12 +27,12 @@ import dev.macula.cloud.system.mapper.SysIamApplicationProtocolConfigMapper;
 import dev.macula.cloud.system.mapper.SysIdentityProviderMapper;
 import dev.macula.cloud.system.mapper.SysTenantInfoMapper;
 import dev.macula.cloud.system.service.IamApplicationCatalogService;
-import dev.macula.cloud.system.protocol.OAuth2ProtocolDefinition;
+import dev.macula.cloud.system.protocol.oauth2.OAuth2ProtocolDefinition;
 import org.springframework.cache.CacheManager;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import dev.macula.cloud.system.form.IamApplicationForm;
 import dev.macula.cloud.system.protocol.ApplicationProtocolConfiguration;
-import dev.macula.cloud.system.protocol.OAuth2ProtocolSettings;
+import dev.macula.cloud.system.protocol.oauth2.OAuth2ProtocolSettings;
 import java.util.Set;
 
 /**

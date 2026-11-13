@@ -16,6 +16,8 @@
  */
 package dev.macula.cloud.system.protocol;
 
+import dev.macula.cloud.system.protocol.oauth2.OAuth2ProtocolSettings;
+
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 

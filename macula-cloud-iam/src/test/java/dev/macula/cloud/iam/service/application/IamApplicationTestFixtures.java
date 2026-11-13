@@ -23,7 +23,7 @@ import dev.macula.cloud.iam.protocol.oauth2.client.OAuth2ClientRegistrationServi
 import dev.macula.cloud.iam.protocol.oauth2.client.OAuth2LoginApplicationResolver;
 import dev.macula.cloud.iam.service.account.ClientAccountDetailsService;
 import dev.macula.cloud.iam.service.account.ClientAwareAccountResolver;
-import dev.macula.cloud.iam.service.account.DefaultClientAccountDetailsService;
+import dev.macula.cloud.iam.service.account.impl.DefaultClientAccountDetailsService;
 import dev.macula.cloud.iam.service.account.SysUserService;
 import dev.macula.cloud.iam.service.account.UserAuthInfoService;
 import dev.macula.cloud.system.enums.BrowserLoginProviderType;

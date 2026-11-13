@@ -378,3 +378,7 @@ STARTTLS 必须升级成功才认证；证书和主机名始终校验，自建 C
 实现按职责分包：`message.mail`、`message.sms` 放抽象接口，`impl` 放供应商实现，IAM 登录编排放 `message.dispatch`，HTTP 配置及传输辅助放 `message.sms.support`。System 与 IAM 不直接引用彼此实现，管理端测试发送与 IAM 实际发码遵循同一契约。
 
 本次沿用现有表结构，无需迁移现有配置；允许后续必要的数据迁移，但不自动改写历史凭据。回滚至旧代码前需先切回旧版支持的供应商。凭据沿用现有存储保护，不代表数据库静态加密；日志不记录认证 Header、验证码、完整手机号或供应商原始响应。真实 Exchange/短信服务需另行联调验收。
+
+## 接口与实现包约定
+
+业务 Service 接口位于 `service`，实现位于 `service/impl`。`ApplicationCredentialCacheService`、`MenuRouteCacheService` 和 `MenuRouteTenantContext` 按具体职责放在 `service/cache`；不为无扩展需求的具体类额外增加接口。包移动不改变缓存键、提交后失效规则或可信租户校验。

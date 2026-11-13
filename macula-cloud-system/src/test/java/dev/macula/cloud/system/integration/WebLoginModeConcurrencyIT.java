@@ -16,7 +16,7 @@
  */
 package dev.macula.cloud.system.integration;
 
-import dev.macula.cloud.system.protocol.OAuth2ProtocolDefinition;
+import dev.macula.cloud.system.protocol.oauth2.OAuth2ProtocolDefinition;
 import java.net.URI;
 import java.sql.DriverManager;
 import java.util.Map;

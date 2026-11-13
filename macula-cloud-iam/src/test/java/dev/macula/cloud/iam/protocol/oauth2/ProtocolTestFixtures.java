@@ -19,7 +19,7 @@ package dev.macula.cloud.iam.protocol.oauth2;
 import dev.macula.cloud.iam.enums.UserTypeEnum;
 import dev.macula.cloud.iam.protocol.oauth2.client.OAuth2ClientRegistration;
 import dev.macula.cloud.system.protocol.ApplicationProtocolConfiguration;
-import dev.macula.cloud.system.protocol.OAuth2ProtocolSettings;
+import dev.macula.cloud.system.protocol.oauth2.OAuth2ProtocolSettings;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;

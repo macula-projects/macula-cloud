@@ -28,7 +28,7 @@ import dev.macula.cloud.system.enums.IamWebLoginMode;
 import dev.macula.cloud.system.mapper.SysIamApplicationMapper;
 import dev.macula.cloud.system.pojo.entity.SysIamApplication;
 import dev.macula.cloud.system.protocol.OAuth2ProtocolConfiguration;
-import dev.macula.cloud.system.protocol.OAuth2ProtocolSettings;
+import dev.macula.cloud.system.protocol.oauth2.OAuth2ProtocolSettings;
 import dev.macula.cloud.system.security.OAuth2ResourcePolicy;
 import dev.macula.cloud.system.service.IamApplicationService;
 import lombok.RequiredArgsConstructor;

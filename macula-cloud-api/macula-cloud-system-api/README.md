@@ -66,3 +66,7 @@ JSON时间点同样可以使用 `Instant`：Jackson原生支持带时区ISO读�
 `OAuth2ProtocolDefinition.registry()` 仅登记实际实现的 OIDC 和 OAuth 2.1。其他协议须提供自己的设置与策略以及对应发布端实现，不能通过增加目录名称启用。资源服务器的内部管理认证按用途单独校验，不能获得业务 grant、Scope、回调或登录权限。
 
 `ApplicationProtocolConfiguration`、`OAuth2ProtocolSettings`、`ApplicationProtocolRegistry` 保持 v1 合同，供历史迁移与既有 HTTP 边界使用；v2 不向旧设置追加默认序列化字段。历史未分配登记槽使用 `protocol=null/schemaVersion=0/enabled=false`，只保留标识视图，不能执行、启用或作为运行设置重新保存。
+
+## 接口与实现包约定
+
+公共协议接口保留在 `dev.macula.cloud.system.protocol`；具体 OAuth2 策略 `OAuth2ProtocolDefinition` 和设置类型 `OAuth2ProtocolSettings` 位于 `dev.macula.cloud.system.protocol.oauth2`。引用旧 Java 类路径的调用方需要更新 import 并重新编译；HTTP/JSON 的 `kind: oauth2`、字段和协议版本保持不变，不需要数据迁移。

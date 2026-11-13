@@ -17,7 +17,7 @@
 package dev.macula.cloud.system.config.protocol;
 
 import dev.macula.cloud.system.protocol.IamApplicationProtocolRegistry;
-import dev.macula.cloud.system.protocol.OAuth2ProtocolDefinition;
+import dev.macula.cloud.system.protocol.oauth2.OAuth2ProtocolDefinition;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 

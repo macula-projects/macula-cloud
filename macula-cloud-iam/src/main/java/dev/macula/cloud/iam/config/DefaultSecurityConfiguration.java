@@ -36,7 +36,7 @@ import dev.macula.cloud.iam.authentication.thirdparty.browser.ThirdPartyLoginFil
 import dev.macula.cloud.iam.authentication.userdetails.HostedUserDetailsService;
 import dev.macula.cloud.iam.authentication.verification.EmailVerificationProperties;
 import dev.macula.cloud.iam.authentication.verification.SmsVerificationProperties;
-import dev.macula.cloud.iam.authentication.verification.UnavailableVerificationCodeService;
+import dev.macula.cloud.iam.authentication.verification.impl.UnavailableVerificationCodeService;
 import dev.macula.cloud.iam.authentication.verification.VerificationCodeChannelService;
 import dev.macula.cloud.iam.authentication.verification.VerificationCodeService;
 import dev.macula.cloud.iam.authentication.wechat.WechatAuthenticationFilter;

@@ -28,7 +28,7 @@ import dev.macula.cloud.system.mapper.SysApplicationApiKeyMapper;
 import dev.macula.cloud.system.mapper.SysApplicationMapper;
 import dev.macula.cloud.system.pojo.entity.SysApplication;
 import dev.macula.cloud.system.pojo.entity.SysApplicationApiKey;
-import dev.macula.cloud.system.service.ApplicationCredentialCacheService;
+import dev.macula.cloud.system.service.cache.ApplicationCredentialCacheService;
 import java.time.LocalDateTime;
 import java.time.Instant;
 import tools.jackson.databind.json.JsonMapper;
@@ -63,14 +63,14 @@ class SysApplicationApiKeyServiceImplTest {
     private final SysApplicationApiKeyMapper keys = mock(SysApplicationApiKeyMapper.class);
     private final SysApplicationMapper apps = mock(SysApplicationMapper.class);
     private final ApplicationCredentialCacheService cache = mock(ApplicationCredentialCacheService.class);
-    private final dev.macula.cloud.system.service.MenuRouteTenantContext tenantContext =
-        mock(dev.macula.cloud.system.service.MenuRouteTenantContext.class);
+    private final dev.macula.cloud.system.service.cache.MenuRouteTenantContext tenantContext =
+        mock(dev.macula.cloud.system.service.cache.MenuRouteTenantContext.class);
     private final SysApplicationApiKeyServiceImpl service = new SysApplicationApiKeyServiceImpl(keys, apps, cache, tenantContext, new DateTimeConverter(null));
     private SysApplication app;
 
     @BeforeEach
     void setup() {
-        var trusted = mock(dev.macula.cloud.system.service.MenuRouteTenantContext.TrustedTenant.class);
+        var trusted = mock(dev.macula.cloud.system.service.cache.MenuRouteTenantContext.TrustedTenant.class);
         when(trusted.tenantId()).thenReturn(12L);
         when(tenantContext.resolve()).thenReturn(trusted);
         TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), SysApplicationApiKey.class);
@@ -99,7 +99,7 @@ class SysApplicationApiKeyServiceImplTest {
         var users = mock(dev.macula.cloud.system.mapper.SysUserMapper.class);
         var memberships = mock(dev.macula.cloud.system.mapper.SysTenantUserMapper.class);
         var tenants = mock(dev.macula.cloud.system.mapper.SysTenantInfoMapper.class);
-        var resolver = new dev.macula.cloud.system.service.MenuRouteTenantContext(users, memberships, tenants);
+        var resolver = new dev.macula.cloud.system.service.cache.MenuRouteTenantContext(users, memberships, tenants);
         var guarded = new SysApplicationApiKeyServiceImpl(keys, apps, cache, resolver, new DateTimeConverter(null));
         var user = new dev.macula.cloud.system.pojo.entity.SysUser();
         user.setId(7L);

@@ -26,7 +26,7 @@ import dev.macula.cloud.system.config.PlatformOAuthClientProperties;
 import dev.macula.cloud.system.form.IamApplicationForm;
 import dev.macula.cloud.system.mapper.SysIamApplicationMapper;
 import dev.macula.cloud.system.pojo.entity.SysIamApplication;
-import dev.macula.cloud.system.protocol.OAuth2ProtocolSettings;
+import dev.macula.cloud.system.protocol.oauth2.OAuth2ProtocolSettings;
 import dev.macula.cloud.system.service.IamApplicationService;
 import dev.macula.cloud.system.vo.IamApplicationVO;
 import org.junit.jupiter.api.Test;

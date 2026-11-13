@@ -16,7 +16,7 @@
  */
 package dev.macula.cloud.system.integration;
 
-import dev.macula.cloud.system.protocol.OAuth2ProtocolSettings;
+import dev.macula.cloud.system.protocol.oauth2.OAuth2ProtocolSettings;
 import java.net.URI;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;

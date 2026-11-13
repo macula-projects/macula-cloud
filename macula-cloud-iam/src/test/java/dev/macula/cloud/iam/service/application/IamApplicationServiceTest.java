@@ -16,6 +16,8 @@
  */
 package dev.macula.cloud.iam.service.application;
 
+import dev.macula.cloud.iam.service.application.impl.IamApplicationServiceImpl;
+
 import dev.macula.boot.mapstruct.DateTimeConverter;
 import dev.macula.cloud.iam.mapper.SysIamApplicationIdentityProviderMapper;
 import dev.macula.cloud.iam.mapper.SysIamApplicationMapper;
@@ -25,8 +27,8 @@ import dev.macula.cloud.iam.pojo.entity.SysIamApplicationIdentityProvider;
 import dev.macula.cloud.iam.pojo.entity.SysIamApplicationProtocolConfig;
 import dev.macula.cloud.system.enums.HostedLoginMethod;
 import dev.macula.cloud.system.protocol.OAuth2ApplicationProtocolSettings;
-import dev.macula.cloud.system.protocol.OAuth2ProtocolDefinition;
-import dev.macula.cloud.system.protocol.OAuth2ProtocolSettings;
+import dev.macula.cloud.system.protocol.oauth2.OAuth2ProtocolDefinition;
+import dev.macula.cloud.system.protocol.oauth2.OAuth2ProtocolSettings;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;

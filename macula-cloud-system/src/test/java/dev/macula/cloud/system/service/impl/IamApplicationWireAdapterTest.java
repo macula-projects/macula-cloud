@@ -22,7 +22,7 @@ import java.util.Set;
 import dev.macula.cloud.system.pojo.entity.SysIamApplication;
 import dev.macula.cloud.system.pojo.entity.SysIamApplicationIdentityProvider;
 import dev.macula.cloud.system.protocol.ApplicationProtocolConfiguration;
-import dev.macula.cloud.system.protocol.OAuth2ProtocolSettings;
+import dev.macula.cloud.system.protocol.oauth2.OAuth2ProtocolSettings;
 import org.junit.jupiter.api.Test;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.server.ResponseStatusException;
