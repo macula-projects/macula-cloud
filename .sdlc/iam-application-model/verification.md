@@ -169,3 +169,7 @@ Cypress exit: 0
 实际执行仅更新System镜像，由Flyway运行V28。版本28、sys_user_identity_binding已不存在；sys_identity_provider_user_binding仍有1条，应用/协议凭据/来源/用户/当前绑定逐值摘要保持。其他容器ID不变，System健康。Admin首页、运行配置、Discovery/JWKS、授权跳转IAM、PASSWORD/SMS/EMAIL呈现、飞书/钉钉发起和匿名拒绝的实际HTTP冒烟均通过；不代表第三方回调或真实用户登录验收。
 
 本轮日志、归档恢复证据及部署记录位于/private/tmp/macula-iam-retire-20261112/，不提交生成物或真实归档。未执行Git提交/推送/合并。
+
+## PR完整范围核对（2026-11-13）
+
+本轮用户明确授权推送合并。以main的48ef77a为基线，05e125b为代码快照，332个Git变更文件均属于IAM相关模块及关联SDLC记录。全部266个实际变更Java文件Checkstyle通过；新增内容对运行凭据明文/编码及私钥模式扫描未发现匹配；git diff检查通过，工作区提交后干净。Stage5独立审查结果见review-findings.md，不将审查当成测试或人类风险批准。
