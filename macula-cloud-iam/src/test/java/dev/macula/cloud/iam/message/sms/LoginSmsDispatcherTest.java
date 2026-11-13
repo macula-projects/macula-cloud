@@ -16,6 +16,10 @@
  */
 package dev.macula.cloud.iam.message.sms;
 
+import dev.macula.cloud.iam.message.dispatch.LoginSmsDispatcher;
+import dev.macula.cloud.iam.message.sms.impl.AliyunLoginSmsSender;
+import dev.macula.cloud.iam.message.sms.impl.TencentLoginSmsSender;
+
 import java.util.List;
 
 import dev.macula.cloud.iam.mapper.SysMessageProviderMapper;

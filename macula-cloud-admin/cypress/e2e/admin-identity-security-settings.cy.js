@@ -648,7 +648,7 @@ describe("平台身份、消息与接入应用管理", () => {
     cy.contains(".message-page .el-form-item", "SMTP 服务器").should(
       "be.visible"
     );
-    cy.contains("Exchange").should("not.exist");
+    cy.contains(".el-form-item", "用户名 / 邮箱").should("be.visible");
 
     cy.contains(".el-tabs__item", "短信服务").click();
     cy.wait("@smsProvider");

@@ -14,7 +14,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package dev.macula.cloud.system.message;
+package dev.macula.cloud.system.message.mail.impl;
+
+import dev.macula.cloud.system.enums.MailSecurityMode;
+import dev.macula.cloud.system.message.mail.MailSender;
 
 import dev.macula.cloud.system.pojo.entity.SysMessageProvider;
 import lombok.AllArgsConstructor;
@@ -37,9 +40,11 @@ import java.util.Properties;
  * @since 2026-10-13
  */
 @Component
-public class MailTestSender {
+public class MailTestSender implements MailSender {
     private final JsonMapper json = JsonMapper.builder().build();
 
+    /** 校验地址和 SMTP 选项后提交邮件，失败不暴露凭据。 */
+    @Override
     public void send(SysMessageProvider provider, String target, String senderName, String subject, String content) {
         if (!target.matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "邮箱地址无效");
@@ -47,7 +52,7 @@ public class MailTestSender {
         MailOptions options = StringUtils.hasText(provider.getConfigJson())
             ? json.readValue(provider.getConfigJson(), MailOptions.class) : new MailOptions(465, "SSL");
         if (options.getPort() < 1 || options.getPort() > 65535 || !StringUtils.hasText(options.getSecurityMode()) ||
-            !java.util.Set.of("NONE", "SSL").contains(options.getSecurityMode()) ||
+            !MailSecurityMode.supports(options.getSecurityMode()) ||
             !StringUtils.hasText(provider.getEndpoint()) ||
             !StringUtils.hasText(provider.getAccount()) || !StringUtils.hasText(provider.getCredential()) ||
             !StringUtils.hasText(provider.getSender())) {
@@ -60,10 +65,7 @@ public class MailTestSender {
         sender.setPassword(provider.getCredential());
         Properties properties = sender.getJavaMailProperties();
         properties.put("mail.smtp.auth", "true");
-        properties.put("mail.smtp.starttls.enable", "false");
-        properties.put("mail.smtp.starttls.required", "false");
-        properties.put("mail.smtp.ssl.enable", String.valueOf("SSL".equals(options.getSecurityMode())));
-        properties.put("mail.smtp.ssl.checkserveridentity", "true");
+        MailSecurityMode.configure(properties, options.getSecurityMode());
         properties.put("mail.smtp.connectiontimeout", "5000");
         properties.put("mail.smtp.timeout", "5000");
         properties.put("mail.smtp.writetimeout", "5000");
@@ -83,11 +85,15 @@ public class MailTestSender {
         }
     }
 
-    JavaMailSenderImpl createSender() {
+    /** 创建局部发送器，允许隔离协议测试替换传输工厂。 */
+    protected JavaMailSenderImpl createSender() {
         return new JavaMailSenderImpl();
     }
 
-    /** SMTP 端口与传输安全模式。 */
+    /**
+     * SMTP 端口与传输安全模式。
+     * @since 6.1.0
+     */
     @Data
     @NoArgsConstructor
     @AllArgsConstructor

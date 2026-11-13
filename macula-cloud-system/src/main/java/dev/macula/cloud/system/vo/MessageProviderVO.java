@@ -41,4 +41,5 @@ public class MessageProviderVO {
     private String smsSdkAppId;
     private boolean enabled;
     private boolean credentialConfigured;
+    private boolean authHeadersConfigured;
 }

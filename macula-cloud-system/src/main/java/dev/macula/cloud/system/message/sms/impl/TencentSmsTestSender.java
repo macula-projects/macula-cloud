@@ -14,7 +14,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package dev.macula.cloud.system.message;
+package dev.macula.cloud.system.message.sms.impl;
+
+import dev.macula.cloud.system.message.sms.SmsSender;
 
 import com.tencentcloudapi.common.Credential;
 import com.tencentcloudapi.sms.v20210111.SmsClient;
@@ -40,9 +42,24 @@ import java.util.Map;
  * @since 2026-10-13
  */
 @Component
-public class TencentSmsTestSender {
+public class TencentSmsTestSender implements SmsSender {
     private final JsonMapper json = JsonMapper.builder().build();
 
+    /** 返回稳定的供应商标识。 */
+    @Override
+    public String providerType() {
+        return "TENCENT";
+    }
+
+    /** 适配管理端统一策略接口，模板顺序由场景定义。 */
+    @Override
+    public void send(SysMessageProvider provider, String target, String templateCode,
+            dev.macula.cloud.system.enums.MessageTemplateType type, String languageCode,
+            Map<String, String> variables) {
+        send(provider, target, templateCode, type, variables);
+    }
+
+    /** 按场景定义的顺序映射腾讯模板变量。 */
     public void send(SysMessageProvider provider, String target, String templateCode,
         MessageTemplateType type, Map<String, String> variables) {
         TencentOptions options = StringUtils.hasText(provider.getConfigJson())
@@ -72,11 +89,15 @@ public class TencentSmsTestSender {
         }
     }
 
-    SmsClient createClient(Credential credential, String region) {
+    /** 根据服务端凭据和地域创建 SDK 客户端。 */
+    protected SmsClient createClient(Credential credential, String region) {
         return new SmsClient(credential, region);
     }
 
-    /** 腾讯短信应用 ID。 */
+    /**
+     * 腾讯短信应用 ID。
+     * @since 6.1.0
+     */
     @Data
     @NoArgsConstructor
     @AllArgsConstructor

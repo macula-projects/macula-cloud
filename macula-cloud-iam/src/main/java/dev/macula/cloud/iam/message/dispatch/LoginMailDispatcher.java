@@ -14,7 +14,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package dev.macula.cloud.iam.message.mail;
+package dev.macula.cloud.iam.message.dispatch;
+
+import dev.macula.cloud.iam.message.mail.MailSender;
 
 import java.time.Duration;
 import java.time.OffsetDateTime;

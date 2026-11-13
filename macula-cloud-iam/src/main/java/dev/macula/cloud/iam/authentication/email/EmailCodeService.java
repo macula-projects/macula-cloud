@@ -25,7 +25,7 @@ import dev.macula.cloud.iam.authentication.verification.VerificationCodeContext;
 import dev.macula.cloud.iam.authentication.verification.VerificationCodePurpose;
 import dev.macula.cloud.iam.authentication.verification.VerificationCodeScope;
 import dev.macula.cloud.iam.authentication.verification.VerificationCodeService;
-import dev.macula.cloud.iam.message.mail.LoginMailDispatcher;
+import dev.macula.cloud.iam.message.dispatch.LoginMailDispatcher;
 import dev.macula.cloud.system.security.UserIdentifierNormalizer;
 import lombok.RequiredArgsConstructor;
 

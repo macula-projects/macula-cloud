@@ -16,6 +16,10 @@
  */
 package dev.macula.cloud.iam.message.mail;
 
+import dev.macula.cloud.iam.message.mail.impl.SmtpMailSender;
+import dev.macula.cloud.iam.message.support.FakeStartTlsSmtpServer;
+import org.springframework.mail.javamail.JavaMailSenderImpl;
+
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Properties;
@@ -36,6 +40,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * @since 6.1.0
  */
 class SmtpMailSenderTest {
+    @org.junit.jupiter.api.io.TempDir java.nio.file.Path temporaryDirectory;
     /**
      * 捕获真实SMTP命令，不连接公网。
      */
@@ -75,5 +80,68 @@ class SmtpMailSenderTest {
         provider.setSender("iam@example.test");
         provider.setConfigJson("{\"port\":" + port + ",\"securityMode\":\"NONE\"}");
         return provider;
+    }
+
+    /** TLS 升级成功才发送邮件，旧隐式 SSL 模式同样可以提交。 */
+    @Test
+    void submitsStartTlsAndImplicitTlsWithVerifiedCertificate() throws Exception {
+        var tls = FakeStartTlsSmtpServer.context(temporaryDirectory);
+        SmtpMailSender sender = new SmtpMailSender() {
+            /** 使用仅测试信任的证书，并保留主机名校验。 */
+            @Override
+            protected JavaMailSenderImpl createSender(SysMessageProvider provider, MailOptions options) {
+                JavaMailSenderImpl mail = super.createSender(provider, options);
+                mail.getJavaMailProperties().put("mail.smtp.ssl.socketFactory", tls.getSocketFactory());
+                return mail;
+            }
+        };
+        for (boolean implicit : new boolean[] {false, true}) {
+            try (var smtp = new FakeStartTlsSmtpServer(tls, true, implicit)) {
+                var provider = provider(smtp.port());
+                provider.setEndpoint("localhost");
+                provider.setConfigJson("{\"port\":" + smtp.port() + ",\"securityMode\":\""
+                        + (implicit ? "SSL" : "STARTTLS") + "\"}");
+                sender.send(provider, "recipient@example.test", "Macula", "fixture", "<b>fixture-body</b>");
+                org.assertj.core.api.Assertions.assertThat(smtp.message()).contains("fixture-body");
+            }
+        }
+    }
+
+    /** 不支持 STARTTLS 时拒绝认证，不能静默回退到明文。 */
+    @Test
+    void rejectsMissingStartTlsCapability() throws Exception {
+        var tls = FakeStartTlsSmtpServer.context(temporaryDirectory);
+        try (var smtp = new FakeStartTlsSmtpServer(tls, false, false)) {
+            var provider = provider(smtp.port());
+            provider.setEndpoint("localhost");
+            provider.setConfigJson("{\"port\":" + smtp.port() + ",\"securityMode\":\"STARTTLS\"}");
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> new SmtpMailSender().send(provider,
+                    "recipient@example.test", "Macula", "fixture", "fixture-body")).isInstanceOf(IllegalStateException.class);
+        }
+    }
+
+    /** 未受信证书及主机名不匹配都必须拒绝，不能开放 trust-all。 */
+    @Test
+    void rejectsUntrustedOrMismatchedStartTlsCertificate() throws Exception {
+        var tls = FakeStartTlsSmtpServer.context(temporaryDirectory);
+        SmtpMailSender sender = new SmtpMailSender() {
+            /** 使用仅测试信任的证书，并保留主机名校验。 */
+            @Override
+            protected JavaMailSenderImpl createSender(SysMessageProvider provider, MailOptions options) {
+                JavaMailSenderImpl mail = super.createSender(provider, options);
+                mail.getJavaMailProperties().put("mail.smtp.ssl.socketFactory", tls.getSocketFactory());
+                return mail;
+            }
+        };
+        for (boolean trust : new boolean[] {false, true}) {
+            try (var smtp = new FakeStartTlsSmtpServer(tls, true, false)) {
+                var provider = provider(smtp.port());
+                provider.setEndpoint(trust ? "127.0.0.1" : "localhost");
+                provider.setConfigJson("{\"port\":" + smtp.port() + ",\"securityMode\":\"STARTTLS\"}");
+                var selected = trust ? sender : new SmtpMailSender();
+                org.assertj.core.api.Assertions.assertThatThrownBy(() -> selected.send(provider,
+                        "recipient@example.test", "Macula", "fixture", "fixture-body")).isInstanceOf(IllegalStateException.class);
+            }
+        }
     }
 }

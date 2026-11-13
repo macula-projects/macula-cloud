@@ -39,6 +39,22 @@ export default {
 			'These settings are stored but not yet enforced by IAM or Gateway.'
 	},
 	messageSettingsPage: {
+		exchangeMail: "Exchange (self-hosted)",
+		netease163Mail: "163 Free Mail",
+		qqMail: "QQ Mail",
+		customHttpSms: "Custom SMS service",
+		postUrl: "POST URL",
+		authHeaders: "Authentication headers",
+		headerName: "Header name",
+		headerValue: "Authentication value",
+		addHeader: "Add header",
+		removeHeader: "Remove",
+		headersRequired: "Configure authentication headers",
+		keepHeaders: "Configured; leave all blank to keep, or replace the entire set",
+		invalidHeaders: "Invalid or duplicate authentication headers",
+		authorizationCodeHint: "Enable SMTP and use a client authorization code as the password.",
+		customSmsHint: "Configure a trusted endpoint, preferably HTTPS; existing template settings apply.",
+
 		retry: 'Reload',
 		emptyTemplates: 'No templates',
 		scene: 'Scenario',

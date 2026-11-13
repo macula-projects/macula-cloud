@@ -16,6 +16,10 @@
  */
 package dev.macula.cloud.system.message;
 
+import dev.macula.cloud.system.message.sms.impl.AliyunSmsTestSender;
+import dev.macula.cloud.system.message.sms.impl.TencentSmsTestSender;
+
+
 import com.aliyun.dysmsapi20170525.Client;
 import com.aliyun.dysmsapi20170525.models.SendSmsRequest;
 import com.aliyun.dysmsapi20170525.models.SendSmsResponse;
@@ -65,7 +69,7 @@ class SupplierSmsTestSenderTest {
         server.start();
         try {
             AliyunSmsTestSender sender = new AliyunSmsTestSender() {
-                @Override Client createClient(Config config) throws Exception {
+                @Override protected Client createClient(Config config) throws Exception {
                     return new Client(config.setProtocol("HTTP")
                         .setEndpoint("127.0.0.1:" + server.getAddress().getPort())
                         .setConnectTimeout(2000).setReadTimeout(2000));
@@ -96,7 +100,7 @@ class SupplierSmsTestSenderTest {
         server.start();
         try {
             TencentSmsTestSender sender = new TencentSmsTestSender() {
-                @Override SmsClient createClient(Credential credential, String region) {
+                @Override protected SmsClient createClient(Credential credential, String region) {
                     HttpProfile http = new HttpProfile();
                     http.setProtocol(HttpProfile.REQ_HTTP);
                     http.setEndpoint("127.0.0.1:" + server.getAddress().getPort());
@@ -119,7 +123,7 @@ class SupplierSmsTestSenderTest {
     void aliyunMapsTemplateAndRejectsNonOkResponse() throws Exception {
         Client client = mock(Client.class);
         AliyunSmsTestSender sender = new AliyunSmsTestSender() {
-            @Override Client createClient(Config config) { return client; }
+            @Override protected Client createClient(Config config) { return client; }
         };
         SysMessageProvider provider = provider();
         when(client.sendSms(any(SendSmsRequest.class))).thenReturn(new SendSmsResponse()
@@ -140,7 +144,7 @@ class SupplierSmsTestSenderTest {
     void tencentOrdersVariablesAndRejectsFailedStatus() throws Exception {
         SmsClient client = mock(SmsClient.class);
         TencentSmsTestSender sender = new TencentSmsTestSender() {
-            @Override SmsClient createClient(Credential credential, String region) { return client; }
+            @Override protected SmsClient createClient(Credential credential, String region) { return client; }
         };
         SysMessageProvider provider = provider();
         provider.setConfigJson("{\"smsSdkAppId\":\"app-1\"}");

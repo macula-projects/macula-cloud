@@ -25,7 +25,7 @@ import dev.macula.cloud.iam.authentication.mfa.AuthenticationMethod;
 import dev.macula.cloud.iam.authentication.mfa.MfaCompletionPolicy;
 import dev.macula.cloud.iam.config.IamProtocolTest;
 import dev.macula.cloud.iam.enums.UserTypeEnum;
-import dev.macula.cloud.iam.message.mail.LoginMailDispatcher;
+import dev.macula.cloud.iam.message.dispatch.LoginMailDispatcher;
 import dev.macula.cloud.iam.pojo.entity.SysUser;
 import dev.macula.cloud.iam.protocol.oauth2.ProtocolTestFixtures;
 import dev.macula.cloud.iam.protocol.oauth2.client.OAuth2ClientRegistration;
