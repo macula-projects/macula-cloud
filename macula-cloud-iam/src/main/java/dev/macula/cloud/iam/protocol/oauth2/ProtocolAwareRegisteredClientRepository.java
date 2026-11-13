@@ -16,20 +16,24 @@
  */
 package dev.macula.cloud.iam.protocol.oauth2;
 
-import java.time.Duration;
-import java.util.Set;
-
+import dev.macula.cloud.iam.protocol.oauth2.client.OAuth2ClientRegistrationService;
 import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeClientSettings;
-import dev.macula.cloud.iam.service.client.SysOAuth2ClientService;
+import dev.macula.cloud.system.enums.IamWebLoginMode;
+import dev.macula.cloud.system.protocol.ApplicationProtocolConfiguration;
 import dev.macula.cloud.system.protocol.OAuth2ProtocolConfiguration;
 import dev.macula.cloud.system.protocol.OAuth2ProtocolSettings;
+import dev.macula.cloud.system.security.OAuth2ResourcePolicy;
+import java.time.Duration;
+import java.util.Set;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
+import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.OAuth2ErrorCodes;
 import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
+import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationCodeRequestAuthenticationException;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.settings.ClientSettings;
@@ -46,13 +50,13 @@ import org.springframework.web.context.request.ServletRequestAttributes;
  */
 public final class ProtocolAwareRegisteredClientRepository implements RegisteredClientRepository {
     private final RegisteredClientRepository base;
-    private final SysOAuth2ClientService clients;
+    private final OAuth2ClientRegistrationService clients;
     private final ObjectProvider<OAuth2AuthorizationService> authorizations;
 
     /**
      * 延迟获取授权服务打断装配环，实际授权恢复仍只使用基础仓库。
      */
-    public ProtocolAwareRegisteredClientRepository(RegisteredClientRepository base, SysOAuth2ClientService clients,
+    public ProtocolAwareRegisteredClientRepository(RegisteredClientRepository base, OAuth2ClientRegistrationService clients,
             ObjectProvider<OAuth2AuthorizationService> authorizations) {
         this.base = base;
         this.clients = clients;
@@ -80,6 +84,21 @@ public final class ProtocolAwareRegisteredClientRepository implements Registered
      */
     @Override
     public RegisteredClient findByClientId(String clientId) {
+        try {
+            return lookupClient(clientId);
+        } catch (OAuth2AuthenticationException ex) {
+            // 基础缓存也可能先拒绝已移除类型；SAS授权端点要求专用异常，不能让拒绝路径变成ClassCastException。
+            if (!(ex instanceof OAuth2AuthorizationCodeRequestAuthenticationException)
+                && RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attributes
+                && attributes.getRequest().getRequestURI().equals(attributes.getRequest().getContextPath() + "/oauth2/authorize")) {
+                throw new OAuth2AuthorizationCodeRequestAuthenticationException(new OAuth2Error(OAuth2ErrorCodes.INVALID_REQUEST), null);
+            }
+            throw ex;
+        }
+    }
+
+    /** 从基础身份和当前快照构建请求视图；端点错误转换由外层统一处理。 */
+    private RegisteredClient lookupClient(String clientId) {
         RegisteredClient identity = base.findByClientId(clientId);
         var client = clients.getClientByClientId(clientId);
         if (identity == null || client == null) {
@@ -96,7 +115,7 @@ public final class ProtocolAwareRegisteredClientRepository implements Registered
             }
             // 即使提交后缓存清理失败，也不能用缓存中的旧Secret或JWKS继续认证。
             var resourceSettings = ClientSettings.builder()
-                    .setting(dev.macula.cloud.system.security.OAuth2ResourcePolicy.AUTHORIZATION_VERSION,
+                    .setting(OAuth2ResourcePolicy.AUTHORIZATION_VERSION,
                             client.getAuthorizationVersion())
                     .setting(ApplicationProtocolResolver.EFFECTIVE_PROTOCOL, "RESOURCE_SERVER");
             var methods = OAuth2ProtocolConfiguration.csv(client.getClientAuthenticationMethods());
@@ -112,13 +131,13 @@ public final class ProtocolAwareRegisteredClientRepository implements Registered
                     }).authorizationGrantTypes(values -> {
                         values.clear();
                         values.add(new AuthorizationGrantType(
-                                dev.macula.cloud.system.security.OAuth2ResourcePolicy.INTROSPECTION_CAPABILITY));
+                                OAuth2ResourcePolicy.INTROSPECTION_CAPABILITY));
                     }).scopes(Set::clear).redirectUris(Set::clear).clientSettings(resourceSettings.build()).build();
         }
         if ("/oauth2/introspect".equals(path)) {
             throw new OAuth2AuthenticationException(OAuth2ErrorCodes.INVALID_CLIENT);
         }
-        dev.macula.cloud.system.protocol.ApplicationProtocolConfiguration configuration;
+        ApplicationProtocolConfiguration configuration;
         try {
             configuration = new ApplicationProtocolResolver(authorizations.getObject()).resolve(client,
                     attributes.getRequest());
@@ -126,8 +145,8 @@ public final class ProtocolAwareRegisteredClientRepository implements Registered
             // authorize原生失败处理器要求专用异常；未验证redirect之前不能回跳调用方URL。
             if (attributes.getRequest().getRequestURI()
                     .equals(attributes.getRequest().getContextPath() + "/oauth2/authorize")) {
-                throw new org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationCodeRequestAuthenticationException(
-                        new org.springframework.security.oauth2.core.OAuth2Error(OAuth2ErrorCodes.INVALID_REQUEST),
+                throw new OAuth2AuthorizationCodeRequestAuthenticationException(
+                        new OAuth2Error(OAuth2ErrorCodes.INVALID_REQUEST),
                         null);
             }
             if (ex instanceof OAuth2AuthenticationException authentication) {
@@ -143,13 +162,17 @@ public final class ProtocolAwareRegisteredClientRepository implements Registered
                 .requireProofKey(Boolean.TRUE.equals(settings.getRequireProofKey()) || auth.contains("none"))
                 .requireAuthorizationConsent(Boolean.TRUE.equals(settings.getRequireAuthorizationConsent()))
                 .setting(ApplicationProtocolResolver.EFFECTIVE_PROTOCOL, configuration.protocol())
-                .setting(dev.macula.cloud.system.security.OAuth2ResourcePolicy.AUTHORIZATION_VERSION,
+                .setting(OAuth2ResourcePolicy.AUTHORIZATION_VERSION,
                         client.getAuthorizationVersion())
                 .setting(ResourceAuthorizationPolicy.PERMISSIONS, ResourceAuthorizationPolicy.permissions(client))
                 .setting(OAuth2ClientProtocolValidator.ENABLED_PROTOCOLS, Set.of(configuration.protocol()))
                 .setting(ExternalCodeClientSettings.ALLOWED_ORIGINS, settings.getAllowedOrigins());
         // 身份源与应用类型必须来自本次RR快照，不能复用基础RegisteredClient缓存中的旧能力。
         clientSettings.setting(ExternalCodeClientSettings.APPLICATION_TYPE, client.getApplicationType());
+        var webMode = IamWebLoginMode.resolve(client.getApplicationType(), client.getWebLoginMode());
+        if (webMode != null) {
+            clientSettings.setting(ExternalCodeClientSettings.WEB_LOGIN_MODE, webMode.value());
+        }
         clientSettings.setting(ExternalCodeClientSettings.CODE_TYPES,
                 OAuth2ProtocolConfiguration.csv(client.getExternalCodeTypes()));
         clientSettings.setting(ExternalCodeClientSettings.PROVIDER_BINDINGS, client.getExternalProviderBindings());

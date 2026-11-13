@@ -25,6 +25,7 @@ import dev.macula.cloud.iam.message.audit.MessageAuditHasher;
 import dev.macula.cloud.iam.message.template.LoginMessageConfigurationService;
 import dev.macula.cloud.iam.pojo.entity.SysMessageProvider;
 import dev.macula.cloud.iam.pojo.entity.SysMessageTemplate;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -100,7 +101,7 @@ class LoginSmsDispatcherTest {
         String first = auditHasher.hash("13800000000");
         String second = new MessageAuditHasher("another-iam-audit-key-32-characters").hash("13800000000");
 
-        org.assertj.core.api.Assertions.assertThat(first).hasSize(64).doesNotContain("13800000000")
+        Assertions.assertThat(first).hasSize(64).doesNotContain("13800000000")
                 .isNotEqualTo(second);
     }
 

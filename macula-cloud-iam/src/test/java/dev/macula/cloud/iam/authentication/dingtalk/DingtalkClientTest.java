@@ -23,7 +23,9 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.sun.net.httpserver.HttpServer;
+import dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures;
 import dev.macula.cloud.iam.service.identity.IdentityProviderConfigService.ProviderConfig;
+import dev.macula.cloud.system.enums.IdentitySourceType;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.boot.test.system.CapturedOutput;
@@ -31,9 +33,11 @@ import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.mock.http.client.MockClientHttpRequest;
 import org.springframework.security.authentication.AuthenticationServiceException;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
+import tools.jackson.databind.json.JsonMapper;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -60,13 +64,13 @@ class DingtalkClientTest {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         DingtalkClient client = new DingtalkClient(builder.build());
-        ProviderConfig config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(
-                dev.macula.cloud.system.enums.IdentitySourceType.DINGTALK_WEB, "DINGTALK", "app", "secret",
+        ProviderConfig config = IdentitySourceTestFixtures.source(
+                IdentitySourceType.DINGTALK_WEB, "DINGTALK", "app", "secret",
                 Map.of("appKey", "app", "corpId", "corp"));
         server.expect(requestTo("https://api.dingtalk.com/v1.0/oauth2/accessToken"))
                 .andExpect(request -> {
-                    var body = tools.jackson.databind.json.JsonMapper.builder().build().readTree(
-                            ((org.springframework.mock.http.client.MockClientHttpRequest) request).getBodyAsString());
+                    var body = JsonMapper.builder().build().readTree(
+                            ((MockClientHttpRequest) request).getBodyAsString());
                     assertEquals(2, body.size());
                     assertTrue(body.has("appKey") && body.has("appSecret"));
                     assertFalse(body.has("clientId") || body.has("clientSecret"));
@@ -74,8 +78,8 @@ class DingtalkClientTest {
                 .andRespond(withSuccess("{\"accessToken\":\"app-token\"}", MediaType.APPLICATION_JSON));
         server.expect(requestTo("https://api.dingtalk.com/v1.0/oauth2/userAccessToken"))
                 .andExpect(request -> {
-                    var body = tools.jackson.databind.json.JsonMapper.builder().build().readTree(
-                            ((org.springframework.mock.http.client.MockClientHttpRequest) request).getBodyAsString());
+                    var body = JsonMapper.builder().build().readTree(
+                            ((MockClientHttpRequest) request).getBodyAsString());
                     assertEquals("authorization_code", body.path("grantType").asText());
                     assertEquals("app", body.path("clientId").asText());
                     assertEquals("secret", body.path("clientSecret").asText());
@@ -104,13 +108,13 @@ class DingtalkClientTest {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         DingtalkClient client = new DingtalkClient(builder.build());
-        ProviderConfig config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(
-                dev.macula.cloud.system.enums.IdentitySourceType.DINGTALK_WEB, "DINGTALK", "app", "secret",
+        ProviderConfig config = IdentitySourceTestFixtures.source(
+                IdentitySourceType.DINGTALK_WEB, "DINGTALK", "app", "secret",
                 Map.of("appKey", "app", "corpId", "corp"));
         server.expect(requestTo("https://api.dingtalk.com/v1.0/oauth2/accessToken"))
                 .andExpect(request -> {
-                    var body = tools.jackson.databind.json.JsonMapper.builder().build().readTree(
-                            ((org.springframework.mock.http.client.MockClientHttpRequest) request).getBodyAsString());
+                    var body = JsonMapper.builder().build().readTree(
+                            ((MockClientHttpRequest) request).getBodyAsString());
                     assertEquals(2, body.size());
                     assertTrue(body.has("appKey") && body.has("appSecret"));
                     assertFalse(body.has("clientId") || body.has("clientSecret"));
@@ -118,8 +122,8 @@ class DingtalkClientTest {
                 .andRespond(withSuccess("{\"accessToken\":\"app-token\"}", MediaType.APPLICATION_JSON));
         server.expect(requestTo("https://api.dingtalk.com/v1.0/oauth2/userAccessToken"))
                 .andExpect(request -> {
-                    var body = tools.jackson.databind.json.JsonMapper.builder().build().readTree(
-                            ((org.springframework.mock.http.client.MockClientHttpRequest) request).getBodyAsString());
+                    var body = JsonMapper.builder().build().readTree(
+                            ((MockClientHttpRequest) request).getBodyAsString());
                     assertEquals("authorization_code", body.path("grantType").asText());
                     assertFalse(body.has("grant_type"));
                 })
@@ -143,13 +147,13 @@ class DingtalkClientTest {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         DingtalkClient client = new DingtalkClient(builder.build());
-        ProviderConfig config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(
-                dev.macula.cloud.system.enums.IdentitySourceType.DINGTALK_WEB, "DINGTALK", "app", "secret",
+        ProviderConfig config = IdentitySourceTestFixtures.source(
+                IdentitySourceType.DINGTALK_WEB, "DINGTALK", "app", "secret",
                 Map.of("appKey", "app", "corpId", "corp"));
         server.expect(requestTo("https://api.dingtalk.com/v1.0/oauth2/accessToken"))
                 .andExpect(request -> {
-                    var body = tools.jackson.databind.json.JsonMapper.builder().build().readTree(
-                            ((org.springframework.mock.http.client.MockClientHttpRequest) request).getBodyAsString());
+                    var body = JsonMapper.builder().build().readTree(
+                            ((MockClientHttpRequest) request).getBodyAsString());
                     assertEquals(2, body.size());
                     assertTrue(body.has("appKey") && body.has("appSecret"));
                     assertFalse(body.has("clientId") || body.has("clientSecret"));
@@ -157,8 +161,8 @@ class DingtalkClientTest {
                 .andRespond(withSuccess("{\"accessToken\":\"app-token\"}", MediaType.APPLICATION_JSON));
         server.expect(requestTo("https://api.dingtalk.com/v1.0/oauth2/userAccessToken"))
                 .andExpect(request -> {
-                    var body = tools.jackson.databind.json.JsonMapper.builder().build().readTree(
-                            ((org.springframework.mock.http.client.MockClientHttpRequest) request).getBodyAsString());
+                    var body = JsonMapper.builder().build().readTree(
+                            ((MockClientHttpRequest) request).getBodyAsString());
                     assertEquals("authorization_code", body.path("grantType").asText());
                     assertFalse(body.has("grant_type"));
                 })
@@ -177,13 +181,13 @@ class DingtalkClientTest {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         DingtalkClient client = new DingtalkClient(builder.build());
-        ProviderConfig config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(
-                dev.macula.cloud.system.enums.IdentitySourceType.DINGTALK_WEB, "DINGTALK", "app", "secret",
+        ProviderConfig config = IdentitySourceTestFixtures.source(
+                IdentitySourceType.DINGTALK_WEB, "DINGTALK", "app", "secret",
                 Map.of("appKey", "app", "corpId", "corp"));
         server.expect(requestTo("https://api.dingtalk.com/v1.0/oauth2/accessToken"))
                 .andExpect(request -> {
-                    var body = tools.jackson.databind.json.JsonMapper.builder().build().readTree(
-                            ((org.springframework.mock.http.client.MockClientHttpRequest) request).getBodyAsString());
+                    var body = JsonMapper.builder().build().readTree(
+                            ((MockClientHttpRequest) request).getBodyAsString());
                     assertEquals(2, body.size());
                     assertTrue(body.has("appKey") && body.has("appSecret"));
                     assertFalse(body.has("clientId") || body.has("clientSecret"));
@@ -203,14 +207,14 @@ class DingtalkClientTest {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         DingtalkClient client = new DingtalkClient(builder.build());
-        ProviderConfig config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(
-                dev.macula.cloud.system.enums.IdentitySourceType.DINGTALK_WEB, "DINGTALK", "app",
+        ProviderConfig config = IdentitySourceTestFixtures.source(
+                IdentitySourceType.DINGTALK_WEB, "DINGTALK", "app",
                 "client-secret-marker",
                 Map.of("appKey", "app", "corpId", "corp"));
         server.expect(requestTo("https://api.dingtalk.com/v1.0/oauth2/accessToken"))
                 .andExpect(request -> {
-                    var body = tools.jackson.databind.json.JsonMapper.builder().build().readTree(
-                            ((org.springframework.mock.http.client.MockClientHttpRequest) request).getBodyAsString());
+                    var body = JsonMapper.builder().build().readTree(
+                            ((MockClientHttpRequest) request).getBodyAsString());
                     assertEquals(2, body.size());
                     assertTrue(body.has("appKey") && body.has("appSecret"));
                     assertFalse(body.has("clientId") || body.has("clientSecret"));
@@ -233,18 +237,67 @@ class DingtalkClientTest {
         assertFalse(logs.contains("provider-text-marker"));
     }
 
+    /**
+     * 顶层88必须保留可行动的数字子码，原始错误正文和凭据不得进入日志。
+     */
+    @Test
+    void embeddedProviderSubcodeIsLoggedWithoutRawMessage(CapturedOutput output) {
+        var builder = RestClient.builder();
+        var server = MockRestServiceServer.bindTo(builder).build();
+        var client = new DingtalkClient(builder.build());
+        var config = IdentitySourceTestFixtures.source(IdentitySourceType.DINGTALK_WEB,
+                "DINGTALK", "app", "private-secret-marker", Map.of("appKey", "app", "corpId", "corp"));
+        server.expect(requestTo("https://api.dingtalk.com/v1.0/oauth2/accessToken"))
+                .andRespond(withSuccess("{\"accessToken\":\"private-token-marker\"}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo("https://oapi.dingtalk.com/topapi/v2/user/getuserinfo?access_token=private-token-marker"))
+                .andRespond(withSuccess("""
+                        {"errcode":88,"errmsg":"ding talk error[subcode=60011,submsg=private-response-marker]
+                        required [qyapi_get_member] private-identity-marker"}
+                        """.replace("\n", " "), MediaType.APPLICATION_JSON));
+        assertThrows(AuthenticationServiceException.class,
+                () -> client.fetchUserId(config, "private-code-marker", DingtalkLoginMode.WEBVIEW));
+        assertTrue(output.toString().contains("subcode=60011"));
+        assertTrue(output.toString().contains("qyapi_get_member"));
+        assertFalse(output.toString().contains("private-"));
+        server.verify();
+    }
+
+    /** HTTP权限失败仍拒绝认证，诊断不能泄露响应正文或URL中的Token。 */
+    @Test
+    void httpPermissionFailureIsProjectedWithoutResponseBody(CapturedOutput output) {
+        var builder = RestClient.builder();
+        var server = MockRestServiceServer.bindTo(builder).build();
+        var client = new DingtalkClient(builder.build());
+        var config = IdentitySourceTestFixtures.source(IdentitySourceType.DINGTALK_WEB,
+                "DINGTALK", "app", "private-secret-marker", Map.of("appKey", "app", "corpId", "corp"));
+        server.expect(requestTo("https://api.dingtalk.com/v1.0/oauth2/accessToken"))
+                .andRespond(withSuccess("{\"accessToken\":\"private-token-marker\"}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo("https://oapi.dingtalk.com/topapi/v2/user/getuserinfo?access_token=private-token-marker"))
+                .andRespond(withStatus(HttpStatus.FORBIDDEN).contentType(MediaType.APPLICATION_JSON).body("""
+                        {"code":"Forbidden.AccessDenied.AccessTokenPermissionDenied",
+                        "message":"private-response-marker","accessdenieddetail":{
+                        "requiredScopes":["Contact.User.Read","private-unknown-marker"]}}
+                        """));
+        assertThrows(AuthenticationServiceException.class,
+                () -> client.fetchUserId(config, "private-code-marker", DingtalkLoginMode.WEBVIEW));
+        assertTrue(output.toString().contains("status=403"));
+        assertTrue(output.toString().contains("Contact.User.Read"));
+        assertFalse(output.toString().contains("private-"));
+        server.verify();
+    }
+
     @Test
     void malformedResponseFailsClosed() {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         DingtalkClient client = new DingtalkClient(builder.build());
-        ProviderConfig config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(
-                dev.macula.cloud.system.enums.IdentitySourceType.DINGTALK_WEB, "DINGTALK", "app", "secret",
+        ProviderConfig config = IdentitySourceTestFixtures.source(
+                IdentitySourceType.DINGTALK_WEB, "DINGTALK", "app", "secret",
                 Map.of("appKey", "app", "corpId", "corp"));
         server.expect(requestTo("https://api.dingtalk.com/v1.0/oauth2/accessToken"))
                 .andExpect(request -> {
-                    var body = tools.jackson.databind.json.JsonMapper.builder().build().readTree(
-                            ((org.springframework.mock.http.client.MockClientHttpRequest) request).getBodyAsString());
+                    var body = JsonMapper.builder().build().readTree(
+                            ((MockClientHttpRequest) request).getBodyAsString());
                     assertEquals(2, body.size());
                     assertTrue(body.has("appKey") && body.has("appSecret"));
                     assertFalse(body.has("clientId") || body.has("clientSecret"));
@@ -260,13 +313,13 @@ class DingtalkClientTest {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         DingtalkClient client = new DingtalkClient(builder.build());
-        ProviderConfig config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(
-                dev.macula.cloud.system.enums.IdentitySourceType.DINGTALK_WEB, "DINGTALK", "app", "secret",
+        ProviderConfig config = IdentitySourceTestFixtures.source(
+                IdentitySourceType.DINGTALK_WEB, "DINGTALK", "app", "secret",
                 Map.of("appKey", "app", "corpId", "corp"));
         server.expect(requestTo("https://api.dingtalk.com/v1.0/oauth2/accessToken"))
                 .andExpect(request -> {
-                    var body = tools.jackson.databind.json.JsonMapper.builder().build().readTree(
-                            ((org.springframework.mock.http.client.MockClientHttpRequest) request).getBodyAsString());
+                    var body = JsonMapper.builder().build().readTree(
+                            ((MockClientHttpRequest) request).getBodyAsString());
                     assertEquals(2, body.size());
                     assertTrue(body.has("appKey") && body.has("appSecret"));
                     assertFalse(body.has("clientId") || body.has("clientSecret"));
@@ -283,8 +336,8 @@ class DingtalkClientTest {
             throw new SocketTimeoutException("timeout-message-marker");
         }).build();
         DingtalkClient client = new DingtalkClient(restClient);
-        ProviderConfig config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(
-                dev.macula.cloud.system.enums.IdentitySourceType.DINGTALK_WEB, "DINGTALK", "app", "secret",
+        ProviderConfig config = IdentitySourceTestFixtures.source(
+                IdentitySourceType.DINGTALK_WEB, "DINGTALK", "app", "secret",
                 Map.of("appKey", "app", "corpId", "corp"));
 
         assertThrows(AuthenticationServiceException.class,

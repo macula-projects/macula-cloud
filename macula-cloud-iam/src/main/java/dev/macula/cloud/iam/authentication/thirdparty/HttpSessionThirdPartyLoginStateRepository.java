@@ -16,6 +16,7 @@
  */
 package dev.macula.cloud.iam.authentication.thirdparty;
 
+import java.io.Serializable;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -95,6 +96,6 @@ public class HttpSessionThirdPartyLoginStateRepository implements ThirdPartyLogi
      *
      * @since 6.1.0
      */
-    private record StoredState(String state, ThirdPartyLoginContext context) implements java.io.Serializable {
+    private record StoredState(String state, ThirdPartyLoginContext context) implements Serializable {
     }
 }

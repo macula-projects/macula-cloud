@@ -18,7 +18,9 @@ package dev.macula.cloud.iam.authentication.feishu;
 
 import java.util.Map;
 
+import dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures;
 import dev.macula.cloud.iam.service.identity.IdentityProviderConfigService.ProviderConfig;
+import dev.macula.cloud.system.enums.IdentitySourceType;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.authentication.AuthenticationServiceException;
@@ -49,8 +51,8 @@ class FeishuLoginModeTest {
     @Test
     void browserUsesOfficialEndpointAndWebviewLoginIsRejected() {
         FeishuClient client = new FeishuClient();
-        ProviderConfig config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(
-                dev.macula.cloud.system.enums.IdentitySourceType.FEISHU_WEB, "FEISHU", "app", "secret",
+        ProviderConfig config = IdentitySourceTestFixtures.source(
+                IdentitySourceType.FEISHU_WEB, "FEISHU", "app", "secret",
                 Map.of("appId", "app"));
         String callback = "https://iam.example/login/feishu";
         assertTrue(client.authorizationUri(config, "state-value", callback, FeishuLoginMode.BROWSER)

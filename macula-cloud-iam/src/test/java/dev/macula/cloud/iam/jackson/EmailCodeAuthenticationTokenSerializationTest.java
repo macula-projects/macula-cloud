@@ -16,12 +16,17 @@
  */
 package dev.macula.cloud.iam.jackson;
 
+import java.util.List;
+
 import dev.macula.cloud.iam.authentication.email.EmailCodeAuthenticationToken;
+import dev.macula.cloud.iam.authentication.sms.SmsAuthenticationToken;
 import dev.macula.cloud.iam.service.userdetails.SysUserDetails;
 import org.junit.jupiter.api.Test;
+import org.springframework.security.core.authority.FactorGrantedAuthority;
 import org.springframework.security.jackson.SecurityJacksonModules;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
+import tools.jackson.databind.node.ObjectNode;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -48,9 +53,9 @@ class EmailCodeAuthenticationTokenSerializationTest {
         user.setUserId(42L);
         user.setTenantId(1L);
         user.setEnabled(true);
-        var factor = org.springframework.security.core.authority.FactorGrantedAuthority.fromAuthority(
-                org.springframework.security.core.authority.FactorGrantedAuthority.OTT_AUTHORITY);
-        var token = new EmailCodeAuthenticationToken(user, null, java.util.List.of(factor));
+        var factor = FactorGrantedAuthority.fromAuthority(
+                FactorGrantedAuthority.OTT_AUTHORITY);
+        var token = new EmailCodeAuthenticationToken(user, null, List.of(factor));
         String encoded = json.writeValueAsString(token);
         var restored = json.readValue(encoded, EmailCodeAuthenticationToken.class);
         assertThat(restored.isAuthenticated()).isTrue();
@@ -59,8 +64,29 @@ class EmailCodeAuthenticationTokenSerializationTest {
         assertThat(restored.getAuthorities()).contains(factor);
         assertThat(encoded).doesNotContain("authentication.email.EmailAuthenticationToken");
         var tree = json.readTree(encoded).deepCopy();
-        ((tools.jackson.databind.node.ObjectNode) tree).put("code", "123456");
+        ((ObjectNode) tree).put("code", "123456");
         assertThatThrownBy(() -> json.readValue(json.writeValueAsString(tree), EmailCodeAuthenticationToken.class))
                 .isInstanceOf(RuntimeException.class);
     }
+    /** 新短信认证因子与旧载体一起恢复，不扩大为整包允许。 */
+    @Test
+    void restoresSmsFactorWithoutChangingPersistedType() {
+        var allowed = BasicPolymorphicTypeValidator.builder().allowIfSubType(SysUserDetails.class)
+                .allowIfSubType(SmsAuthenticationToken.class).allowIfSubType(Long.class);
+        var json = JsonMapper.builder()
+                .addModules(SecurityJacksonModules.getModules(getClass().getClassLoader(), allowed))
+                .addModule(new MaculaIamJacksonModule()).build();
+        var user = new SysUserDetails();
+        user.setUsername("alice");
+        user.setUserId(42L);
+        user.setEnabled(true);
+        var factor = FactorGrantedAuthority.fromAuthority(FactorGrantedAuthority.OTT_AUTHORITY);
+        var token = new SmsAuthenticationToken(user, null, List.of(factor));
+        var restored = json.readValue(json.writeValueAsString(token), SmsAuthenticationToken.class);
+        assertThat(restored.isAuthenticated()).isTrue();
+        assertThat(restored.getPrincipal()).isInstanceOf(SysUserDetails.class);
+        assertThat(restored.getCredentials()).isNull();
+        assertThat(restored.getAuthorities()).containsExactly(factor);
+    }
+
 }

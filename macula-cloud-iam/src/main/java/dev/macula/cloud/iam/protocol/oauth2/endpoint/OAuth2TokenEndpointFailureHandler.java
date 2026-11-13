@@ -17,6 +17,10 @@
 package dev.macula.cloud.iam.protocol.oauth2.endpoint;
 
 import java.io.IOException;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.util.Map;
+import java.util.Set;
 
 import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalBindingRequiredException;
 import jakarta.servlet.ServletException;
@@ -27,6 +31,8 @@ import org.springframework.http.MediaType;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.oauth2.server.authorization.web.authentication.OAuth2ErrorAuthenticationFailureHandler;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
+import org.springframework.web.util.UriComponentsBuilder;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * 只为 binding_required 增加 opaque ticket，其余 Token 错误保持框架原生输出。
@@ -58,22 +64,22 @@ public class OAuth2TokenEndpointFailureHandler implements AuthenticationFailureH
         }
         response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        response.setCharacterEncoding(java.nio.charset.StandardCharsets.UTF_8.name());
+        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
         response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store");
         response.setHeader(HttpHeaders.PRAGMA, "no-cache");
-        java.net.URI base = java.net.URI.create(issuer);
+        URI base = URI.create(issuer);
         if (!base.isAbsolute() || base.getHost() == null || base.getUserInfo() != null || base.getQuery() != null
                 || base.getFragment() != null || !("https".equals(base.getScheme()) || "http".equals(base.getScheme())
-                && java.util.Set.of("localhost", "127.0.0.1").contains(base.getHost()))) {
+                && Set.of("localhost", "127.0.0.1").contains(base.getHost()))) {
             throw new IllegalStateException("绑定入口需要可信issuer配置");
         }
-        String bindingUri = org.springframework.web.util.UriComponentsBuilder.fromUriString(
+        String bindingUri = UriComponentsBuilder.fromUriString(
                         issuer.replaceAll("/+$", ""))
                 .path("/login/bind/external").queryParam("ticket", "{ticket}").encode()
                 .buildAndExpand(bindingRequired.getBindingTicket()).toUriString();
         response.setHeader("Referrer-Policy", "no-referrer");
-        response.getWriter().write(tools.jackson.databind.json.JsonMapper.builder().build().writeValueAsString(
-                java.util.Map.of("error", "binding_required", "error_description", "请打开绑定页面确认已有账号。",
+        response.getWriter().write(JsonMapper.builder().build().writeValueAsString(
+                Map.of("error", "binding_required", "error_description", "请打开绑定页面确认已有账号。",
                         "binding_ticket", bindingRequired.getBindingTicket(), "binding_uri", bindingUri)));
     }
 }

@@ -16,38 +16,94 @@
  */
 package dev.macula.cloud.iam.service.identity;
 
-import java.net.URI;
-import java.util.Map;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
+import com.baomidou.mybatisplus.core.config.GlobalConfig;
 import com.baomidou.mybatisplus.spring.MybatisSqlSessionFactoryBean;
+import dev.macula.boot.mapstruct.DateTimeConverter;
+import dev.macula.boot.starter.mp.config.MyBatisPlusProperties;
+import dev.macula.boot.starter.mp.handler.AuditMetaObjectHandler;
+import dev.macula.cloud.iam.authentication.thirdparty.BindingTestTransactions;
 import dev.macula.cloud.iam.authentication.thirdparty.ExternalBindingTicketStore;
 import dev.macula.cloud.iam.authentication.thirdparty.PendingThirdPartyBindingRepository;
 import dev.macula.cloud.iam.authentication.thirdparty.VerifiedExternalIdentity;
 import dev.macula.cloud.iam.authentication.thirdparty.binding.ThirdPartyBindingService;
+import dev.macula.cloud.iam.authentication.verification.RedisVerificationCodeStore;
+import dev.macula.cloud.iam.authentication.verification.SmsVerificationProperties;
+import dev.macula.cloud.iam.authentication.verification.VerificationChannel;
+import dev.macula.cloud.iam.authentication.verification.VerificationCodeChannelService;
+import dev.macula.cloud.iam.authentication.verification.VerificationCodeContext;
+import dev.macula.cloud.iam.authentication.verification.VerificationCodePurpose;
+import dev.macula.cloud.iam.authentication.verification.VerificationCodeScope;
 import dev.macula.cloud.iam.enums.UserTypeEnum;
+import dev.macula.cloud.iam.mapper.SysIamApplicationIdentityProviderMapper;
+import dev.macula.cloud.iam.mapper.SysIamApplicationMapper;
+import dev.macula.cloud.iam.mapper.SysIamApplicationProtocolConfigMapper;
 import dev.macula.cloud.iam.mapper.SysIdentityProviderMapper;
-import dev.macula.cloud.iam.mapper.SysOAuth2ClientExternalProviderMapper;
-import dev.macula.cloud.iam.mapper.SysOAuth2ClientMapper;
-import dev.macula.cloud.iam.mapper.SysRegistrationIdentityBindingMapper;
+import dev.macula.cloud.iam.mapper.SysIdentityProviderUserBindingMapper;
 import dev.macula.cloud.iam.mapper.SysUserMapper;
+import dev.macula.cloud.iam.pojo.entity.SysUser;
+import dev.macula.cloud.iam.protocol.oauth2.client.OAuth2ClientRegistrationServiceImpl;
+import dev.macula.cloud.iam.protocol.oauth2.client.OAuth2LoginApplicationResolver;
+import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalBindingRequiredException;
+import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeAccountResolver;
+import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeClientSettings;
+import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeSecurityProperties;
+import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeVerification;
 import dev.macula.cloud.iam.service.account.ClientAccountDetailsService;
+import dev.macula.cloud.iam.service.account.SysUserService;
+import dev.macula.cloud.iam.service.application.IamApplicationService;
+import dev.macula.cloud.iam.service.application.IamApplicationServiceImpl;
+import dev.macula.cloud.iam.service.application.IamApplicationSnapshot;
 import dev.macula.cloud.iam.service.identity.directory.IdentityDirectoryService;
 import dev.macula.cloud.iam.service.userdetails.SysUserDetails;
+import dev.macula.cloud.system.enums.ExternalCodeType;
+import dev.macula.cloud.system.enums.IdentityBindingMapping;
+import dev.macula.cloud.system.protocol.OAuth2ApplicationProtocolSettings;
+import dev.macula.cloud.system.protocol.OAuth2ProtocolDefinition;
+import dev.macula.cloud.system.protocol.OAuth2ProtocolSettings;
 import dev.macula.cloud.system.security.UserIdentifierNormalizer;
+import java.net.URI;
+import java.time.Instant;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.mockito.Mockito;
 import org.mybatis.spring.SqlSessionTemplate;
+import org.redisson.Redisson;
+import org.redisson.api.RedissonClient;
+import org.redisson.client.codec.StringCodec;
+import org.redisson.config.Config;
+import org.redisson.spring.data.connection.RedissonConnectionFactory;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.security.authentication.AuthenticationServiceException;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.core.AuthorizationGrantType;
+import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
+import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
+import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
+import org.springframework.security.oauth2.server.authorization.settings.ClientSettings;
+import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
+import tools.jackson.databind.json.JsonMapper;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -58,7 +114,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * 在V19隔离MySQL通过真实Mapper、Service和事务验证来源隔离及并发绑定。
+ * 在V27隔离MySQL通过真实Mapper、Service和事务验证来源隔离及并发绑定。
  * 用户认证范围服务为明确Mock，实际厂商及完整权限集成不由本测试证明。
  *
  * @author Rain
@@ -73,7 +129,7 @@ class IdentitySourceBindingIT {
     private SysUserMapper identityUsers;
     private TransactionTemplate transaction;
     private IdentityProviderConfigService configs;
-    private RegistrationIdentityBindingService bindings;
+    private IdentityProviderUserBindingService bindings;
     private IdentitySourceBindingPolicyService policy;
 
     /**
@@ -87,17 +143,17 @@ class IdentitySourceBindingIT {
         var dataSource = new DriverManagerDataSource(url, System.getenv("IAM_SOURCE_IT_USER"),
                 System.getenv("IAM_SOURCE_IT_PASSWORD"));
         jdbc = new JdbcTemplate(dataSource);
-        assertEquals("23", jdbc.queryForObject(
+        assertEquals("27", jdbc.queryForObject(
                 "SELECT version FROM flyway_schema_history WHERE success=1 ORDER BY installed_rank DESC LIMIT 1",
                 String.class));
         transaction = new TransactionTemplate(new DataSourceTransactionManager(dataSource));
-        jdbc.update("DELETE FROM sys_registration_identity_binding WHERE registration_id BETWEEN 91000 AND 91999");
-        jdbc.update("DELETE FROM sys_oauth2_client_external_provider WHERE client_id IN (?,?)", CLIENT_A, CLIENT_B);
+        jdbc.update("DELETE FROM sys_identity_provider_user_binding WHERE identity_provider_id BETWEEN 91000 AND 91999");
+        jdbc.update("DELETE r FROM sys_iam_application_identity_provider r JOIN sys_iam_application c ON c.id=r.application_id WHERE c.application_code IN (?,?)", CLIENT_A, CLIENT_B);
         jdbc.update(
-                "DELETE p FROM sys_application_protocol_config p JOIN sys_oauth2_client c ON c.id=p.application_id " +
-                        "WHERE c.client_id IN (?,?)",
+                "DELETE p FROM sys_iam_application_protocol_config p JOIN sys_iam_application c ON c.id=p.application_id " +
+                        "WHERE c.application_code IN (?,?)",
                 CLIENT_A, CLIENT_B);
-        jdbc.update("DELETE FROM sys_oauth2_client WHERE client_id IN (?,?)", CLIENT_A, CLIENT_B);
+        jdbc.update("DELETE FROM sys_iam_application WHERE application_code IN (?,?)", CLIENT_A, CLIENT_B);
         jdbc.update("DELETE FROM sys_identity_provider WHERE id BETWEEN 91000 AND 91999");
         jdbc.update("DELETE FROM sys_user WHERE id IN (91001,91002)");
         jdbc.update("INSERT INTO sys_user(id,username,nickname,mobile,status,deleted,create_time,last_update_time) "
@@ -114,15 +170,15 @@ class IdentitySourceBindingIT {
         var factory = new MybatisSqlSessionFactoryBean();
         factory.setDataSource(dataSource);
         factory.setConfiguration(configuration);
-        factory.setMapperLocations(new org.springframework.core.io.ClassPathResource("mapper/SysUserMapper.xml"));
-        var global = new com.baomidou.mybatisplus.core.config.GlobalConfig();
-        global.setMetaObjectHandler(new dev.macula.boot.starter.mp.handler.AuditMetaObjectHandler(
-                new dev.macula.boot.starter.mp.config.MyBatisPlusProperties().getAudit()));
+        factory.setMapperLocations(new ClassPathResource("mapper/SysUserMapper.xml"));
+        var global = new GlobalConfig();
+        global.setMetaObjectHandler(new AuditMetaObjectHandler(
+                new MyBatisPlusProperties().getAudit()));
         factory.setGlobalConfig(global);
         var sqlFactory = factory.getObject();
-        for (Class<?> mapper : new Class<?>[]{SysIdentityProviderMapper.class, SysOAuth2ClientMapper.class,
-                dev.macula.cloud.iam.mapper.SysApplicationProtocolConfigMapper.class,
-                SysOAuth2ClientExternalProviderMapper.class, SysRegistrationIdentityBindingMapper.class,
+        for (Class<?> mapper : new Class<?>[]{SysIdentityProviderMapper.class, SysIamApplicationMapper.class,
+                SysIamApplicationProtocolConfigMapper.class,
+                SysIamApplicationIdentityProviderMapper.class, SysIdentityProviderUserBindingMapper.class,
                 SysUserMapper.class}) {
             if (!sqlFactory.getConfiguration().hasMapper(mapper)) {
                 sqlFactory.getConfiguration().addMapper(mapper);
@@ -132,7 +188,7 @@ class IdentitySourceBindingIT {
         identityUsers = session.getMapper(SysUserMapper.class);
         configs = new IdentityProviderConfigService(session.getMapper(SysIdentityProviderMapper.class));
         ClientAccountDetailsService details = mock(ClientAccountDetailsService.class);
-        when(details.loadUserByClient(any(), any(), any(), any())).thenAnswer(call -> {
+        when(details.loadUserByApplication(any(), any(), any(), any())).thenAnswer(call -> {
             Long id = jdbc.queryForObject("SELECT id FROM sys_user WHERE username=? AND deleted=0", Long.class,
                     (String) call.getArgument(3));
             var result = new SysUserDetails();
@@ -142,14 +198,30 @@ class IdentitySourceBindingIT {
             result.setEnabled(true);
             return result;
         });
-        bindings = new RegistrationIdentityBindingService(session.getMapper(SysOAuth2ClientMapper.class),
-                session.getMapper(dev.macula.cloud.iam.mapper.SysApplicationProtocolConfigMapper.class),
-                session.getMapper(SysIdentityProviderMapper.class),
-                session.getMapper(SysOAuth2ClientExternalProviderMapper.class),
-                session.getMapper(SysUserMapper.class), session.getMapper(SysRegistrationIdentityBindingMapper.class),
-                configs, details, new UserIdentifierNormalizer());
+        var rawReader = new IamApplicationServiceImpl(session.getMapper(SysIamApplicationMapper.class),
+            session.getMapper(SysIamApplicationProtocolConfigMapper.class),
+            session.getMapper(SysIamApplicationIdentityProviderMapper.class), new DateTimeConverter("Asia/Shanghai"),
+            OAuth2ProtocolDefinition.registry());
+        var reads = new TransactionTemplate(transaction.getTransactionManager());
+        reads.setReadOnly(true);
+        reads.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);
+        IamApplicationService appReader = new IamApplicationService() {
+            /** 保持生产读取端口的RR事务边界。 */
+            @Override public IamApplicationSnapshot findById(Long id) {
+                return reads.execute(status -> rawReader.findById(id));
+            }
+            /** 锁始终加入调用者事务，不创建独立提交边界。 */
+            @Override public IamApplicationSnapshot lock(Long id) { return rawReader.lock(id); }
+        };
+        var oauth = new OAuth2ClientRegistrationServiceImpl(session.getMapper(SysIamApplicationProtocolConfigMapper.class),
+            appReader, new DateTimeConverter("Asia/Shanghai"));
+        var loginApplications = new OAuth2LoginApplicationResolver(oauth, appReader,
+            session.getMapper(SysIamApplicationProtocolConfigMapper.class), AuthorizationServerSettings.builder().build());
+        bindings = new IdentityProviderUserBindingService(loginApplications, session.getMapper(SysIdentityProviderMapper.class),
+            session.getMapper(SysUserMapper.class), session.getMapper(SysIdentityProviderUserBindingMapper.class),
+            configs, details, new UserIdentifierNormalizer());
         policy = new IdentitySourceBindingPolicyService(bindings, configs, session.getMapper(SysUserMapper.class),
-                dev.macula.cloud.iam.authentication.thirdparty.BindingTestTransactions.directory());
+                BindingTestTransactions.directory());
     }
 
     /**
@@ -157,42 +229,42 @@ class IdentitySourceBindingIT {
      */
     @Test
     void oidcSdkResolvesAutomaticAndManualBindingsThroughRealServices() {
-        jdbc.update("UPDATE sys_application_protocol_config p JOIN sys_oauth2_client c ON c.id=p.application_id "
+        jdbc.update("UPDATE sys_iam_application_protocol_config p JOIN sys_iam_application c ON c.id=p.application_id "
                         +
-                        "SET p.protocol='OIDC',p.configuration=JSON_SET(p.configuration,'$.scopes','openid,profile') " +
-                        "WHERE c.client_id=?",
+                        "SET p.protocol='OIDC',p.configuration=JSON_SET(p.configuration,'$.oauth2.scopes','openid,profile') " +
+                        "WHERE c.application_code=?",
                 CLIENT_A);
         var redisson = isolatedRedis();
         try {
-            var redis = new org.springframework.data.redis.core.StringRedisTemplate(
-                    new org.redisson.spring.data.connection.RedissonConnectionFactory(redisson));
-            var security = new dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeSecurityProperties();
+            var redis = new StringRedisTemplate(
+                    new RedissonConnectionFactory(redisson));
+            var security = new ExternalCodeSecurityProperties();
             security.setDigestKey("fixture-oidc-binding-digest-key");
             var tickets = new ExternalBindingTicketStore(redis, security);
-            var resolver = new dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeAccountResolver(
+            var resolver = new ExternalCodeAccountResolver(
                     policy, tickets);
-            var type = dev.macula.cloud.system.enums.ExternalCodeType.WECOM_APP_CODE;
-            var client = org.springframework.security.oauth2.server.authorization.client.RegisteredClient.withId(
+            var type = ExternalCodeType.WECOM_APP_CODE;
+            var client = RegisteredClient.withId(
                             CLIENT_A)
                     .clientId(CLIENT_A).clientAuthenticationMethod(
-                            org.springframework.security.oauth2.core.ClientAuthenticationMethod.NONE)
-                    .authorizationGrantType(new org.springframework.security.oauth2.core.AuthorizationGrantType(
-                            dev.macula.cloud.system.enums.ExternalCodeType.GRANT_TYPE))
+                            ClientAuthenticationMethod.NONE)
+                    .authorizationGrantType(new AuthorizationGrantType(
+                            ExternalCodeType.GRANT_TYPE))
                     .scope("openid").scope("profile").clientSettings(
-                            org.springframework.security.oauth2.server.authorization.settings.ClientSettings.builder()
+                            ClientSettings.builder()
                                     .setting(
-                                            dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeClientSettings.TENANT_ID,
+                                            ExternalCodeClientSettings.TENANT_ID,
                                             1L)
                                     .setting(
-                                            dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeClientSettings.USER_TYPE,
+                                            ExternalCodeClientSettings.USER_TYPE,
                                             "employee")
                                     .setting(
-                                            dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeClientSettings.PROVIDER_BINDINGS,
+                                            ExternalCodeClientSettings.PROVIDER_BINDINGS,
                                             Map.of(type.name(), 91011L)).build()).build();
-            var manual = new dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeVerification(
+            var manual = new ExternalCodeVerification(
                     identity(91011L, "manual-member"));
             var error = assertThrows(
-                    dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalBindingRequiredException.class,
+                    ExternalBindingRequiredException.class,
                     () -> resolver.resolve(client, type, manual));
             assertEquals(0, count());
             var claim = tickets.claim(error.getBindingTicket());
@@ -204,12 +276,12 @@ class IdentitySourceBindingIT {
             jdbc.update(
                     "UPDATE sys_identity_provider SET auto_bind_enabled=1,binding_rule='MEMBER_ID_TO_USERNAME'," +
                             "version=version+1 WHERE id=91011");
-            var automatic = new dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeVerification(
+            var automatic = new ExternalCodeVerification(
                     identity(91011L, "binding-it-bob"));
             assertEquals("binding-it-bob",
                     transaction.execute(status -> resolver.resolve(client, type, automatic)).getName());
             assertEquals(2, count());
-            jdbc.update("DELETE FROM sys_oauth2_client_external_provider WHERE client_id=?", CLIENT_A);
+            jdbc.update("DELETE r FROM sys_iam_application_identity_provider r JOIN sys_iam_application c ON c.id=r.application_id WHERE c.application_code=?", CLIENT_A);
             assertThrows(BadCredentialsException.class, () -> resolver.resolve(client, type, manual));
         } finally {
             redisson.shutdown();
@@ -322,7 +394,7 @@ class IdentitySourceBindingIT {
             boolean manualWon = manual.get(10, TimeUnit.SECONDS);
             assertTrue(automaticSucceeded || manualWon);
             assertEquals(manualWon ? 91002L : 91001L, jdbc.queryForObject(
-                    "SELECT user_id FROM sys_registration_identity_binding WHERE registration_id=91011", Long.class));
+                    "SELECT user_id FROM sys_identity_provider_user_binding WHERE identity_provider_id=91011", Long.class));
             assertEquals(1, count());
         } finally {
             executor.shutdownNow();
@@ -337,7 +409,7 @@ class IdentitySourceBindingIT {
         var identity = identity(91011L, "disabled-race");
         var executor = Executors.newSingleThreadExecutor();
         var operation =
-                new java.util.concurrent.atomic.AtomicReference<java.util.concurrent.Future<org.springframework.security.core.userdetails.UserDetails>>();
+                new AtomicReference<Future<UserDetails>>();
         try {
             transaction.executeWithoutResult(status -> {
                 jdbc.queryForObject("SELECT id FROM sys_identity_provider WHERE id=91011 FOR UPDATE", Long.class);
@@ -349,9 +421,9 @@ class IdentitySourceBindingIT {
             });
             executor.shutdown();
             assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS));
-            var failure = assertThrows(java.util.concurrent.ExecutionException.class, () -> operation.get().get());
+            var failure = assertThrows(ExecutionException.class, () -> operation.get().get());
             assertTrue(
-                    failure.getCause() instanceof org.springframework.security.authentication.AuthenticationServiceException);
+                    failure.getCause() instanceof AuthenticationServiceException);
             assertEquals(0, count());
         } finally {
             executor.shutdownNow();
@@ -365,9 +437,9 @@ class IdentitySourceBindingIT {
     void verifiedMobileRelationChecksCurrentLocalPhone() {
         jdbc.update("UPDATE sys_identity_provider SET provider_type='ALIYUN_MOBILE',source_type='ALIYUN_MOBILE',"
                 + "app_id='key',config_json='{\"accessKeyId\":\"key\"}' WHERE id=91011");
-        jdbc.update("UPDATE sys_oauth2_client SET external_code_types='ALIYUN_MOBILE_TOKEN' WHERE client_id=?",
+        jdbc.update("UPDATE sys_iam_application_protocol_config p JOIN sys_iam_application c ON c.id=p.application_id SET p.configuration=JSON_SET(p.configuration,'$.externalCodeTypes',JSON_ARRAY('ALIYUN_MOBILE_TOKEN')) WHERE c.application_code=?",
                 CLIENT_A);
-        jdbc.update("UPDATE sys_oauth2_client_external_provider SET code_type='ALIYUN_MOBILE_TOKEN' WHERE client_id=?",
+        jdbc.update("UPDATE sys_iam_application_identity_provider r JOIN sys_iam_application c ON c.id=r.application_id SET r.login_capability='ALIYUN_MOBILE' WHERE c.application_code=?",
                 CLIENT_A);
         var source = configs.requireEnabledById(91011L, "ALIYUN_MOBILE");
         var identity = VerifiedExternalIdentity.of(source, "ALIYUN_MOBILE_TOKEN", VerifiedExternalIdentity.MOBILE_PROOF,
@@ -413,7 +485,7 @@ class IdentitySourceBindingIT {
         assertTrue(
                 transaction.execute(status -> policy.resolve(CLIENT_A, 1L, UserTypeEnum.EMPLOYEE, absent)).isEmpty());
         // 真实V9唯一索引从存储层阻止多候选；防御性多候选分支由单元测试覆盖。
-        assertThrows(org.springframework.dao.DuplicateKeyException.class,
+        assertThrows(DuplicateKeyException.class,
                 () -> jdbc.update("UPDATE sys_user SET username=? WHERE id=91002", ALICE));
         var ambiguous = identity(91011L, ALICE);
         assertEquals(0, count());
@@ -430,14 +502,14 @@ class IdentitySourceBindingIT {
     void sdkTicketHasOneBrowserOwnerAndFixedAttempts() {
         var redisson = isolatedRedis();
         try {
-            var redis = new org.springframework.data.redis.core.StringRedisTemplate(
-                    new org.redisson.spring.data.connection.RedissonConnectionFactory(redisson));
+            var redis = new StringRedisTemplate(
+                    new RedissonConnectionFactory(redisson));
             var properties =
-                    new dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeSecurityProperties();
+                    new ExternalCodeSecurityProperties();
             properties.setDigestKey("test-only-binding-digest");
             properties.setBindingTicketMaxAttempts(3);
             var store = new ExternalBindingTicketStore(redis, properties);
-            var verification = new dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeVerification(
+            var verification = new ExternalCodeVerification(
                     identity(91011L, "redis-member"));
             String ticket = store.issue(CLIENT_A, 1L, UserTypeEnum.EMPLOYEE, verification);
             var claimed = store.claimForBrowser(ticket);
@@ -455,7 +527,7 @@ class IdentitySourceBindingIT {
             var secondClaim = store.claimForBrowser(second);
             var pending = new PendingThirdPartyBindingRepository();
             pending.setTickets(store);
-            var request = new org.springframework.mock.web.MockHttpServletRequest();
+            var request = new MockHttpServletRequest();
             pending.saveSdk(request, secondClaim);
             assertEquals(CLIENT_A, pending.current(request).context().clientId());
             pending.clear(request);
@@ -472,43 +544,43 @@ class IdentitySourceBindingIT {
     void bindingSmsCannotConsumeLoginCodesOrBypassSendLimits() {
         var redisson = isolatedRedis();
         try {
-            var redis = new org.springframework.data.redis.core.StringRedisTemplate(
-                    new org.redisson.spring.data.connection.RedissonConnectionFactory(redisson));
-            var properties = new dev.macula.cloud.iam.authentication.verification.SmsVerificationProperties();
+            var redis = new StringRedisTemplate(
+                    new RedissonConnectionFactory(redisson));
+            var properties = new SmsVerificationProperties();
             properties.setDigestKey("test-only-sms-digest");
             properties.setMaxIpSendsPerInterval(1);
-            var store = new dev.macula.cloud.iam.authentication.verification.RedisVerificationCodeStore(redis);
-            var binding = dev.macula.cloud.iam.authentication.verification.VerificationCodePurpose.IDENTITY_BINDING;
-            var login = dev.macula.cloud.iam.authentication.verification.VerificationCodePurpose.LOGIN;
-            store.activate(new dev.macula.cloud.iam.authentication.verification.VerificationCodeScope(
-                            dev.macula.cloud.iam.authentication.verification.VerificationChannel.SMS, binding,
+            var store = new RedisVerificationCodeStore(redis);
+            var binding = VerificationCodePurpose.IDENTITY_BINDING;
+            var login = VerificationCodePurpose.LOGIN;
+            store.activate(new VerificationCodeScope(
+                            VerificationChannel.SMS, binding,
                             CLIENT_A),
                     "13800000111", "123456", properties);
-            assertFalse(store.consume(new dev.macula.cloud.iam.authentication.verification.VerificationCodeScope(
-                            dev.macula.cloud.iam.authentication.verification.VerificationChannel.SMS, login, CLIENT_A),
+            assertFalse(store.consume(new VerificationCodeScope(
+                            VerificationChannel.SMS, login, CLIENT_A),
                     "13800000111", "123456", properties));
-            assertFalse(store.consume(new dev.macula.cloud.iam.authentication.verification.VerificationCodeScope(
-                            dev.macula.cloud.iam.authentication.verification.VerificationChannel.SMS, binding,
+            assertFalse(store.consume(new VerificationCodeScope(
+                            VerificationChannel.SMS, binding,
                             CLIENT_B),
                     "13800000111", "123456", properties));
-            assertTrue(store.consume(new dev.macula.cloud.iam.authentication.verification.VerificationCodeScope(
-                            dev.macula.cloud.iam.authentication.verification.VerificationChannel.SMS, binding,
+            assertTrue(store.consume(new VerificationCodeScope(
+                            VerificationChannel.SMS, binding,
                             CLIENT_A),
                     "13800000111", "123456", properties));
-            assertFalse(store.consume(new dev.macula.cloud.iam.authentication.verification.VerificationCodeScope(
-                            dev.macula.cloud.iam.authentication.verification.VerificationChannel.SMS, binding,
+            assertFalse(store.consume(new VerificationCodeScope(
+                            VerificationChannel.SMS, binding,
                             CLIENT_A),
                     "13800000111", "123456", properties));
-            store.issue(new dev.macula.cloud.iam.authentication.verification.VerificationCodeScope(
-                            dev.macula.cloud.iam.authentication.verification.VerificationChannel.SMS, login, CLIENT_A),
+            store.issue(new VerificationCodeScope(
+                            VerificationChannel.SMS, login, CLIENT_A),
                     "13800000112", "192.0.2.1", properties);
             assertThrows(IllegalStateException.class, () -> store.issue(
-                    new dev.macula.cloud.iam.authentication.verification.VerificationCodeScope(
-                            dev.macula.cloud.iam.authentication.verification.VerificationChannel.SMS, binding,
+                    new VerificationCodeScope(
+                            VerificationChannel.SMS, binding,
                             CLIENT_B), "13800000112", "192.0.2.2", properties));
             assertThrows(IllegalStateException.class, () -> store.issue(
-                    new dev.macula.cloud.iam.authentication.verification.VerificationCodeScope(
-                            dev.macula.cloud.iam.authentication.verification.VerificationChannel.SMS, binding,
+                    new VerificationCodeScope(
+                            VerificationChannel.SMS, binding,
                             CLIENT_B), "13800000113", "192.0.2.1", properties));
         } finally {
             redisson.shutdown();
@@ -522,45 +594,45 @@ class IdentitySourceBindingIT {
     void sdkSmsProofUsesOriginalClientWithoutSavedRequest() {
         var redisson = isolatedRedis();
         try {
-            var redis = new org.springframework.data.redis.core.StringRedisTemplate(
-                    new org.redisson.spring.data.connection.RedissonConnectionFactory(redisson));
+            var redis = new StringRedisTemplate(
+                    new RedissonConnectionFactory(redisson));
             var properties =
-                    new dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeSecurityProperties();
+                    new ExternalCodeSecurityProperties();
             properties.setDigestKey("sdk-proof-isolated-test");
             var tickets = new ExternalBindingTicketStore(redis, properties);
             var pending = new PendingThirdPartyBindingRepository();
             pending.setTickets(tickets);
-            var request = new org.springframework.mock.web.MockHttpServletRequest();
+            var request = new MockHttpServletRequest();
             var identity = identity(91011L, "sdk-proof-member");
             String ticket = tickets.issue(CLIENT_A, 1L, UserTypeEnum.EMPLOYEE,
-                    new dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeVerification(identity));
+                    new ExternalCodeVerification(identity));
             pending.saveSdk(request, tickets.claimForBrowser(ticket));
-            jdbc.update("UPDATE sys_oauth2_client SET hosted_login_methods='[]' WHERE client_id=?", CLIENT_A);
-            var users = mock(dev.macula.cloud.iam.service.account.SysUserService.class);
-            var account = new dev.macula.cloud.iam.pojo.entity.SysUser();
+            jdbc.update("UPDATE sys_iam_application SET hosted_login_methods='' WHERE application_code=?", CLIENT_A);
+            var users = mock(SysUserService.class);
+            var account = new SysUser();
             account.setId(91001L);
             account.setUsername(ALICE);
             account.setStatus(1);
             account.setMobile("13800000001");
             when(users.findUniqueByUsername(ALICE)).thenReturn(account);
             when(users.findUniqueByMobile("13800000001")).thenReturn(account);
-            var sms = mock(dev.macula.cloud.iam.authentication.sms.SmsService.class);
-            var purpose = dev.macula.cloud.iam.authentication.verification.VerificationCodePurpose.IDENTITY_BINDING;
-            when(sms.verifyCode("13800000001", "654321", CLIENT_A, purpose)).thenReturn(true);
+            var sms = mock(VerificationCodeChannelService.class);
+            var proof = VerificationCodeContext.binding(CLIENT_A);
+            when(sms.verifyCode("13800000001", "654321", proof)).thenReturn(true);
             var service = new ThirdPartyBindingService(pending, bindings, users,
-                    mock(org.springframework.security.crypto.password.PasswordEncoder.class), sms,
+                    mock(PasswordEncoder.class), sms,
                     new UserIdentifierNormalizer(),
-                    dev.macula.cloud.iam.authentication.thirdparty.BindingTestTransactions.directory(),
+                    BindingTestTransactions.directory(),
                     transaction.getTransactionManager());
             service.sendSms(request, ALICE, "13800000001");
-            org.mockito.Mockito.verify(sms).sendCode("13800000001", request.getRemoteAddr(), CLIENT_A, purpose);
+            Mockito.verify(sms).sendCode("13800000001", request.getRemoteAddr(), proof);
             assertTrue(transaction.execute(
                     status -> service.bind(request, ALICE, "sms", null, "13800000001", "654321", null)).sdk());
             assertEquals(1, count());
             assertThrows(BadCredentialsException.class, () -> pending.current(request));
             assertThrows(BadCredentialsException.class, () -> tickets.claim(ticket));
             assertEquals(null, request.getSession().getAttribute(
-                    org.springframework.security.web.context.HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY));
+                    HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY));
         } finally {
             redisson.shutdown();
         }
@@ -569,16 +641,16 @@ class IdentitySourceBindingIT {
     /**
      * 端口和运行标记必须同时确认，拒绝连接默认或业务Redis。
      */
-    private org.redisson.api.RedissonClient isolatedRedis() {
+    private RedissonClient isolatedRedis() {
         int port = Integer.parseInt(System.getenv("IAM_SOURCE_IT_REDIS_PORT"));
         assertTrue(port >= 30000);
-        var config = new org.redisson.config.Config();
+        var config = new Config();
         config.useSingleServer().setAddress("redis://127.0.0.1:" + port);
-        var client = org.redisson.Redisson.create(config);
+        var client = Redisson.create(config);
         String marker = System.getenv("IAM_SOURCE_IT_RUN_ID");
         assertTrue(marker != null && !marker.isBlank());
         assertEquals(marker,
-                client.<String>getBucket("iam-source-it-only", org.redisson.client.codec.StringCodec.INSTANCE).get());
+                client.<String>getBucket("iam-source-it-only", StringCodec.INSTANCE).get());
         return client;
     }
 
@@ -590,20 +662,20 @@ class IdentitySourceBindingIT {
         jdbc.update(
                 "UPDATE sys_identity_provider SET directory_policy='REQUIRED',organization_id='corp-a' WHERE id=91011");
         var verified = identity(91011L, "admission-member");
-        assertThrows(org.springframework.security.authentication.BadCredentialsException.class,
+        assertThrows(BadCredentialsException.class,
                 () -> transaction.execute(status ->
                         bindings.bind(CLIENT_A, 1L, UserTypeEnum.EMPLOYEE, verified, 91001L, false)));
         var expired = new IdentityDirectoryService.Admission(verified, "corp-a",
-                java.time.Instant.now().minusSeconds(1));
-        assertThrows(org.springframework.security.authentication.BadCredentialsException.class,
+                Instant.now().minusSeconds(1));
+        assertThrows(BadCredentialsException.class,
                 () -> transaction.execute(status ->
                         bindings.bind(CLIENT_A, 1L, UserTypeEnum.EMPLOYEE, verified, 91001L, false, expired)));
         var current = new IdentityDirectoryService.Admission(verified, "corp-a",
-                java.time.Instant.now().plusSeconds(60));
+                Instant.now().plusSeconds(60));
         transaction.execute(
                 status -> bindings.bind(CLIENT_A, 1L, UserTypeEnum.EMPLOYEE, verified, 91001L, false, current));
         jdbc.update("UPDATE sys_identity_provider SET version=version+1 WHERE id=91011");
-        assertThrows(org.springframework.security.authentication.BadCredentialsException.class,
+        assertThrows(BadCredentialsException.class,
                 () -> transaction.execute(status ->
                         bindings.bind(CLIENT_A, 1L, UserTypeEnum.EMPLOYEE, verified, 91001L, false, current)));
     }
@@ -646,31 +718,26 @@ class IdentitySourceBindingIT {
      * Client明确关联具体SDK来源，缺少该映射就不能认证。
      */
     private void client(String client, Long source) {
-        jdbc.update(
-                "INSERT INTO sys_oauth2_client(client_id,client_name,client_authentication_methods," +
-                        "authorization_grant_types,"
-                        +
-                        "redirect_uris,scopes,user_type,tenant_id,require_proof_key,enabled_protocols," +
-                        "default_protocol,configuration_status,application_type,external_code_types,create_time," +
-                        "last_update_time) "
-                        +
-                        "VALUES(?,?,'none','urn:macula:params:oauth:grant-type:external_code','','message.read'," +
-                        "'employee',1,1,'OAUTH2_1','OAUTH2_1','ENABLED','NATIVE','WECOM_APP_CODE',NOW(),NOW())",
-                client, client);
-        var settings = new dev.macula.cloud.system.protocol.OAuth2ProtocolSettings();
+        jdbc.update("INSERT INTO sys_iam_application(application_code,application_name,user_type,tenant_id,"
+            + "configuration_status,application_type,create_time,last_update_time) "
+            + "VALUES(?,?,'employee',1,'ENABLED','NATIVE',NOW(),NOW())", client, client);
+        var settings = new OAuth2ProtocolSettings();
         settings.setClientAuthenticationMethods("none");
         settings.setAuthorizationGrantTypes("urn:macula:params:oauth:grant-type:external_code");
         settings.setScopes("message.read");
         settings.setRequireProofKey(true);
         settings.setRequireAuthorizationConsent(false);
-        jdbc.update(
-                "INSERT INTO sys_application_protocol_config(application_id,protocol,schema_version,enabled," +
-                        "configuration) SELECT id,'OAUTH2_1',1,1,? FROM sys_oauth2_client WHERE client_id=?",
-                tools.jackson.databind.json.JsonMapper.builder().build().writeValueAsString(settings), client);
-        jdbc.update(
-                "INSERT INTO sys_oauth2_client_external_provider(client_id,code_type,identity_provider_id) VALUES(?," +
-                        "'WECOM_APP_CODE',?)",
-                client, source);
+        var payload = new OAuth2ApplicationProtocolSettings();
+        payload.setOauth2(settings);
+        payload.setExternalCodeTypes(Set.of(ExternalCodeType.WECOM_APP_CODE));
+        jdbc.update("INSERT INTO sys_iam_application_protocol_config(application_id,protocol,schema_version,enabled,"
+            + "protocol_identifier,identifier_issued_at,configuration) "
+            + "SELECT id,'OAUTH2_1',2,1,application_code,application_code_issued_at,? "
+            + "FROM sys_iam_application WHERE application_code=?",
+            JsonMapper.builder().build().writeValueAsString(payload), client);
+        jdbc.update("INSERT INTO sys_iam_application_identity_provider(application_id,login_capability,identity_provider_id) "
+            + "SELECT id,'WECOM_SDK',? FROM sys_iam_application WHERE application_code=?", source, client);
+
     }
 
     /**
@@ -678,7 +745,7 @@ class IdentitySourceBindingIT {
      */
     private int count() {
         return jdbc.queryForObject(
-                "SELECT COUNT(*) FROM sys_registration_identity_binding WHERE registration_id BETWEEN 91000 AND 91999",
+                "SELECT COUNT(*) FROM sys_identity_provider_user_binding WHERE identity_provider_id BETWEEN 91000 AND 91999",
                 Integer.class);
     }
 
@@ -693,18 +760,18 @@ class IdentitySourceBindingIT {
         jdbc.update("UPDATE sys_user SET mobile='138-0000-0001', email=' Same@Example.Test ' WHERE id=91001");
         jdbc.update("UPDATE sys_user SET mobile='138 0000 0001', email='same@example.test' WHERE id=91002");
         var matcher = new IdentityBindingMatcher(identityUsers);
-        var mobile = dev.macula.cloud.system.enums.IdentityBindingMapping.of("mobile", "mobile");
-        var email = dev.macula.cloud.system.enums.IdentityBindingMapping.of("email", "email");
+        var mobile = IdentityBindingMapping.of("mobile", "mobile");
+        var email = IdentityBindingMapping.of("email", "email");
         assertEquals(2, matcher.candidates(mobile, identity, false).size());
         assertEquals(2, matcher.candidates(email, identity, false).size());
         transaction.executeWithoutResult(status -> assertEquals(2, matcher.candidates(mobile, identity, true).size()));
         assertEquals(1,
-                matcher.candidates(dev.macula.cloud.system.enums.IdentityBindingMapping.of("member_id", "username"),
+                matcher.candidates(IdentityBindingMapping.of("member_id", "username"),
                         identity, false).size());
         var differentCase = new VerifiedExternalIdentity(91011L, "DINGTALK", "DINGTALK_WEB", 0L, "DINGTALK_OAUTH_V1",
                 "BROWSER", "MEMBER_ID", "fixture-member",
-                Map.of("member_id", ALICE.toUpperCase(java.util.Locale.ROOT)));
-        assertTrue(matcher.candidates(dev.macula.cloud.system.enums.IdentityBindingMapping.of("member_id", "username"),
+                Map.of("member_id", ALICE.toUpperCase(Locale.ROOT)));
+        assertTrue(matcher.candidates(IdentityBindingMapping.of("member_id", "username"),
                 differentCase, false).isEmpty());
     }
 
@@ -714,12 +781,12 @@ class IdentitySourceBindingIT {
     @Test
     void refusesAutomaticMatchingInsideReadCommittedTransaction() {
         var weak = new TransactionTemplate(transaction.getTransactionManager());
-        weak.setIsolationLevel(org.springframework.transaction.TransactionDefinition.ISOLATION_READ_COMMITTED);
+        weak.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
         var identity = new VerifiedExternalIdentity(91011L, "DINGTALK", "DINGTALK_WEB", 0L, "DINGTALK_OAUTH_V1",
                 "BROWSER", "MEMBER_ID", "fixture-member", Map.of("member_id", ALICE));
         assertThrows(BadCredentialsException.class,
                 () -> weak.execute(status -> new IdentityBindingMatcher(identityUsers)
-                        .candidates(dev.macula.cloud.system.enums.IdentityBindingMapping.of("member_id", "username"),
+                        .candidates(IdentityBindingMapping.of("member_id", "username"),
                                 identity, true)));
     }
 
@@ -770,8 +837,8 @@ class IdentitySourceBindingIT {
                         "binding_mappings_json=? WHERE id=91011",
                 "[{\"sourceField\":\"mobile\",\"targetField\":\"mobile\"},{\"sourceField\":\"email\"," +
                         "\"targetField\":\"email\"}]");
-        jdbc.update("UPDATE sys_oauth2_client SET external_code_types='DINGTALK_APP_CODE' WHERE client_id=?", CLIENT_A);
-        jdbc.update("UPDATE sys_oauth2_client_external_provider SET code_type='DINGTALK_APP_CODE' WHERE client_id=?",
+        jdbc.update("UPDATE sys_iam_application_protocol_config p JOIN sys_iam_application c ON c.id=p.application_id SET p.configuration=JSON_SET(p.configuration,'$.externalCodeTypes',JSON_ARRAY('DINGTALK_APP_CODE')) WHERE c.application_code=?", CLIENT_A);
+        jdbc.update("UPDATE sys_iam_application_identity_provider r JOIN sys_iam_application c ON c.id=r.application_id SET r.login_capability='DINGTALK_SDK' WHERE c.application_code=?",
                 CLIENT_A);
         var source = configs.requireEnabledById(91011L, "DINGTALK");
         return VerifiedExternalIdentity.of(source, "DINGTALK_APP_CODE", VerifiedExternalIdentity.MEMBER_ID,

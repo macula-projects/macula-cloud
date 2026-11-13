@@ -19,6 +19,7 @@ package dev.macula.cloud.iam.handler;
 import java.time.Instant;
 import java.util.List;
 
+import dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures;
 import dev.macula.cloud.iam.authentication.thirdparty.PendingThirdPartyBindingRepository;
 import dev.macula.cloud.iam.enums.ThirdPartyProviderType;
 import org.junit.jupiter.api.Test;
@@ -57,10 +58,10 @@ class BrowserAuthenticationFailureHandlerTest {
         BrowserAuthenticationFailureHandler handler = new BrowserAuthenticationFailureHandler(pending, TRUSTED_ISSUER);
         MockHttpServletRequest request = new MockHttpServletRequest();
         MockHttpServletResponse response = new MockHttpServletResponse();
-        var context = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.context(
+        var context = IdentitySourceTestFixtures.context(
                 ThirdPartyProviderType.GITHUB.providerType(), "", "test-client",
                 Instant.now(), "/");
-        var required = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.bindingRequired(
+        var required = IdentitySourceTestFixtures.bindingRequired(
                 ThirdPartyProviderType.GITHUB.providerType(), "external-subject", context);
 
         handler.onAuthenticationFailure(request, response, required);

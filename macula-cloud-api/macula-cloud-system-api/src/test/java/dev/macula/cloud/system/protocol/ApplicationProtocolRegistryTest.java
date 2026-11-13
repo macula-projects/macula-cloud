@@ -18,9 +18,16 @@ package dev.macula.cloud.system.protocol;
 
 import java.util.List;
 import java.util.Set;
+
+import dev.macula.cloud.system.enums.ExternalCodeType;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
-import static org.junit.jupiter.api.Assertions.*;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertSame;
 
 /**
  * 协议扩展白名单、类型化JSON和共享凭据的安全边界。
@@ -77,7 +84,7 @@ class ApplicationProtocolRegistryTest {
     void runtimeOidcSdkRequiresPublicClientAndOpenidWithoutCallback() {
         var oidc = profile("OIDC", true, "none");
         var settings = OAuth2ProtocolConfiguration.settings(oidc);
-        settings.setAuthorizationGrantTypes(dev.macula.cloud.system.enums.ExternalCodeType.GRANT_TYPE);
+        settings.setAuthorizationGrantTypes(ExternalCodeType.GRANT_TYPE);
         settings.setScopes("openid,profile");
         settings.setRequireProofKey(true);
         settings.setAllowedOrigins(Set.of());
@@ -89,7 +96,7 @@ class ApplicationProtocolRegistryTest {
         assertThrows(IllegalArgumentException.class, () -> OAuth2ProtocolConfiguration.validateRuntime(oidc, "SPA"));
         settings.setScopes("openid,profile");
         settings.setClientAuthenticationMethods("client_secret_basic");
-        assertThrows(IllegalArgumentException.class, () -> OAuth2ProtocolConfiguration.validateRuntime(oidc, "WEB_SERVER"));
+        assertDoesNotThrow(() -> OAuth2ProtocolConfiguration.validateRuntime(oidc, "WEB_SERVER"));
         settings.setClientAuthenticationMethods("none");
         for (String grant : List.of("sms", "email", "client_credentials")) {
             settings.setAuthorizationGrantTypes(grant);

@@ -26,6 +26,9 @@ import org.springframework.security.core.userdetails.UserDetails;
  * @since 6.1.0
  */
 public interface ClientAccountDetailsService {
+    /** 使用服务器解析的内部应用ID加载账号；租户和用户目录必须匹配可信快照。 */
+    UserDetails loadUserByApplication(Long applicationId, Long expectedTenantId, UserTypeEnum expectedUserType, String username);
+
     /**
      * 读取一次客户端配置，核对第三方登录 state 的路由快照后加载用户。
      *

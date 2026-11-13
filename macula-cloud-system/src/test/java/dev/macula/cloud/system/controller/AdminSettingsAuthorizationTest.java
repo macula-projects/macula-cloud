@@ -16,10 +16,14 @@
  */
 package dev.macula.cloud.system.controller;
 
+import dev.macula.cloud.system.service.IamApplicationCatalogService;
+import dev.macula.cloud.system.service.OAuth2IssuerMetadataService;
+import dev.macula.cloud.system.vo.MessageProviderVO;
+
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import dev.macula.cloud.system.service.IdentityProviderService;
 import dev.macula.cloud.system.service.MessageSettingsService;
-import dev.macula.cloud.system.service.OAuth2ClientConfigService;
+import dev.macula.cloud.system.service.IamApplicationService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -43,12 +47,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class AdminSettingsAuthorizationTest {
     private final IdentityProviderService identity = mock(IdentityProviderService.class);
     private final MessageSettingsService message = mock(MessageSettingsService.class);
-    private final OAuth2ClientConfigService oauth = mock(OAuth2ClientConfigService.class);
+    private final IamApplicationService oauth = mock(IamApplicationService.class);
     private final MockMvc mvc = MockMvcBuilders.standaloneSetup(
         new IdentityProviderController(identity),
         new MessageSettingsController(message),
-        new OAuth2ClientConfigController(oauth,
-            mock(dev.macula.cloud.system.service.OAuth2IssuerMetadataService.class), mock(dev.macula.cloud.system.service.OAuth2ClientConfigurationCatalogService.class))).build();
+        new IamApplicationController(oauth,
+            mock(OAuth2IssuerMetadataService.class), mock(IamApplicationCatalogService.class))).build();
 
     @AfterEach
     void clearContext() {
@@ -61,7 +65,7 @@ class AdminSettingsAuthorizationTest {
             new TestingAuthenticationToken("config-manager", "unused", "ROLE_CONFIG_MANAGER"));
         when(identity.page(anyInt(), anyInt(), any(), any(), any())).thenReturn(new Page<>());
         when(oauth.page(anyInt(), anyInt(), any())).thenReturn(new Page<>());
-        when(message.provider("MAIL")).thenReturn(new dev.macula.cloud.system.vo.MessageProviderVO());
+        when(message.provider("MAIL")).thenReturn(new MessageProviderVO());
         mvc.perform(get("/api/v1/identity-providers")).andExpect(status().isOk());
         mvc.perform(get("/api/v1/identity-providers/catalog")).andExpect(status().isOk());
         mvc.perform(get("/api/v1/message-settings/providers/MAIL"))

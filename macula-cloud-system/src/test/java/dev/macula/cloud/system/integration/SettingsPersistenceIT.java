@@ -16,6 +16,10 @@
  */
 package dev.macula.cloud.system.integration;
 
+import dev.macula.cloud.system.service.impl.ProtocolConfigurationTestFixtures;
+import java.time.Duration;
+import java.util.Set;
+
 import dev.macula.boot.constants.CacheConstants;
 import dev.macula.boot.starter.cache.CacheEvictMessage;
 import dev.macula.boot.starter.cache.TwoLevelCache;
@@ -23,11 +27,11 @@ import dev.macula.boot.starter.cache.TwoLevelCacheManager;
 import dev.macula.boot.starter.cache.TwoLevelCacheProperties;
 import dev.macula.cloud.system.form.IdentityProviderForm;
 import dev.macula.cloud.system.form.MessageProviderForm;
-import dev.macula.cloud.system.form.OAuth2ClientForm;
+import dev.macula.cloud.system.form.IamApplicationForm;
 import dev.macula.cloud.system.mapper.SysIdentityProviderMapper;
-import dev.macula.cloud.system.mapper.SysOAuth2ClientConfigMapper;
+import dev.macula.cloud.system.mapper.SysIamApplicationMapper;
 import dev.macula.cloud.system.pojo.entity.SysIdentityProvider;
-import dev.macula.cloud.system.service.OAuth2ClientConfigService;
+import dev.macula.cloud.system.service.IamApplicationService;
 import dev.macula.cloud.system.service.IdentityProviderService;
 import dev.macula.cloud.system.service.MessageSettingsService;
 import org.junit.jupiter.api.BeforeEach;
@@ -49,6 +53,7 @@ import org.springframework.test.context.ActiveProfiles;
 import java.sql.Connection;
 import java.util.Map;
 import java.util.UUID;
+import tools.jackson.databind.json.JsonMapper;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -70,10 +75,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class SettingsPersistenceIT {
     @Autowired private JdbcTemplate jdbc;
     @Autowired private SysIdentityProviderMapper identityMapper;
-    @Autowired private SysOAuth2ClientConfigMapper clientMapper;
+    @Autowired private SysIamApplicationMapper clientMapper;
     @Autowired private IdentityProviderService identityService;
     @Autowired private MessageSettingsService messageService;
-    @Autowired private OAuth2ClientConfigService clientService;
+    @Autowired private IamApplicationService clientService;
     @Autowired private CacheManager cacheManager;
     @Autowired private ApplicationContext context;
     @Autowired private TwoLevelCacheProperties cacheProperties;
@@ -213,7 +218,8 @@ class SettingsPersistenceIT {
             assertFalse(saved.getConfiguredSecrets().containsKey("officialAccountAppSecret"));
             assertFalse(saved.getConfig().containsKey("officialAccountAppSecret"));
             assertEquals("fixture-official-secret", identityMapper.selectById(id).getAppSecret());
-            assertNull(identityMapper.selectById(id).getSecretConfigJson());
+            assertEquals(Map.of(), JsonMapper.builder().build().readValue(
+                identityMapper.selectById(id).getSecretConfigJson(), Map.class));
         } finally {
             if (id != null) {
                 identityService.delete(id);
@@ -236,6 +242,7 @@ class SettingsPersistenceIT {
         }
     }
 
+    /** 新协议登记保持公共应用无Secret，提交后同步失效两个实例的配置缓存。 */
     @Test
     void publicClientPersistsNullSecretAndEvictsRedisCacheAfterCommit() throws Exception {
         String clientId = "settings-it-" + UUID.randomUUID();
@@ -258,12 +265,12 @@ class SettingsPersistenceIT {
         remoteListener.start();
         remoteCache.put(clientId, "stale-client");
         assertEquals("stale-client", remoteCache.get(clientId).get());
-        OAuth2ClientForm form = new OAuth2ClientForm();
+        IamApplicationForm form = new IamApplicationForm();
         form.setClientId(clientId);
         form.setClientName("Public integration fixture");
         form.setApplicationType("SPA");
         form.setProtocolMode("OIDC");
-        form.setEnabledProtocols(java.util.Set.of("OIDC"));
+        form.setEnabledProtocols(Set.of("OIDC"));
         form.setDefaultProtocol("OIDC");
         form.setConfigurationStatus("ENABLED");
         form.setClientAuthenticationMethods("none");
@@ -277,18 +284,18 @@ class SettingsPersistenceIT {
         form.setTenantId(1L);
         Long id = null;
         try {
-            id = clientService.save(null, dev.macula.cloud.system.service.impl.ProtocolConfigurationTestFixtures.configure(form)).getId();
+            id = clientService.save(null, ProtocolConfigurationTestFixtures.configure(form)).getId();
             assertNull(cache.get(clientId));
-            long deadline = System.nanoTime() + java.time.Duration.ofSeconds(3).toNanos();
+            long deadline = System.nanoTime() + Duration.ofSeconds(3).toNanos();
             while (remoteCache.get(clientId) != null && System.nanoTime() < deadline) {
                 Thread.sleep(25);
             }
             assertNull(remoteCache.get(clientId), "另一个 Boot 缓存实例的本地缓存应收到 Redis 驱逐消息");
-            assertNull(jdbc.queryForObject("SELECT client_secret FROM sys_oauth2_client WHERE id = ?",
+            assertNull(jdbc.queryForObject("SELECT credential_hash FROM sys_iam_application_protocol_config WHERE application_id = ?",
                 String.class, id));
             // 认证方式由唯一协议配置持有，主表旧共享列不再作为运行时来源。
             assertEquals("none", clientService.get(id).getSettings().getClientAuthenticationMethods());
-            assertEquals(2L, jdbc.queryForObject("SELECT COUNT(*) FROM sys_oauth2_client WHERE id IN (1, 2)",
+            assertEquals(2L, jdbc.queryForObject("SELECT COUNT(*) FROM sys_iam_application WHERE id IN (1, 2)",
                 Long.class));
         } finally {
             if (id != null) {

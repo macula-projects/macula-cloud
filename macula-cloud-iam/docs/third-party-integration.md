@@ -443,7 +443,7 @@ challenge/verifier绑定。
 
 ## 2026-11-09 终端与网页环境约束更新
 
-应用架构、平台运行环境和Code取码方式分别校验。Web/SPA只选通用网页能力；NATIVE仅一个SDK/AppLink能力；MINIAPP仅一个本平台小程序来源；IN_APP仅一个端内能力；SERVICE不提供用户登录。业务Client使用none不代表获得所有SDK许可。完整逐接口参数、原链接及新增官方Markdown证据见[本轮复核](../../.sdlc/iam-application-configuration/research.md#2026-11-09-原始第三方文档复核与终端约束)。
+应用架构、平台运行环境和Code取码方式分别校验。Web/SPA的BROWSER模式只选通用网页能力，IN_APP模式只选一个端内能力；NATIVE仅一个SDK/AppLink能力；MINIAPP仅一个本平台小程序来源；SERVICE不提供用户登录。业务Client使用none不代表获得所有SDK许可。完整逐接口参数、原链接及新增官方Markdown证据见[本轮复核](../../.sdlc/iam-application-configuration/research.md#2026-11-09-原始第三方文档复核与终端约束)。
 
 微信网站及企微浏览器入口按PC合同筛选；钉钉通用网页登录已按本轮官方PC/H5合同允许手机浏览器。Web/SPA不按容器UA自动切换端内登录。IN_APP企微/公众号走固定网页授权，飞书/钉钉走JSAPI
 Code。错误回调不重复拉起；真实设备验收仍独立进行。
@@ -478,7 +478,7 @@ provider_code_verifier，不失败后尝试旧Token端点。显式旧FEISHU_WEBV
 业务H5在飞书内调用tt.requestAccess({appID,scopeList:[]})；如传state须核对回调state。只有客户端不支持（如errno=
 103）时按官方指引兼容requestAuthCode，用户拒绝或其他失败不得盲切。JSAPI Code有效期3分钟且单次使用，提交IAM
 external_code时明确code_type=
-FEISHU_WEBVIEW_CODE。仅IN_APP可关联；Web/SPA、APP原生与小程序不接受该Code，直接换Token仍遵守既有公共Client（none）及固定来源约束。标准Web默认机密配置不使用此扩展。正常Code登录不经过IAM登录选择页，也不建立浏览器SSO会话；账号未绑定仍需证明已有账号。
+FEISHU_WEBVIEW_CODE。仅Web/SPA的IN_APP模式可关联；BROWSER、APP原生与小程序不接受该Code。SPA使用none；标准Web由业务后端使用已配置的client_secret_basic、client_secret_post或private_key_jwt认证，前端不得持有凭据。固定来源、一次性Code、版本及MFA约束仍生效。正常Code登录不经过IAM登录选择页，也不建立浏览器SSO会话；账号未绑定仍需证明已有账号。
 
 来源配置页不再给JSAPI来源显示无用的IAM浏览器回调地址；隐藏Flow后按服务端唯一可用默认合同显示必要关联参数。网页OAuth及AppLink能力继续独立存在，不与JSAPI
 Code互换。本机证据：/private/tmp/terminal-doc-audit/feishu-webview-example.md、feishu-webview-token.md、feishu-incremental-token.md、feishu-webview-incremental.md及官方流程图feishu-webview-flow.jpg（已视检）。未取得真实飞书Code或执行企业设备授权，合同/Mock验证不能替代真实联调。
@@ -488,10 +488,10 @@ Code互换。本机证据：/private/tmp/terminal-doc-audit/feishu-webview-examp
 Rain明确说明小程序/移动客户端均可直接提交平台Code，也可打开IAM统一登录页，并在完整模型展示后回复“是的”。本补充保留内置统一登录与直接平台Code并存；第三方网页来源边界以文末六类矩阵为准。
 
 -
-IAM统一登录与平台Code是两条独立入口。同一公共Client允许authorization_code与external_code并存；小程序可仅统一登录、仅本平台Code或两者并存。SERVICE继续禁止用户登录。公共授权码使用S256
+IAM统一登录与平台Code是两条独立入口。Native/Miniapp公共Client允许authorization_code与external_code并存；Web/SPA端内模式按选定能力只启用其中一种；小程序可仅统一登录、仅本平台Code或两者并存。SERVICE继续禁止用户登录。公共授权码使用S256
 PKCE，沿用已登记回调、state及OIDC nonce约束。
 - 网页第三方来源仅用于Web/SPA。移动/小程序打开IAM页面时不显示第三方网页来源；业务方仍需处理系统浏览器或web-view的回调桥接。平台Code继续按已保存架构、平台、具体registration校验，拒绝客户端自报终端绕过。
-- 小程序主动打开IAM登录页仅提供内置密码/短信，不因微信UA跳走，也不执行第三方网页直登。端内网页/JSAPI独立归入IN_APP。
+- 小程序主动打开IAM登录页仅提供内置密码/短信，不因微信UA跳走，也不执行第三方网页直登。端内网页/JSAPI归入Web/SPA的IN_APP登录模式。
 - 新小程序的hostedLoginMethods为null继承平台策略；已有显式[]仍表示关闭，不重置已有配置或身份绑定。启停统一登录不删除已有Code关联；有关联的网页来源时须先移除关联才可关闭。
 - 小程序业务方负责web-view业务域名、回调页面与授权码返回桥接；IAM不把Access Token放入回跳URL。本轮未实现业务小程序SDK或桥接，也未完成真机/真实第三方联调。
 
@@ -515,7 +515,7 @@ PKCE，沿用已登记回调、state及OIDC nonce约束。
 
 管理页面将“应用类型”单选与“登录能力”多选分开，凭据只填写一次；不显示flow、接口版本或通讯录策略。应用类型创建后固定，修改应用身份标识需新建来源；应用Secret仍可轮换，变化递增来源版本。关闭全部能力可保留来源配置，但不能用于认证。已有显式历史合同保留，不自动切换厂商接口。
 
-应用登录控制按能力固定registrationId，微信网站来源用于Web/SPA，服务号来源用于IN_APP，不能在同一Client混用。展示、显式发起、自动直登、回调、Code换码、目录、缓存及账号证明都复查当前能力与来源版本；不能凭客户端自报终端或registration切换凭据。应用类型先筛选能力，实际浏览器/容器再筛选网页登录入口。密码/SMS与统一登录/平台Code双入口策略保持。
+应用登录控制按能力固定registrationId，微信网站来源用于Web/SPA，服务号来源用于Web/SPA的IN_APP模式，不能在同一Client混用。展示、显式发起、自动直登、回调、Code换码、目录、缓存及账号证明都复查当前能力与来源版本；不能凭客户端自报终端或registration切换凭据。应用类型先筛选能力，实际浏览器/容器再筛选网页登录入口。密码/SMS与统一登录/平台Code双入口策略保持。
 
 存储与接口：V22新增sys_identity_provider.credential_type、capabilities_json及sys_oauth2_client.browser_capability_bindings。身份源请求新增credentialType/loginCapabilities；Client新增browserCapabilityBindings（能力代码→registrationId）。来源能力JSON只保存服务器选定的合同，密钥留在原加密列。Client网页关联使用受控JSON文本，与旧关联字段保持字符串CAS语义。
 
@@ -579,16 +579,17 @@ Token端点发送同一redirect_uri和code_verifier；不会读取来源旧回�
 | 单页Web `SPA`        | 同标准Web；授权码使用S256 PKCE                                     | 同标准Web                                                          |
 | 移动客户端 `NATIVE`  | 仅一个移动SDK或AppLink能力、一个固定来源                           | 可另开内置密码/短信入口；无第三方网页图标                          |
 | 小程序 `MINIAPP`     | 仅一个本平台小程序来源；微信登录Code/手机号Code可同时关联同一来源  | 可另开内置入口；无第三方网页图标，业务方负责回传桥接               |
-| 端内应用 `IN_APP`    | 启用时恰一个端内能力：企微/公众号网页授权，或飞书/钉钉JSAPI Code   | 无标准页；企微/微信在对应容器直接进入平台授权；JSAPI由业务前端取码 |
+| Web/SPA · `IN_APP`模式 | 启用时恰一个端内能力：企微/公众号网页授权，或飞书/钉钉JSAPI Code | 不提供普通登录或SSO回退；Web保留机密认证，SPA使用none |
 | 后端服务 `SERVICE`   | 无用户身份源；OAuth2.1仅`client_credentials`及业务Scope            | 无用户登录；界面只保留客户端认证、Scope、Token参数和示例           |
 
 直接Code均使用`urn:macula:params:oauth:grant-type:external_code`。移动与小程序选择来源不关闭内置入口；“排他”约束第三方来源及能力，不覆盖IAM内置登录。端内JSAPI使用
 `none`认证且不创建浏览器SSO；端内网页使用授权码与S256，可保留服务端机密认证。用户绑定、目录准入、MFA、防重放及来源版本校验继续执行。
 
-旧配置不会自动猜测类型或删除用户绑定。不兼容渠道会显示待整改并拒绝发起/回调，移动/小程序合法内置入口仍可用。只有既有Web/SPA业务Client可通过“转换为端内应用”选择唯一能力、预览确认后提交完整CAS快照；保留Client
-ID、原凭据哈希和用户绑定，递增授权版本。`none`不启用保留的旧Secret认证。平台管理身份、资源服务器、跨租户/用户目录转换及反向转换均拒绝。
+Web/SPA创建时选择`BROWSER`或`IN_APP`，创建成功后应用类型和登录模式均固定，草稿/启用/停用状态不开放切换。管理端详情只读，后端在写协议或关联前拒绝修改模式；需要另一模式时新建应用。已有Client保留当前有效模式、ID、凭据、回调/Origin、身份源实体和用户绑定；历史NULL按BROWSER固定。平台Admin固定BROWSER。
 
-普通IAM会话不能直接签端内授权码：仅本次授权请求临时隔离缺失或陈旧的平台证明，不清空其他应用SSO。证明绑定当前Client及授权版本、注册/能力/来源版本/Flow和已认证用户；授权、绑定、MFA及Token发布点复核。新旧state/pending不可跨转换继续使用。未在真实平台设备联调前，本地Mock和安全链测试不代表厂商端到端验收。
+V26仅新增可空`web_login_mode`列，不更新历史记录。正常Web/SPA的NULL读取为BROWSER，新建时写入BROWSER；更新省略保留原模式。非法模式、非Web配置模式及已移除的独立`applicationType=IN_APP`明确拒绝，不转换、不迁移。模式保持在完整摘要、CAS和授权版本中，模式内配置更新提交后失效派生Client缓存；部署需要协调Schema、System、IAM和Admin版本。
+
+普通IAM会话不能直接签端内授权码：仅本次授权请求临时隔离缺失或陈旧的平台证明，不清空其他应用SSO。证明绑定当前Client及授权版本、注册/能力/来源版本/Flow和已认证用户；授权、绑定、MFA及Token发布点复核。在途state/pending不可跨模式版本继续使用。未在真实平台设备联调前，本地Mock和安全链测试不代表厂商端到端验收。
 
 ## 授权扩展收敛后的接入边界
 

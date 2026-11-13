@@ -16,8 +16,10 @@
  */
 package dev.macula.cloud.iam.protocol.oauth2.endpoint;
 
-import dev.macula.cloud.iam.service.client.SysOAuth2ClientService;
+import dev.macula.cloud.iam.protocol.oauth2.client.OAuth2ClientRegistrationService;
+import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeClientSettings;
 import jakarta.servlet.FilterChain;
+import java.util.Set;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
@@ -28,6 +30,7 @@ import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2ClientAuthenticationToken;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
+import org.springframework.security.oauth2.server.authorization.settings.ClientSettings;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -42,7 +45,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
  */
 class OAuth2TokenOriginFilterTest {
     private static final String ORIGIN = "https://app.example.test";
-    private final SysOAuth2ClientService clientService = mock(SysOAuth2ClientService.class);
+    private final OAuth2ClientRegistrationService clientService = mock(OAuth2ClientRegistrationService.class);
     private final OAuth2TokenOriginFilter filter = new OAuth2TokenOriginFilter("/oauth2/token", clientService);
 
     @AfterEach
@@ -54,10 +57,10 @@ class OAuth2TokenOriginFilterTest {
     void allowsOriginOwnedByAuthenticatedClient() throws Exception {
         authenticate(client());
         authenticate(RegisteredClient.from(client()).clientSettings(
-                org.springframework.security.oauth2.server.authorization.settings.ClientSettings.builder()
+                ClientSettings.builder()
                         .setting(
-                                dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeClientSettings.ALLOWED_ORIGINS,
-                                java.util.Set.of(ORIGIN)).build()).build());
+                                ExternalCodeClientSettings.ALLOWED_ORIGINS,
+                                Set.of(ORIGIN)).build()).build());
         MockHttpServletRequest request = tokenRequest();
         MockHttpServletResponse response = new MockHttpServletResponse();
         FilterChain chain = mock(FilterChain.class);

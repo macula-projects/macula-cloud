@@ -1,12 +1,29 @@
 # Plan: IAM 托管邮箱验证码登录与认证规则收敛 (from spec.md 2026-11-11)
 
-Status: accepted。已接受[spec.md](spec.md)，用户2026-11-11以OK确认规格，Plan审查已完成（1个实际轮次，NO_FINDINGS），用户以OK明确批准，进入Phase B。作者署名待确认，不推断署名；无提交/推送/业务库操作授权。
+Status: accepted — 用户以YES批准邮件/SMS统一补充计划，进入Phase B；此前已批准范围保持。原接受记录：已接受[spec.md](spec.md)，用户2026-11-11以OK确认规格，Plan审查已完成（1个实际轮次，NO_FINDINGS），用户以OK明确批准，进入Phase B。作者署名待确认，不推断署名；无提交/推送/业务库操作授权。
 
 使用现有Java17、Spring Security、Spring Authorization Server、Jackson3、Redis/MySQL、JUnit/Mockito、Vue/Vitest/Cypress与本地SVG；不新增或升级运行库。现有邮件依赖用于隔离SMTP测试。当前DefaultSecurityConfiguration已由用户放回config根包，以实际工作区为准，不再次移动。未找到CLAUDE.md，遵循Cloud AGENTS.md及相关规则。
 
 REVIEW.md未指定Stage3审查器，工具检索未发现codex-plan-review；按sdlc-build回退sdlc-reviewer子代理，只运行Plan pass，最多3轮，每轮记录review-findings.md；后续只审变更，不重复已记录问题。
 
 ## Files that change
+
+- `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/authentication/verification/VerificationCodeChannelService.java`
+- `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/authentication/verification/VerificationCodeContext.java`
+- `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/authentication/verification/UnavailableVerificationCodeService.java`
+- `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/authentication/verification/AbstractVerificationCodeAuthenticationFilter.java`
+- `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/authentication/verification/AbstractVerificationCodeAuthenticationProvider.java`
+- `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/authentication/sms/SmsCodeService.java`
+- `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/authentication/sms/SmsAuthenticationFilter.java`
+- `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/authentication/sms/SmsAuthenticationProvider.java`
+- `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/authentication/sms/SmsLoginFilterConfigurer.java`
+- `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/controller/SmsCodeController.java`
+- `macula-cloud-iam/src/test/java/dev/macula/cloud/iam/authentication/sms/SmsAuthenticationFilterTest.java`
+- `macula-cloud-iam/src/test/java/dev/macula/cloud/iam/authentication/sms/SmsCodeServiceTest.java`
+- `macula-cloud-iam/src/test/java/dev/macula/cloud/iam/authentication/verification/VerificationCodeChannelServicesTest.java`
+- `macula-cloud-iam/src/test/java/dev/macula/cloud/iam/authentication/verification/VerificationCodeAuthenticationContractTest.java`
+- `macula-cloud-iam/src/test/java/dev/macula/cloud/iam/controller/HostedLoginFlowTest.java`
+- `macula-cloud-iam/src/test/java/dev/macula/cloud/iam/controller/HostedSmsLoginFlowTest.java`
 
 - `.sdlc/iam-architecture-simplification/verification.md`
 
@@ -235,3 +252,112 @@ REVIEW.md未指定Stage3审查器，工具检索未发现codex-plan-review；按
 - 实施偏差：对实际暂存的完整Java差异执行Checkstyle，补充现有排版变动类型缺失的职责Javadoc及since；只补文档，不改变运行行为。
 
 - 实施偏差：两项接受计划共同交付，正式Test报告同步架构和邮箱两个slug，仅补工程证据。
+
+
+## Follow-up: Email/SMS认证结构统一与相关死代码清理
+
+Supplement status: accepted，2026-11-11。用户明确要求统一email/sms整体结构，并清理不用的类、接口和变量。基于本slug已接受的intent/spec，不新增协议、登录方式、绑定方式或通知平台。没有发现CLAUDE.md；沿用Cloud AGENTS/架构、后端和测试规则。复用Java17、现有Spring Security/Jackson/Redis/JUnit/Mockito，不新增依赖。补充计划已完成sdlc-build Phase A审查，用户YES后进入Phase B。
+
+### 当前差异与实际引用
+
+- SMS为SmsService接口、SmsServiceImpl、UnavailableSmsService；EmailCodeService为具体类且依赖必选。两边方法命名、装配与不可用状态表达不同。
+- UnavailableSmsService当前有DefaultSecurityConfiguration及绑定可用性调用，不能当作无用类直接删除；其失败关闭语义必须由共享实现替代。
+- SmsAuthenticationProvider仍带MessageSourceAware/InitializingBean和不可配置的NullAuthoritiesMapper；Email已执行账号状态检查并记录真实OTT认证时间。短信需要统一这些边界，不能退回较弱规则。
+- SmsAuthenticationFilter存在固定参数字段、固定Converter及历史构造；Email已有重复参数与六位格式拒绝。两边需要共享请求解析模板。
+- SmsLoginFilterConfigurer泛型H最终又强转HttpSecurity，且依赖可变字段/按类型找Bean；Email固定HttpSecurity但通过ApplicationContext找Bean。改为一致的显式构造装配。
+- 两个Token的全限定名、字段布局及serialVersionUID已经可能持久化，不为形式对称重命名、搬字段或修改父类。SmsUserDetailsService、EmailUserDetailsService、UserAuthInfoService仍有实际调用/扩展职责，不按“无实现/名字相似”删除。
+
+### Files that change（补充精确范围）
+- `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/authentication/verification/VerificationCodeChannelService.java`
+- `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/authentication/verification/VerificationCodeContext.java`
+- `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/authentication/verification/UnavailableVerificationCodeService.java`
+- `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/authentication/verification/AbstractVerificationCodeAuthenticationFilter.java`
+- `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/authentication/verification/AbstractVerificationCodeAuthenticationProvider.java`
+- `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/authentication/sms/SmsCodeService.java`
+- `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/authentication/sms/SmsService.java`
+- `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/authentication/sms/SmsServiceImpl.java`
+- `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/authentication/sms/UnavailableSmsService.java`
+- `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/authentication/sms/SmsAuthenticationFilter.java`
+- `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/authentication/sms/SmsAuthenticationProvider.java`
+- `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/authentication/sms/SmsLoginFilterConfigurer.java`
+- `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/authentication/email/EmailCodeService.java`
+- `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/authentication/email/EmailCodeAuthenticationFilter.java`
+- `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/authentication/email/EmailCodeAuthenticationProvider.java`
+- `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/authentication/email/EmailLoginFilterConfigurer.java`
+- `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/authentication/thirdparty/binding/ThirdPartyBindingService.java`
+- `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/config/DefaultSecurityConfiguration.java`
+- `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/controller/SmsCodeController.java`
+- `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/controller/EmailCodeController.java`
+- `macula-cloud-iam/src/test/java/dev/macula/cloud/iam/authentication/sms/SmsAuthenticationFilterTest.java`
+- `macula-cloud-iam/src/test/java/dev/macula/cloud/iam/authentication/sms/SmsCodeServiceTest.java`
+- `macula-cloud-iam/src/test/java/dev/macula/cloud/iam/authentication/email/EmailCodeAuthenticationProviderTest.java`
+- `macula-cloud-iam/src/test/java/dev/macula/cloud/iam/authentication/verification/VerificationCodeChannelServicesTest.java`
+- `macula-cloud-iam/src/test/java/dev/macula/cloud/iam/authentication/verification/VerificationCodeAuthenticationContractTest.java`
+- `macula-cloud-iam/src/test/java/dev/macula/cloud/iam/config/IamProtocolTest.java`
+- `macula-cloud-iam/src/test/java/dev/macula/cloud/iam/config/MfaProtocolIT.java`
+- `macula-cloud-iam/src/test/java/dev/macula/cloud/iam/authentication/thirdparty/binding/ThirdPartyBindingServiceTest.java`
+- `macula-cloud-iam/src/test/java/dev/macula/cloud/iam/controller/HostedLoginFlowTest.java`
+- `macula-cloud-iam/src/test/java/dev/macula/cloud/iam/controller/HostedEmailLoginFlowTest.java`
+- `macula-cloud-iam/src/test/java/dev/macula/cloud/iam/controller/HostedSmsLoginFlowTest.java`
+- `macula-cloud-iam/src/test/java/dev/macula/cloud/iam/service/userdetails/SmsServiceImplTest.java`
+- `macula-cloud-iam/src/test/java/dev/macula/cloud/iam/service/identity/IdentitySourceBindingIT.java`
+- `macula-cloud-iam/src/test/java/dev/macula/cloud/iam/jackson/EmailCodeAuthenticationTokenSerializationTest.java`
+- `macula-cloud-iam/src/test/java/dev/macula/cloud/iam/protocol/oauth2/persistence/MaculaOAuth2AuthorizationServiceTest.java`
+- `macula-cloud-iam/README.md`
+- `macula-cloud-iam/docs/architecture.md`
+- `macula-cloud-iam/docs/configuration.md`
+- `.sdlc/iam-hosted-email-login/plan.md`
+- `.sdlc/iam-hosted-email-login/review-findings.md`
+- `.sdlc/iam-hosted-email-login/build-notes.md`
+- `.sdlc/iam-hosted-email-login/verification.md`
+
+### Order of work
+
+1. **保护当前基线**：将未提交的全模块import整理和用户已有AbstractThirdPartyAuthenticationFilter变动记入临时清单/摘要。仅修改本补充名单，不回滚其他文件；全用显式import，不新增package-info.java。
+2. **统一真实服务端口**：引入VerificationCodeChannelService，统一isAvailable/sendCode/verifyCode；由SmsCodeService及EmailCodeService实现。VerificationCodeContext显式携带可信clientId、服务端purpose与邮件显示所需clientName，提供login/binding工厂；它不是HTTP请求DTO，不携带验证码或凭据。原VerificationCodeScope及Redis/HMAC算法不变。
+3. **统一失败关闭**：UnavailableVerificationCodeService供两种通道复用，verify固定拒绝，send明确失败，isAvailable=false；不访问发送器/存储。DefaultSecurityConfiguration为两种通道以具名Bean和显式@Qualifier装配真实或不可用策略；不按类型随机选多Bean。未配置消息渠道仍在发送时拒绝，不伪装送达。
+4. **简化通道适配**：将SmsServiceImpl收敛为SmsCodeService；删除被替代的SmsService、SmsServiceImpl、UnavailableSmsService及没有生产调用的phone-only/默认IP等便利重载。短信仍支持LOGIN和IDENTITY_BINDING，邮件仍仅LOGIN；Email收到绑定上下文直接拒绝。保留原SMS browser域和Client/用途键，不把缺Client绑定证明退回门户。绑定可用性继续读取端口isAvailable，不删UI保护、不把全局托管SMS开关当绑定证明开关。
+5. **共享认证模板**：新增AbstractVerificationCodeAuthenticationFilter，统一POST、单值、长度、trim与六位验证码校验、可信Client恢复及details；具体过滤器只固定参数/路径并构造原Token。新增AbstractVerificationCodeAuthenticationProvider，统一类型检查、一次性消费、账号状态检查、清除成功凭据、真实OTT认证时间及details；具体Provider保留类型、账号目录适配和原成功Token工厂。Token类本身不改字段或层次。SMS不新增MFA挑战，auth_time来自真实主认证，不伪造acr/amr；原MfaCompletionPolicy及权限声明的框架因子排除继续执行。
+6. **统一装配和调用**：两个Configurer固定HttpSecurity，显式构造接收端口与各自用户目录，不再有ApplicationContext查找、getBeanOrNull、可变setter或伪泛型。两个Configurer类型继续分开，避免HttpSecurity按Configurer类覆盖前者；原安全链、Filter顺序、CSRF、SavedRequest和MFA围栏保持。Controller与绑定服务只依赖通用服务端口，保留原HTTP路径、参数名、响应形状与绑定用途。
+7. **清理与文档**：全仓核对Java调用、Spring注解/Bean、模板、Jackson/反射及资源配置后删除替代项；移除NullAuthoritiesMapper、旧消息生命周期接口、固定参数副本、固定Converter、死构造/重载及过期测试装配。旧SmsServiceImplTest迁到authentication/sms/SmsCodeServiceTest。保留真实扩展端口和历史兼容读取器。README与类图说明当前结构，不追加产品流水账。
+8. **验证**：先最小双通道契约和bean装配，再IAM/API全套、真实授权链、MFA、序列化及隔离Redis/MySQL绑定回归；全仓Maven验证删除引用。测试只Mock外发渠道和业务目录，不发真实短信/邮件。规范检查与残留符号扫描通过后才报告完成；不提交推送/部署或操作业务库。
+
+### Risks
+
+- **不可用语义是实际能力**：不能用“生产通常有Bean”删除失败关闭实现；验证两通道设施缺失时都不能发码/认证，也不影响其他允许流程。绑定页可用性语义保留。
+- **SMS规则收敛**：原SMS过滤器对重复/缺失参数较宽松，统一后歧义或非六位输入在消费前拒绝；两通道规范化后校验且设原始输入上限，保留合法trim输入。补正SMS账号状态及auth_time，不把Email降到旧SMS行为。
+- **序列化**：绝不移动SmsAuthenticationToken/EmailCodeAuthenticationToken字段到公共父类或改全限定名。证明原SMS/旧邮箱授权及新双通道因子往返；不能以白名单放宽换取通过。
+- **作用域**：Context来自服务端策略，browser仅保留登录兼容；IDENTITY_BINDING必须有可信Client。邮件没有新增绑定证明能力。发码、尝试次数、消费时序、配额、TTL与摘要键保持。
+- **装配**：多端口Bean必须显式@Qualifier；不能恢复全局AuthenticationProvider Bean或合并为同类Configurer导致覆盖。测试用@MockitoBean按名称覆盖真实端口，删除生产里仅为测试而设的注入旁路。
+- **范围**：不将“没有实现”或仅有SPI/注解引用判成未使用；不删UserAuthInfoService、Token类型、序列化/兼容类型、实体字段或Mapper。仅对有证据的失效组件/参数清理，不做重命名全模块。
+
+### Proof
+
+- VerificationCodeChannelServicesTest：真实SMS/Email适配和共享不可用实现，重复注入/缺设施、发送失败不激活、clientName传递/转义保持、Email拒绝绑定上下文、SMS LOGIN/绑定隔离；端口只是装配可用不等于供应商实际送达。
+- VerificationCodeAuthenticationContractTest参数化两通道：POST/CSRF策略先行、重复/缺失/越界/空白/非六位拒绝、trim正常值、错误码不查目录、无效/停用/锁定/过期账号拒绝；成功载体无凭据、details/角色保留、真实OTT时间并不代表MFA完成。
+- HostedEmailLoginFlowTest与新HostedSmsLoginFlowTest：两通道真实安全链、真实隔离Redis、外发Mock，从发码到Session、SavedRequest、授权码+S256、OIDC nonce/auth_time、UserInfo、重放拒绝；源码/Mock不能声称真实投递。两种Configurer同时生效且仅在登录链注册Provider。
+- IamProtocolTest/MfaProtocolIT、序列化测试：双通道MFA拒绝不建会话、不留半份Token；原SMS/新Email因子序列化与授权JSON往返，旧邮箱受限夹具继续恢复/内省/撤销，不扩大类型许可。
+- IdentitySourceBindingIT/绑定单元：密码/绑定短信/会话证明仍可用；SMS不可用时不显示短信证明，LOGIN码不能消费绑定域、跨Client拒绝、失败回滚及提交后消费保持；新建隔离MySQL/Redis，禁止业务库。
+- `mvn -pl macula-cloud-iam -am test -Plocal`、目标Failsafe及`mvn test -Plocal`，统计实际失败/跳过；变更Java Checkstyle、git diff --check、源码/模板/序列化残留引用扫描。没有额外依赖或受保护审查配置变更，无对应eval变更。
+
+### Acceptance gate
+
+补充Plan Round2为NO_FINDINGS，用户已对工程确认门回复YES；允许按上述顺序实现。已有135文件import整理保持；未授权提交推送或部署。
+
+### Follow-up Build交接（2026-11-12）
+
+- 本补充生产实现和用例均已落盘，没有新增名单外路径或改变Token层次。原135文件import整理中，补充名单外124文件与先前after快照逐字节一致。
+- 删除旧SmsService/SmsServiceImpl/UnavailableSmsService，以公共通道策略、短信适配与共享不可用策略替代；旧测试迁移到认证通道包。没有删除真实目录SPI、绑定可用性保护或历史序列化读取器。
+- 两个Configurer保留独立具体类型、显式构造依赖和链内Provider；通道Bean具名注入，不恢复Service定位器。
+- 构建证据：clean test-compile -DskipTests通过；当前155个变更Java文件Checkstyle通过；git diff --check与旧符号扫描通过。本轮新增/修改测试尚未执行，之前测试结果仅代表之前实现。
+- 执行顺序说明：依sdlc-build Phase B exit gate，步骤8中的正式执行测试留待工程师确认实现完成后由sdlc-test开展；本阶段仅编译及静态检查。须从清洁IAM/API生成目录运行，避免已删除类残留。
+- 新提出的端内Web/SPA配置模型调整涉及公共API、System、Admin和IAM，独立于本补充范围；当前仅完成调用点分析并请求策略语义澄清，未写该模型实现或迁移。
+- Build人工门已通过：用户在展示实现后回复yes，确认完成并进入Stage 4；此确认不授权提交、推送、合并或部署。
+
+### Follow-up Stage 4结果（2026-11-12）
+
+- 用户yes后按sdlc-test实际执行；最终全仓Surefire为661项，660通过、1项环境门控。该用户名迁移用例已在全新独立MySQL空库中另行执行通过，因此本轮661项用例均有通过证据。
+- 全仓Failsafe实际执行24项通过；门控跳过50项中，相关绑定17项与映射迁移1项已在专用MySQL/Redis补跑通过。另32项未改动的独立System数据库场景保留环境门控，不计作通过，也不属于本补充必须覆盖的证明。
+- Admin单元213项、Cypress全套83项及build通过；静态Checkstyle155个变更Java、diff检查和旧符号/资源引用扫描通过。
+- 证明补强：绑定UI测试原Mock整个ThirdPartyBindingService，初次仅修改验证码Mock的可用性不能影响页面，断言如实失败。已修正Mock层级，并以真实ThirdPartyBindingService单元证明可用性传递；定向6项与最终全仓回归通过。只改本补充名单内测试，没有改变生产策略。
+- Protected配置未改，无适用eval变更。Verification is green（本补充已批准范围）。完整命令、输出、隔离边界与历史测试区分见verification.md。

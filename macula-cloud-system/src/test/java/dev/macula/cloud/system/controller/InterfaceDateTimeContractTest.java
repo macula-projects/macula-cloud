@@ -17,6 +17,9 @@
 
 package dev.macula.cloud.system.controller;
 
+import java.time.ZoneId;
+import org.mockito.ArgumentMatchers;
+
 import com.alibaba.excel.EasyExcel;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import dev.macula.boot.mapstruct.config.MapStructAutoConfiguration;
@@ -44,7 +47,7 @@ import dev.macula.cloud.system.query.DeptQuery;
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import dev.macula.cloud.system.service.SysPermissionService;
 import dev.macula.cloud.system.service.SysRoleService;
-import dev.macula.cloud.system.vo.OAuth2ClientVO;
+import dev.macula.cloud.system.vo.IamApplicationVO;
 import dev.macula.cloud.system.vo.app.ApplicationApiKeyVO;
 import dev.macula.cloud.system.vo.app.ApplicationVO;
 import dev.macula.cloud.system.vo.dept.DeptVO;
@@ -110,7 +113,7 @@ class InterfaceDateTimeContractTest {
     @Test
     void interfaceModelsUseTimepointsWithoutTimezoneStrippingAnnotations() {
         for (Class<?> type : List.of(ApplicationVO.class, ApplicationApiKeyVO.class, UserVO.class,
-            AuditLogVO.class, DeptVO.class, MenuVO.class, RolePageVO.class, OAuth2ClientVO.class,
+            AuditLogVO.class, DeptVO.class, MenuVO.class, RolePageVO.class, IamApplicationVO.class,
             RoleDetailVO.class, MenuDetailVO.class, PermissionVO.class, UserExportVO.class)) {
             for (var field : type.getDeclaredFields()) {
                 assertThat(TemporalAccessor.class.isAssignableFrom(field.getType()) && field.getType() != Instant.class).as(type.getSimpleName() + "." + field.getName())
@@ -201,7 +204,7 @@ class InterfaceDateTimeContractTest {
             dept.setParentId(1L);
             dept.setCreateTime(STORED_TIME);
             var service = spy(new SysDeptServiceImpl(context.getBean(DeptConverter.class)));
-            doReturn(List.of(dept)).when(service).list(org.mockito.ArgumentMatchers.<Wrapper<SysDept>>any());
+            doReturn(List.of(dept)).when(service).list(ArgumentMatchers.<Wrapper<SysDept>>any());
             assertThat(service.listDepartments(new DeptQuery()).get(0).getCreateTime().toInstant()).isEqualTo(INSTANT);
         });
     }
@@ -276,7 +279,7 @@ class InterfaceDateTimeContractTest {
     void excelExportRetainsReadableDateTime() {
         UserExportVO user = new UserExportVO();
         user.setUsername("fixture");
-        user.setCreateTime(Date.from(STORED_TIME.atZone(java.time.ZoneId.systemDefault()).toInstant()));
+        user.setCreateTime(Date.from(STORED_TIME.atZone(ZoneId.systemDefault()).toInstant()));
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         EasyExcel.write(output, UserExportVO.class).sheet("users").doWrite(List.of(user));
         List<Map<Integer, String>> rows = EasyExcel.read(new ByteArrayInputStream(output.toByteArray()))

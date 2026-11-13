@@ -22,10 +22,14 @@ import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import dev.macula.cloud.iam.authentication.thirdparty.cache.ProviderApplicationTokenCache;
+import dev.macula.cloud.iam.authentication.thirdparty.provider.ProviderFailureDiagnostics;
+import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeConsumptionState;
 import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeInfrastructureException;
 import dev.macula.cloud.iam.service.identity.IdentityProviderConfigService.ProviderConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.security.authentication.AuthenticationServiceException;
@@ -78,7 +82,7 @@ public class DingtalkClient {
     private final RestClient restClient;
     private final boolean httpContractTest;
     private final JsonMapper json = JsonMapper.builder().build();
-    private dev.macula.cloud.iam.authentication.thirdparty.cache.ProviderApplicationTokenCache applicationTokens;
+    private ProviderApplicationTokenCache applicationTokens;
 
     public DingtalkClient() {
         this(RestClient.builder().requestFactory(noRedirectRequestFactory()).build(), false);
@@ -115,9 +119,9 @@ public class DingtalkClient {
     /**
      * 生产装配来源隔离缓存；显式HTTP测试构造器仍可仅验证平台合同。
      */
-    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    @Autowired(required = false)
     void applicationTokenCache(
-            dev.macula.cloud.iam.authentication.thirdparty.cache.ProviderApplicationTokenCache cache) {
+            ProviderApplicationTokenCache cache) {
         this.applicationTokens = cache;
     }
 
@@ -134,6 +138,7 @@ public class DingtalkClient {
                 .queryParam(PROMPT_PARAMETER, CONSENT).build().encode().toUriString();
     }
 
+    /** 按固定来源兑换用户Code并核验组织成员；失败仅输出安全投影，保持原消费语义。 */
     public String fetchUserId(ProviderConfig config, String code, DingtalkLoginMode mode) {
         String stage = TOKEN_STAGE;
         boolean codeConsumed = false;
@@ -179,20 +184,20 @@ public class DingtalkClient {
         } catch (AuthenticationServiceException ex) {
             throw ex;
         } catch (RestClientResponseException ex) {
-            LOGGER.warn("第三方接口 HTTP 失败 provider=DINGTALK stage={} status={}", stage,
-                    ex.getStatusCode().value());
+            ProviderFailureDiagnostics.dingtalk(LOGGER, stage, ex.getStatusCode().value(),
+                    ProviderFailureDiagnostics.response(ex.getResponseBodyAsString()));
             if (ex.getStatusCode().is5xxServerError()) {
                 throw new ExternalCodeInfrastructureException(codeConsumed
-                        ? dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeConsumptionState.CONSUMED
-                        : dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeConsumptionState.UNKNOWN);
+                        ? ExternalCodeConsumptionState.CONSUMED
+                        : ExternalCodeConsumptionState.UNKNOWN);
             }
             throw failed();
         } catch (RestClientException ex) {
             LOGGER.warn("第三方接口调用失败 provider=DINGTALK stage={} failure=transport_error exception={}",
                     stage, ex.getClass().getSimpleName());
             throw new ExternalCodeInfrastructureException(codeConsumed
-                    ? dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeConsumptionState.CONSUMED
-                    : dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeConsumptionState.UNKNOWN);
+                    ? ExternalCodeConsumptionState.CONSUMED
+                    : ExternalCodeConsumptionState.UNKNOWN);
         } catch (RuntimeException ex) {
             LOGGER.error("第三方接口响应处理失败 provider=DINGTALK stage={} "
                             + "failure=invalid_response exception={}",
@@ -235,35 +240,37 @@ public class DingtalkClient {
     String appAccessToken(ProviderConfig config) {
         if (applicationTokens == null && !httpContractTest) {
             throw new ExternalCodeInfrastructureException(
-                    dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeConsumptionState.NOT_SUBMITTED);
+                    ExternalCodeConsumptionState.NOT_SUBMITTED);
         }
         return applicationTokens == null ? loadApplicationToken(config).token()
                 : applicationTokens.get(config,
-                dev.macula.cloud.iam.authentication.thirdparty.cache.ProviderApplicationTokenCache.APPLICATION_TOKEN,
+                ProviderApplicationTokenCache.APPLICATION_TOKEN,
                 () -> loadApplicationToken(config));
     }
 
     /**
      * 该HTTP阶段尚未提交用户Code，明确的网络故障可安全释放占用。
      */
-    private dev.macula.cloud.iam.authentication.thirdparty.cache.ProviderApplicationTokenCache.TokenValue loadApplicationToken(
+    private ProviderApplicationTokenCache.TokenValue loadApplicationToken(
             ProviderConfig config) {
         try {
             String body = restClient.post().uri(APP_TOKEN).contentType(MediaType.APPLICATION_JSON)
                     .body(Map.of(APP_KEY_CONFIG, config.require(APP_KEY_CONFIG), APP_SECRET_CONFIG, config.appSecret()))
                     .retrieve().body(String.class);
             JsonNode token = json.readTree(body);
-            return new dev.macula.cloud.iam.authentication.thirdparty.cache.ProviderApplicationTokenCache.TokenValue(
+            return new ProviderApplicationTokenCache.TokenValue(
                     requireToken(TOKEN_STAGE, token), Duration.ofSeconds(token.path("expireIn").asLong()));
         } catch (RestClientResponseException ex) {
+            ProviderFailureDiagnostics.dingtalk(LOGGER, "application_token", ex.getStatusCode().value(),
+                    ProviderFailureDiagnostics.response(ex.getResponseBodyAsString()));
             if (ex.getStatusCode().is5xxServerError()) {
                 throw new ExternalCodeInfrastructureException(
-                        dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeConsumptionState.NOT_SUBMITTED);
+                        ExternalCodeConsumptionState.NOT_SUBMITTED);
             }
             throw failed();
         } catch (RestClientException ex) {
             throw new ExternalCodeInfrastructureException(
-                    dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeConsumptionState.NOT_SUBMITTED);
+                    ExternalCodeConsumptionState.NOT_SUBMITTED);
         }
     }
 
@@ -286,10 +293,11 @@ public class DingtalkClient {
         return userId;
     }
 
+    /** 原业务拒绝保持不变，仅增加有界数字子码及权限诊断。 */
     private void requireSuccess(String stage, JsonNode response) {
         int errorCode = response.path(ERROR_CODE).asInt(Integer.MIN_VALUE);
         if (errorCode != 0) {
-            LOGGER.warn("第三方接口业务失败 provider=DINGTALK stage={} errcode={}", stage, errorCode);
+            ProviderFailureDiagnostics.dingtalk(LOGGER, stage, 200, response);
             throw failed();
         }
     }

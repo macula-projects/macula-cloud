@@ -19,18 +19,21 @@ package dev.macula.cloud.iam.authentication.thirdparty.directory;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 import dev.macula.cloud.iam.authentication.thirdparty.VerifiedExternalIdentity;
 import dev.macula.cloud.iam.authentication.thirdparty.cache.ProviderCacheCipher;
 import dev.macula.cloud.iam.authentication.thirdparty.provider.ProviderIntegrationProperties;
 import dev.macula.cloud.iam.service.identity.IdentityProviderConfigService;
+import dev.macula.cloud.system.enums.IdentityDirectoryPolicy;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
+import org.springframework.security.authentication.AuthenticationServiceException;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -178,7 +181,7 @@ public class ProviderDirectoryRefreshService {
                     .forCapability(identity.loginCapability());
             if (!work.expiresAt().isAfter(Instant.now()) || !source.version().equals(identity.sourceVersion())
                     || !source.flow().value().equals(identity.flow())
-                    || source.directoryPolicy() != dev.macula.cloud.system.enums.IdentityDirectoryPolicy.BACKGROUND) {
+                    || source.directoryPolicy() != IdentityDirectoryPolicy.BACKGROUND) {
                 done = true;
                 return;
             }
@@ -195,7 +198,7 @@ public class ProviderDirectoryRefreshService {
             // Snapshot发布也必须owner原子核验，不能check-then-write跨过租约。
             snapshots.saveOwned(identity, result, key, owner, redis);
             done = result.status() != ProviderDirectoryResult.Status.UNAVAILABLE;
-        } catch (org.springframework.security.authentication.AuthenticationServiceException ex) {
+        } catch (AuthenticationServiceException ex) {
             // 来源停用或配置已失效时取消旧任务，不为旧身份重新选择来源。
             done = true;
         } catch (RuntimeException ex) {
@@ -233,8 +236,8 @@ public class ProviderDirectoryRefreshService {
          * 旧记录缺少必填字段直接失效，不能补猜。
          */
         public Work {
-            java.util.Objects.requireNonNull(identity);
-            java.util.Objects.requireNonNull(expiresAt);
+            Objects.requireNonNull(identity);
+            Objects.requireNonNull(expiresAt);
         }
 
         /**

@@ -46,7 +46,7 @@ class ThirdPartyIdentityResolutionServiceTest {
     private final IdentitySourceBindingPolicyService policy = mock(IdentitySourceBindingPolicyService.class);
     private final ThirdPartyIdentityResolutionService service = new ThirdPartyIdentityResolutionService(policy);
     private final ThirdPartyLoginContext context =
-            dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.context(
+            IdentitySourceTestFixtures.context(
             "WECOM", "BROWSER", "test-client",
             Instant.now(), "/");
 

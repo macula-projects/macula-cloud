@@ -79,11 +79,17 @@ JSON时间点同样可以使用 `Instant`：Jackson原生支持带时区ISO读�
 
 ## IAM 应用配置
 
-创建应用时选择标准Web、单页Web、移动客户端、后端服务、小程序或端内应用；微信/企微作为小程序平台，身份源作为登录渠道独立管理。Client ID 自动生成且只读，创建后应用类型/小程序平台不可修改。新建阶段切换类型或平台会清空旧登录方式、固定身份源、回调、直登与派生grant，保留名称及通用参数。详情分为应用配置、协议配置、登录控制和接入指南，共用一份草稿；切换分区不丢值，离开有未保存提示。
+V28移除已退役的`sys_user_identity_binding`；当前绑定统一使用`sys_identity_provider_user_binding`。执行System自动迁移前先完成旧表外部归档及恢复核验，详见[IAM升级指南](../macula-cloud-iam/docs/configuration.md)。旧记录不会自动合并，历史V1—V27不修改。
+
+应用配置由三张表组成：`sys_iam_application`保存公共应用信息和登录策略，`sys_iam_application_protocol_config`保存唯一协议登记、版本化设置和受保护凭据，`sys_iam_application_identity_provider`保存具体登录能力与身份源关联。一个应用单选协议；当前只提供OIDC/OAuth2.1，未来SAML2/CAS必须实现完整策略后再加入目录。HTTP路径及既有JSON字段由边界适配器保持。
+
+V27保留应用/绑定ID、原协议标识及凭据编码字符串，不重新编码或轮换。没有选择协议的历史凭据只进入不可执行保留槽，普通空草稿没有协议行。资源管理身份保留内省认证能力而没有业务grant。IAM与System必须协同升级，旧版本不能混跑新表；备份、预检及故障恢复见[IAM配置指南](../macula-cloud-iam/docs/configuration.md)。
+
+创建应用时选择标准Web、单页Web、移动客户端、后端服务或小程序；微信/企微作为小程序平台，身份源作为登录渠道独立管理。Client ID 自动生成且只读，创建Web/SPA时选择浏览器或端内模式；创建成功后应用类型、小程序平台和网页登录模式均不可修改。新建阶段切换类型或平台会清空旧登录方式、固定身份源、回调、直登与派生grant，保留名称及通用参数。详情分为应用配置、协议配置、登录控制和接入指南，共用一份草稿；切换分区不丢值，离开有未保存提示。
 
 Web 默认 Basic 与授权码；SPA/本地应用使用 none 与 S256 PKCE；服务应用使用 client_credentials 和目录中的业务 Scope；小程序使用已关联具体来源的 external_code。协议、Scope 和来源能力均从目录选择。private_key_jwt 保持 HTTPS JWKS URL 配置，私钥由客户端保管；平台端点使用紧凑只读文本与复制。
 
-托管登录方式`hostedLoginMethods`支持PASSWORD/SMS/EMAIL，null继承平台、[]关闭全部本地方式；全局关闭优先。托管页呈现、密码/SMS/EMAIL POST和发码使用Session受控授权请求的同一Client策略，核对授权端点、唯一client_id、code响应及精确回调。请求参数/header/cookie不能成为可信身份，验证码发送与消费绑定相同Client。策略只控制新托管认证，不撤销已有SSO会话/Token，不改变独立Token扩展grant的校验。
+托管登录方式`hostedLoginMethods`支持PASSWORD/SMS/EMAIL，null继承平台、[]关闭全部本地方式；全局关闭优先。托管页呈现、密码/SMS/EMAIL POST和发码使用Session受控授权请求的同一Client策略，核对授权端点、唯一client_id、code响应及精确回调。请求参数/header/cookie不能成为可信身份，验证码发送与消费绑定相同Client。策略只控制新托管认证，不撤销已有SSO会话/Token，不改变external_code协议校验。
 
 同厂商可配置多个具体身份源。每个 Client 为每个网页厂商明确关联一个 registration，SDK/小程序按认证能力关联具体来源；运行时不按厂商全局择一。取消应用关联不删除来源，有引用时禁止删除来源。来源类型及 AppID/CorpID 等身份域标识保存后不可替换，Secret 可轮换。
 
@@ -224,11 +230,11 @@ System追加V21两个nullable映射列，确定转换原三种bindingRule；未�
 
 ### 应用与第三方认证场景约束（2026-11-09）
 
-网页授权、原生APP Code、端内WEBVIEW Code、小程序Code分别限定。Web/SPA仅使用通用网页能力；NATIVE仅一个APP能力；MINIAPP仅一个本平台注册；IN_APP仅一个端内能力；SERVICE无用户第三方登录。外部Code仍受原有公共Client、固定来源和协议约束，不能仅靠none认证获得跨场景能力。Admin过滤与System保存、IAM换码执行相同矩阵，不自动改写历史关联。
+网页授权、原生APP Code、端内WEBVIEW Code、小程序Code分别限定。Web/SPA按webLoginMode二选一：BROWSER使用通用网页能力，IN_APP使用一个固定端内能力；NATIVE仅一个APP能力；MINIAPP仅一个本平台注册；SERVICE无用户第三方登录。外部Code仍受原有公共Client、固定来源和协议约束，不能仅靠none认证获得跨场景能力。Admin过滤与System保存、IAM换码执行相同矩阵，不自动改写历史关联。
 
-网页目录按实际环境筛选通用网页入口。Web/SPA默认展示IAM页，只有明确配置的通用网页直登才续转；IN_APP企微/公众号直接进入固定容器授权，飞书/钉钉由业务JSAPI取Code。UA只影响入口体验，身份仍由平台Code、一次性state及固定来源核验；错误后不循环拉起。逐接口参数、官方原链接及未完成的真机边界见第三方接入文档。
+网页目录按实际环境筛选通用网页入口。Web/SPA默认展示IAM页，只有明确配置的通用网页直登才续转；Web/SPA端内模式的企微/公众号直接进入固定容器授权，飞书/钉钉由业务JSAPI取Code。UA只影响入口体验，身份仍由平台Code、一次性state及固定来源核验；错误后不循环拉起。逐接口参数、官方原链接及未完成的真机边界见第三方接入文档。
 
-2026-11-10补正：飞书端内Code已按官方v1→v2→v3迁移说明补齐FEISHU_WEBVIEW_V3。IN_APP可关联FEISHU_WEBVIEW_CODE，由H5调用requestAccess取得Code后交IAM external_code；IAM以平台凭据调用v3 Token和user_info，不需要浏览器回调或AppLink PKCE，不建立浏览器SSO会话。平台Secret保留在IAM，直接Token模式仍要求公共Client及固定来源。旧显式v1不自动升级，真实企业/设备尚未联调；完整证据见第三方接入文档2026-11-10补正章节。
+2026-11-10补正：飞书端内Code已按官方v1→v2→v3迁移说明补齐FEISHU_WEBVIEW_V3。Web/SPA的IN_APP模式可关联FEISHU_WEBVIEW_CODE，由H5调用requestAccess取得Code后交IAM external_code；IAM以平台凭据调用v3 Token和user_info，不需要浏览器回调或AppLink PKCE，不建立浏览器SSO会话。平台Secret保留在IAM，直接Token模式按架构要求SPA公共认证或Web机密认证，并固定来源。旧显式v1不自动升级，真实企业/设备尚未联调；完整证据见第三方接入文档2026-11-10补正章节。
 
 
 ## 2026-11-10 身份源按真实应用注册与多登录能力配置
@@ -249,7 +255,7 @@ System追加V21两个nullable映射列，确定转换原三种bindingRule；未�
 
 管理页面将“应用类型”单选与“登录能力”多选分开，凭据只填写一次；不显示flow、接口版本或通讯录策略。应用类型创建后固定，修改应用身份标识需新建来源；应用Secret仍可轮换，变化递增来源版本。关闭全部能力可保留来源配置，但不能用于认证。已有显式历史合同保留，不自动切换厂商接口。
 
-应用登录控制按能力固定registrationId，微信网站来源用于Web/SPA，服务号来源用于IN_APP，不能在同一Client混用。展示、显式发起、自动直登、回调、Code换码、目录、缓存及账号证明都复查当前能力与来源版本；不能凭客户端自报终端或registration切换凭据。应用类型先筛选能力，实际浏览器/容器再筛选网页登录入口。密码/SMS/EMAIL与统一登录/平台Code双入口策略保持。
+应用登录控制按能力固定registrationId，微信网站来源用于Web/SPA，服务号来源用于Web/SPA的IN_APP模式，不能在同一Client混用。展示、显式发起、自动直登、回调、Code换码、目录、缓存及账号证明都复查当前能力与来源版本；不能凭客户端自报终端或registration切换凭据。应用类型先筛选能力，实际浏览器/容器再筛选网页登录入口。密码/SMS/EMAIL与统一登录/平台Code双入口策略保持。
 
 存储与接口：V22新增sys_identity_provider.credential_type、capabilities_json及sys_oauth2_client.browser_capability_bindings。身份源请求新增credentialType/loginCapabilities；Client新增browserCapabilityBindings（能力代码→registrationId）。来源能力JSON只保存服务器选定的合同，密钥留在原加密列。Client网页关联使用受控JSON文本，与旧关联字段保持字符串CAS语义。
 
@@ -278,14 +284,16 @@ V23只新增nullable `binding_mappings_json`。NULL按旧单条合同读取；�
 | 单页Web `SPA` | 同标准Web；授权码使用S256 PKCE | 同标准Web |
 | 移动客户端 `NATIVE` | 仅一个移动SDK或AppLink能力、一个固定来源 | 可另开内置密码/短信/邮箱入口；无第三方网页图标 |
 | 小程序 `MINIAPP` | 仅一个本平台小程序来源；微信登录Code/手机号Code可同时关联同一来源 | 可另开内置入口；无第三方网页图标，业务方负责回传桥接 |
-| 端内应用 `IN_APP` | 启用时恰一个端内能力：企微/公众号网页授权，或飞书/钉钉JSAPI Code | 无标准页；企微/微信在对应容器直接进入平台授权；JSAPI由业务前端取码 |
+| Web/SPA · `IN_APP`模式 | 启用时恰一个端内能力：企微/公众号网页授权，或飞书/钉钉JSAPI Code | 不提供普通登录或SSO回退；Web保留机密认证，SPA使用none |
 | 后端服务 `SERVICE` | 无用户身份源；OAuth2.1仅`client_credentials`及业务Scope | 无用户登录；界面只保留客户端认证、Scope、Token参数和示例 |
 
 直接Code均使用`urn:macula:params:oauth:grant-type:external_code`。移动与小程序选择来源不关闭内置入口；“排他”约束第三方来源及能力，不覆盖IAM内置登录。端内JSAPI使用`none`认证且不创建浏览器SSO；端内网页使用授权码与S256，可保留服务端机密认证。用户绑定、目录准入、MFA、防重放及来源版本校验继续执行。
 
-旧配置不会自动猜测类型或删除用户绑定。不兼容渠道会显示待整改并拒绝发起/回调，移动/小程序合法内置入口仍可用。只有既有Web/SPA业务Client可通过“转换为端内应用”选择唯一能力、预览确认后提交完整CAS快照；保留Client ID、原凭据哈希和用户绑定，递增授权版本。`none`不启用保留的旧Secret认证。平台管理身份、资源服务器、跨租户/用户目录转换及反向转换均拒绝。
+Web/SPA创建时选择`BROWSER`或`IN_APP`，创建成功后应用类型和登录模式均固定，草稿/启用/停用状态不开放切换。管理端详情只读，后端在写协议或关联前拒绝修改模式；需要另一模式时新建应用。已有Client保留当前有效模式、ID、凭据、回调/Origin、身份源实体和用户绑定；历史NULL按BROWSER固定。平台Admin固定BROWSER。
 
-普通IAM会话不能直接签端内授权码：仅本次授权请求临时隔离缺失或陈旧的平台证明，不清空其他应用SSO。证明绑定当前Client及授权版本、注册/能力/来源版本/Flow和已认证用户；授权、绑定、MFA及Token发布点复核。新旧state/pending不可跨转换继续使用。未在真实平台设备联调前，本地Mock和安全链测试不代表厂商端到端验收。
+V26仅新增可空`web_login_mode`列，不更新历史记录。正常Web/SPA的NULL读取为BROWSER，新建时写入BROWSER；更新省略保留原模式。非法模式、非Web配置模式及已移除的独立`applicationType=IN_APP`明确拒绝，不转换、不迁移。模式保持在完整摘要、CAS和授权版本中，模式内配置更新提交后失效派生Client缓存；部署需要协调Schema、System、IAM和Admin版本。
+
+普通IAM会话不能直接签端内授权码：仅本次授权请求临时隔离缺失或陈旧的平台证明，不清空其他应用SSO。证明绑定当前Client及授权版本、注册/能力/来源版本/Flow和已认证用户；授权、绑定、MFA及Token发布点复核。在途state/pending不可跨模式版本继续使用。未在真实平台设备联调前，本地Mock和安全链测试不代表厂商端到端验收。
 
 后端服务无需选择用户目录，不提供访问授权中的用户类型分区；认证租户和业务Scope仍必需。原列已允许空值，无额外Schema变更，也不填入虚构的员工目录。
 

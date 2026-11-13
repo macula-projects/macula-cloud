@@ -16,15 +16,14 @@
  */
 package dev.macula.cloud.iam.service.identity;
 
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
-
 import dev.macula.cloud.iam.authentication.thirdparty.VerifiedExternalIdentity;
 import dev.macula.cloud.iam.enums.UserTypeEnum;
 import dev.macula.cloud.iam.mapper.SysUserMapper;
 import dev.macula.cloud.iam.pojo.entity.SysUser;
 import dev.macula.cloud.iam.service.identity.directory.IdentityDirectoryService;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
@@ -37,7 +36,7 @@ import org.springframework.stereotype.Service;
  */
 @Service
 public class IdentitySourceBindingPolicyService {
-    private final RegistrationIdentityBindingService bindings;
+    private final IdentityProviderUserBindingService bindings;
     private final IdentityProviderConfigService configs;
     private final SysUserMapper users;
     private final IdentityDirectoryService directory;
@@ -46,7 +45,7 @@ public class IdentitySourceBindingPolicyService {
      * 生产统一准入必须覆盖已有绑定。
      */
     @Autowired
-    public IdentitySourceBindingPolicyService(RegistrationIdentityBindingService bindings,
+    public IdentitySourceBindingPolicyService(IdentityProviderUserBindingService bindings,
             IdentityProviderConfigService configs, SysUserMapper users, IdentityDirectoryService directory) {
         this.bindings = bindings;
         this.configs = configs;

@@ -16,7 +16,21 @@
  */
 package dev.macula.cloud.system.service.impl;
 
-import dev.macula.cloud.system.form.OAuth2ClientForm;
+import java.util.Arrays;
+import java.util.stream.Collectors;
+import org.springframework.beans.BeanUtils;
+
+import dev.macula.boot.mapstruct.DateTimeConverter;
+import dev.macula.cloud.system.mapper.SysIamApplicationMapper;
+import dev.macula.cloud.system.mapper.SysIamApplicationIdentityProviderMapper;
+import dev.macula.cloud.system.mapper.SysIamApplicationProtocolConfigMapper;
+import dev.macula.cloud.system.mapper.SysIdentityProviderMapper;
+import dev.macula.cloud.system.mapper.SysTenantInfoMapper;
+import dev.macula.cloud.system.service.IamApplicationCatalogService;
+import dev.macula.cloud.system.protocol.OAuth2ProtocolDefinition;
+import org.springframework.cache.CacheManager;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import dev.macula.cloud.system.form.IamApplicationForm;
 import dev.macula.cloud.system.protocol.ApplicationProtocolConfiguration;
 import dev.macula.cloud.system.protocol.OAuth2ProtocolSettings;
 import java.util.Set;
@@ -31,25 +45,43 @@ public final class ProtocolConfigurationTestFixtures {
     private ProtocolConfigurationTestFixtures() { }
 
     /** 保留非法组合供负向校验；双协议按真实能力拆分。 */
-    public static OAuth2ClientForm configure(OAuth2ClientForm form) {
+    public static IamApplicationForm configure(IamApplicationForm form) {
         Set<String> protocols = form.getEnabledProtocols() == null ? Set.of() : form.getEnabledProtocols();
         form.setProtocolConfigurations(protocols.stream().sorted().map(protocol -> {
             var settings = new OAuth2ProtocolSettings();
-            org.springframework.beans.BeanUtils.copyProperties(form, settings);
+            BeanUtils.copyProperties(form, settings);
             if (settings.getAuthorizationCodeTimeToLive() == null) { settings.setAuthorizationCodeTimeToLive(300L); }
             if (settings.getAccessTokenTimeToLive() == null) { settings.setAccessTokenTimeToLive(3600L); }
             if (settings.getRefreshTokenTimeToLive() == null) { settings.setRefreshTokenTimeToLive(3600L); }
             if (settings.getTokenFormat() == null) { settings.setTokenFormat("reference"); }
             if (protocols.size() > 1 && "OIDC".equals(protocol)) {
-                settings.setAuthorizationGrantTypes(java.util.Arrays.stream(settings.getAuthorizationGrantTypes().split(","))
-                    .filter(value -> Set.of("authorization_code", "refresh_token").contains(value)).collect(java.util.stream.Collectors.joining(",")));
+                settings.setAuthorizationGrantTypes(Arrays.stream(settings.getAuthorizationGrantTypes().split(","))
+                    .filter(value -> Set.of("authorization_code", "refresh_token").contains(value)).collect(Collectors.joining(",")));
             }
             if (protocols.size() > 1 && "OAUTH2_1".equals(protocol)) {
-                settings.setScopes(java.util.Arrays.stream(settings.getScopes().split(","))
-                    .filter(value -> !Set.of("openid", "profile").contains(value)).collect(java.util.stream.Collectors.joining(",")));
+                settings.setScopes(Arrays.stream(settings.getScopes().split(","))
+                    .filter(value -> !Set.of("openid", "profile").contains(value)).collect(Collectors.joining(",")));
             }
             return new ApplicationProtocolConfiguration(protocol, 1, true, settings);
         }).toList());
         return form;
+    }
+    /** 真实Mapper集成测试共用生产组件装配，避免每个用例维护旧构造参数。 */
+    public static IamApplicationServiceImpl service(SysIamApplicationMapper apps,
+        SysIamApplicationIdentityProviderMapper routes, SysIamApplicationProtocolConfigMapper rows,
+        SysIdentityProviderMapper identities, SysTenantInfoMapper tenants, PasswordEncoder encoder,
+        CacheManager caches, IamApplicationCatalogService catalog) {
+        var dates = new DateTimeConverter("UTC");
+        var protocols = protocols(rows, routes);
+        var policy = new IamApplicationPolicyValidator(tenants, identities);
+        var wire = new IamApplicationWireAdapter(protocols, OAuth2ProtocolDefinition.registry(), policy, catalog, dates);
+        return new IamApplicationServiceImpl(apps, routes, identities, protocols, policy, wire,
+            new OAuth2ClientCredentialService(encoder, rows), dates, caches);
+    }
+
+    /** 所有反馈测试使用同一显式产品策略，不改变v1历史载荷。 */
+    public static IamApplicationProtocolService protocols(SysIamApplicationProtocolConfigMapper rows,
+        SysIamApplicationIdentityProviderMapper routes) {
+        return new IamApplicationProtocolService(rows, routes, OAuth2ProtocolDefinition.registry(), new DateTimeConverter("UTC"));
     }
 }

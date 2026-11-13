@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Macula
+ * Copyright (c) 2026 Macula
  *   macula.dev, China
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,80 +14,50 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package dev.macula.cloud.iam.authentication.sms;
 
-import org.springframework.context.ApplicationContext;
+import java.util.Objects;
+
+import dev.macula.cloud.iam.authentication.verification.VerificationCodeChannelService;
 import org.springframework.http.HttpMethod;
-import org.springframework.security.authentication.AuthenticationProvider;
-import org.springframework.security.config.annotation.web.HttpSecurityBuilder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractAuthenticationFilterConfigurer;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
-import org.springframework.util.Assert;
 
 import static org.springframework.security.config.annotation.web.builders.FilterOrderRegUtils.Position.AFTER;
 import static org.springframework.security.config.annotation.web.builders.FilterOrderRegUtils.registryFilterOrder;
 
 /**
- * 配置短信验证码登录过滤器及其认证 Provider。
+ * Sms登录链装配；使用独立Configurer类型，避免两通道在HttpSecurity中互相覆盖。
  *
- * @param <H> HttpSecurity 构建器类型
- * @author rain
+ * @author Macula
  * @since 6.1.0
  */
-public class SmsLoginFilterConfigurer<H extends HttpSecurityBuilder<H>>
-        extends AbstractAuthenticationFilterConfigurer<H, SmsLoginFilterConfigurer<H>, SmsAuthenticationFilter> {
+public final class SmsLoginFilterConfigurer extends AbstractAuthenticationFilterConfigurer<HttpSecurity,
+        SmsLoginFilterConfigurer, SmsAuthenticationFilter> {
+    private final VerificationCodeChannelService codes;
+    private final SmsUserDetailsService users;
 
-    private SmsUserDetailsService smsUserDetailsService;
-
-    private SmsService smsService;
-
-    public SmsLoginFilterConfigurer() {
-        super(new SmsAuthenticationFilter(), "/login/sms");
+    /** 显式接收依赖，不隐式查询ApplicationContext。 */
+    public SmsLoginFilterConfigurer(VerificationCodeChannelService codes, SmsUserDetailsService users) {
+        super(new SmsAuthenticationFilter(), SmsAuthenticationFilter.PATH);
+        this.codes = Objects.requireNonNull(codes);
+        this.users = Objects.requireNonNull(users);
     }
 
-    public SmsLoginFilterConfigurer<H> smsUserDetailsService(SmsUserDetailsService smsUserDetailsService) {
-        this.smsUserDetailsService = smsUserDetailsService;
-        return this;
-    }
-
-    public SmsLoginFilterConfigurer<H> smsService(SmsService smsService) {
-        this.smsService = smsService;
-        return this;
-    }
-
+    /** 仅注册到登录链；由框架处理Session保护、上下文保存及成功续转。 */
     @Override
-    public void init(H http) {
-        http.authenticationProvider(postProcess(authenticationProvider(http)));
-        registryFilterOrder((HttpSecurity) http, getAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class,
-                AFTER);
+    public void init(HttpSecurity http) {
+        http.authenticationProvider(postProcess(new SmsAuthenticationProvider(codes, users)));
+        registryFilterOrder(http, getAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class, AFTER);
         super.init(http);
     }
 
+    /** 认证副作用只允许POST。 */
     @Override
-    protected RequestMatcher createLoginProcessingUrlMatcher(String loginProcessingUrl) {
-        return PathPatternRequestMatcher.pathPattern(HttpMethod.POST, loginProcessingUrl);
-    }
-
-    protected AuthenticationProvider authenticationProvider(H http) {
-        ApplicationContext applicationContext = http.getSharedObject(ApplicationContext.class);
-        SmsUserDetailsService smsUserDetailsService = this.smsUserDetailsService != null ? this.smsUserDetailsService
-                : getBeanOrNull(applicationContext, SmsUserDetailsService.class);
-
-        Assert.notNull(smsUserDetailsService, "smsUserDetailsService is required");
-
-        SmsService smsService = this.smsService != null ? this.smsService
-                : getBeanOrNull(applicationContext, SmsService.class);
-
-        Assert.notNull(smsService, "smsService is required");
-
-        return new SmsAuthenticationProvider(smsUserDetailsService, smsService);
-    }
-
-    private <T> T getBeanOrNull(ApplicationContext applicationContext, Class<T> beanType) {
-        return applicationContext == null ? null : applicationContext.getBeanProvider(beanType).getIfUnique();
+    protected RequestMatcher createLoginProcessingUrlMatcher(String path) {
+        return PathPatternRequestMatcher.pathPattern(HttpMethod.POST, path);
     }
 }

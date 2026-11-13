@@ -62,7 +62,7 @@ class HostedEmailLoginMigrationIT {
         var protectedBefore = jdbc.queryForList("SELECT client_id,client_secret,purpose,application_type,authorization_version,default_protocol,redirect_uris,scopes FROM sys_oauth2_client ORDER BY id");
         var usersBefore = jdbc.queryForList("SELECT id,username,password,email,mobile FROM sys_user ORDER BY id");
         var bindingsBefore = jdbc.queryForList("SELECT * FROM sys_registration_identity_binding ORDER BY id");
-        var flyway = Flyway.configure().dataSource(ds).locations("classpath:db/migration").load();
+        var flyway = Flyway.configure().dataSource(ds).locations("classpath:db/migration").target("25").load();
         assertThat(flyway.migrate().migrationsExecuted).isEqualTo(1);
         methods.forEach((name, value) -> {
             String expected = switch (name) {

@@ -25,6 +25,7 @@ import dev.macula.cloud.iam.authentication.thirdparty.provider.ThirdPartyProvide
 import dev.macula.cloud.iam.authentication.thirdparty.provider.ThirdPartyProviderAdapterRegistry;
 import dev.macula.cloud.iam.service.identity.IdentityProviderConfigService;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import org.springframework.security.authentication.AuthenticationServiceException;
 import org.springframework.security.core.userdetails.User;
 
@@ -52,7 +53,7 @@ class ThirdPartyAuthenticationProviderTest {
             var adapter = mock(ThirdPartyProviderAdapter.class);
             when(adapter.providerType()).thenReturn(vendor);
             var configs = mock(IdentityProviderConfigService.class);
-            var config = mock(IdentityProviderConfigService.ProviderConfig.class, org.mockito.Mockito.RETURNS_SELF);
+            var config = mock(IdentityProviderConfigService.ProviderConfig.class, Mockito.RETURNS_SELF);
             var identities = mock(ThirdPartyIdentityResolutionService.class);
             var context = IdentitySourceTestFixtures.context(vendor, vendor.equals("GITHUB") ? "" : "BROWSER",
                     "test-client", Instant.now(), "/");
@@ -87,11 +88,11 @@ class ThirdPartyAuthenticationProviderTest {
         var context = IdentitySourceTestFixtures.context("GITHUB", "", "test-client", Instant.now(), "/");
         var provider = new ThirdPartyAuthenticationProvider(new ThirdPartyProviderAdapterRegistry(List.of(adapter)),
                 configs, identities);
-        org.mockito.Mockito.clearInvocations(adapter);
+        Mockito.clearInvocations(adapter);
         assertThatThrownBy(() -> provider.authenticate(
                 ThirdPartyAuthenticationToken.unauthenticated("GITHUB", "code", context, "/callback")))
                 .isInstanceOf(AuthenticationServiceException.class);
         verifyNoInteractions(identities);
-        org.mockito.Mockito.verify(adapter, org.mockito.Mockito.never()).verify(any(), any(), any(), any());
+        Mockito.verify(adapter, Mockito.never()).verify(any(), any(), any(), any());
     }
 }

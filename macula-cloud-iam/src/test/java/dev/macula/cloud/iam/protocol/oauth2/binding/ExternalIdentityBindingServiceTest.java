@@ -16,12 +16,7 @@
  */
 package dev.macula.cloud.iam.protocol.oauth2.binding;
 
-import java.security.Principal;
-import java.time.Instant;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
+import dev.macula.cloud.iam.authentication.thirdparty.BindingTestTransactions;
 import dev.macula.cloud.iam.authentication.thirdparty.ExternalBindingTicket;
 import dev.macula.cloud.iam.authentication.thirdparty.ExternalBindingTicketStore;
 import dev.macula.cloud.iam.authentication.thirdparty.ExternalBindingTicketStore.ClaimedTicket;
@@ -31,11 +26,17 @@ import dev.macula.cloud.iam.pojo.entity.SysUser;
 import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeClientSettings;
 import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.OAuth2ExternalCodeAuthenticationToken;
 import dev.macula.cloud.iam.service.account.SysUserService;
-import dev.macula.cloud.iam.service.identity.RegistrationIdentityBindingService;
+import dev.macula.cloud.iam.service.identity.IdentityProviderUserBindingService;
 import dev.macula.cloud.iam.service.userdetails.SysUserDetails;
+import java.security.Principal;
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentMatchers;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -45,6 +46,7 @@ import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.security.oauth2.core.endpoint.OAuth2ParameterNames;
 import org.springframework.security.oauth2.server.authorization.OAuth2Authorization;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
+import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.settings.ClientSettings;
@@ -72,11 +74,11 @@ class ExternalIdentityBindingServiceTest {
     private final OAuth2AuthorizationService authorizations = mock(OAuth2AuthorizationService.class);
     private final RegisteredClientRepository clients = mock(RegisteredClientRepository.class);
     private final SysUserService users = mock(SysUserService.class);
-    private final RegistrationIdentityBindingService bindings = mock(RegistrationIdentityBindingService.class);
+    private final IdentityProviderUserBindingService bindings = mock(IdentityProviderUserBindingService.class);
     private final ExternalIdentityBindingService service =
             new ExternalIdentityBindingService(tickets, authorizations, clients, users, bindings,
-                    dev.macula.cloud.iam.authentication.thirdparty.BindingTestTransactions.directory(),
-                    new dev.macula.cloud.iam.authentication.thirdparty.BindingTestTransactions());
+                    BindingTestTransactions.directory(),
+                    new BindingTestTransactions());
 
     @BeforeEach
     void setUp() {
@@ -96,7 +98,7 @@ class ExternalIdentityBindingServiceTest {
         ClaimedTicket claimed = claimed("EXTERNAL_IDENTITY", "WECOM", "member-id", null);
         when(tickets.claim("binding-ticket")).thenReturn(claimed);
         when(authorizations.findByToken(ACCESS_TOKEN,
-                org.springframework.security.oauth2.server.authorization.OAuth2TokenType.ACCESS_TOKEN))
+                OAuth2TokenType.ACCESS_TOKEN))
                 .thenReturn(authorization(client, AuthorizationGrantType.AUTHORIZATION_CODE));
         when(clients.findById(client.getId())).thenReturn(client);
         when(users.getById(7L)).thenReturn(account(null));
@@ -115,7 +117,7 @@ class ExternalIdentityBindingServiceTest {
         ClaimedTicket claimed = claimed("EXTERNAL_IDENTITY", "WECOM", "member-id", null);
         when(tickets.claim("binding-ticket")).thenReturn(claimed);
         when(authorizations.findByToken(ACCESS_TOKEN,
-                org.springframework.security.oauth2.server.authorization.OAuth2TokenType.ACCESS_TOKEN))
+                OAuth2TokenType.ACCESS_TOKEN))
                 .thenReturn(authorization(client, OAuth2ExternalCodeAuthenticationToken.GRANT_TYPE));
         when(clients.findById(client.getId())).thenReturn(client);
 
@@ -123,8 +125,8 @@ class ExternalIdentityBindingServiceTest {
                 .isInstanceOf(BadCredentialsException.class);
 
         verify(tickets).failedAttempt(claimed);
-        verify(bindings, never()).bind(any(), any(), any(), any(), any(), org.mockito.ArgumentMatchers.anyBoolean(),
-                org.mockito.ArgumentMatchers.isNull());
+        verify(bindings, never()).bind(any(), any(), any(), any(), any(), ArgumentMatchers.anyBoolean(),
+                ArgumentMatchers.isNull());
     }
 
     @Test
@@ -133,7 +135,7 @@ class ExternalIdentityBindingServiceTest {
         ClaimedTicket claimed = claimed("MOBILE", null, null, "13800000000");
         when(tickets.claim("binding-ticket")).thenReturn(claimed);
         when(authorizations.findByToken(ACCESS_TOKEN,
-                org.springframework.security.oauth2.server.authorization.OAuth2TokenType.ACCESS_TOKEN))
+                OAuth2TokenType.ACCESS_TOKEN))
                 .thenReturn(authorization(client, AuthorizationGrantType.AUTHORIZATION_CODE));
         when(clients.findById(client.getId())).thenReturn(client);
         when(users.getById(7L)).thenReturn(account("13900000000"));

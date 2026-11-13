@@ -16,6 +16,13 @@
         ><span>{{ type.description }}</span>
       </button>
     </div>
+    <el-form-item v-if="isWebApplication(client)" :label="$t('applicationBoundary.webLoginMode')">
+      <el-radio-group :model-value="client.webLoginMode ?? 'BROWSER'" @change="mode => emit('change',{...client,webLoginMode:mode})">
+        <el-radio value="BROWSER">{{ $t('applicationBoundary.browserMode') }}</el-radio>
+        <el-radio value="IN_APP">{{ $t('applicationBoundary.inAppMode') }}</el-radio>
+      </el-radio-group>
+      <p class="hint">浏览器使用IAM登录和SSO；端内只使用一个固定平台能力。创建后不可修改。</p>
+    </el-form-item>
     <el-form-item
       v-if="client.applicationType === 'MINIAPP'"
       label="小程序平台"
@@ -32,11 +39,12 @@
       <el-input :model-value="client.clientName" @update:model-value="value => emit('change',{...client,clientName:value})" placeholder="输入应用名称" maxlength="200" />
     </el-form-item><p class="hint">创建后继续配置协议、回调和访问授权，完成配置前不可用于认证。</p></div></div>
     <p class="hint">
-      切换类型会清空原类型的登录方式、身份源和回调，应用名称与通用参数保留。保存后类型不可修改。
+      切换类型会清空原类型的登录方式、身份源和回调，应用名称与通用参数保留。创建后类型和网页登录模式不可修改。
     </p></template>
   </section>
 </template>
 <script setup>
+import {isWebApplication} from '@/utils/identitySourceCompatibility';
 import { APPLICATION_TYPES } from "@/api/model/system/oauth2Client";
 import { applicationTemplate } from "@/utils/oauthClientConfiguration";
 const props = defineProps({ client: { type: Object, required: true } });

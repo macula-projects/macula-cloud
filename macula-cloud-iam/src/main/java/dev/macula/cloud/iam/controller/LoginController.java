@@ -17,25 +17,32 @@
 
 package dev.macula.cloud.iam.controller;
 
-import java.util.Locale;
-import java.util.Optional;
-
 import cn.hutool.core.util.StrUtil;
 import dev.macula.cloud.iam.authentication.dingtalk.DingtalkLoginMode;
 import dev.macula.cloud.iam.authentication.feishu.FeishuLoginMode;
 import dev.macula.cloud.iam.authentication.hosted.HostedLoginClientPolicyService;
+import dev.macula.cloud.iam.authentication.inapp.InAppLoginPolicyService;
 import dev.macula.cloud.iam.authentication.thirdparty.browser.BrowserLoginClientPolicyService;
 import dev.macula.cloud.iam.authentication.thirdparty.browser.BrowserLoginClientPolicyService.ClientPolicy;
 import dev.macula.cloud.iam.authentication.wechat.WechatLoginMode;
 import dev.macula.cloud.iam.authentication.wecom.WecomLoginMode;
 import dev.macula.cloud.iam.enums.ThirdPartyProviderType;
 import dev.macula.cloud.iam.handler.AuthenticationFailureReason;
+import dev.macula.cloud.iam.service.application.LoginApplicationResolver.Selection;
 import dev.macula.cloud.iam.service.identity.IdentityProviderConfigService;
 import dev.macula.cloud.system.enums.BrowserLoginProviderType;
-import dev.macula.cloud.system.enums.OAuth2HostedLoginMethod;
+import dev.macula.cloud.system.enums.HostedLoginMethod;
+import dev.macula.cloud.system.enums.IdentityBrowserEnvironment;
+import dev.macula.cloud.system.enums.IdentityLoginCapability;
+import dev.macula.cloud.system.enums.IdentitySourceType;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.util.List;
+import java.util.Locale;
+import java.util.Optional;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.authentication.AuthenticationServiceException;
@@ -63,20 +70,20 @@ public class LoginController {
     private final IdentityProviderConfigService providerConfigService;
     private final BrowserLoginClientPolicyService clientPolicyService;
     private final HostedLoginClientPolicyService hostedPolicy;
-    private dev.macula.cloud.iam.authentication.inapp.InAppLoginPolicyService inApp;
+    private InAppLoginPolicyService inApp;
 
     /**
      * 保持既有测试构造；生产将当前端内策略注入控制器。
      */
-    @org.springframework.beans.factory.annotation.Autowired
-    public void setInAppPolicy(dev.macula.cloud.iam.authentication.inapp.InAppLoginPolicyService value) {
+    @Autowired
+    public void setInAppPolicy(InAppLoginPolicyService value) {
         inApp = value;
     }
 
     /**
      * 缺策略时仅非端内旧门户可继续，不从query猜测端内来源。
      */
-    private dev.macula.cloud.iam.authentication.inapp.InAppLoginPolicyService inAppPolicy() {
+    private InAppLoginPolicyService inAppPolicy() {
         if (inApp == null) {
             throw new IllegalStateException("端内策略未装配");
         }
@@ -101,22 +108,23 @@ public class LoginController {
                     required = false) CsrfToken csrfToken) {
 
         try {
+            // 先按已校验请求的Client模式处理端内证明，普通SSO不能抢先跳过此边界。
             var inApp =
-                    this.inApp == null ? java.util.Optional.<dev.macula.cloud.iam.pojo.entity.SysOAuth2Client>empty() :
+                    this.inApp == null ? Optional.<Selection>empty() :
                             inAppPolicy().savedClient(request, response);
             if (inApp.isPresent()) {
                 if (StrUtil.isNotBlank(authenticationError)) {
                     return "in-app-login-error";
                 }
                 var source = inAppPolicy().source(inApp.get());
-                var capability = dev.macula.cloud.system.enums.IdentityLoginCapability.fromValue(
+                var capability = IdentityLoginCapability.fromValue(
                         source.loginCapability());
                 if (!capability.browser() || !capability.environments().contains(
-                        dev.macula.cloud.system.enums.IdentityBrowserEnvironment.fromUserAgent(
+                        IdentityBrowserEnvironment.fromUserAgent(
                                 request.getHeader(HttpHeaders.USER_AGENT)))) {
                     return "in-app-login-error";
                 }
-                return "redirect:" + (capability == dev.macula.cloud.system.enums.IdentityLoginCapability.WECOM_WEBVIEW
+                return "redirect:" + (capability == IdentityLoginCapability.WECOM_WEBVIEW
                         ? WecomLoginMode.WEBVIEW.loginPath() : WechatLoginMode.WEBVIEW.loginPath());
             }
         } catch (RuntimeException ex) {
@@ -129,15 +137,15 @@ public class LoginController {
         if (csrfToken != null) {
             model.addAttribute("_csrfToken", csrfToken);
         }
-        for (String key : java.util.List.of("githubLoginEnabled", "wecomLoginEnabled", "feishuLoginEnabled",
+        for (String key : List.of("githubLoginEnabled", "wecomLoginEnabled", "feishuLoginEnabled",
                 "dingtalkLoginEnabled", "wechatLoginEnabled")) {
             model.addAttribute(key, false);
         }
         try {
             HostedLoginClientPolicyService.Context context = hostedPolicy.resolve(request, response);
-            model.addAttribute("enablePasswordLogin", context.methods().contains(OAuth2HostedLoginMethod.PASSWORD));
-            model.addAttribute("enableSmsLogin", context.methods().contains(OAuth2HostedLoginMethod.SMS));
-            model.addAttribute("enableEmailLogin", context.methods().contains(OAuth2HostedLoginMethod.EMAIL));
+            model.addAttribute("enablePasswordLogin", context.methods().contains(HostedLoginMethod.PASSWORD));
+            model.addAttribute("enableSmsLogin", context.methods().contains(HostedLoginMethod.SMS));
+            model.addAttribute("enableEmailLogin", context.methods().contains(HostedLoginMethod.EMAIL));
             model.addAttribute(OAuth2ParameterNames.CLIENT_ID, context.clientId());
         } catch (AuthenticationServiceException ex) {
             model.addAttribute("enablePasswordLogin", false);
@@ -159,9 +167,9 @@ public class LoginController {
                 userAgent.contains(WECHAT_USER_AGENT_MARKER) && !userAgent.contains(WECOM_USER_AGENT_MARKER);
         model.addAttribute("wechatLoginEnabled", wechatVisible && (!officialAccount || insideWechat));
         model.addAttribute("wechatNeedsWebview", officialAccount && !insideWechat);
-        var environment = dev.macula.cloud.system.enums.IdentityBrowserEnvironment.fromUserAgent(userAgent);
+        var environment = IdentityBrowserEnvironment.fromUserAgent(userAgent);
         model.addAttribute("browserEnvironmentNotice",
-                environment == dev.macula.cloud.system.enums.IdentityBrowserEnvironment.MOBILE_BROWSER
+                environment == IdentityBrowserEnvironment.MOBILE_BROWSER
                         && policy.isPresent() && policy.get().allowedProviders().stream()
                         .anyMatch(provider -> !canStart(request, policy.get(), provider)));
         model.addAttribute("githubLoginPath", ThirdPartyProviderType.GITHUB.loginPath());
@@ -223,7 +231,7 @@ public class LoginController {
         }
         try {
             return clientPolicyService.requireSource(policy.get(), "WECHAT").sourceType()
-                    == dev.macula.cloud.system.enums.IdentitySourceType.WECHAT_OFFICIAL_ACCOUNT;
+                    == IdentitySourceType.WECHAT_OFFICIAL_ACCOUNT;
         } catch (AuthenticationServiceException ex) {
             return false;
         }
@@ -233,25 +241,25 @@ public class LoginController {
      * 企业微信容器优先于其携带的普通微信或手机标记。
      */
     private boolean insideWecom(HttpServletRequest request) {
-        return dev.macula.cloud.system.enums.IdentityBrowserEnvironment.fromUserAgent(
+        return IdentityBrowserEnvironment.fromUserAgent(
                 request.getHeader(HttpHeaders.USER_AGENT))
-                == dev.macula.cloud.system.enums.IdentityBrowserEnvironment.WECOM_WEBVIEW;
+                == IdentityBrowserEnvironment.WECOM_WEBVIEW;
     }
 
     /**
      * Web/SPA只执行管理员明确设置的通用网页直登；UA不触发端内自动分流。
      */
     private String automaticLoginPath(HttpServletRequest request, ClientPolicy policy) {
-        if (!java.util.Set.of("WEB_SERVER", "SPA")
+        if (!Set.of("WEB_SERVER", "SPA")
                 .contains(policy.applicationType() == null ? "" : policy.applicationType())) {
             return null;
         }
         BrowserLoginProviderType direct = policy.directProvider();
         if (direct == BrowserLoginProviderType.WECHAT && canStart(request, policy, direct)
                 && clientPolicyService.requireSourceForEnvironment(policy, "WECHAT",
-                dev.macula.cloud.system.enums.IdentityBrowserEnvironment.fromUserAgent(
+                IdentityBrowserEnvironment.fromUserAgent(
                         request.getHeader(HttpHeaders.USER_AGENT))).sourceType()
-                == dev.macula.cloud.system.enums.IdentitySourceType.WECHAT_OFFICIAL_ACCOUNT) {
+                == IdentitySourceType.WECHAT_OFFICIAL_ACCOUNT) {
             return null;
         }
         return direct != null && canStart(request, policy, direct) ? loginPath(direct) : null;
@@ -266,9 +274,9 @@ public class LoginController {
         }
         try {
             var source = clientPolicyService.requireSourceForEnvironment(policy, providerType.name(),
-                    dev.macula.cloud.system.enums.IdentityBrowserEnvironment.fromUserAgent(
+                    IdentityBrowserEnvironment.fromUserAgent(
                             request.getHeader(HttpHeaders.USER_AGENT)));
-            var environment = dev.macula.cloud.system.enums.IdentityBrowserEnvironment.fromUserAgent(
+            var environment = IdentityBrowserEnvironment.fromUserAgent(
                     request.getHeader(HttpHeaders.USER_AGENT));
             String mode = switch (source.sourceType()) {
                 case GITHUB_OAUTH -> "";

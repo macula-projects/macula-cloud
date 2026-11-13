@@ -3,6 +3,8 @@
 本文依据当前源码说明主要类型、依赖和运行逻辑。[模块介绍](../README.md)面向接入者，[配置指南](configuration.md)
 说明运行合同，[架构总览图](architecture.svg)用于快速定位边界。
 
+Web/SPA在创建时选择`webLoginMode=BROWSER|IN_APP`，创建成功后固定，草稿也不可修改。BROWSER使用普通登录与SSO；IN_APP固定一个平台能力并核验平台证明，不提供普通登录回退。Web保持服务端机密认证，SPA保持none。独立IN_APP应用类型已移除，不兼容或迁移旧记录。
+
 ## 1. 阅读模型
 
 IAM 的核心是三件事：**核验身份、解析本地账号、发布协议结果**。
@@ -10,7 +12,7 @@ IAM 的核心是三件事：**核验身份、解析本地账号、发布协议�
 | 职责         | 回答的问题                                     | 归属                                                                 |
 |--------------|------------------------------------------------|----------------------------------------------------------------------|
 | 用户认证     | 当前凭据能否证明这个用户是谁？                 | authentication；平台Code认证适配在protocol/oauth2/grant/externalcode |
-| 公共身份规则 | 该来源身份能否对应这个Client范围内的本地账号？ | service/account、service/client、service/identity                    |
+| 公共身份规则 | 该来源身份能否对应这个Client范围内的本地账号？ | service/account、service/application、service/identity                    |
 | 协议发布     | 当前Client、协议和授权允许发布什么结果？       | protocol/oauth2                                                      |
 | 装配         | 使用哪些实现、怎样组合安全链？                 | config/DefaultSecurityConfiguration、config/oauth2；根包为共用配置   |
 
@@ -19,6 +21,53 @@ IAM 的核心是三件事：**核验身份、解析本地账号、发布协议�
 
 下列类图省略普通DTO、全部Mapper和框架内部调用。`A --> B`表示持有/依赖，`A ..> B`表示创建或调用依赖，`B <|.. A`表示A实现接口，
 `B <|-- A`表示继承；框架分派用明确标注的依赖线表示，不冒充直接方法调用。
+
+## 接入应用与协议边界
+
+一个接入应用只有一个协议登记。应用类型及登录方式属于公共应用策略；OAuth grant、Scope、回调、Client认证和令牌参数由协议策略解释。当前仅提供OIDC/OAuth2.1，SAML2/CAS需要对应完整策略与发布适配器后才能加入目录。
+
+| 表 | 职责 |
+|---|---|
+| `sys_iam_application` | 内部应用ID、稳定代码、名称、用途、认证租户/目录及登录策略 |
+| `sys_iam_application_protocol_config` | 唯一协议、版本化非秘密设置、协议标识及受保护凭据摘要 |
+| `sys_iam_application_identity_provider` | 应用的具体登录能力与固定身份源关联 |
+| `sys_identity_provider_user_binding` | 外部稳定身份到本地userId的来源隔离绑定 |
+
+前三张表构成应用配置聚合，应用主行是配置写入及绑定复核的共同锁。`IamApplicationService`在同一RR事务内组装非秘密快照，锁定读要求调用者可写事务。第四张表由原`sys_registration_identity_binding`改名而来；V27保留历史`sys_user_identity_binding`，V28在升级前归档后将其删除，不将不同身份键的历史数据合并。
+
+```mermaid
+classDiagram
+    class IamApplicationService {
+        <<interface>>
+        findById(applicationId)
+        lock(applicationId)
+    }
+    class LoginApplicationResolver {
+        <<interface>>
+        resolve(request,response)
+        trusted(reference,capability,lock)
+    }
+    IamApplicationService <|.. IamApplicationServiceImpl
+    LoginApplicationResolver <|.. OAuth2LoginApplicationResolver
+    OAuth2LoginApplicationResolver --> IamApplicationService
+    HostedLoginClientPolicyService --> LoginApplicationResolver
+    BrowserLoginClientPolicyService --> LoginApplicationResolver
+    InAppLoginPolicyService --> LoginApplicationResolver
+    IdentityProviderUserBindingService --> LoginApplicationResolver
+    IdentityProviderUserBindingService --> ClientAccountDetailsService
+    ClientAccountDetailsService <|.. DefaultClientAccountDetailsService
+    DefaultClientAccountDetailsService --> IamApplicationService : 内部应用ID加载账号
+    OAuth2ClientRegistrationService <|.. OAuth2ClientRegistrationServiceImpl
+    OAuth2ClientRegistrationServiceImpl --> IamApplicationService
+    MaculaRegisteredClientRepository --> OAuth2ClientRegistrationService
+    IamApplicationServiceImpl --> IamApplicationProtocolRegistry
+    IamApplicationProtocolRegistry --> ApplicationProtocolDefinition
+    ApplicationProtocolDefinition <|.. OAuth2ProtocolDefinition
+```
+
+`OAuth2LoginApplicationResolver`独占当前SavedRequest中的OAuth参数校验：授权端点、参数唯一性、response_type、Scope、grant和精确回调。公共登录层只接收规范引用与应用快照，不解析OAuth设置。第三方既有Session/Token证明中的`clientId`、`registrationId`及序列化类型保持；它们不能作为未来SAML/CAS标识的替代。
+
+`OAuth2ClientRegistration`是协议发布投影，不映射数据库主表。只有该适配器读取原凭据摘要；`RegisteredClient.id`与`client_id`继续使用原公开OAuth标识，不改为内部应用主键。资源管理身份保留内部内省哨兵，不能取得业务grant。未分配历史槽永不发布。
 
 ## 2. 配置与装配
 
@@ -31,6 +80,28 @@ classDiagram
     class OAuth2ProtocolExtensionConfiguration
     class OAuth2TokenConfiguration
     class OAuth2PersistenceConfiguration
+    class IamApplicationType {
+        <<enumeration>>
+        WEB_SERVER
+        SPA
+        NATIVE
+        MINIAPP
+        SERVICE
+    }
+    class IamWebLoginMode {
+        <<enumeration>>
+        BROWSER
+        IN_APP
+    }
+    class IamApplicationLoginPolicy
+    class InAppLoginPolicyService
+    class InAppAuthorizationRequestFilter
+    IamApplicationLoginPolicy ..> IamApplicationType : 架构约束
+    IamApplicationLoginPolicy ..> IamWebLoginMode : Web模式及唯一能力
+    class IamApplicationServiceImpl
+    IamApplicationServiceImpl ..> IamWebLoginMode : 创建时固定，更新拒绝改变
+    InAppLoginPolicyService --> LoginApplicationResolver : 可信应用与能力许可
+    InAppAuthorizationRequestFilter --> InAppLoginPolicyService : 当前请求隔离
     class JwtConfiguration
     class MfaExtensionConfiguration
     class PasswordEncoderConfig
@@ -194,7 +265,7 @@ classDiagram
     class IdentityBindingMatcher {
         +candidates(...)
     }
-    class RegistrationIdentityBindingService {
+    class IdentityProviderUserBindingService {
         +findBound(...)
         +validateAccount(...)
         +bind(...)
@@ -208,7 +279,7 @@ classDiagram
     class Admission {
         +requireCurrent(identity,source)
     }
-    RegistrationIdentityBindingService ..> Admission : 锁内完整快照复核
+    IdentityProviderUserBindingService ..> Admission : 锁内完整快照复核
     class ProviderDirectoryPolicyService
     class ProviderDirectoryAdapter {
         <<interface>>
@@ -228,16 +299,16 @@ classDiagram
     IdentitySourceBindingPolicyService --> IdentityProviderConfigService
     IdentitySourceBindingPolicyService --> IdentityDirectoryService
     IdentitySourceBindingPolicyService ..> IdentityBindingMatcher : 构造候选匹配器
-    IdentitySourceBindingPolicyService --> RegistrationIdentityBindingService
+    IdentitySourceBindingPolicyService --> IdentityProviderUserBindingService
     IdentityDirectoryService <|.. ProviderDirectoryPolicyService
     ProviderDirectoryPolicyService --> ProviderDirectoryAdapter
-    RegistrationIdentityBindingService --> IdentityProviderConfigService
-    RegistrationIdentityBindingService --> ClientAccountDetailsService
+    IdentityProviderUserBindingService --> IdentityProviderConfigService
+    IdentityProviderUserBindingService --> ClientAccountDetailsService
     ClientAccountDetailsService <|.. DefaultClientAccountDetailsService
     HostedUserDetailsService --> ClientAccountDetailsService
-    ThirdPartyBindingService --> RegistrationIdentityBindingService
+    ThirdPartyBindingService --> IdentityProviderUserBindingService
     ThirdPartyBindingService --> IdentityDirectoryService
-    ExternalIdentityBindingService --> RegistrationIdentityBindingService
+    ExternalIdentityBindingService --> IdentityProviderUserBindingService
     ExternalIdentityBindingService --> IdentityDirectoryService
 ```
 
@@ -245,7 +316,7 @@ classDiagram
 。已有绑定不跳过目录准入；映射关闭、无候选或歧义不会自动创建/合并用户。
 
 - **IdentitySourceBindingPolicyService**决定何时复用绑定、何时自动匹配。
-- **RegistrationIdentityBindingService**复核Client范围、来源、账号状态与版本，维护稳定userId绑定；底层Mapper承担数据访问。
+- **IdentityProviderUserBindingService**复核Client范围、来源、账号状态与版本，维护稳定userId绑定；底层Mapper承担数据访问。
 - **IdentityDirectoryService**是公共准入端口，携带有界有效期Admission。具体实现处理成员查询、资料快照和后台刷新；公共身份规则不依赖该实现类。
 - **ClientAccountDetailsService**
   只接受显式Client/租户/用户类型快照，不读取当前HTTP请求。HostedUserDetailsService负责登录请求适配；协议或绑定无需借用浏览器请求来猜用户目录。
@@ -328,9 +399,26 @@ classDiagram
     }
     VerificationCodeStore <|.. RedisVerificationCodeStore
     VerificationCodeService --> VerificationCodeStore
-    SmsServiceImpl --> VerificationCodeService
+    class VerificationCodeChannelService {
+        <<interface>>
+        isAvailable()
+        sendCode(target, remoteAddress, context)
+        verifyCode(target, code, context)
+    }
+    VerificationCodeChannelService <|.. SmsCodeService
+    VerificationCodeChannelService <|.. EmailCodeService
+    VerificationCodeChannelService <|.. UnavailableVerificationCodeService
+    AbstractVerificationCodeAuthenticationFilter <|-- SmsAuthenticationFilter
+    AbstractVerificationCodeAuthenticationFilter <|-- EmailCodeAuthenticationFilter
+    AbstractVerificationCodeAuthenticationProvider <|-- SmsAuthenticationProvider
+    AbstractVerificationCodeAuthenticationProvider <|-- EmailCodeAuthenticationProvider
+    AbstractVerificationCodeAuthenticationProvider --> VerificationCodeChannelService
+    SmsCodeController --> VerificationCodeChannelService : smsCodeService
+    EmailCodeController --> VerificationCodeChannelService : emailCodeService
+    ThirdPartyBindingService --> VerificationCodeChannelService : smsCodeService
+    SmsCodeService --> VerificationCodeService
     EmailCodeService --> VerificationCodeService
-    SmsServiceImpl --> LoginSmsDispatcher
+    SmsCodeService --> LoginSmsDispatcher
     EmailCodeService --> LoginMailDispatcher
     class SmsSender {
         <<interface>>
@@ -352,11 +440,53 @@ classDiagram
     LoginMailDispatcher --> LoginMessageAudit
 ```
 
+两通道采用模板方法共享请求解析和认证流程，具体 Filter/Provider 只适配各自字段、目录端口及 Token。成功认证保留业务角色和 details，清除验证码；重复字段、非六位码及不可用账号一致拒绝。
+
+`VerificationCodeChannelService` 是调用方依赖的策略端口。`SmsCodeService`、`EmailCodeService` 分别固定通道，以组合方式复用内核；缺少设施时用 `UnavailableVerificationCodeService` 失败关闭。两个具名 Bean 通过 `@Qualifier` 注入，避免按公共接口误选。Configurer 显式接收依赖并只注册到登录链，保持独立类型以防 Spring Security 覆盖另一个通道的装配。
+
+`VerificationCodeContext` 由服务端创建，携带可信 Client、用途与邮件显示名，不作为 HTTP DTO，也不包含验证码。绑定短信必须有 Client，邮箱不接受绑定用途。两个 Token 保留原包名、字段及继承关系，兼容已有会话和授权存储。
+
 `authentication/verification` 负责验证码安全生命周期：申请额度、投递回调、成功后激活、一次性消费。Scope 明确通道、用途和
 Client；Redis 保留原 SMS 键和摘要，EMAIL 使用独立 `email-login` 命名空间，不能消费退役 email grant 的遗留记录。
 
 `message/sms`、`message/mail` 提供真实投递端口，`template` 只读取服务端渠道与模板，`audit`
 记录脱敏提交结果。采用组合、策略注册和适配器，避免用抽象父类强行统一邮件正文与短信供应商模板。投递成功仅代表已提交，不等于收件人收到。
 
-邮箱成功认证记录框架 OTT 因子的真实时间，供 OIDC `auth_time` 使用；框架因子不进入业务权限声明，也不代表完成 MFA。会话发布仍调用
+短信和邮箱成功认证均记录框架 OTT 因子的真实时间，供 OIDC `auth_time` 使用；框架因子不进入业务权限声明，也不代表完成 MFA。会话发布仍调用
 `MfaCompletionPolicy`，拒绝时不留下 SecurityContext。
+
+## 应用配置写入的职责边界
+
+System以应用为事务聚合：主行只保存公共元数据及登录策略，协议设置/凭据与来源关系分别存储。兼容HTTP字段在边界转换，不能通过clientId/settings等展示字段重新建立第二份持久化权威。
+
+```mermaid
+classDiagram
+    class IamApplicationService {
+        <<interface>>
+        save()
+        resetSecret()
+        createDraft()
+    }
+    class ApplicationProtocolDefinition {
+        <<interface>>
+        parse()
+        validate()
+        requiresSecret()
+    }
+    IamApplicationController --> IamApplicationService
+    IamApplicationServiceImpl ..|> IamApplicationService
+    IamApplicationServiceImpl --> IamApplicationPolicyValidator : 公共登录与来源
+    IamApplicationServiceImpl --> IamApplicationWireAdapter : HTTP兼容投影
+    IamApplicationServiceImpl --> IamApplicationProtocolService : 唯一登记与完整版本
+    IamApplicationServiceImpl --> OAuth2ClientCredentialService : 显式Secret操作
+    IamApplicationProtocolService --> IamApplicationProtocolRegistry
+    IamApplicationProtocolRegistry --> ApplicationProtocolDefinition
+    OAuth2ProtocolDefinition ..|> ApplicationProtocolDefinition
+    IamApplicationServiceImpl --> SysIamApplicationMapper
+    IamApplicationServiceImpl --> SysIamApplicationIdentityProviderMapper
+    IamApplicationProtocolService --> SysIamApplicationProtocolConfigMapper
+```
+
+保存先锁主应用，再读取完整配置版本；来源按ID排序锁定，避免与身份源删除形成孤儿关联。全部校验通过才写入，缓存只在提交后驱逐。响应从数据库实际落值重读，保证时间精度和审计字段不会造成下一次ETag误冲突。
+
+`OAuth2ClientCredentialService`只对明确的新Secret编码；普通编辑保留原哈希，旋转入口只更新哈希与应用授权版本。未选协议的历史槽不能认证，也不会因编辑名称丢失保留材料。资源管理身份的内部OAuth登记不改变公开的无业务协议视图。此处描述System管理写入；完整认证发布链须与IAM适配实现配套升级，不能单独切换数据库。

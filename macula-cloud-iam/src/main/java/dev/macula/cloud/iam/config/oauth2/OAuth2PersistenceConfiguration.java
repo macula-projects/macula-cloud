@@ -16,12 +16,11 @@
  */
 package dev.macula.cloud.iam.config.oauth2;
 
-import dev.macula.cloud.iam.mapper.SysOAuth2ClientExternalProviderMapper;
 import dev.macula.cloud.iam.protocol.oauth2.ProtocolAwareRegisteredClientRepository;
+import dev.macula.cloud.iam.protocol.oauth2.client.OAuth2ClientRegistrationService;
 import dev.macula.cloud.iam.protocol.oauth2.persistence.MaculaOAuth2AuthorizationConsentService;
 import dev.macula.cloud.iam.protocol.oauth2.persistence.MaculaOAuth2AuthorizationService;
 import dev.macula.cloud.iam.protocol.oauth2.persistence.MaculaRegisteredClientRepository;
-import dev.macula.cloud.iam.service.client.SysOAuth2ClientService;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
@@ -54,7 +53,7 @@ public class OAuth2PersistenceConfiguration {
     @Bean
     OAuth2AuthorizationService oauth2AuthorizationService(RedisTemplate<String, Object> redis,
             @Qualifier("baseRegisteredClientRepository") RegisteredClientRepository base,
-            SysOAuth2ClientService clients) {
+            OAuth2ClientRegistrationService clients) {
         return new MaculaOAuth2AuthorizationService(redis, base, clients);
     }
 
@@ -62,9 +61,8 @@ public class OAuth2PersistenceConfiguration {
      * 基础Client身份用于持久化恢复，避免依赖当前HTTP请求。
      */
     @Bean("baseRegisteredClientRepository")
-    RegisteredClientRepository baseRegisteredClientRepository(SysOAuth2ClientService clients,
-            SysOAuth2ClientExternalProviderMapper mappings) {
-        return new MaculaRegisteredClientRepository(clients, mappings);
+    RegisteredClientRepository baseRegisteredClientRepository(OAuth2ClientRegistrationService clients) {
+        return new MaculaRegisteredClientRepository(clients);
     }
 
     /**
@@ -74,7 +72,7 @@ public class OAuth2PersistenceConfiguration {
     @Primary
     RegisteredClientRepository registeredClientRepository(
             @Qualifier("baseRegisteredClientRepository") RegisteredClientRepository base,
-            SysOAuth2ClientService clients, ObjectProvider<OAuth2AuthorizationService> authorizations) {
+            OAuth2ClientRegistrationService clients, ObjectProvider<OAuth2AuthorizationService> authorizations) {
         return new ProtocolAwareRegisteredClientRepository(base, clients, authorizations);
     }
 }

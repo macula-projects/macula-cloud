@@ -25,12 +25,18 @@ import dev.macula.cloud.iam.authentication.thirdparty.directory.ProviderDirector
 import dev.macula.cloud.iam.service.identity.IdentityProviderConfigService.ProviderConfig;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -49,6 +55,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
  * @author Rain
  * @since 6.1.0
  */
+@ExtendWith(OutputCaptureExtension.class)
 class FeishuDirectoryClientTest {
     private static final String USER = "https://open.feishu.cn/open-apis/contact/v3/users/open-member?user_id_type" +
             "=open_id";
@@ -108,6 +115,44 @@ class FeishuDirectoryClientTest {
         var result = client.lookup(source, identity);
         assertEquals(ProviderDirectoryResult.Status.PERMISSION_DENIED, result.status());
         assertTrue(result.tolerableProfileFailure());
+        server.verify();
+    }
+    /**
+     * 未识别权限错误仍失败关闭，只增加平台码和已知权限诊断，不改变准入分类。
+     */
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void missingScopeRemainsClosedWithSafeDiagnostics(boolean httpError, CapturedOutput output) {
+        when(tokens.get(eq(source), anyString(), any())).thenReturn("private-token-marker");
+        String body = """
+                {"code":99991672,"msg":"private-response-marker","error":{
+                "permission_violations":[{"subject":"contact:user.id:readonly"},
+                {"subject":"private-secret-marker"}],"helps":[{"url":"https://private-url-marker"}]}}
+                """;
+        server.expect(requestTo(USER)).andRespond(httpError
+                ? withStatus(HttpStatus.BAD_REQUEST).contentType(MediaType.APPLICATION_JSON).body(body)
+                : withSuccess(body, MediaType.APPLICATION_JSON));
+        var result = client.lookup(source, identity);
+        assertEquals(ProviderDirectoryResult.Status.UNAVAILABLE, result.status());
+        assertFalse(result.tolerableProfileFailure());
+        assertTrue(output.toString().contains("code=99991672"));
+        assertTrue(output.toString().contains("contact:user.id:readonly"));
+        assertFalse(output.toString().contains("private-"));
+        server.verify();
+    }
+
+    /**
+     * 缓存异常仍是不可容忍失败，只记录异常类型，不带可能含密文的message。
+     */
+    @Test
+    void cacheFailureDoesNotLeakExceptionMessage(CapturedOutput output) {
+        when(tokens.get(eq(source), anyString(), any())).thenThrow(new IllegalStateException("private-secret-marker"));
+        var result = client.lookup(source, identity);
+        assertEquals(ProviderDirectoryResult.Status.UNAVAILABLE, result.status());
+        assertFalse(result.tolerableProfileFailure());
+        assertTrue(output.toString().contains("stage=tenant_token"));
+        assertTrue(output.toString().contains("exception=IllegalStateException"));
+        assertFalse(output.toString().contains("private-secret-marker"));
         server.verify();
     }
 }

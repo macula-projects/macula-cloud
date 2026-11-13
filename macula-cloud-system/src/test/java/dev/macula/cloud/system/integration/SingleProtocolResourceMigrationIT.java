@@ -16,6 +16,9 @@
  */
 package dev.macula.cloud.system.integration;
 
+import java.util.List;
+import org.springframework.dao.DataIntegrityViolationException;
+
 import java.util.UUID;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.AfterEach;
@@ -42,7 +45,7 @@ class SingleProtocolResourceMigrationIT {
     @Test
     void emptyDatabaseMigratesThroughAllHistoricalVersions() {
         var dataSource = isolated();
-        Flyway.configure().dataSource(dataSource).locations("classpath:db/migration").load().migrate();
+        Flyway.configure().dataSource(dataSource).locations("classpath:db/migration").target("19").load().migrate();
         var jdbc = new JdbcTemplate(dataSource);
         assertEquals("19", jdbc.queryForObject("SELECT version FROM flyway_schema_history WHERE success=1 ORDER BY installed_rank DESC LIMIT 1", String.class));
         assertEquals(5, jdbc.queryForObject("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() "
@@ -58,20 +61,20 @@ class SingleProtocolResourceMigrationIT {
         jdbc.update("INSERT INTO sys_oauth2_client(client_id,client_name,configuration_status,application_type,client_secret,tenant_id,user_type,client_authentication_methods,authorization_grant_types,redirect_uris,scopes,create_time,last_update_time) "
             + "VALUES('fixture-dual','fixture','ENABLED','WEB_SERVER','synthetic-hash',1,'employee','client_secret_basic','authorization_code','https://fixture.example/cb','openid',NOW(),NOW())");
         Long id = jdbc.queryForObject("SELECT id FROM sys_oauth2_client WHERE client_id='fixture-dual'", Long.class);
-        for (String protocol : java.util.List.of("OIDC", "OAUTH2_1")) {
+        for (String protocol : List.of("OIDC", "OAUTH2_1")) {
             jdbc.update("INSERT INTO sys_application_protocol_config(application_id,protocol,schema_version,enabled,configuration) VALUES(?,?,1,1,'{}')", id, protocol);
         }
-        var flyway = Flyway.configure().dataSource(dataSource).locations("classpath:db/migration").load();
+        var flyway = Flyway.configure().dataSource(dataSource).locations("classpath:db/migration").target("19").load();
         flyway.migrate();
         assertEquals(id, jdbc.queryForObject("SELECT id FROM sys_oauth2_client WHERE client_id='fixture-dual'", Long.class));
         assertEquals("synthetic-hash", jdbc.queryForObject("SELECT client_secret FROM sys_oauth2_client WHERE id=?", String.class, id));
         assertEquals("DRAFT", jdbc.queryForObject("SELECT configuration_status FROM sys_oauth2_client WHERE id=?", String.class, id));
         assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM sys_application_protocol_config WHERE application_id=?", Integer.class, id));
         jdbc.update("INSERT INTO sys_application_protocol_config(application_id,protocol,schema_version,enabled,configuration) VALUES(?,'OIDC',1,0,'{}')", id);
-        assertThrows(org.springframework.dao.DataIntegrityViolationException.class, () -> jdbc.update(
+        assertThrows(DataIntegrityViolationException.class, () -> jdbc.update(
             "INSERT INTO sys_application_protocol_config(application_id,protocol,schema_version,enabled,configuration) VALUES(?,'OAUTH2_1',1,0,'{}')", id));
         jdbc.update("UPDATE sys_oauth2_client SET managed_key='platform-fixture' WHERE id=?", id);
-        assertThrows(org.springframework.dao.DataIntegrityViolationException.class, () -> jdbc.update(
+        assertThrows(DataIntegrityViolationException.class, () -> jdbc.update(
             "INSERT INTO sys_oauth2_client(client_id,client_name,managed_key,client_authentication_methods,authorization_grant_types,redirect_uris,scopes,create_time,last_update_time) VALUES('duplicate','fixture','platform-fixture','','','','',NOW(),NOW())"));
         assertEquals(0, flyway.migrate().migrationsExecuted);
     }

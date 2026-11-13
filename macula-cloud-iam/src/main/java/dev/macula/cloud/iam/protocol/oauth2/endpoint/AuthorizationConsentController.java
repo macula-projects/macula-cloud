@@ -20,7 +20,9 @@ package dev.macula.cloud.iam.protocol.oauth2.endpoint;
 import java.security.Principal;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 
 import lombok.AllArgsConstructor;
 import org.springframework.security.oauth2.core.endpoint.OAuth2ParameterNames;
@@ -75,13 +77,13 @@ public class AuthorizationConsentController {
         Set<String> authorizedScopes =
                 currentAuthorizationConsent != null ? currentAuthorizationConsent.getScopes() : Collections.emptySet();
 
-        Set<String> scopesToApproves = new java.util.TreeSet<>();
-        Set<String> previouslyApprovedScopesSet = new java.util.TreeSet<>();
+        Set<String> scopesToApproves = new TreeSet<>();
+        Set<String> previouslyApprovedScopesSet = new TreeSet<>();
 
         String[] scopes = StringUtils.delimitedListToStringArray(scope, " ");
         model.addAttribute("openidRequested", Arrays.asList(scopes).contains(OidcScopes.OPENID)
                 && registeredClient.getScopes().contains(OidcScopes.OPENID));
-        model.addAttribute("scopeLabels", java.util.Map.of("profile", "基本资料", "email", "电子邮箱",
+        model.addAttribute("scopeLabels", Map.of("profile", "基本资料", "email", "电子邮箱",
                 "phone", "手机号码", "address", "联系地址", "offline_access", "离线访问"));
 
         Arrays.stream(scopes).filter(s -> registeredClient.getScopes().contains(s) && !OidcScopes.OPENID.equals(s))

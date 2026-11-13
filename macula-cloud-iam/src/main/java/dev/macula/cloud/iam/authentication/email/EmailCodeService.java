@@ -16,8 +16,12 @@
  */
 package dev.macula.cloud.iam.authentication.email;
 
+import java.util.Objects;
+
 import dev.macula.cloud.iam.authentication.verification.EmailVerificationProperties;
 import dev.macula.cloud.iam.authentication.verification.VerificationChannel;
+import dev.macula.cloud.iam.authentication.verification.VerificationCodeChannelService;
+import dev.macula.cloud.iam.authentication.verification.VerificationCodeContext;
 import dev.macula.cloud.iam.authentication.verification.VerificationCodePurpose;
 import dev.macula.cloud.iam.authentication.verification.VerificationCodeScope;
 import dev.macula.cloud.iam.authentication.verification.VerificationCodeService;
@@ -26,52 +30,56 @@ import dev.macula.cloud.system.security.UserIdentifierNormalizer;
 import lombok.RequiredArgsConstructor;
 
 /**
- * 托管邮箱验证码适配，和SMS共用状态算法但不共享凭据命名空间。
+ * 邮箱验证码通道适配；只承担规范化与投递，不复制验证码状态算法。
  *
  * @author Macula
  * @since 6.1.0
  */
 @RequiredArgsConstructor
-public class EmailCodeService {
+public final class EmailCodeService implements VerificationCodeChannelService {
     private final VerificationCodeService codes;
-    private final LoginMailDispatcher mail;
+    private final LoginMailDispatcher dispatcher;
     private final UserIdentifierNormalizer normalizer;
     private final EmailVerificationProperties settings;
 
-    /**
-     * 收件地址合法即可受限发送，不在发码接口枚举本地账号。
-     */
-    public void send(String email, String remote, String clientId, String clientName) {
-        String target = normalize(email);
-        codes.send(scope(clientId), target, remote, settings,
-                code -> mail.send(target, code, clientName, settings.getTtl()));
+    /** 完整设施可用，渠道凭据仍在提交时校验。 */
+    @Override
+    public boolean isAvailable() {
+        return true;
     }
 
-    /**
-     * 消费码后仍由认证Provider加载当前Client的唯一合法账号。
-     */
-    public boolean verify(String email, String code, String clientId) {
-        if (email == null || code == null) {
+    /** 规范化后提交投递，额度和激活时序由共享内核控制。 */
+    @Override
+    public void sendCode(String target, String remoteAddress, VerificationCodeContext context) {
+        VerificationCodeScope scope = scope(context);
+        String normalized = normalize(target);
+        codes.send(scope, normalized, remoteAddress, settings, code -> dispatcher.send(normalized, code, context.clientName(), settings.getTtl()));
+    }
+
+    /** 错误标识或非法用途不进入消费，不查询账号存在性。 */
+    @Override
+    public boolean verifyCode(String target, String rawCode, VerificationCodeContext context) {
+        if (target == null || rawCode == null || context == null) {
             return false;
         }
         try {
-            return codes.verify(scope(clientId), normalize(email), code, settings);
+            return codes.verify(scope(context), normalize(target), rawCode, settings);
         } catch (IllegalArgumentException ex) {
             return false;
         }
     }
 
-    /**
-     * 场景由服务端固定，不允许调用方选择绑定或协议grant用途。
-     */
-    private VerificationCodeScope scope(String clientId) {
-        return new VerificationCodeScope(VerificationChannel.EMAIL, VerificationCodePurpose.LOGIN, clientId);
+    /** 固定通道，保留原Client/用途摘要合同。 */
+    private VerificationCodeScope scope(VerificationCodeContext context) {
+        Objects.requireNonNull(context, "验证码上下文不能为空");
+        if (context.purpose() != VerificationCodePurpose.LOGIN) {
+            throw new IllegalArgumentException("邮箱不支持此验证码用途");
+        }
+        return new VerificationCodeScope(VerificationChannel.EMAIL, context.purpose(), context.clientId());
     }
 
-    /**
-     * 与账号目录复用相同邮箱规范化规则。
-     */
-    private String normalize(String value) {
-        return normalizer.email(value).orElseThrow(() -> new IllegalArgumentException("邮箱格式无效"));
+    /** 复用账号目录的标识规范化，不更改历史存量数据。 */
+    private String normalize(String target) {
+        return normalizer.email(target).orElseThrow(() -> new IllegalArgumentException("邮箱格式无效"));
     }
 }

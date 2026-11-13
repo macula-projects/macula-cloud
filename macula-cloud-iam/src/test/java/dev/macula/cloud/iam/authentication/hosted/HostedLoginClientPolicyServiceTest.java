@@ -16,11 +16,13 @@
  */
 package dev.macula.cloud.iam.authentication.hosted;
 
+import dev.macula.cloud.iam.protocol.oauth2.ProtocolTestFixtures;
+import dev.macula.cloud.iam.protocol.oauth2.client.OAuth2ClientRegistration;
+import dev.macula.cloud.iam.protocol.oauth2.client.OAuth2ClientRegistrationService;
+import dev.macula.cloud.iam.service.application.IamApplicationTestFixtures;
+import dev.macula.cloud.system.enums.HostedLoginMethod;
+import dev.macula.cloud.system.protocol.OAuth2ProtocolSettings;
 import java.util.Set;
-
-import dev.macula.cloud.iam.pojo.entity.SysOAuth2Client;
-import dev.macula.cloud.iam.service.client.SysOAuth2ClientService;
-import dev.macula.cloud.system.enums.OAuth2HostedLoginMethod;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -42,9 +44,8 @@ import static org.mockito.Mockito.when;
  * @since 6.1.0
  */
 class HostedLoginClientPolicyServiceTest {
-    private final SysOAuth2ClientService clients = mock(SysOAuth2ClientService.class);
-    private final HostedLoginClientPolicyService service = new HostedLoginClientPolicyService(clients,
-            AuthorizationServerSettings.builder().build(), true, true, true);
+    private final OAuth2ClientRegistrationService clients = mock(OAuth2ClientRegistrationService.class);
+    private final HostedLoginClientPolicyService service = new HostedLoginClientPolicyService(IamApplicationTestFixtures.resolver(clients, AuthorizationServerSettings.builder().build()), true, true, true);
 
     /**
      * 缺少SavedRequest的Client声明不能降级为门户。
@@ -53,7 +54,7 @@ class HostedLoginClientPolicyServiceTest {
     void rejectsForgedContextAndKeepsPlainPortal() {
         MockHttpServletRequest request = new MockHttpServletRequest();
         assertEquals(
-                Set.of(OAuth2HostedLoginMethod.PASSWORD, OAuth2HostedLoginMethod.SMS, OAuth2HostedLoginMethod.EMAIL),
+                Set.of(HostedLoginMethod.PASSWORD, HostedLoginMethod.SMS, HostedLoginMethod.EMAIL),
                 service.resolve(request, new MockHttpServletResponse()).methods());
         request.addParameter("client_id", "test");
         assertThrows(AuthenticationServiceException.class,
@@ -65,20 +66,19 @@ class HostedLoginClientPolicyServiceTest {
      */
     @Test
     void enforcesCallbackAndPolicyIntersection() {
-        SysOAuth2Client client = new SysOAuth2Client();
+        OAuth2ClientRegistration client = new OAuth2ClientRegistration();
         client.setClientId("test");
         client.setAuthorizationGrantTypes("authorization_code");
         client.setRedirectUris("https://client.example/callback");
-        dev.macula.cloud.iam.protocol.oauth2.ProtocolTestFixtures.configure(client);
+        ProtocolTestFixtures.configure(client);
         when(clients.getClientByClientId("test")).thenReturn(client);
         MockHttpServletRequest request = request("https://client.example/callback");
         request.addParameter("client_id", "attacker");
         assertEquals("test", service.resolve(request, new MockHttpServletResponse()).clientId());
         client.setHostedLoginMethods("SMS");
-        assertEquals(Set.of(OAuth2HostedLoginMethod.SMS),
+        assertEquals(Set.of(HostedLoginMethod.SMS),
                 service.resolve(request, new MockHttpServletResponse()).methods());
-        var globallyDisabled = new HostedLoginClientPolicyService(clients,
-                AuthorizationServerSettings.builder().build(), true, false, true);
+        var globallyDisabled = new HostedLoginClientPolicyService(IamApplicationTestFixtures.resolver(clients, AuthorizationServerSettings.builder().build()), true, false, true);
         assertTrue(globallyDisabled.resolve(request, new MockHttpServletResponse()).methods().isEmpty());
         client.setHostedLoginMethods("");
         assertTrue(service.resolve(request, new MockHttpServletResponse()).methods().isEmpty());
@@ -98,11 +98,11 @@ class HostedLoginClientPolicyServiceTest {
      */
     @Test
     void rejectsPollutedAndNonAuthorizationSavedRequests() {
-        SysOAuth2Client client = new SysOAuth2Client();
+        OAuth2ClientRegistration client = new OAuth2ClientRegistration();
         client.setClientId("test");
         client.setAuthorizationGrantTypes("authorization_code");
         client.setRedirectUris("https://client.example/callback");
-        dev.macula.cloud.iam.protocol.oauth2.ProtocolTestFixtures.configure(client);
+        ProtocolTestFixtures.configure(client);
         when(clients.getClientByClientId("test")).thenReturn(client);
         for (String field : Set.of("client_id", "response_type", "redirect_uri")) {
             MockHttpServletRequest saved = new MockHttpServletRequest("GET", "/oauth2/authorize");
@@ -119,7 +119,7 @@ class HostedLoginClientPolicyServiceTest {
             assertThrows(AuthenticationServiceException.class,
                     () -> service.resolve(request, new MockHttpServletResponse()));
         }
-        ((dev.macula.cloud.system.protocol.OAuth2ProtocolSettings) client.getProtocolConfigurations().get(0).settings())
+        ((OAuth2ProtocolSettings) client.getProtocolConfigurations().get(0).settings())
                 .setAuthorizationGrantTypes("client_credentials");
         assertThrows(AuthenticationServiceException.class,
                 () -> service.resolve(request("https://client.example/callback"), new MockHttpServletResponse()));

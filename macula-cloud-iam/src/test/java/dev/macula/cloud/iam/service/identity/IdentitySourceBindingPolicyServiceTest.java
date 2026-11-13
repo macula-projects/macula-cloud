@@ -16,18 +16,21 @@
  */
 package dev.macula.cloud.iam.service.identity;
 
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-
+import dev.macula.cloud.iam.authentication.thirdparty.BindingTestTransactions;
 import dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures;
 import dev.macula.cloud.iam.authentication.thirdparty.VerifiedExternalIdentity;
 import dev.macula.cloud.iam.enums.UserTypeEnum;
 import dev.macula.cloud.iam.mapper.SysUserMapper;
 import dev.macula.cloud.iam.pojo.entity.SysUser;
 import dev.macula.cloud.system.enums.IdentityBindingRule;
+import dev.macula.cloud.system.enums.IdentityDirectoryPolicy;
+import dev.macula.cloud.system.enums.IdentitySourceFlow;
 import dev.macula.cloud.system.enums.IdentitySourceType;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentMatchers;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.userdetails.User;
 
@@ -49,11 +52,11 @@ import static org.mockito.Mockito.when;
  * @since 6.1.0
  */
 class IdentitySourceBindingPolicyServiceTest {
-    private final RegistrationIdentityBindingService bindings = mock(RegistrationIdentityBindingService.class);
+    private final IdentityProviderUserBindingService bindings = mock(IdentityProviderUserBindingService.class);
     private final IdentityProviderConfigService configs = mock(IdentityProviderConfigService.class);
     private final SysUserMapper users = mock(SysUserMapper.class);
     private final IdentitySourceBindingPolicyService policy = new IdentitySourceBindingPolicyService(bindings, configs,
-            users, dev.macula.cloud.iam.authentication.thirdparty.BindingTestTransactions.directory());
+            users, BindingTestTransactions.directory());
     private final VerifiedExternalIdentity identity = IdentitySourceTestFixtures.sdkIdentity("WECOM", "alice")
             .identity();
 
@@ -77,7 +80,7 @@ class IdentitySourceBindingPolicyServiceTest {
         assertTrue(policy.resolve("app", 1L, UserTypeEnum.EMPLOYEE, identity).isEmpty());
         verifyNoInteractions(users);
         verify(bindings, never()).bind(any(), any(), any(), any(), any(), anyBoolean(),
-                org.mockito.ArgumentMatchers.isNull());
+                ArgumentMatchers.isNull());
     }
 
     /**
@@ -105,7 +108,7 @@ class IdentitySourceBindingPolicyServiceTest {
         assertTrue(policy.resolve("app", 1L, UserTypeEnum.EMPLOYEE, identity).isEmpty());
         assertTrue(policy.resolve("app", 1L, UserTypeEnum.EMPLOYEE, identity).isEmpty());
         verify(bindings, never()).bind(any(), any(), any(), any(), any(), anyBoolean(),
-                org.mockito.ArgumentMatchers.isNull());
+                ArgumentMatchers.isNull());
     }
 
     /**
@@ -115,7 +118,7 @@ class IdentitySourceBindingPolicyServiceTest {
     void missingAttributeRequiresManualBinding() {
         source(true);
         var missing = new VerifiedExternalIdentity(1L, "WECOM", "WECOM_SDK", 0L,
-                dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.flow("WECOM_SDK"),
+                IdentitySourceTestFixtures.flow("WECOM_SDK"),
                 "WECOM_APP_CODE", "MEMBER_ID", "id", Map.of());
         assertTrue(policy.resolve("app", 1L, UserTypeEnum.EMPLOYEE, missing).isEmpty());
         verifyNoInteractions(users);
@@ -131,7 +134,7 @@ class IdentitySourceBindingPolicyServiceTest {
         user.setId(7L);
         when(users.findIdentityBindingCandidates(any(), any(), any(), any(), anyBoolean())).thenReturn(List.of(user));
         when(bindings.bind(any(), any(), any(), any(), any(), anyBoolean(),
-                org.mockito.ArgumentMatchers.isNull())).thenThrow(new BadCredentialsException("disabled"));
+                ArgumentMatchers.isNull())).thenThrow(new BadCredentialsException("disabled"));
         assertThrows(BadCredentialsException.class, () -> policy.resolve("app", 1L, UserTypeEnum.EMPLOYEE, identity));
     }
 
@@ -142,7 +145,7 @@ class IdentitySourceBindingPolicyServiceTest {
         when(configs.requireEnabledById(1L, "WECOM")).thenReturn(new IdentityProviderConfigService.ProviderConfig(
                 1L, IdentitySourceType.WECOM_SDK, enabled, enabled ? IdentityBindingRule.MEMBER_ID_TO_USERNAME : null,
                 0L, "WECOM", "corp", "secret", Map.of(), Map.of(), true,
-                dev.macula.cloud.system.enums.IdentitySourceFlow.WECOM_SDK_V1,
-                dev.macula.cloud.system.enums.IdentityDirectoryPolicy.IDENTITY_ONLY, null, null));
+                IdentitySourceFlow.WECOM_SDK_V1,
+                IdentityDirectoryPolicy.IDENTITY_ONLY, null, null));
     }
 }

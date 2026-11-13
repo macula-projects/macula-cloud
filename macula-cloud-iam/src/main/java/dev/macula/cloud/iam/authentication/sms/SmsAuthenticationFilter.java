@@ -16,76 +16,25 @@
  */
 package dev.macula.cloud.iam.authentication.sms;
 
-import dev.macula.cloud.iam.authentication.hosted.HostedLoginClientPolicyService;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-import org.jspecify.annotations.NonNull;
-import org.springframework.core.convert.converter.Converter;
-import org.springframework.http.HttpMethod;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.AuthenticationServiceException;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.AuthenticationException;
-import org.springframework.security.web.authentication.AbstractAuthenticationProcessingFilter;
-import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
+import dev.macula.cloud.iam.authentication.verification.AbstractVerificationCodeAuthenticationFilter;
 
 /**
- * 将短信登录请求转换为 {@link SmsAuthenticationToken}。
+ * Sms表单入口，字段边界及可信上下文由共用模板校验。
  *
- * @author n1
+ * @author Macula
  * @since 6.1.0
  */
-public class SmsAuthenticationFilter extends AbstractAuthenticationProcessingFilter {
-    public static final String SPRING_SECURITY_FORM_PHONE_KEY = "phone";
+public class SmsAuthenticationFilter extends AbstractVerificationCodeAuthenticationFilter<SmsAuthenticationToken> {
+    public static final String PATH = "/login/sms";
 
-    public static final String SPRING_SECURITY_FORM_CODE_KEY = "code";
-
-    private static final PathPatternRequestMatcher DEFAULT_REQUEST_MATCHER =
-            PathPatternRequestMatcher.pathPattern(HttpMethod.POST, "/login/sms");
-
-    private final String phoneParameter = SPRING_SECURITY_FORM_PHONE_KEY;
-
-    private final String codeParameter = SPRING_SECURITY_FORM_CODE_KEY;
-
-    private final Converter<HttpServletRequest, SmsAuthenticationToken> smsAuthenticationTokenConverter;
-
+    /** 固定该通道的入口与标识字段。 */
     public SmsAuthenticationFilter() {
-        super(DEFAULT_REQUEST_MATCHER);
-        this.smsAuthenticationTokenConverter = defaultConverter();
+        super(PATH, "phone", 24);
     }
 
-    public SmsAuthenticationFilter(AuthenticationManager authenticationManager) {
-        super(DEFAULT_REQUEST_MATCHER, authenticationManager);
-        this.smsAuthenticationTokenConverter = defaultConverter();
-    }
-
+    /** 保留原载体，不更改持久化类型与字段。 */
     @Override
-    public Authentication attemptAuthentication(HttpServletRequest request, @NonNull HttpServletResponse response)
-            throws AuthenticationException {
-        if (!HttpMethod.POST.matches(request.getMethod())) {
-            throw new AuthenticationServiceException("Authentication method not supported: " + request.getMethod());
-        }
-
-        SmsAuthenticationToken authRequest = smsAuthenticationTokenConverter.convert(request);
-        // Allow subclasses to set the "details" property
-        setDetails(request, authRequest);
-        return this.getAuthenticationManager().authenticate(authRequest);
-    }
-
-    /**
-     * 验证码消费绑定到发码时的可信Client，门户路径为空。
-     */
-    private Converter<HttpServletRequest, SmsAuthenticationToken> defaultConverter() {
-        return request -> {
-            String phone = request.getParameter(this.phoneParameter);
-            phone = (phone != null) ? phone.trim() : "";
-            String code = request.getParameter(this.codeParameter);
-            code = (code != null) ? code.trim() : "";
-            return new SmsAuthenticationToken(phone, code, HostedLoginClientPolicyService.context(request).clientId());
-        };
-    }
-
-    protected void setDetails(HttpServletRequest request, SmsAuthenticationToken authRequest) {
-        authRequest.setDetails(this.authenticationDetailsSource.buildDetails(request));
+    protected SmsAuthenticationToken createToken(String identifier, String code, String clientId) {
+        return new SmsAuthenticationToken(identifier, code, clientId);
     }
 }

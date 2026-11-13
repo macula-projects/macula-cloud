@@ -18,7 +18,9 @@ package dev.macula.cloud.iam.authentication.dingtalk;
 
 import java.util.Map;
 
+import dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures;
 import dev.macula.cloud.iam.service.identity.IdentityProviderConfigService.ProviderConfig;
+import dev.macula.cloud.system.enums.IdentitySourceType;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.authentication.AuthenticationServiceException;
@@ -49,8 +51,8 @@ class DingtalkLoginModeTest {
     @Test
     void browserUsesOfficialEndpointAndWebviewLoginIsRejected() {
         DingtalkClient client = new DingtalkClient();
-        ProviderConfig config = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.source(
-                dev.macula.cloud.system.enums.IdentitySourceType.DINGTALK_WEB, "DINGTALK", "app", "secret", Map.of(
+        ProviderConfig config = IdentitySourceTestFixtures.source(
+                IdentitySourceType.DINGTALK_WEB, "DINGTALK", "app", "secret", Map.of(
                         "appKey", "app", "corpId", "corp"));
         String callback = "https://iam.example/login/dingtalk";
         assertTrue(client.authorizationUri(config, "state-value", callback, DingtalkLoginMode.BROWSER)

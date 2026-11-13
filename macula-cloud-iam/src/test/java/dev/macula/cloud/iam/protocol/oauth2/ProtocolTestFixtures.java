@@ -16,15 +16,14 @@
  */
 package dev.macula.cloud.iam.protocol.oauth2;
 
+import dev.macula.cloud.iam.enums.UserTypeEnum;
+import dev.macula.cloud.iam.protocol.oauth2.client.OAuth2ClientRegistration;
+import dev.macula.cloud.system.protocol.ApplicationProtocolConfiguration;
+import dev.macula.cloud.system.protocol.OAuth2ProtocolSettings;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
-
-import dev.macula.cloud.iam.enums.UserTypeEnum;
-import dev.macula.cloud.iam.pojo.entity.SysOAuth2Client;
-import dev.macula.cloud.system.protocol.ApplicationProtocolConfiguration;
-import dev.macula.cloud.system.protocol.OAuth2ProtocolSettings;
 
 /**
  * 将前序测试素材显式转为新子配置；生产代码不能使用该迁移辅助。
@@ -42,7 +41,14 @@ public final class ProtocolTestFixtures {
     /**
      * 使用明确的测试应用身份及两份独立设置，避免共享可变对象。
      */
-    public static SysOAuth2Client configure(SysOAuth2Client row) {
+    public static OAuth2ClientRegistration configure(OAuth2ClientRegistration row) {
+        String selected = row.getProtocolConfigurations() == null || row.getProtocolConfigurations().isEmpty()
+            ? "OIDC" : row.getProtocolConfigurations().get(0).protocol();
+        return configure(row, selected);
+    }
+
+    /** 单协议夹具显式选择发布协议，不再恢复旧主表的默认/启用字段。 */
+    public static OAuth2ClientRegistration configure(OAuth2ClientRegistration row, String protocol) {
         row.setPurpose("APPLICATION");
         if (row.getAuthorizationVersion() == null) {
             row.setAuthorizationVersion(1L);
@@ -57,18 +63,12 @@ public final class ProtocolTestFixtures {
             row.setUserType(UserTypeEnum.EMPLOYEE);
         }
         if (row.getApplicationType() == null) {
-            row.setApplicationType("WEB_SERVER");
+            row.setApplicationType("none".equals(row.getClientAuthenticationMethods()) ? "SPA" : "WEB_SERVER");
         }
         if (row.getConfigurationStatus() == null) {
             row.setConfigurationStatus("ENABLED");
         }
-        if (row.getDefaultProtocol() == null) {
-            row.setDefaultProtocol("OIDC");
-        }
-        String codes = row.getEnabledProtocols() == null ? row.getDefaultProtocol() : row.getEnabledProtocols();
-        if (codes.contains(",")) {
-            codes = row.getDefaultProtocol();
-        }
+        String codes = protocol.contains(",") ? "OIDC" : protocol;
         row.setProtocolConfigurations(Arrays.stream(codes.split(",")).map(code -> {
             var settings = new OAuth2ProtocolSettings();
             settings.setClientAuthenticationMethods(
@@ -87,8 +87,8 @@ public final class ProtocolTestFixtures {
                 scopes = Arrays.stream(scopes.split(",")).filter(value -> !"openid".equals(value))
                         .collect(Collectors.joining(","));
             }
-            if (java.util.Set.of(grants.split(",")).contains("client_credentials")) {
-                scopes = java.util.Arrays.stream(scopes.split(",")).filter(value -> !"profile".equals(value))
+            if (Set.of(grants.split(",")).contains("client_credentials")) {
+                scopes = Arrays.stream(scopes.split(",")).filter(value -> !"profile".equals(value))
                         .collect(Collectors.joining(","));
             }
             settings.setScopes(scopes);

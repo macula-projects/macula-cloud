@@ -18,9 +18,12 @@ package dev.macula.cloud.iam.message.mail;
 
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.Properties;
 
 import dev.macula.cloud.iam.message.support.FakeSmtpServer;
 import dev.macula.cloud.iam.pojo.entity.SysMessageProvider;
+import jakarta.mail.Session;
+import jakarta.mail.internet.MimeMessage;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -41,8 +44,8 @@ class SmtpMailSenderTest {
         try (var smtp = new FakeSmtpServer()) {
             var provider = provider(smtp.port());
             new SmtpMailSender().send(provider, "alice@example.test", "Macula", "Login", "<b>123456</b>");
-            var message = new jakarta.mail.internet.MimeMessage(
-                    jakarta.mail.Session.getInstance(new java.util.Properties()),
+            var message = new MimeMessage(
+                    Session.getInstance(new Properties()),
                     new ByteArrayInputStream(smtp.message().getBytes(StandardCharsets.UTF_8)));
             assertThat(message.getAllRecipients()[0].toString()).isEqualTo("alice@example.test");
             assertThat(message.getSubject()).isEqualTo("Login");

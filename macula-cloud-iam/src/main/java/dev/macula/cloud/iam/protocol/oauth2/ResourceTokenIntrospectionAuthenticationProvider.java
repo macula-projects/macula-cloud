@@ -16,12 +16,12 @@
  */
 package dev.macula.cloud.iam.protocol.oauth2;
 
+import dev.macula.cloud.iam.protocol.oauth2.client.OAuth2ClientRegistrationService;
+import dev.macula.cloud.system.security.OAuth2ResourcePolicy;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
-
-import dev.macula.cloud.iam.service.client.SysOAuth2ClientService;
-import dev.macula.cloud.system.security.OAuth2ResourcePolicy;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
@@ -44,7 +44,7 @@ public final class ResourceTokenIntrospectionAuthenticationProvider implements A
     private static final Set<String> COMMON = Set.of("active", "client_id", "sub", "iss", "iat", "exp", "nbf",
             "token_type");
     private static final Set<String> SYSTEM = Set.of("tenantId", "authorities", "deptId", "dataScope", "grant_type");
-    private final SysOAuth2ClientService clients;
+    private final OAuth2ClientRegistrationService clients;
     private final OAuth2AuthorizationService authorizations;
     private final AuthenticationProvider delegate;
 
@@ -52,7 +52,7 @@ public final class ResourceTokenIntrospectionAuthenticationProvider implements A
      * 原生provider验证并恢复claims；响应仅包含既有安全元数据。
      */
     public ResourceTokenIntrospectionAuthenticationProvider(RegisteredClientRepository base,
-            OAuth2AuthorizationService authorizations, SysOAuth2ClientService clients) {
+            OAuth2AuthorizationService authorizations, OAuth2ClientRegistrationService clients) {
         this.clients = clients;
         this.authorizations = authorizations;
         this.delegate = new OAuth2TokenIntrospectionAuthenticationProvider(base, authorizations);
@@ -76,7 +76,7 @@ public final class ResourceTokenIntrospectionAuthenticationProvider implements A
         if (authenticatedVersion == null || client.getAuthorizationVersion() == null
                 || authenticatedVersion.longValue() != client.getAuthorizationVersion()
                 ||
-                !java.util.Objects.equals(caller.getRegisteredClient().getClientSecret(), client.getClientSecret())) {
+                !Objects.equals(caller.getRegisteredClient().getClientSecret(), client.getClientSecret())) {
             throw new OAuth2AuthenticationException(OAuth2ErrorCodes.INVALID_CLIENT);
         }
         var authorization = authorizations.findByToken(request.getToken(), OAuth2TokenType.ACCESS_TOKEN);

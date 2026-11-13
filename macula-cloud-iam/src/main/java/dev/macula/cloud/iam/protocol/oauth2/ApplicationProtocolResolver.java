@@ -16,13 +16,12 @@
  */
 package dev.macula.cloud.iam.protocol.oauth2;
 
-import java.util.Set;
-
-import dev.macula.cloud.iam.pojo.entity.SysOAuth2Client;
+import dev.macula.cloud.iam.protocol.oauth2.client.OAuth2ClientRegistration;
 import dev.macula.cloud.system.protocol.ApplicationProtocolConfiguration;
 import dev.macula.cloud.system.protocol.ApplicationProtocolRegistry;
 import dev.macula.cloud.system.protocol.OAuth2ProtocolConfiguration;
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.Set;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2ErrorCodes;
 import org.springframework.security.oauth2.server.authorization.OAuth2Authorization;
@@ -74,7 +73,7 @@ public final class ApplicationProtocolResolver {
     /**
      * 管理端点选择调用方配置，目标令牌不参与认证协议选择。
      */
-    public ApplicationProtocolConfiguration resolve(SysOAuth2Client client, HttpServletRequest request) {
+    public ApplicationProtocolConfiguration resolve(OAuth2ClientRegistration client, HttpServletRequest request) {
         String path = request.getRequestURI().substring(request.getContextPath().length());
         String protocol;
         if (Set.of("/oauth2/introspect", "/oauth2/revoke").contains(path)) {

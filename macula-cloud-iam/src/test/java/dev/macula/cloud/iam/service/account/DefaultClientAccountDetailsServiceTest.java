@@ -19,9 +19,13 @@ package dev.macula.cloud.iam.service.account;
 
 import dev.macula.cloud.iam.enums.UserTypeEnum;
 import dev.macula.cloud.iam.pojo.dto.UserAuthInfo;
-import dev.macula.cloud.iam.pojo.entity.SysOAuth2Client;
-import dev.macula.cloud.iam.service.client.SysOAuth2ClientService;
+import dev.macula.cloud.iam.pojo.entity.SysUser;
+import dev.macula.cloud.iam.protocol.oauth2.client.OAuth2ClientRegistration;
+import dev.macula.cloud.iam.protocol.oauth2.client.OAuth2ClientRegistrationService;
+import dev.macula.cloud.iam.service.application.IamApplicationTestFixtures;
 import dev.macula.cloud.iam.service.userdetails.SysUserDetails;
+import dev.macula.cloud.system.security.UserIdentifierNormalizer;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.DisabledException;
@@ -45,13 +49,13 @@ class DefaultClientAccountDetailsServiceTest {
     @Test
     void rejectsChangedTenantBeforeLoadingDirectory() {
         var users = mock(SysUserService.class);
-        var clients = mock(SysOAuth2ClientService.class);
+        var clients = mock(OAuth2ClientRegistrationService.class);
         var client = client();
         client.setTenantId(2L);
         when(clients.getClientByClientId("app")).thenReturn(client);
         var directory = mock(UserAuthInfoService.class);
-        var service = new DefaultClientAccountDetailsService(users, clients, directory,
-                new ClientAwareAccountResolver(users, new dev.macula.cloud.system.security.UserIdentifierNormalizer()));
+        var service = IamApplicationTestFixtures.accounts(users, clients, directory,
+                new ClientAwareAccountResolver(users, new UserIdentifierNormalizer()));
         assertThatThrownBy(() -> service.loadUserByClient("app", 1L, UserTypeEnum.EMPLOYEE, "alice"))
                 .isInstanceOf(BadCredentialsException.class);
         verifyNoInteractions(users, directory);
@@ -63,15 +67,15 @@ class DefaultClientAccountDetailsServiceTest {
     @Test
     void loadsLocalEmployeeWithoutRequestContext() {
         var users = mock(SysUserService.class);
-        var clients = mock(SysOAuth2ClientService.class);
+        var clients = mock(OAuth2ClientRegistrationService.class);
         when(clients.getClientByClientId("app")).thenReturn(client());
         var info = new UserAuthInfo();
         info.setUsername("alice");
         info.setStatus(1);
         info.setDataScope(1);
         when(users.getUserAuthInfo(1L, "alice", null)).thenReturn(info);
-        var service = new DefaultClientAccountDetailsService(users, clients, null,
-                new ClientAwareAccountResolver(users, new dev.macula.cloud.system.security.UserIdentifierNormalizer()));
+        var service = IamApplicationTestFixtures.accounts(users, clients, null,
+                new ClientAwareAccountResolver(users, new UserIdentifierNormalizer()));
         assertThat((SysUserDetails) service.loadUserByClient("app", 1L, UserTypeEnum.EMPLOYEE, "alice"))
                 .extracting(SysUserDetails::getUsername, SysUserDetails::getTenantId).containsExactly("alice", 1L);
         info.setStatus(0);
@@ -85,16 +89,16 @@ class DefaultClientAccountDetailsServiceTest {
     @Test
     void hostedEmployeeUsesLocalWhileExplicitClientUsesExtension() {
         var users = mock(SysUserService.class);
-        var clients = mock(SysOAuth2ClientService.class);
+        var clients = mock(OAuth2ClientRegistrationService.class);
         var directory = mock(UserAuthInfoService.class);
         var identifiers = mock(ClientAwareAccountResolver.class);
         when(clients.getClientByClientId("app")).thenReturn(client());
-        var account = new dev.macula.cloud.iam.pojo.entity.SysUser();
+        var account = new SysUser();
         account.setUsername("alice");
         when(identifiers.resolveIdentifier(UserTypeEnum.EMPLOYEE, "alice")).thenReturn(account);
         when(users.getUserAuthInfo(1L, "alice", null)).thenReturn(info(10L));
         when(directory.getUserAuthInfo(UserTypeEnum.EMPLOYEE, 1L, "alice")).thenReturn(info(20L));
-        var service = new DefaultClientAccountDetailsService(users, clients, directory, identifiers);
+        var service = IamApplicationTestFixtures.accounts(users, clients, directory, identifiers);
         assertThat((SysUserDetails) service.loadForHostedLogin("app", 1L, UserTypeEnum.EMPLOYEE, "alice",
                 ClientAccountDetailsService.IdentifierType.USERNAME)).extracting(SysUserDetails::getUserId)
                 .isEqualTo(10L);
@@ -109,17 +113,17 @@ class DefaultClientAccountDetailsServiceTest {
     @Test
     void rejectsEmailCandidateWhoseLoadedPrincipalChanged() {
         var users = mock(SysUserService.class);
-        var clients = mock(SysOAuth2ClientService.class);
+        var clients = mock(OAuth2ClientRegistrationService.class);
         var directory = mock(UserAuthInfoService.class);
         var identifiers = mock(ClientAwareAccountResolver.class);
         when(clients.getClientByClientId("app")).thenReturn(client());
-        var account = new dev.macula.cloud.iam.pojo.entity.SysUser();
+        var account = new SysUser();
         account.setId(10L);
         account.setUsername("alice");
         when(identifiers.findByEmail(UserTypeEnum.EMPLOYEE, "alice@example.test")).thenReturn(
-                java.util.Optional.of(account));
+                Optional.of(account));
         when(directory.getUserAuthInfo(UserTypeEnum.EMPLOYEE, 1L, "alice")).thenReturn(info(20L));
-        var service = new DefaultClientAccountDetailsService(users, clients, directory, identifiers);
+        var service = IamApplicationTestFixtures.accounts(users, clients, directory, identifiers);
         assertThatThrownBy(() -> service.loadForHostedLogin("app", 1L, UserTypeEnum.EMPLOYEE, "alice@example.test",
                 ClientAccountDetailsService.IdentifierType.EMAIL)).isInstanceOf(BadCredentialsException.class);
     }
@@ -139,8 +143,8 @@ class DefaultClientAccountDetailsServiceTest {
     /**
      * 构造完整的合成Client路由，不读取真实配置。
      */
-    private SysOAuth2Client client() {
-        var client = new SysOAuth2Client();
+    private OAuth2ClientRegistration client() {
+        var client = new OAuth2ClientRegistration();
         client.setTenantId(1L);
         client.setUserType(UserTypeEnum.EMPLOYEE);
         return client;

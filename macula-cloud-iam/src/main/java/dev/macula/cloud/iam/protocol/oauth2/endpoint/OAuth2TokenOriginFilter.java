@@ -16,15 +16,16 @@
  */
 package dev.macula.cloud.iam.protocol.oauth2.endpoint;
 
-import java.io.IOException;
-import java.util.Collections;
-import java.util.List;
-
-import dev.macula.cloud.iam.service.client.SysOAuth2ClientService;
+import dev.macula.cloud.iam.protocol.oauth2.client.OAuth2ClientRegistrationService;
+import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeClientSettings;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.core.Authentication;
@@ -45,10 +46,10 @@ import org.springframework.web.filter.OncePerRequestFilter;
  */
 public class OAuth2TokenOriginFilter extends OncePerRequestFilter {
     private final PathPatternRequestMatcher tokenEndpointMatcher;
-    private final SysOAuth2ClientService clientService;
+    private final OAuth2ClientRegistrationService clientService;
     private final AuthenticationFailureHandler failureHandler = new OAuth2ErrorAuthenticationFailureHandler();
 
-    public OAuth2TokenOriginFilter(String tokenEndpoint, SysOAuth2ClientService clientService) {
+    public OAuth2TokenOriginFilter(String tokenEndpoint, OAuth2ClientRegistrationService clientService) {
         this.tokenEndpointMatcher = PathPatternRequestMatcher.pathPattern(HttpMethod.POST, tokenEndpoint);
         this.clientService = clientService;
     }
@@ -77,8 +78,8 @@ public class OAuth2TokenOriginFilter extends OncePerRequestFilter {
      */
     private boolean allowedForProtocol(OAuth2ClientAuthenticationToken client, String origin) {
         Object allowed = client.getRegisteredClient().getClientSettings().getSetting(
-                dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeClientSettings.ALLOWED_ORIGINS);
-        return allowed instanceof java.util.Collection<?> values && values.contains(origin);
+                ExternalCodeClientSettings.ALLOWED_ORIGINS);
+        return allowed instanceof Collection<?> values && values.contains(origin);
     }
 
     private boolean hasOriginHeader(HttpServletRequest request) {

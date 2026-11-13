@@ -13,7 +13,6 @@ export const BROWSER_LOGIN_PROVIDERS = Object.freeze([
 ]);
 
 export const APPLICATION_TYPES = Object.freeze([
-  {value: "IN_APP", label: "端内应用", description: "固定平台容器登录，不展示IAM标准登录页"},
   {
     value: "WEB_SERVER",
     label: "标准 Web",

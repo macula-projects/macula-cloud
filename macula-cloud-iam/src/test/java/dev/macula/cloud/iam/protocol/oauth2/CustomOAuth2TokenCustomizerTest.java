@@ -19,13 +19,22 @@ package dev.macula.cloud.iam.protocol.oauth2;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import dev.macula.boot.constants.GlobalConstants;
 import dev.macula.boot.constants.SecurityConstants;
+import dev.macula.cloud.iam.protocol.oauth2.token.claims.AccessTokenClaimsService;
+import dev.macula.cloud.iam.protocol.oauth2.token.claims.DefaultAccessTokenClaimsService;
 import dev.macula.cloud.iam.service.userdetails.SysUserDetails;
+import dev.macula.cloud.system.security.OAuth2ResourcePolicy;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.oauth2.core.AuthorizationGrantType;
+import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
+import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
+import org.springframework.security.oauth2.server.authorization.settings.ClientSettings;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -75,20 +84,20 @@ class CustomOAuth2TokenCustomizerTest {
     /**
      * 通过声明服务端口测试，协议适配器不再暴露内部规则的静态入口。
      */
-    private Map<String, Object> accessClaims(org.springframework.security.core.Authentication principal) {
-        var settings = org.springframework.security.oauth2.server.authorization.settings.ClientSettings.builder()
+    private Map<String, Object> accessClaims(Authentication principal) {
+        var settings = ClientSettings.builder()
                 .setting(ResourceAuthorizationPolicy.PERMISSIONS,
-                        Map.of("api.read", dev.macula.cloud.system.security.OAuth2ResourcePolicy.SYSTEM_RESOURCE))
-                .setting(dev.macula.cloud.system.security.OAuth2ResourcePolicy.AUTHORIZATION_VERSION, 1L).build();
-        var client = org.springframework.security.oauth2.server.authorization.client.RegisteredClient.withId(
+                        Map.of("api.read", OAuth2ResourcePolicy.SYSTEM_RESOURCE))
+                .setting(OAuth2ResourcePolicy.AUTHORIZATION_VERSION, 1L).build();
+        var client = RegisteredClient.withId(
                         "fixture-client")
                 .clientId("fixture-client")
-                .clientAuthenticationMethod(org.springframework.security.oauth2.core.ClientAuthenticationMethod.NONE)
+                .clientAuthenticationMethod(ClientAuthenticationMethod.NONE)
                 .authorizationGrantType(
-                        org.springframework.security.oauth2.core.AuthorizationGrantType.AUTHORIZATION_CODE)
+                        AuthorizationGrantType.AUTHORIZATION_CODE)
                 .redirectUri("https://fixture.example/callback").clientSettings(settings).scope("api.read").build();
-        dev.macula.cloud.iam.protocol.oauth2.token.claims.AccessTokenClaimsService claims =
-                new dev.macula.cloud.iam.protocol.oauth2.token.claims.DefaultAccessTokenClaimsService();
-        return claims.create(principal, client, java.util.Set.of("api.read"), "authorization_code");
+        AccessTokenClaimsService claims =
+                new DefaultAccessTokenClaimsService();
+        return claims.create(principal, client, Set.of("api.read"), "authorization_code");
     }
 }

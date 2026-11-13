@@ -16,7 +16,9 @@
  */
 package dev.macula.cloud.iam.pojo.entity;
 
+import com.baomidou.mybatisplus.annotation.FieldStrategy;
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import dev.macula.boot.starter.crypto.annotation.CryptoField;
@@ -44,11 +46,11 @@ public class SysIdentityProvider {
     private String oauthRedirectUri;
     private Boolean autoBindEnabled;
     private String bindingRule;
-    @com.baomidou.mybatisplus.annotation.TableField(updateStrategy =
-            com.baomidou.mybatisplus.annotation.FieldStrategy.ALWAYS)
+    @TableField(updateStrategy =
+            FieldStrategy.ALWAYS)
     private String bindingSourceField;
-    @com.baomidou.mybatisplus.annotation.TableField(updateStrategy =
-            com.baomidou.mybatisplus.annotation.FieldStrategy.ALWAYS)
+    @TableField(updateStrategy =
+            FieldStrategy.ALWAYS)
     private String bindingTargetField;
     private String bindingMappingsJson;
     private Long version;

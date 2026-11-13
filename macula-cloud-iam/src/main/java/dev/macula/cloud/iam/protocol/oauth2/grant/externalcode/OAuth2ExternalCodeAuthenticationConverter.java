@@ -24,12 +24,18 @@ import java.util.stream.Collectors;
 
 import dev.macula.cloud.iam.protocol.oauth2.endpoint.OAuth2EndpointUtils;
 import dev.macula.cloud.system.enums.ExternalCodeType;
+import jakarta.servlet.ServletRequest;
+import jakarta.servlet.ServletRequestWrapper;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.core.OAuth2ErrorCodes;
+import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
+import org.springframework.security.oauth2.server.authorization.authentication.OAuth2ClientAuthenticationToken;
 import org.springframework.security.oauth2.core.endpoint.OAuth2ParameterNames;
+import org.springframework.security.oauth2.core.oidc.endpoint.OidcParameterNames;
 import org.springframework.security.web.authentication.AuthenticationConverter;
+import org.springframework.security.web.authentication.WebAuthenticationDetails;
 import org.springframework.util.MultiValueMap;
 import org.springframework.util.StringUtils;
 
@@ -46,9 +52,12 @@ public class OAuth2ExternalCodeAuthenticationConverter implements Authentication
     private static final Set<String> ALLOWED_PARAMETERS = Set.of(OAuth2ParameterNames.GRANT_TYPE,
             OAuth2ParameterNames.CLIENT_ID, OAuth2ParameterNames.CODE, OAuth2ParameterNames.SCOPE,
             OAuth2ExternalCodeParameterNames.CODE_TYPE,
-            org.springframework.security.oauth2.core.oidc.endpoint.OidcParameterNames.NONCE,
+            OidcParameterNames.NONCE,
             OAuth2ExternalCodeParameterNames.PROVIDER_CODE_VERIFIER,
             OAuth2ExternalCodeParameterNames.PROVIDER_REDIRECT_URI);
+
+    private static final Set<String> CLIENT_CREDENTIAL_PARAMETERS = Set.of(OAuth2ParameterNames.CLIENT_SECRET,
+        OAuth2ParameterNames.CLIENT_ASSERTION, OAuth2ParameterNames.CLIENT_ASSERTION_TYPE);
 
     /**
      * 解包框架转发头包装，只使用连接地址或容器已校验的可信代理地址，防止任意XFF换IP限流。
@@ -73,15 +82,15 @@ public class OAuth2ExternalCodeAuthenticationConverter implements Authentication
                 ? new HashSet<>(Arrays.asList(StringUtils.delimitedListToStringArray(scope, " "))) : Set.of();
         Map<String, Object> additional = parameters.entrySet().stream()
                 .filter(entry -> !Set.of(OAuth2ParameterNames.GRANT_TYPE, OAuth2ParameterNames.SCOPE)
-                        .contains(entry.getKey()))
+                        .contains(entry.getKey()) && !CLIENT_CREDENTIAL_PARAMETERS.contains(entry.getKey()))
                 .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().get(0)));
         OAuth2ExternalCodeAuthenticationToken token = buildToken(client, scopes, additional);
-        jakarta.servlet.ServletRequest connection = request;
-        while (connection instanceof jakarta.servlet.ServletRequestWrapper wrapper) {
+        ServletRequest connection = request;
+        while (connection instanceof ServletRequestWrapper wrapper) {
             connection = wrapper.getRequest();
         }
         var session = request.getSession(false);
-        token.setDetails(new org.springframework.security.web.authentication.WebAuthenticationDetails(
+        token.setDetails(new WebAuthenticationDetails(
                 connection.getRemoteAddr(), session == null ? null : session.getId()));
         return token;
     }
@@ -91,12 +100,26 @@ public class OAuth2ExternalCodeAuthenticationConverter implements Authentication
      */
     private void checkParams(HttpServletRequest request) {
         MultiValueMap<String, String> parameters = OAuth2EndpointUtils.getParameters(request);
-        parameters.keySet().stream().filter(parameter -> !ALLOWED_PARAMETERS.contains(parameter))
-                .findFirst().ifPresent(this::invalid);
+        Authentication authenticated = SecurityContextHolder.getContext().getAuthentication();
+        Set<String> credentialParameters = Set.of();
+        if (authenticated instanceof OAuth2ClientAuthenticationToken client && client.isAuthenticated()) {
+            if (ClientAuthenticationMethod.CLIENT_SECRET_POST.equals(client.getClientAuthenticationMethod())) {
+                credentialParameters = Set.of(OAuth2ParameterNames.CLIENT_SECRET);
+            } else if (ClientAuthenticationMethod.PRIVATE_KEY_JWT.equals(client.getClientAuthenticationMethod())) {
+                credentialParameters = Set.of(OAuth2ParameterNames.CLIENT_ASSERTION, OAuth2ParameterNames.CLIENT_ASSERTION_TYPE);
+            }
+        }
+        // 仅接收原生客户端认证链已核验方法的字段；不把认证凭据写入grant附加参数或授权存储。
+        for (String name : parameters.keySet()) {
+            if (!ALLOWED_PARAMETERS.contains(name)) {
+                if (!credentialParameters.contains(name)) { invalid(name); }
+                requireSingle(parameters, name, MAX_CODE_LENGTH);
+            }
+        }
         requireSingle(parameters, OAuth2ParameterNames.GRANT_TYPE, ExternalCodeType.GRANT_TYPE.length());
         String code = requireSingle(parameters, OAuth2ParameterNames.CODE, MAX_CODE_LENGTH);
-        if (parameters.containsKey(org.springframework.security.oauth2.core.oidc.endpoint.OidcParameterNames.NONCE)) {
-            requireSingle(parameters, org.springframework.security.oauth2.core.oidc.endpoint.OidcParameterNames.NONCE,
+        if (parameters.containsKey(OidcParameterNames.NONCE)) {
+            requireSingle(parameters, OidcParameterNames.NONCE,
                     MAX_NONCE_LENGTH);
         }
         if (parameters.containsKey(OAuth2ExternalCodeParameterNames.PROVIDER_CODE_VERIFIER)) {

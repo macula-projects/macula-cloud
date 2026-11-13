@@ -16,15 +16,23 @@
  */
 package dev.macula.cloud.system.integration;
 
+import dev.macula.cloud.system.protocol.OAuth2ProtocolDefinition;
+import dev.macula.cloud.system.service.impl.ProtocolConfigurationTestFixtures;
+import dev.macula.boot.starter.mp.config.MyBatisPlusProperties;
+import dev.macula.boot.starter.mp.handler.AuditMetaObjectHandler;
+import dev.macula.cloud.system.mapper.SysIamApplicationProtocolConfigMapper;
+import java.util.Set;
+import java.util.UUID;
+import org.springframework.data.redis.cache.RedisCacheConfiguration;
+
 
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.spring.MybatisSqlSessionFactoryBean;
 import dev.macula.cloud.system.mapper.SysIdentityProviderMapper;
-import dev.macula.cloud.system.mapper.SysOAuth2ClientConfigMapper;
-import dev.macula.cloud.system.mapper.SysOAuth2ClientExternalProviderMapper;
+import dev.macula.cloud.system.mapper.SysIamApplicationMapper;
+import dev.macula.cloud.system.mapper.SysIamApplicationIdentityProviderMapper;
 import dev.macula.cloud.system.mapper.SysTenantInfoMapper;
-import dev.macula.cloud.system.service.impl.OAuth2ClientConfigServiceImpl;
-import dev.macula.cloud.system.service.impl.OAuth2ClientConfigurationCatalogServiceImpl;
+import dev.macula.cloud.system.service.impl.IamApplicationCatalogServiceImpl;
 import dev.macula.cloud.system.config.OAuth2ScopeCatalogProperties;
 import java.net.URI;
 import org.flywaydb.core.Flyway;
@@ -81,11 +89,11 @@ class AdminClientProvisioningIT {
         factory.setDataSource(dataSource);
         factory.setConfiguration(configuration);
         var global = new com.baomidou.mybatisplus.core.config.GlobalConfig();
-        global.setMetaObjectHandler(new dev.macula.boot.starter.mp.handler.AuditMetaObjectHandler(
-            new dev.macula.boot.starter.mp.config.MyBatisPlusProperties().getAudit()));
+        global.setMetaObjectHandler(new AuditMetaObjectHandler(
+            new MyBatisPlusProperties().getAudit()));
         factory.setGlobalConfig(global);
         var sqlFactory = factory.getObject();
-        for (Class<?> mapper : new Class<?>[] {SysOAuth2ClientConfigMapper.class,dev.macula.cloud.system.mapper.SysApplicationProtocolConfigMapper.class, SysOAuth2ClientExternalProviderMapper.class,
+        for (Class<?> mapper : new Class<?>[] {SysIamApplicationMapper.class,SysIamApplicationProtocolConfigMapper.class, SysIamApplicationIdentityProviderMapper.class,
             SysIdentityProviderMapper.class, SysTenantInfoMapper.class}) {
             sqlFactory.getConfiguration().addMapper(mapper);
         }
@@ -98,27 +106,24 @@ class AdminClientProvisioningIT {
         try {
             // 唯一前缀确保即使端口误配也不会驱逐其他测试或业务缓存。
             var caches = RedisCacheManager.builder(redis).cacheDefaults(
-                org.springframework.data.redis.cache.RedisCacheConfiguration.defaultCacheConfig()
-                    .prefixCacheNameWith("admin-client-it-" + java.util.UUID.randomUUID() + "::"))
-                .initialCacheNames(java.util.Set.of(
+                RedisCacheConfiguration.defaultCacheConfig()
+                    .prefixCacheNameWith("admin-client-it-" + UUID.randomUUID() + "::"))
+                .initialCacheNames(Set.of(
                 CacheConstants.OAUTH2_CLIENT_CACHE_KEY, OAuth2ClientCacheNames.TOKEN_ORIGIN_INDEX)).build();
             caches.afterPropertiesSet();
             var sources = session.getMapper(SysIdentityProviderMapper.class);
-            var mapper = session.getMapper(SysOAuth2ClientConfigMapper.class);
-            var configService = new OAuth2ClientConfigServiceImpl(mapper,
-                session.getMapper(SysOAuth2ClientExternalProviderMapper.class), sources,
-                session.getMapper(SysTenantInfoMapper.class), mock(PasswordEncoder.class), caches,
-                new OAuth2ClientConfigurationCatalogServiceImpl(new OAuth2ScopeCatalogProperties(), sources), new dev.macula.cloud.system.service.impl.ApplicationProtocolConfigurationService(session.getMapper(dev.macula.cloud.system.mapper.SysApplicationProtocolConfigMapper.class), session.getMapper(SysOAuth2ClientExternalProviderMapper.class)));
+            var mapper = session.getMapper(SysIamApplicationMapper.class);
+            var configService = ProtocolConfigurationTestFixtures.service(mapper, session.getMapper(SysIamApplicationIdentityProviderMapper.class), session.getMapper(SysIamApplicationProtocolConfigMapper.class), sources, session.getMapper(SysTenantInfoMapper.class), mock(PasswordEncoder.class), caches, new IamApplicationCatalogServiceImpl(new OAuth2ScopeCatalogProperties(), sources, OAuth2ProtocolDefinition.registry()));
             var properties = new AdminClientProvisioningProperties();
-            properties.setAdminClientId(java.util.UUID.randomUUID().toString());
+            properties.setAdminClientId(UUID.randomUUID().toString());
             properties.setGatewayClientId("e4da4a32-592b-46f0-ae1d-784310e88423");
             properties.setAdminOrigin("http://127.0.0.1:5900");
             properties.setTenantId(1L);
             properties.setUserType("employee");
             String gatewayId = properties.getGatewayClientId();
-            String originalSecret = jdbc.queryForObject("SELECT client_secret FROM sys_oauth2_client WHERE client_id=?", String.class, gatewayId);
-            String others = jdbc.queryForList("SELECT * FROM sys_oauth2_client WHERE client_id<>? ORDER BY id", gatewayId).toString();
-            String before = jdbc.queryForList("SELECT * FROM sys_oauth2_client ORDER BY id").toString();
+            String originalSecret = jdbc.queryForObject("SELECT p.credential_hash FROM sys_iam_application_protocol_config p JOIN sys_iam_application a ON a.id=p.application_id WHERE a.application_code=?", String.class, gatewayId);
+            String others = jdbc.queryForList("SELECT * FROM sys_iam_application WHERE application_code<>? ORDER BY id", gatewayId).toString();
+            String before = jdbc.queryForList("SELECT * FROM sys_iam_application ORDER BY id").toString();
             var transaction = new TransactionTemplate(new DataSourceTransactionManager(dataSource));
             // 第二个写入失败必须撤回第一个 Gateway 更新，提交后缓存回调也不能执行。
             var failing = spy(configService);
@@ -133,7 +138,7 @@ class AdminClientProvisioningIT {
                 failureService.provision(properties);
                 return null;
             }));
-            assertEquals(before, jdbc.queryForList("SELECT * FROM sys_oauth2_client ORDER BY id").toString());
+            assertEquals(before, jdbc.queryForList("SELECT * FROM sys_iam_application ORDER BY id").toString());
             assertEquals("before", cache.get("provisioning-fixture", String.class));
             var service = new AdminClientProvisioningService(mapper, configService);
             transaction.execute(status -> {
@@ -141,21 +146,21 @@ class AdminClientProvisioningIT {
                 return null;
             });
             assertNull(cache.get("provisioning-fixture"));
-            assertEquals(originalSecret, jdbc.queryForObject("SELECT client_secret FROM sys_oauth2_client WHERE client_id=?", String.class, gatewayId));
-            assertEquals(others, jdbc.queryForList("SELECT * FROM sys_oauth2_client WHERE client_id NOT IN (?,?) ORDER BY id",
+            assertEquals(originalSecret, jdbc.queryForObject("SELECT p.credential_hash FROM sys_iam_application_protocol_config p JOIN sys_iam_application a ON a.id=p.application_id WHERE a.application_code=?", String.class, gatewayId));
+            assertEquals(others, jdbc.queryForList("SELECT * FROM sys_iam_application WHERE application_code NOT IN (?,?) ORDER BY id",
                 gatewayId, properties.getAdminClientId()).toString());
-            String enabled = jdbc.queryForList("SELECT * FROM sys_oauth2_client ORDER BY id").toString();
+            String enabled = jdbc.queryForList("SELECT * FROM sys_iam_application ORDER BY id").toString();
             transaction.execute(status -> {
                 service.provision(properties);
                 return null;
             });
-            assertEquals(enabled, jdbc.queryForList("SELECT * FROM sys_oauth2_client ORDER BY id").toString());
-            jdbc.update("UPDATE sys_oauth2_client SET client_name='operator change' WHERE client_id=?", properties.getAdminClientId());
+            assertEquals(enabled, jdbc.queryForList("SELECT * FROM sys_iam_application ORDER BY id").toString());
+            jdbc.update("UPDATE sys_iam_application SET application_name='operator change' WHERE application_code=?", properties.getAdminClientId());
             assertThrows(IllegalStateException.class, () -> transaction.execute(status -> {
                 service.provision(properties);
                 return null;
             }));
-            assertEquals("operator change", jdbc.queryForObject("SELECT client_name FROM sys_oauth2_client WHERE client_id=?", String.class, properties.getAdminClientId()));
+            assertEquals("operator change", jdbc.queryForObject("SELECT application_name FROM sys_iam_application WHERE application_code=?", String.class, properties.getAdminClientId()));
         } finally {
             redis.destroy();
             redisson.shutdown();

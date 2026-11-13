@@ -25,6 +25,7 @@ import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeVerif
 import dev.macula.cloud.iam.service.identity.IdentityProviderConfigService;
 import dev.macula.cloud.iam.service.identity.IdentityProviderConfigService.ProviderConfig;
 import dev.macula.cloud.system.enums.ExternalCodeType;
+import dev.macula.cloud.system.security.UserIdentifierNormalizer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -63,7 +64,7 @@ public class WechatExternalCodeVerifier implements ExternalCodeVerifier {
         };
         boolean mobile = codeType == ExternalCodeType.WECHAT_MINIAPP_PHONE_CODE;
         if (mobile) {
-            value = new dev.macula.cloud.system.security.UserIdentifierNormalizer().mobile(value)
+            value = new UserIdentifierNormalizer().mobile(value)
                     .orElseThrow(() -> new IllegalArgumentException("已核验手机号格式无效"));
         }
         return new ExternalCodeVerification(VerifiedExternalIdentity.of(config, codeType.name(),

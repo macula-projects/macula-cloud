@@ -16,15 +16,19 @@
  */
 package dev.macula.cloud.iam.authentication.thirdparty.directory;
 
-import java.time.Instant;
-import java.util.List;
-import java.util.Objects;
-
 import dev.macula.cloud.iam.authentication.thirdparty.VerifiedExternalIdentity;
 import dev.macula.cloud.iam.authentication.thirdparty.provider.ProviderIntegrationProperties;
 import dev.macula.cloud.iam.service.identity.IdentityProviderConfigService;
 import dev.macula.cloud.iam.service.identity.directory.IdentityDirectoryService;
 import dev.macula.cloud.system.enums.IdentityDirectoryPolicy;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.AuthenticationServiceException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -37,6 +41,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  */
 @Service
 public class ProviderDirectoryPolicyService implements IdentityDirectoryService {
+    private static final Logger LOGGER = LoggerFactory.getLogger(ProviderDirectoryPolicyService.class);
     private final IdentityProviderConfigService configs;
     private final List<ProviderDirectoryAdapter> adapters;
     private final ProviderMemberSnapshotStore snapshots;
@@ -68,9 +73,9 @@ public class ProviderDirectoryPolicyService implements IdentityDirectoryService 
         if (policy == IdentityDirectoryPolicy.AUTO && "WECOM".equals(source.providerType())
                 && VerifiedExternalIdentity.MEMBER_ID.equals(identity.identityKind())
                 && identity.identityValue().equals(identity.attributes().get("member_id"))
-                && java.util.Objects.equals(source.organizationId(), source.require("corpId"))) {
+                && Objects.equals(source.organizationId(), source.require("corpId"))) {
             return admission(identity, source.organizationId(),
-                    java.util.Map.of("member_id", identity.identityValue()));
+                    Map.of("member_id", identity.identityValue()));
         }
         if (policy == IdentityDirectoryPolicy.IDENTITY_ONLY) {
             return admission(identity, source.organizationId());
@@ -91,11 +96,11 @@ public class ProviderDirectoryPolicyService implements IdentityDirectoryService 
         try {
             snapshots.save(identity, result);
         } catch (RuntimeException ex) {
-            org.slf4j.LoggerFactory.getLogger(ProviderDirectoryPolicyService.class)
+            LoggerFactory.getLogger(ProviderDirectoryPolicyService.class)
                     .warn("Directory profile snapshot unavailable category=INFRASTRUCTURE");
         }
         return admission(identity, source.organizationId(), result.status() == ProviderDirectoryResult.Status.MEMBER
-                ? result.profile() : java.util.Map.of());
+                ? result.profile() : Map.of());
     }
 
     /**
@@ -108,10 +113,10 @@ public class ProviderDirectoryPolicyService implements IdentityDirectoryService 
         if (admission.profile().isEmpty()) {
             return identity;
         }
-        var attributes = new java.util.HashMap<>(identity.attributes());
+        var attributes = new HashMap<>(identity.attributes());
         admission.profile().forEach((key, value) -> {
             // 资料不能替换已经由登录合同证明的成员ID或手机号；不把任意显示字段当身份。
-            if (attributes.containsKey(key) && !java.util.Objects.equals(attributes.get(key), value)) {
+            if (attributes.containsKey(key) && !Objects.equals(attributes.get(key), value)) {
                 throw unavailable();
             }
             attributes.put(key, value);
@@ -130,7 +135,7 @@ public class ProviderDirectoryPolicyService implements IdentityDirectoryService 
             try {
                 refresh.enqueueBound(identity);
             } catch (RuntimeException ex) {
-                org.slf4j.LoggerFactory.getLogger(ProviderDirectoryPolicyService.class)
+                LoggerFactory.getLogger(ProviderDirectoryPolicyService.class)
                         .warn("Directory refresh enqueue unavailable category=INFRASTRUCTURE");
             }
         }
@@ -164,33 +169,43 @@ public class ProviderDirectoryPolicyService implements IdentityDirectoryService 
             boolean required) {
         if (result == null || result.status() == ProviderDirectoryResult.Status.NOT_MEMBER
                 || result.status() == ProviderDirectoryResult.Status.DISABLED) {
+            logRejection(result, required, "member_rejected");
             throw unavailable();
         }
         if (result.status() == ProviderDirectoryResult.Status.MEMBER) {
             if (!Objects.equals(source.organizationId(), result.organizationId())) {
+                logRejection(result, required, "organization_mismatch");
                 throw unavailable();
             }
             return;
         }
         if (required || !result.tolerableProfileFailure()) {
+            logRejection(result, required, "proof_unavailable");
             throw unavailable();
         }
+    }
+
+    /** 仅输出受控枚举和策略，不记录来源、组织、外部主体或目录资料。 */
+    private void logRejection(ProviderDirectoryResult result, boolean required, String reason) {
+        LOGGER.warn("第三方目录准入拒绝 stage=admission status={} required={} tolerable={} reason={}",
+                result == null ? "MISSING" : result.status(), required,
+                result != null && result.tolerableProfileFailure(), reason);
     }
 
     /**
      * 快照最多保持配置的资料TTL，不延长原来源证明。
      */
     private Admission admission(VerifiedExternalIdentity identity, String organizationId) {
-        return admission(identity, organizationId, java.util.Map.of());
+        return admission(identity, organizationId, Map.of());
     }
 
     /**
      * 只有实时核实的同一成员目录资料可补充绑定凭据；不使用BACKGROUND旧快照自动匹配。
      */
     private Admission admission(VerifiedExternalIdentity identity, String organizationId,
-            java.util.Map<String, String> profile) {
+            Map<String, String> profile) {
         var ttl = properties.getMemberSnapshotTtl();
-        if (ttl == null || ttl.isNegative() || ttl.isZero() || ttl.compareTo(java.time.Duration.ofHours(1)) > 0) {
+        if (ttl == null || ttl.isNegative() || ttl.isZero() || ttl.compareTo(Duration.ofHours(1)) > 0) {
             throw unavailable();
         }
         return new Admission(identity, identity.sourceVersion(), identity.flow(), organizationId,

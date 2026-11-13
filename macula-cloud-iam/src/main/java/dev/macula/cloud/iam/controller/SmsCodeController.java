@@ -19,10 +19,11 @@ package dev.macula.cloud.iam.controller;
 import java.util.Map;
 
 import dev.macula.cloud.iam.authentication.hosted.HostedLoginClientPolicyService;
-import dev.macula.cloud.iam.authentication.sms.SmsService;
+import dev.macula.cloud.iam.authentication.verification.VerificationCodeChannelService;
+import dev.macula.cloud.iam.authentication.verification.VerificationCodeContext;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.constraints.Pattern;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -37,10 +38,14 @@ import org.springframework.web.server.ResponseStatusException;
  * @since 2026-10-17
  */
 @RestController
-@RequiredArgsConstructor
 @Validated
 public class SmsCodeController {
-    private final SmsService smsService;
+    private final VerificationCodeChannelService smsService;
+
+    /** 通道依赖以名称显式注入，避免公共接口存在两个Bean时发生误选。 */
+    public SmsCodeController(@Qualifier("smsCodeService") VerificationCodeChannelService smsService) {
+        this.smsService = smsService;
+    }
 
     /**
      * 使用安全过滤器已校验的Client上下文发送验证码。
@@ -50,11 +55,7 @@ public class SmsCodeController {
             HttpServletRequest request) {
         try {
             String clientId = HostedLoginClientPolicyService.context(request).clientId();
-            if (clientId == null) {
-                smsService.sendCode(phone, request.getRemoteAddr());
-            } else {
-                smsService.sendCode(phone, request.getRemoteAddr(), clientId);
-            }
+            smsService.sendCode(phone, request.getRemoteAddr(), VerificationCodeContext.login(clientId));
         } catch (RuntimeException ex) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "验证码暂时无法发送");
         }

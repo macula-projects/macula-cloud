@@ -17,22 +17,23 @@
 
 package dev.macula.cloud.iam.service.account;
 
-import java.util.Objects;
-
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import dev.macula.boot.enums.StatusEnum;
 import dev.macula.cloud.iam.enums.UserTypeEnum;
 import dev.macula.cloud.iam.pojo.dto.UserAuthInfo;
-import dev.macula.cloud.iam.pojo.entity.SysOAuth2Client;
 import dev.macula.cloud.iam.pojo.entity.SysUser;
-import dev.macula.cloud.iam.service.client.SysOAuth2ClientService;
+import dev.macula.cloud.iam.service.application.IamApplicationService;
+import dev.macula.cloud.iam.service.application.LoginApplicationResolver;
 import dev.macula.cloud.iam.service.userdetails.SysUserDetails;
+import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.Assert;
 
 /**
@@ -42,21 +43,24 @@ import org.springframework.util.Assert;
  * @since 6.1.0
  */
 @Service
-public final class DefaultClientAccountDetailsService implements ClientAccountDetailsService {
+@Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+public class DefaultClientAccountDetailsService implements ClientAccountDetailsService {
     private final SysUserService sysUserService;
     private final ClientAwareAccountResolver identifiers;
-    private final SysOAuth2ClientService sysOAuth2ClientService;
+    private final IamApplicationService applications;
+    private final LoginApplicationResolver references;
     @Nullable
     private final UserAuthInfoService userAuthInfoService;
 
     /**
      * 可选扩展用户目录保持原语义；员工在扩展无结果时使用本地目录。
      */
-    public DefaultClientAccountDetailsService(SysUserService users, SysOAuth2ClientService clients,
-            @Nullable UserAuthInfoService externalUsers, ClientAwareAccountResolver identifiers) {
+    public DefaultClientAccountDetailsService(SysUserService users, IamApplicationService applications,
+            LoginApplicationResolver references, @Nullable UserAuthInfoService externalUsers, ClientAwareAccountResolver identifiers) {
         this.sysUserService = users;
         this.identifiers = identifiers;
-        this.sysOAuth2ClientService = clients;
+        this.applications = applications;
+        this.references = references;
         this.userAuthInfoService = externalUsers;
     }
 
@@ -66,20 +70,31 @@ public final class DefaultClientAccountDetailsService implements ClientAccountDe
     @Override
     public UserDetails loadUserByClient(String clientId, Long expectedTenantId, UserTypeEnum expectedUserType,
             String username) {
-        Assert.hasText(clientId, "OAuth client ID 不能为空");
-        Assert.notNull(expectedTenantId, "OAuth client 租户快照不能为空");
-        Assert.notNull(expectedUserType, "OAuth client 用户类型快照不能为空");
-        SysOAuth2Client oauth2Client = sysOAuth2ClientService.getClientByClientId(clientId);
-        if (oauth2Client == null || oauth2Client.getTenantId() == null || oauth2Client.getUserType() == null) {
-            throw new UsernameNotFoundException("OAuth client 不存在或用户路由未配置");
+        Assert.hasText(clientId, "可信Client引用不能为空");
+        var application = references.trusted(clientId, null, false);
+        if (application == null) {
+            throw new UsernameNotFoundException("应用不存在或用户路由未配置");
         }
-        if (!expectedTenantId.equals(oauth2Client.getTenantId()) || expectedUserType != oauth2Client.getUserType()) {
-            throw new BadCredentialsException("OAuth client 配置已变化");
+        return loadUserByApplication(application.id(), expectedTenantId, expectedUserType, username);
+    }
+
+    /** 中立应用ID是目录路由的唯一入口；不从请求或其他协议标识推断租户。 */
+    @Override
+    public UserDetails loadUserByApplication(Long applicationId, Long expectedTenantId, UserTypeEnum expectedUserType,
+            String username) {
+        Assert.notNull(expectedTenantId, "应用租户快照不能为空");
+        Assert.notNull(expectedUserType, "应用用户目录快照不能为空");
+        var app = applications.findById(applicationId);
+        if (app == null || !app.loginEnabled() || app.tenantId() == null || app.accountUserType() == null) {
+            throw new UsernameNotFoundException("应用不存在或用户路由未配置");
         }
-        Long tenantId = oauth2Client.getTenantId();
+        if (!expectedTenantId.equals(app.tenantId()) || expectedUserType != app.accountUserType()) {
+            throw new BadCredentialsException("应用配置已变化");
+        }
+        Long tenantId = app.tenantId();
         UserAuthInfo userAuthInfo = userAuthInfoService == null ? null
-                : userAuthInfoService.getUserAuthInfo(oauth2Client.getUserType(), tenantId, username);
-        if (userAuthInfo == null && UserTypeEnum.EMPLOYEE == oauth2Client.getUserType()) {
+            : userAuthInfoService.getUserAuthInfo(app.accountUserType(), tenantId, username);
+        if (userAuthInfo == null && UserTypeEnum.EMPLOYEE == app.accountUserType()) {
             userAuthInfo = sysUserService.getUserAuthInfo(tenantId, username, null);
         }
         return details(userAuthInfo, tenantId);
@@ -98,9 +113,9 @@ public final class DefaultClientAccountDetailsService implements ClientAccountDe
             // 无Client门户保留原员工目录，不允许请求自报路由。
             return details(sysUserService.getUserAuthInfo(1L, identifier, null), 1L);
         }
-        SysOAuth2Client client = sysOAuth2ClientService.getClientByClientId(clientId);
-        if (client == null || !Objects.equals(tenantId, client.getTenantId()) ||
-                userType != client.getUserType()) {
+        var client = references.trusted(clientId, null, false);
+        if (client == null || !Objects.equals(tenantId, client.tenantId()) ||
+                userType != client.accountUserType()) {
             throw new BadCredentialsException("Client路由已变化");
         }
         if (kind == IdentifierType.USERNAME) {
@@ -117,7 +132,7 @@ public final class DefaultClientAccountDetailsService implements ClientAccountDe
         var account = (kind == IdentifierType.MOBILE ? identifiers.findByMobile(userType, identifier)
                 : identifiers.findByEmail(userType, identifier)).orElseThrow(
                 () -> new UsernameNotFoundException("用户不存在"));
-        UserDetails loaded = loadUserByClient(clientId, tenantId, userType, account.getUsername());
+        UserDetails loaded = loadUserByApplication(client.id(), tenantId, userType, account.getUsername());
         if (!(loaded instanceof SysUserDetails principal) ||
                 !Objects.equals(account.getId(), principal.getUserId())
                 || !Objects.equals(tenantId, principal.getTenantId())) {
@@ -133,6 +148,7 @@ public final class DefaultClientAccountDetailsService implements ClientAccountDe
      * 仅供框架认证后的编码升级，保留原全局唯一用户名更新条件。
      */
     @Override
+    @Transactional
     public UserDetails updatePassword(UserDetails user, String encodedPassword) {
         boolean changed = sysUserService.update(
                 new LambdaUpdateWrapper<SysUser>()

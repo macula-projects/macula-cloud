@@ -17,10 +17,10 @@
 package dev.macula.cloud.iam.protocol.oauth2.configuration;
 
 import dev.macula.cloud.iam.protocol.oauth2.ResourceTokenIntrospectionAuthenticationProvider;
+import dev.macula.cloud.iam.protocol.oauth2.client.OAuth2ClientRegistrationService;
 import dev.macula.cloud.iam.protocol.oauth2.client.PublicTokenClientAuthenticationConverter;
 import dev.macula.cloud.iam.protocol.oauth2.client.PublicTokenClientAuthenticationProvider;
 import dev.macula.cloud.iam.protocol.oauth2.jwt.PolicyClientAssertionDecoderFactory;
-import dev.macula.cloud.iam.service.client.SysOAuth2ClientService;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.configurers.oauth2.server.authorization.OAuth2AuthorizationServerConfigurer;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
@@ -41,7 +41,7 @@ public final class ClientAuthenticationExtension implements AuthorizationServerE
     private final RegisteredClientRepository clients;
     private final RegisteredClientRepository baseClients;
     private final OAuth2AuthorizationService authorizations;
-    private final SysOAuth2ClientService clientService;
+    private final OAuth2ClientRegistrationService clientService;
     private final RequestMatcher tokenEndpoint;
     private final PolicyClientAssertionDecoderFactory decoders = new PolicyClientAssertionDecoderFactory();
 
@@ -49,7 +49,7 @@ public final class ClientAuthenticationExtension implements AuthorizationServerE
      * 区分请求协议视图与只读恢复仓库，不能用目标Client选择内省调用方身份。
      */
     public ClientAuthenticationExtension(RegisteredClientRepository clients, RegisteredClientRepository baseClients,
-            OAuth2AuthorizationService authorizations, SysOAuth2ClientService clientService,
+            OAuth2AuthorizationService authorizations, OAuth2ClientRegistrationService clientService,
             AuthorizationServerSettings settings) {
         this.clients = clients;
         this.baseClients = baseClients;

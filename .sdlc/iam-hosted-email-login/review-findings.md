@@ -32,3 +32,12 @@ Stage: Plan。codex-plan-review未安装，按sdlc-build回退sdlc-reviewer子�
 ### Remote publication checkpoint
 
 用户已要求“推送合并”。本地提交和完整审查已完成，`git push`尚未执行成功：自动审批判定目标macula-projects/macula-cloud为公开仓库，要求明确确认将本次源码/配置/文档公开披露。未换接口绕过拒绝、未创建远端PR、未合并。待公开发布授权后，推送并发布包含上述证据和发现计数的PR，按实际分支保护执行。
+
+
+## Stage: Plan — Supplement Round 2：Email/SMS统一与相关清理
+
+审查方式：sdlc-build fallback，channel_alignment_plan_review独立fresh context，仅Plan pass、只读。审查已接受intent/spec及plan.md末尾补充计划和42个精确路径，保留已有135文件import整理基线。
+
+结果：NO_FINDINGS。Important 0 / Minor 0 / Nit 0，抑制0；本次完成1轮，累计实际Plan 2/3轮。核对共同失败关闭、SMS绑定可用性、可信Context/用途隔离、Token字段和FQCN兼容、Configurer独立类型避免覆盖、按名覆盖测试Bean及真实隔离链路证据。
+
+没有修改生产代码、运行测试、操作远端或批准计划。补充计划仍为draft，等待工程师明确确认；此记录不将Plan审查当作源码审查或实现完成。

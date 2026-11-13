@@ -18,93 +18,33 @@ package dev.macula.cloud.iam.authentication.sms;
 
 import java.util.Collection;
 
-import org.jspecify.annotations.NonNull;
-import org.springframework.beans.factory.InitializingBean;
-import org.springframework.context.MessageSource;
-import org.springframework.context.MessageSourceAware;
-import org.springframework.context.support.MessageSourceAccessor;
-import org.springframework.security.authentication.AuthenticationProvider;
-import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.AuthenticationException;
+import dev.macula.cloud.iam.authentication.verification.AbstractVerificationCodeAuthenticationProvider;
+import dev.macula.cloud.iam.authentication.verification.VerificationCodeChannelService;
 import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.SpringSecurityMessageSource;
-import org.springframework.security.core.authority.mapping.GrantedAuthoritiesMapper;
-import org.springframework.security.core.authority.mapping.NullAuthoritiesMapper;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.util.Assert;
 
 /**
- * 校验短信验证码并建立用户认证状态。
+ * Sms认证策略适配，复用验证码核验与账号状态检查模板。
  *
- * @author n1
+ * @author Macula
  * @since 6.1.0
  */
-public class SmsAuthenticationProvider implements AuthenticationProvider, InitializingBean, MessageSourceAware {
-
-    private final GrantedAuthoritiesMapper authoritiesMapper = new NullAuthoritiesMapper();
-    private final SmsUserDetailsService smsUserDetailsService;
-    private final SmsService smsService;
-    private MessageSourceAccessor messages = SpringSecurityMessageSource.getAccessor();
-
-    public SmsAuthenticationProvider(SmsUserDetailsService smsUserDetailsService,
-            SmsService smsService) {
-        this.smsUserDetailsService = smsUserDetailsService;
-        this.smsService = smsService;
+public final class SmsAuthenticationProvider extends AbstractVerificationCodeAuthenticationProvider<SmsAuthenticationToken> {
+    /** 显式依赖通道端口与对应账号目录。 */
+    public SmsAuthenticationProvider(VerificationCodeChannelService codes, SmsUserDetailsService users) {
+        super(SmsAuthenticationToken.class, codes, users::loadUserByPhone);
     }
 
+    /** 读取服务端已核验的Client，不从外部输入重新推断。 */
     @Override
-    public Authentication authenticate(@NonNull Authentication authentication) throws AuthenticationException {
-        Assert.isInstanceOf(SmsAuthenticationToken.class, authentication,
-                () -> messages.getMessage("SmsAuthenticationProvider.onlySupports",
-                        "Only SmsAuthenticationToken is supported"));
-
-        SmsAuthenticationToken unAuthenticationToken = (SmsAuthenticationToken) authentication;
-
-        String phone = unAuthenticationToken.getName();
-        String rawCode = (String) unAuthenticationToken.getCredentials();
-        // 验证码校验
-        boolean verified = unAuthenticationToken.getClientId() == null
-                ? smsService.verifyCode(phone, rawCode)
-                : smsService.verifyCode(phone, rawCode, unAuthenticationToken.getClientId());
-        if (verified) {
-            UserDetails userDetails = smsUserDetailsService.loadUserByPhone(phone);
-            return createSuccessAuthentication(authentication, userDetails);
-        } else {
-            throw new BadCredentialsException("code is not matched");
-        }
+    protected String clientId(SmsAuthenticationToken token) {
+        return token.getClientId();
     }
 
+    /** 成功载体不保存验证码，角色与真实认证时间由模板提供。 */
     @Override
-    public boolean supports(@NonNull Class<?> authentication) {
-        return SmsAuthenticationToken.class.isAssignableFrom(authentication);
+    protected SmsAuthenticationToken authenticatedToken(UserDetails user,
+            Collection<? extends GrantedAuthority> authorities) {
+        return new SmsAuthenticationToken(user, null, authorities);
     }
-
-    @Override
-    public void afterPropertiesSet() throws Exception {
-        Assert.notNull(smsUserDetailsService, "smsUserDetailsService must not be null");
-        Assert.notNull(smsService, "smsService must not be null");
-    }
-
-    @Override
-    public void setMessageSource(@NonNull MessageSource messageSource) {
-        this.messages = new MessageSourceAccessor(messageSource);
-    }
-
-    /**
-     * 认证成功将非授信凭据转为授信凭据. 封装用户信息 角色信息。
-     *
-     * @param authentication the authentication
-     * @param user the user
-     * @return the authentication
-     */
-    protected Authentication createSuccessAuthentication(Authentication authentication, UserDetails user) {
-
-        Collection<? extends GrantedAuthority> authorities = authoritiesMapper.mapAuthorities(user.getAuthorities());
-        SmsAuthenticationToken authenticationToken = new SmsAuthenticationToken(user, null, authorities);
-        authenticationToken.setDetails(authentication.getDetails());
-
-        return authenticationToken;
-    }
-
 }

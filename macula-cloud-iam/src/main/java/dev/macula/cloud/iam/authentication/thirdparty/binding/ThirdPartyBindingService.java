@@ -16,20 +16,24 @@
  */
 package dev.macula.cloud.iam.authentication.thirdparty.binding;
 
-import java.util.Objects;
-
-import dev.macula.cloud.iam.authentication.sms.SmsService;
 import dev.macula.cloud.iam.authentication.thirdparty.PendingThirdPartyBindingRepository;
 import dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyLoginContext;
-import dev.macula.cloud.iam.authentication.verification.VerificationCodePurpose;
-import dev.macula.cloud.iam.pojo.entity.SysOAuth2Client;
+import dev.macula.cloud.iam.authentication.thirdparty.provider.ProviderFailureDiagnostics;
+import dev.macula.cloud.iam.authentication.verification.VerificationCodeChannelService;
+import dev.macula.cloud.iam.authentication.verification.VerificationCodeContext;
 import dev.macula.cloud.iam.pojo.entity.SysUser;
 import dev.macula.cloud.iam.service.account.SysUserService;
-import dev.macula.cloud.iam.service.identity.RegistrationIdentityBindingService;
+import dev.macula.cloud.iam.service.application.IamApplicationSnapshot;
+import dev.macula.cloud.iam.service.identity.IdentityProviderUserBindingService;
 import dev.macula.cloud.iam.service.identity.directory.IdentityDirectoryService;
 import dev.macula.cloud.iam.service.userdetails.SysUserDetails;
+import dev.macula.cloud.system.enums.IamWebLoginMode;
 import dev.macula.cloud.system.security.UserIdentifierNormalizer;
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.Objects;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.Authentication;
@@ -37,8 +41,10 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.util.StringUtils;
 
 /**
@@ -49,31 +55,32 @@ import org.springframework.util.StringUtils;
  */
 @Service
 public class ThirdPartyBindingService {
+    private static final Logger LOGGER = LoggerFactory.getLogger(ThirdPartyBindingService.class);
     private final PendingThirdPartyBindingRepository pending;
-    private final RegistrationIdentityBindingService bindings;
+    private final IdentityProviderUserBindingService bindings;
     private final SysUserService users;
     private final PasswordEncoder passwords;
-    private final SmsService sms;
+    private final VerificationCodeChannelService sms;
     private final UserIdentifierNormalizer normalizer;
     private final IdentityDirectoryService directory;
-    private final org.springframework.transaction.support.TransactionTemplate transactions;
+    private final TransactionTemplate transactions;
 
     /**
      * 目录请求在事务外，证明与绑定在显式事务内完成。
      */
     public ThirdPartyBindingService(PendingThirdPartyBindingRepository pending,
-            RegistrationIdentityBindingService bindings,
-            SysUserService users, PasswordEncoder passwords, SmsService sms, UserIdentifierNormalizer normalizer,
-            IdentityDirectoryService directory, org.springframework.transaction.PlatformTransactionManager manager) {
+            IdentityProviderUserBindingService bindings,
+            SysUserService users, PasswordEncoder passwords, @Qualifier("smsCodeService") VerificationCodeChannelService sms, UserIdentifierNormalizer normalizer,
+            IdentityDirectoryService directory, PlatformTransactionManager manager) {
         this.pending = pending;
         this.bindings = bindings;
         this.users = users;
         this.passwords = passwords;
         this.sms = sms;
         this.normalizer = normalizer;
-        this.directory = java.util.Objects.requireNonNull(directory);
-        this.transactions = new org.springframework.transaction.support.TransactionTemplate(
-                java.util.Objects.requireNonNull(manager));
+        this.directory = Objects.requireNonNull(directory);
+        this.transactions = new TransactionTemplate(
+                Objects.requireNonNull(manager));
     }
 
     /**
@@ -100,8 +107,10 @@ public class ThirdPartyBindingService {
     private BoundAccount bindVerified(HttpServletRequest request, String username, String method, String password,
             String phone, String code, Authentication current, PendingThirdPartyBindingRepository.Pending external,
             IdentityDirectoryService.Admission admission) {
+        String stage = "account";
         try {
             SysUser account = account(external, username);
+            stage = "account_proof";
             switch (method) {
                 case "password" -> {
                     if (!StringUtils.hasText(password) || !StringUtils.hasText(account.getPassword())
@@ -114,8 +123,7 @@ public class ThirdPartyBindingService {
                     SysUser owner = users.findUniqueByMobile(registered);
                     if (owner == null || !Objects.equals(owner.getId(), account.getId())
                             || !normalizer.mobile(phone).filter(registered::equals).isPresent()
-                            || !sms.verifyCode(registered, code, external.context().clientId(),
-                            VerificationCodePurpose.IDENTITY_BINDING)) {
+                            || !sms.verifyCode(registered, code, VerificationCodeContext.binding(external.context().clientId()))) {
                         throw denied();
                     }
                 }
@@ -129,6 +137,7 @@ public class ThirdPartyBindingService {
                 }
                 default -> throw denied();
             }
+            stage = "binding_write";
             UserDetails principal = external.context().clientAuthorizationVersion() != null
                     ? bindings.bind(external.context().clientId(), external.context().tenantId(),
                     external.context().userType(), external.identity(),
@@ -146,6 +155,8 @@ public class ThirdPartyBindingService {
             return new BoundAccount(principal, external.context().savedRequestTarget(), external.claimed() != null,
                     external.context(), method);
         } catch (AuthenticationException | DuplicateKeyException ex) {
+            // 包装前只保留受控代码位置，否则下游拒绝会全部丢失起点；次数及回滚规则保持原样。
+            ProviderFailureDiagnostics.bindingFailure(LOGGER, stage, ex);
             pending.failedAttempt(request);
             throw denied();
         }
@@ -166,8 +177,7 @@ public class ThirdPartyBindingService {
             if (owner == null || !Objects.equals(owner.getId(), account.getId())) {
                 throw denied();
             }
-            sms.sendCode(registered, request.getRemoteAddr(), external.context().clientId(),
-                    VerificationCodePurpose.IDENTITY_BINDING);
+            sms.sendCode(registered, request.getRemoteAddr(), VerificationCodeContext.binding(external.context().clientId()));
         } catch (AuthenticationException ex) {
             pending.failedAttempt(request);
             // 与成功相同的响应，不通过发码接口暴露账号是否存在。
@@ -178,10 +188,10 @@ public class ThirdPartyBindingService {
      * 在证明前校验当前来源/路由/用户状态与认证范围。
      */
     private SysUser account(PendingThirdPartyBindingRepository.Pending external, String username) {
-        SysOAuth2Client client = bindings.requireClient(external.context().clientId(), external.identity(), false,
+        IamApplicationSnapshot client = bindings.requireApplication(external.context().clientId(), external.identity(), false,
                 external.context().tenantId(), external.context().userType());
-        if ("IN_APP".equals(client.getApplicationType()) && external.claimed() == null
-                && !Objects.equals(client.getAuthorizationVersion(), external.context().clientAuthorizationVersion())) {
+        if (client.login().webLoginMode() == IamWebLoginMode.IN_APP && external.claimed() == null
+                && !Objects.equals(client.authorizationVersion(), external.context().clientAuthorizationVersion())) {
             throw denied();
         }
         SysUser account = users.findUniqueByUsername(username);

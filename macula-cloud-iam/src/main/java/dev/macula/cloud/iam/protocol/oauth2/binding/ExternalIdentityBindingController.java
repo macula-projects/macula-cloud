@@ -46,7 +46,7 @@ public class ExternalIdentityBindingController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void bind(Authentication authentication, @Valid @RequestBody ExternalIdentityBindingForm form) {
         if (!(authentication instanceof AbstractOAuth2TokenAuthenticationToken<?> tokenAuthentication)) {
-            throw new org.springframework.security.authentication.BadCredentialsException("Bearer token 无效");
+            throw new BadCredentialsException("Bearer token 无效");
         }
         try {
             bindingService.bind(tokenAuthentication.getToken().getTokenValue(), form.getBindingTicket());

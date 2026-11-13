@@ -58,10 +58,17 @@ public record OAuth2ClientConfigurationCatalogVO(List<Protocol> protocols, List<
      */
     public record Capability(String codeType, String label, String scene, String resultType, Set<String> applicationTypes,
         String loginCapability, boolean browser, Set<String> environments, String flow, boolean providerPkce,
-        String providerRedirectUri, boolean available) {
+        String providerRedirectUri, boolean available, Set<String> webLoginModes) {
+        /** 旧内部目录不推断新增端内能力，正式目录显式携带模式。 */
+        public Capability(String codeType, String label, String scene, String resultType, Set<String> applicationTypes,
+            String loginCapability, boolean browser, Set<String> environments, String flow, boolean providerPkce,
+            String providerRedirectUri, boolean available) {
+            this(codeType, label, scene, resultType, applicationTypes, loginCapability, browser, environments, flow,
+                providerPkce, providerRedirectUri, available, Set.of());
+        }
         /** 旧目录只描述直接Code；正式能力目录包含网页及各自合同。 */
         public Capability(String codeType, String label, String scene, String resultType, Set<String> applicationTypes) {
-            this(codeType, label, scene, resultType, applicationTypes, null, false, Set.of(), null, false, null, true);
+            this(codeType, label, scene, resultType, applicationTypes, null, false, Set.of(), null, false, null, true, Set.of());
         }
         /** 兼容旧内部调用；正式目录始终提供共享白名单产生的应用类型。 */
         public Capability(String codeType, String label, String scene, String resultType) {

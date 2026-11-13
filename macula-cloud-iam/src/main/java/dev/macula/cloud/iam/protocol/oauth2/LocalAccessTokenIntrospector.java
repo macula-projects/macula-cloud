@@ -20,6 +20,7 @@ package dev.macula.cloud.iam.protocol.oauth2;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.core.DefaultOAuth2AuthenticatedPrincipal;
 import org.springframework.security.oauth2.core.OAuth2AuthenticatedPrincipal;
@@ -65,7 +66,7 @@ public final class LocalAccessTokenIntrospector implements OpaqueTokenIntrospect
         claims.put("iat", access.getToken().getIssuedAt());
         claims.put("exp", access.getToken().getExpiresAt());
         return new DefaultOAuth2AuthenticatedPrincipal(authorization.getPrincipalName(), claims,
-                access.getToken().getScopes().stream().<org.springframework.security.core.GrantedAuthority>map(
+                access.getToken().getScopes().stream().<GrantedAuthority>map(
                         scope -> new SimpleGrantedAuthority("SCOPE_" + scope)).toList());
     }
 }

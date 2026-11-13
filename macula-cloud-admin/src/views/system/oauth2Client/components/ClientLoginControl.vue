@@ -1,11 +1,11 @@
 <template>
   <section class="configuration-panel">
-    <div v-if="!['SERVICE','IN_APP'].includes(client.applicationType)" class="section-heading"><h3>IAM 统一登录</h3><p>使用内置账号密码、短信或邮箱验证码登录。标准Web与SPA还可展示已关联的第三方网页授权图标。</p></div>
-    <el-form-item v-if="!['SERVICE','IN_APP'].includes(client.applicationType)" label="统一登录入口">
+    <div v-if="client.applicationType !== 'SERVICE' && !isInApp(client)" class="section-heading"><h3>IAM 统一登录</h3><p>使用内置账号密码、短信或邮箱验证码登录。标准Web与SPA还可展示已关联的第三方网页授权图标。</p></div>
+    <el-form-item v-if="client.applicationType !== 'SERVICE' && !isInApp(client)" label="统一登录入口">
       <el-switch :model-value="hostedEnabled" @change="setHostedEnabled" />
       <p class="hint">启用后需在应用配置填写登录回调；使用授权码与S256 PKCE。第三方平台Code仍走独立登录路径。</p>
     </el-form-item>
-    <template v-if="!['SERVICE','IN_APP'].includes(client.applicationType) && hostedEnabled">
+    <template v-if="client.applicationType !== 'SERVICE' && !isInApp(client) && hostedEnabled">
       <el-form-item label="本地登录策略">
         <el-radio-group :model-value="client.hostedLoginMethods == null ? 'default' : 'custom'"
           @change="value => client.hostedLoginMethods = value === 'default' ? null : ['PASSWORD', 'SMS', 'EMAIL']">
@@ -23,8 +23,8 @@
     <el-alert v-if="client.applicationType === 'SERVICE'" title="后端服务不提供用户登录" type="info" :closable="false" />
     <p v-if="client.applicationType === 'MINIAPP'" class="hint">小程序只关联一个同平台小程序身份源；微信登录Code与手机号Code可以同源并存。另开IAM页面时仅提供内置登录。</p>
     <p v-if="client.applicationType === 'NATIVE'" class="hint">{{ $t('applicationBoundary.native') }} IAM页面不提供第三方网页登录。</p>
-    <p v-if="['WEB_SERVER','SPA'].includes(client.applicationType)" class="hint">第三方网页授权图标展示在IAM登录页下方；可关联多个通用网页身份源。</p>
-    <el-alert v-if="client.applicationType === 'IN_APP'" title="只能选择一个端内登录能力；网页授权直接跳转平台，JSAPI由业务前端取Code。无IAM标准登录页。" type="info" :closable="false" />
+    <p v-if="!isInApp(client) && ['WEB_SERVER','SPA'].includes(client.applicationType)" class="hint">第三方网页授权图标展示在IAM登录页下方；可关联多个通用网页身份源。</p>
+    <el-alert v-if="isInApp(client)" title="只能选择一个端内登录能力；网页授权直接跳转平台，JSAPI由业务前端取Code。无IAM标准登录页。" type="info" :closable="false" />
     <div v-if="client.applicationType !== 'SERVICE'" class="source-toolbar">
       <div class="section-heading source-heading"><h3>关联登录能力</h3><p>网页登录用于IAM统一登录；平台Code用于应用直接登录。可用能力按应用类型筛选，绑定策略在身份源管理中设置。</p></div>
       <div class="source-actions"><el-button link @click="$emit('reload')">刷新配置目录</el-button><el-button v-if="client.applicationType !== 'SERVICE'" type="primary" :disabled="!catalogLoaded" @click="pickerOpen = true">添加身份源</el-button></div>
@@ -41,7 +41,7 @@
         <el-button link type="danger" @click="removeSource(row.id)">移除</el-button>
       </article>
     </div>
-    <el-form-item v-if="['WEB_SERVER','SPA'].includes(client.applicationType) && client.browserLoginProviderTypes?.length" label="默认直登">
+    <el-form-item v-if="!isInApp(client) && ['WEB_SERVER','SPA'].includes(client.applicationType) && client.browserLoginProviderTypes?.length" label="默认直登">
       <el-radio-group v-model="client.directLoginProviderType"><el-radio value="">先展示登录页</el-radio>
         <el-radio v-for="provider in client.browserLoginProviderTypes" :key="provider" :value="provider">{{ browserName(provider) }}</el-radio>
       </el-radio-group>
@@ -51,6 +51,7 @@
   </section>
 </template>
 <script setup>
+import {isInApp} from '@/utils/identitySourceCompatibility';
 import {ensureProtocol,projectProtocol} from '@/utils/applicationProtocolRegistry';
 
 import {computed,ref} from 'vue';
@@ -107,7 +108,7 @@ const relations = computed(() => {
 const boundaryIssue = computed(()=>{
   if (!singleSourceApplication(client.value)) return '';
   if (relations.value.length > 1) return '当前应用存在多个第三方来源，请明确移除或替换为一个来源';
-  if (['NATIVE','IN_APP'].includes(client.value.applicationType) &&
+  if ((client.value.applicationType === 'NATIVE' || isInApp(client.value)) &&
     Object.keys(client.value.externalProviderBindings || {}).length + Object.keys(client.value.browserCapabilityBindings || client.value.browserProviderBindings || {}).length > 1)
     return '当前应用存在多个第三方登录能力，请明确保留一个';
   return '';
@@ -118,7 +119,7 @@ async function addSources(additions) {
   if (issue) return ElMessage.warning(issue);
   const selectedIds = new Set(additions.map(item=>String(item.source.id)));
   const replaces = singleSourceApplication(client.value) && (relations.value.some(row=>!selectedIds.has(String(row.id))) ||
-    ['NATIVE','IN_APP'].includes(client.value.applicationType) && relations.value.length > 0);
+    (client.value.applicationType === 'NATIVE' || isInApp(client.value)) && relations.value.length > 0);
   if (replaces) {
     try { await ElMessageBox.confirm('将移除当前第三方登录关联，替换为本次所选来源与能力。IAM内置登录设置保留。','替换登录能力',{type:'warning'}); }
     catch { return; }
@@ -168,13 +169,13 @@ async function addSources(additions) {
     const code=client.value.protocol || 'OIDC';
     const settings=ensureProtocol(client.value,code).settings;
     const grants=new Set(csvValues(settings.authorizationGrantTypes));grants.add('authorization_code');
-    if (client.value.applicationType === 'IN_APP') grants.delete(EXTERNAL_CODE_GRANT);
+    if (isInApp(client.value)) grants.delete(EXTERNAL_CODE_GRANT);
     settings.authorizationGrantTypes=[...grants].join(',');settings.requireProofKey=true;
   }
   if(Object.keys(sdk).length) {
     const settings=ensureProtocol(client.value,client.value.protocol).settings;
     const grants=new Set(csvValues(settings.authorizationGrantTypes));grants.add(EXTERNAL_CODE_GRANT);
-    if (client.value.applicationType === 'IN_APP') {grants.delete('authorization_code');settings.clientAuthenticationMethods='none';}
+    if (isInApp(client.value)) {grants.delete('authorization_code');}
     settings.authorizationGrantTypes=[...grants].join(',');
     ElMessage.info('已按当前协议启用第三方Code登录');
   }

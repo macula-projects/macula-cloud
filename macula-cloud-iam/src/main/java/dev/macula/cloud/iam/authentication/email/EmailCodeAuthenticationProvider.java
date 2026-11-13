@@ -16,53 +16,35 @@
  */
 package dev.macula.cloud.iam.authentication.email;
 
-import java.util.ArrayList;
+import java.util.Collection;
 
-import lombok.RequiredArgsConstructor;
-import org.springframework.security.authentication.AccountStatusUserDetailsChecker;
-import org.springframework.security.authentication.AuthenticationProvider;
-import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.core.Authentication;
+import dev.macula.cloud.iam.authentication.verification.AbstractVerificationCodeAuthenticationProvider;
+import dev.macula.cloud.iam.authentication.verification.VerificationCodeChannelService;
 import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.FactorGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
 /**
- * 只核验托管邮件凭据并加载本地账号，不签发Token或处理协议grant。
+ * Email认证策略适配，复用验证码核验与账号状态检查模板。
  *
  * @author Macula
  * @since 6.1.0
  */
-@RequiredArgsConstructor
-public class EmailCodeAuthenticationProvider implements AuthenticationProvider {
-    private final EmailCodeService codes;
-    private final EmailUserDetailsService users;
-
-    /**
-     * 一次性凭据核验后仍检查当前账号状态，失败不创建Session。
-     */
-    @Override
-    public Authentication authenticate(Authentication authentication) {
-        EmailCodeAuthenticationToken token = (EmailCodeAuthenticationToken) authentication;
-        if (!codes.verify(token.getName(), (String) token.getCredentials(), token.getClientId())) {
-            throw new BadCredentialsException("邮箱或验证码无效");
-        }
-        UserDetails user = users.loadUserByEmail(token.getName());
-        new AccountStatusUserDetailsChecker().check(user);
-        var authorities = new ArrayList<GrantedAuthority>(user.getAuthorities());
-        // 框架以真实主认证因子时间生成auth_time；不等同于完成MFA，也不伪造acr/amr。
-        authorities.add(FactorGrantedAuthority.fromAuthority(
-                FactorGrantedAuthority.OTT_AUTHORITY));
-        var result = new EmailCodeAuthenticationToken(user, null, authorities);
-        result.setDetails(token.getDetails());
-        return result;
+public final class EmailCodeAuthenticationProvider extends AbstractVerificationCodeAuthenticationProvider<EmailCodeAuthenticationToken> {
+    /** 显式依赖通道端口与对应账号目录。 */
+    public EmailCodeAuthenticationProvider(VerificationCodeChannelService codes, EmailUserDetailsService users) {
+        super(EmailCodeAuthenticationToken.class, codes, users::loadUserByEmail);
     }
 
-    /**
-     * 不能处理退役邮箱grant或短信认证载体。
-     */
+    /** 读取服务端已核验的Client，不从外部输入重新推断。 */
     @Override
-    public boolean supports(Class<?> type) {
-        return EmailCodeAuthenticationToken.class.isAssignableFrom(type);
+    protected String clientId(EmailCodeAuthenticationToken token) {
+        return token.getClientId();
+    }
+
+    /** 成功载体不保存验证码，角色与真实认证时间由模板提供。 */
+    @Override
+    protected EmailCodeAuthenticationToken authenticatedToken(UserDetails user,
+            Collection<? extends GrantedAuthority> authorities) {
+        return new EmailCodeAuthenticationToken(user, null, authorities);
     }
 }

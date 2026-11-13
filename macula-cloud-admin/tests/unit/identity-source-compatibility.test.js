@@ -15,7 +15,7 @@ describe('应用架构与身份源能力矩阵',()=>{
     expect(externalCodeAllowed({applicationType:'NATIVE'},'UNKNOWN_APP_CODE')).toBe(false);
   });
   it('采用服务端能力收窄，不把公众号端内能力提供给原生客户端',()=>{
-    const official={browser:true,scene:'WEBVIEW',browserApplicationTypes:['IN_APP'],browserEnvironments:['WECHAT_WEBVIEW'],capabilities:[{browser:true,loginCapability:'WECHAT_OFFICIAL_ACCOUNT',applicationTypes:['IN_APP']}]};
+    const official={browser:true,scene:'WEBVIEW',browserApplicationTypes:['WEB_SERVER','SPA'],browserEnvironments:['WECHAT_WEBVIEW'],capabilities:[{browser:true,loginCapability:'WECHAT_OFFICIAL_ACCOUNT',applicationTypes:['WEB_SERVER','SPA'],webLoginModes:['IN_APP']}]};
     expect(browserSourceAllowed({applicationType:'NATIVE'},official)).toBe(false);
     expect(browserSourceAllowed({applicationType:'SPA'},official)).toBe(false);
     expect(browserSourceAllowed({applicationType:'MINIAPP'},official)).toBe(false);
@@ -35,10 +35,17 @@ it('uses real enabled capabilities without treating shared credentials as every 
 });
 
 it('端内JSAPI只给端内应用且移动SDK单选，小程序双Code同源',()=>{
- expect(externalCodeAllowed({applicationType:'IN_APP'},'FEISHU_WEBVIEW_CODE')).toBe(true);
- expect(externalCodeAllowed({applicationType:'IN_APP'},'FEISHU_APP_CODE')).toBe(false);
+ expect(externalCodeAllowed({applicationType:'SPA',webLoginMode:'IN_APP'},'FEISHU_WEBVIEW_CODE',{capabilities:[{codeType:'FEISHU_WEBVIEW_CODE',applicationTypes:['WEB_SERVER','SPA'],webLoginModes:['IN_APP']}]})).toBe(true);
+ expect(externalCodeAllowed({applicationType:'SPA',webLoginMode:'IN_APP'},'FEISHU_APP_CODE')).toBe(false);
  const a={source:{id:1},capability:'WECHAT_MINIAPP_LOGIN_CODE'},b={source:{id:1},capability:'WECHAT_MINIAPP_PHONE_CODE'};
  expect(sourceSelectionIssue({applicationType:'MINIAPP'},[a,b])).toBe('');
  expect(sourceSelectionIssue({applicationType:'MINIAPP'},[a,{...b,source:{id:2}}])).toBeTruthy();
  expect(sourceSelectionIssue({applicationType:'NATIVE'},[a,b])).toBeTruthy();
+});
+
+it('旧目录缺少模式元数据时不猜端内能力，旧独立类型被拒绝',()=>{
+ const source={browser:true,capabilities:[{browser:true,loginCapability:'WECOM_WEBVIEW',applicationTypes:['WEB_SERVER','SPA']}]};
+ expect(browserSourceAllowed({applicationType:'SPA',webLoginMode:'IN_APP'},source)).toBe(false);
+ expect(browserSourceAllowed({applicationType:'IN_APP'},source)).toBe(false);
+ expect(externalCodeAllowed({applicationType:'SPA',webLoginMode:'IN_APP'},'FEISHU_WEBVIEW_CODE',{})).toBe(false);
 });

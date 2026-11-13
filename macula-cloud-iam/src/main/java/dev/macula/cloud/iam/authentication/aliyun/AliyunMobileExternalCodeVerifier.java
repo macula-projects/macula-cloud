@@ -32,6 +32,7 @@ import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeVerif
 import dev.macula.cloud.iam.service.identity.IdentityProviderConfigService;
 import dev.macula.cloud.iam.service.identity.IdentityProviderConfigService.ProviderConfig;
 import dev.macula.cloud.system.enums.ExternalCodeType;
+import dev.macula.cloud.system.security.UserIdentifierNormalizer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationServiceException;
@@ -84,7 +85,7 @@ public class AliyunMobileExternalCodeVerifier implements ExternalCodeVerifier {
                     || !StringUtils.hasText(response.getBody().getGetMobileResultDTO().getMobile())) {
                 throw failed();
             }
-            String mobile = new dev.macula.cloud.system.security.UserIdentifierNormalizer()
+            String mobile = new UserIdentifierNormalizer()
                     .mobile(response.getBody().getGetMobileResultDTO().getMobile())
                     .orElseThrow(() -> new IllegalArgumentException("已核验手机号格式无效"));
             return new ExternalCodeVerification(VerifiedExternalIdentity.of(provider, codeType.name(),

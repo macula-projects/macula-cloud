@@ -23,6 +23,7 @@ import dev.macula.cloud.iam.service.userdetails.SysUserDetails;
 import dev.macula.cloud.system.enums.ExternalCodeType;
 import org.springframework.security.oauth2.core.oidc.OidcScopes;
 import org.springframework.security.oauth2.core.oidc.endpoint.OidcParameterNames;
+import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
 import org.springframework.security.oauth2.server.authorization.token.JwtEncodingContext;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenCustomizer;
 import org.springframework.util.StringUtils;
@@ -48,7 +49,7 @@ public final class CustomOidcTokenCustomizer implements OAuth2TokenCustomizer<Jw
      */
     @Override
     public void customize(JwtEncodingContext context) {
-        if (org.springframework.security.oauth2.server.authorization.OAuth2TokenType.ACCESS_TOKEN.equals(
+        if (OAuth2TokenType.ACCESS_TOKEN.equals(
                 context.getTokenType())) {
             context.getClaims().claims(claims -> claims.putAll(claimsService.create(
                     context.getPrincipal(), context.getRegisteredClient(), context.getAuthorizedScopes(),

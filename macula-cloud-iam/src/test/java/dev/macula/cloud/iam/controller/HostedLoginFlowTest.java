@@ -16,15 +16,17 @@
  */
 package dev.macula.cloud.iam.controller;
 
-import java.util.List;
-
 import dev.macula.cloud.iam.authentication.hosted.HostedLoginPolicyFilter;
 import dev.macula.cloud.iam.authentication.sms.SmsAuthenticationFilter;
-import dev.macula.cloud.iam.authentication.sms.SmsService;
+import dev.macula.cloud.iam.authentication.verification.VerificationCodeChannelService;
+import dev.macula.cloud.iam.authentication.verification.VerificationCodeContext;
 import dev.macula.cloud.iam.config.IamProtocolTest;
 import dev.macula.cloud.iam.enums.UserTypeEnum;
-import dev.macula.cloud.iam.pojo.entity.SysOAuth2Client;
-import dev.macula.cloud.iam.service.client.SysOAuth2ClientService;
+import dev.macula.cloud.iam.protocol.oauth2.ProtocolTestFixtures;
+import dev.macula.cloud.iam.protocol.oauth2.client.OAuth2ClientRegistration;
+import dev.macula.cloud.iam.protocol.oauth2.client.OAuth2ClientRegistrationService;
+import jakarta.servlet.Filter;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,6 +39,7 @@ import org.springframework.security.web.csrf.CsrfFilter;
 import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.test.context.web.WebAppConfiguration;
 import org.springframework.test.web.servlet.MockMvc;
@@ -71,11 +74,14 @@ import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppC
         "macula.cloud.iam.email-verification.digest-key=fixture-digest-key",
         "macula.cloud.iam.login-captcha.digest-key=fixture-digest-key"})
 class HostedLoginFlowTest {
+    @MockitoBean(name = "smsCodeService")
+    private VerificationCodeChannelService fixtureSmsCodes;
+
     @Autowired
     private WebApplicationContext context;
     private MockMvc mvc;
-    private SysOAuth2Client client;
-    private SmsService sms;
+    private OAuth2ClientRegistration client;
+    private VerificationCodeChannelService sms;
 
     /**
      * 每例重设Client策略和短信副作用记录。
@@ -83,15 +89,15 @@ class HostedLoginFlowTest {
     @BeforeEach
     void setup() {
         mvc = webAppContextSetup(context).apply(springSecurity()).build();
-        client = new SysOAuth2Client();
+        client = new OAuth2ClientRegistration();
         client.setClientId("public");
         client.setTenantId(1L);
         client.setUserType(UserTypeEnum.EMPLOYEE);
         client.setAuthorizationGrantTypes("authorization_code,refresh_token");
         client.setRedirectUris("https://client.example/callback");
-        dev.macula.cloud.iam.protocol.oauth2.ProtocolTestFixtures.configure(client);
-        when(context.getBean(SysOAuth2ClientService.class).getClientByClientId("public")).thenReturn(client);
-        sms = context.getBean(SmsService.class);
+        ProtocolTestFixtures.configure(client);
+        when(context.getBean(OAuth2ClientRegistrationService.class).getClientByClientId("public")).thenReturn(client);
+        sms = context.getBean("smsCodeService", VerificationCodeChannelService.class);
         clearInvocations(sms);
     }
 
@@ -100,7 +106,7 @@ class HostedLoginFlowTest {
      */
     @Test
     void realChainOrdersPolicyBeforeBothAuthenticators() {
-        List<jakarta.servlet.Filter> filters = context.getBean(FilterChainProxy.class).getFilters("/login");
+        List<Filter> filters = context.getBean(FilterChainProxy.class).getFilters("/login");
         int policy = index(filters, HostedLoginPolicyFilter.class);
         assertTrue(index(filters, CsrfFilter.class) < policy);
         assertTrue(policy < index(filters, UsernamePasswordAuthenticationFilter.class));
@@ -132,7 +138,7 @@ class HostedLoginFlowTest {
         mvc.perform(post("/api/v1/sms-code").session(session()).with(csrf())
                         .param("client_id", "attacker").param("phone", "13800000000"))
                 .andExpect(status().isOk());
-        verify(sms).sendCode("13800000000", "127.0.0.1", "public");
+        verify(sms).sendCode("13800000000", "127.0.0.1", VerificationCodeContext.login("public"));
         client.setHostedLoginMethods("");
         mvc.perform(get("/login").session(session())).andExpect(status().isOk())
                 .andExpect(content().string(not(containsString("id=\"password-login\""))))
@@ -148,9 +154,9 @@ class HostedLoginFlowTest {
     void smsConsumptionUsesTheSameClientAsIssuance() throws Exception {
         client.setHostedLoginMethods("SMS");
         mvc.perform(post("/login/sms").session(session()).with(csrf()).param("phone", "13800000000")
-                        .param("code", "fixture-code").param("client_id", "attacker"))
+                        .param("code", "123456").param("client_id", "attacker"))
                 .andExpect(status().is3xxRedirection());
-        verify(sms).verifyCode("13800000000", "fixture-code", "public");
+        verify(sms).verifyCode("13800000000", "123456", VerificationCodeContext.login("public"));
     }
 
     /**
@@ -171,7 +177,7 @@ class HostedLoginFlowTest {
     /**
      * 以真实过滤器类型定位顺序，找不到时返回负值使断言失败。
      */
-    private int index(List<jakarta.servlet.Filter> filters, Class<?> type) {
+    private int index(List<Filter> filters, Class<?> type) {
         for (int i = 0; i < filters.size(); i++) {
             if (type.isInstance(filters.get(i))) {
                 return i;

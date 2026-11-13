@@ -16,103 +16,145 @@
  */
 package dev.macula.cloud.system.service.impl;
 
-import dev.macula.cloud.system.config.PlatformOAuthClientProperties;
-import dev.macula.cloud.system.mapper.SysOAuth2ClientConfigMapper;
-import dev.macula.cloud.system.pojo.entity.SysOAuth2ClientConfig;
-import dev.macula.cloud.system.protocol.ApplicationProtocolConfiguration;
-import dev.macula.cloud.system.protocol.OAuth2ProtocolSettings;
-import java.util.ArrayList;
+import org.mockito.ArgumentMatchers;
+
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import dev.macula.cloud.system.config.PlatformOAuthClientProperties;
+import dev.macula.cloud.system.form.IamApplicationForm;
+import dev.macula.cloud.system.mapper.SysIamApplicationMapper;
+import dev.macula.cloud.system.pojo.entity.SysIamApplication;
+import dev.macula.cloud.system.protocol.OAuth2ProtocolSettings;
+import dev.macula.cloud.system.service.IamApplicationService;
+import dev.macula.cloud.system.vo.IamApplicationVO;
 import org.junit.jupiter.api.Test;
-import org.springframework.cache.concurrent.ConcurrentMapCacheManager;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
+import org.mockito.ArgumentCaptor;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
- * 平台身份认领的幂等和提交边界；真实事务并发由数据库IT覆盖。
+ * 受信平台认领只编排中立聚合保存，不接触Secret编码或重置入口。
  * @author Rain
  * @since 6.1.0
  */
 class PlatformOAuthClientProvisioningServiceTest {
-    /** 保留已有身份，提交前不发布缓存，重复启动不撤销正常会话。 */
+    /** 已认领且配置一致的启动不调用保存，不增版本或撤销已有会话。 */
     @Test
-    void preservesIdentityAndOnlyInvalidatesAfterFirstCommit() {
-        var clients = mock(SysOAuth2ClientConfigMapper.class);
-        var protocols = mock(ApplicationProtocolConfigurationService.class);
-        String clientCache = dev.macula.boot.constants.CacheConstants.OAUTH2_CLIENT_CACHE_KEY;
-        String originCache = dev.macula.cloud.system.security.OAuth2ClientCacheNames.TOKEN_ORIGIN_INDEX;
-        var caches = new ConcurrentMapCacheManager(clientCache, originCache);
-        var gateway = new SysOAuth2ClientConfig();
-        gateway.setId(7L);
-        gateway.setClientId("fixture-gateway");
-        gateway.setClientSecret("synthetic-encoded-secret");
-        gateway.setClientAuthenticationMethods("client_secret_basic");
-        gateway.setAuthorizationVersion(1L);
-        var admin = new SysOAuth2ClientConfig();
-        admin.setId(8L);
-        admin.setClientId("fixture-admin");
-        admin.setApplicationType("SPA");
-        admin.setTenantId(1L);
-        admin.setUserType("employee");
-        admin.setAuthorizationVersion(1L);
-        admin.setResourcePermissions("{}");
-        var settings = new OAuth2ProtocolSettings();
-        settings.setClientAuthenticationMethods("none");
-        settings.setAuthorizationGrantTypes("authorization_code," + dev.macula.cloud.system.enums.ExternalCodeType.GRANT_TYPE);
-        settings.setScopes("openid,profile");
-        settings.setRequireProofKey(true);
-        settings.setRequireAuthorizationConsent(false);
-        settings.setRedirectUris("https://admin.example.test/callback");
-        var configurations = new ArrayList<>(List.of(new ApplicationProtocolConfiguration("OIDC", 1, true, settings)));
-        when(protocols.list(8L)).thenAnswer(call -> configurations);
-        when(protocols.list(7L)).thenReturn(List.of());
-        when(clients.selectOne(any())).thenReturn(gateway, admin, gateway, admin);
-        when(clients.updateById(any(SysOAuth2ClientConfig.class))).thenReturn(1);
-        var properties = new PlatformOAuthClientProperties();
-        properties.setEnabled(true);
-        properties.setAdminClientId(admin.getClientId());
-        properties.setGatewayClientId(gateway.getClientId());
-        var external = mock(dev.macula.cloud.system.mapper.SysOAuth2ClientExternalProviderMapper.class);
-        var catalog = mock(dev.macula.cloud.system.service.OAuth2ClientConfigurationCatalogService.class);
-        admin.setExternalCodeTypes("WECOM_APP_CODE");
-        var mapping = new dev.macula.cloud.system.pojo.entity.SysOAuth2ClientExternalProvider();
-        mapping.setCodeType("WECOM_APP_CODE");
-        mapping.setIdentityProviderId(17L);
-        when(external.selectList(any())).thenReturn(List.of(mapping));
-        var source = new dev.macula.cloud.system.vo.OAuth2ClientConfigurationCatalogVO.Source(
-            17L, "fixture", "WECOM", "WECOM_SDK", "企微SDK", "SDK", false,
-            List.of(new dev.macula.cloud.system.vo.OAuth2ClientConfigurationCatalogVO.Capability("WECOM_APP_CODE", "Code", "SDK", "MEMBER_ID")), true, null, "WECOM_SDK_V1", false, null);
-        when(catalog.catalog()).thenReturn(new dev.macula.cloud.system.vo.OAuth2ClientConfigurationCatalogVO(List.of(), List.of(), List.of(source)));
-        var service = new PlatformOAuthClientProvisioningService(clients, protocols, caches, external, catalog);
-        caches.getCache(clientCache).put("fixture", "old");
-        TransactionSynchronizationManager.initSynchronization();
-        try {
-            service.initialize(properties);
-            assertEquals("old", caches.getCache(clientCache).get("fixture", String.class));
-            assertEquals(1, TransactionSynchronizationManager.getSynchronizations().size());
-            TransactionSynchronizationManager.getSynchronizations().forEach(sync -> sync.afterCommit());
-            assertNull(caches.getCache(clientCache).get("fixture"));
-        } finally {
-            TransactionSynchronizationManager.clearSynchronization();
+    void alreadyClaimedIdentityIsIdempotent() {
+        var fixture = new Fixture(true);
+        fixture.service.initialize(fixture.properties);
+        verify(fixture.applications, never()).save(any(), any());
+        verify(fixture.mapper, never()).updateById(any(SysIamApplication.class));
+        verify(fixture.applications, never()).resetSecret(any(), any(), any());
+    }
+
+    /** 新认领保留公开ID，仅明确清除Gateway业务授予；没有Secret值进入编排表单。 */
+    @Test
+    void claimRetainsIdentityAndDelegatesSecretPreservation() {
+        var fixture = new Fixture(false);
+        fixture.service.initialize(fixture.properties);
+        var form = ArgumentCaptor.forClass(IamApplicationForm.class);
+        verify(fixture.applications).save(ArgumentMatchers.eq(7L), form.capture());
+        assertThat(form.getValue().getClientId()).isEqualTo("fixture-gateway");
+        assertThat(form.getValue().getClientSecret()).isNull();
+        assertThat(form.getValue().getPurpose()).isEqualTo("RESOURCE_SERVER");
+        assertThat(form.getValue().getSettings().getAuthorizationGrantTypes()).isEmpty();
+        assertThat(form.getValue().getProtocol()).isNull();
+        assertThat(form.getValue().getConfigurationVersion()).isEqualTo("updated-version");
+        verify(fixture.applications, never()).resetSecret(any(), any(), any());
+    }
+
+    /** 不把端内Admin或重复声明ID自动修正成其他身份。 */
+    @Test
+    void mismatchedModeAndIdentityRejectBeforeWriting() {
+        var fixture = new Fixture(true);
+        fixture.admin.setWebLoginMode("IN_APP");
+        assertThrows(IllegalStateException.class, () -> fixture.service.initialize(fixture.properties));
+        verify(fixture.applications, never()).save(any(), any());
+        var collision = new Fixture(true);
+        collision.properties.setAdminClientId(collision.properties.getGatewayClientId());
+        assertThrows(IllegalStateException.class, () -> collision.service.initialize(collision.properties));
+        verifyNoInteractions(collision.mapper);
+    }
+
+    /**
+     * 只模拟公开应用视图与受管标识，不提供任何真实凭据。
+     * @since 6.1.0
+     */
+    private static final class Fixture {
+        final SysIamApplicationMapper mapper = mock(SysIamApplicationMapper.class);
+        final IamApplicationService applications = mock(IamApplicationService.class);
+        final IamApplicationProtocolService protocols = mock(IamApplicationProtocolService.class);
+        final IamApplicationWireAdapter wire = mock(IamApplicationWireAdapter.class);
+        final PlatformOAuthClientProperties properties = new PlatformOAuthClientProperties();
+        final SysIamApplication admin = application(8L, "fixture-admin", "SPA");
+        final SysIamApplication gateway = application(7L, "fixture-gateway", "SERVICE");
+        final PlatformOAuthClientProvisioningService service = new PlatformOAuthClientProvisioningService(mapper, applications, protocols, wire);
+
+        /** 声明已存在的两身份，原哈希不在公共视图或表单中。 */
+        Fixture(boolean claimed) {
+            properties.setEnabled(true);
+            properties.setAdminClientId(admin.getApplicationCode());
+            properties.setGatewayClientId(gateway.getApplicationCode());
+            gateway.setPurpose(claimed ? "RESOURCE_SERVER" : "APPLICATION");
+            if (claimed) {
+                admin.setManagedKey("platform-admin");
+                gateway.setManagedKey("platform-gateway");
+            }
+            admin.setResourcePermissions("{\"profile\":\"urn:macula:iam:profile\",\"system:access\":\"urn:macula:system\"}");
+            var adminView = view(admin, "none", "authorization_code");
+            adminView.setProtocol("OIDC");
+            adminView.getSettings().setScopes("openid,profile,system:access");
+            var gatewayView = view(gateway, "client_secret_basic", "");
+            gatewayView.setSecretConfigured(true);
+            when(mapper.selectOne(any())).thenReturn(gateway, admin);
+            when(mapper.updateById(any(SysIamApplication.class))).thenReturn(1);
+            when(applications.get(8L)).thenReturn(adminView);
+            when(applications.get(7L)).thenReturn(gatewayView);
+            when(protocols.state(anyLong(), anyBoolean())).thenReturn(new IamApplicationProtocolService.Stored(null, List.of()));
+            when(protocols.version(any(), any())).thenReturn("updated-version");
+            var gatewayForm = new IamApplicationForm();
+            gatewayForm.setClientId(gateway.getApplicationCode());
+            gatewayForm.setClientName("fixture");
+            when(wire.form(gatewayView)).thenReturn(gatewayForm);
+            when(wire.form(adminView)).thenReturn(new IamApplicationForm());
         }
-        assertEquals("synthetic-encoded-secret", gateway.getClientSecret());
-        assertEquals("fixture-gateway", gateway.getClientId());
-        assertEquals(2L, gateway.getAuthorizationVersion());
-        assertEquals(2L, admin.getAuthorizationVersion());
-        // 重复运行不安排缓存操作，所以在事务外执行也应无需注册同步回调。
-        service.initialize(properties);
-        assertEquals(2L, gateway.getAuthorizationVersion());
-        assertEquals(2L, admin.getAuthorizationVersion());
-        assertEquals("authorization_code," + dev.macula.cloud.system.enums.ExternalCodeType.GRANT_TYPE, settings.getAuthorizationGrantTypes());
-        verify(clients, times(2)).updateById(any(SysOAuth2ClientConfig.class));
-        when(external.selectList(any())).thenReturn(List.of());
-        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, () -> service.initialize(properties));
-        verify(clients, times(2)).updateById(any(SysOAuth2ClientConfig.class));
+
+        /** 仅构造中立主表字段。 */
+        private SysIamApplication application(Long id, String code, String type) {
+            var app = new SysIamApplication();
+            app.setId(id);
+            app.setApplicationCode(code);
+            app.setApplicationType(type);
+            app.setPurpose("APPLICATION");
+            app.setTenantId(1L);
+            app.setUserType("employee");
+            app.setResourcePermissions("{}");
+            return app;
+        }
+
+        /** 构造不包含任何Secret的协议视图。 */
+        private IamApplicationVO view(SysIamApplication app, String auth, String grant) {
+            var result = new IamApplicationVO();
+            result.setClientId(app.getApplicationCode());
+            result.setExternalCodeTypes(Set.of());
+            result.setExternalProviderBindings(Map.of());
+            var settings = new OAuth2ProtocolSettings();
+            settings.setClientAuthenticationMethods(auth);
+            settings.setAuthorizationGrantTypes(grant);
+            result.setSettings(settings);
+            return result;
+        }
     }
 }

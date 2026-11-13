@@ -6,6 +6,41 @@ Status: accepted。Plan review: completed（2 rounds，最终 NO_FINDINGS；工�
 
 ## Files that change
 
+- `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/authentication/hosted/HostedLoginPolicyFilter.java`
+- `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/authentication/mfa/MfaSessionAuthenticationStrategy.java`
+- `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/authentication/thirdparty/ExternalBindingTicketStore.java`
+- `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/authentication/thirdparty/ThirdPartyAuthenticationToken.java`
+- `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/authentication/thirdparty/ThirdPartyLoginContext.java`
+- `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/config/PasswordEncoderConfig.java`
+- `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/jackson/MaculaIamJacksonModule.java`
+- `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/mapper/SysUserMapper.java`
+- `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/pojo/entity/SysIdentityProvider.java`
+- `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/pojo/entity/SysOAuth2Client.java`
+- `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/protocol/oauth2/LocalAccessTokenIntrospector.java`
+- `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/protocol/oauth2/OAuth2ClientProtocolValidator.java`
+- `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/protocol/oauth2/endpoint/AuthorizationConsentController.java`
+- `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/protocol/oauth2/endpoint/OAuth2TokenEndpointFailureHandler.java`
+- `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/protocol/oauth2/grant/base/OAuth2UserGrantTokenIssuer.java`
+- `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/protocol/oauth2/grant/externalcode/ExternalCodeInfrastructureException.java`
+- `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/protocol/oauth2/grant/externalcode/ExternalCodeReplayStore.java`
+- `macula-cloud-iam/src/test/java/dev/macula/cloud/iam/authentication/email/EmailCodeAuthenticationProviderTest.java`
+- `macula-cloud-iam/src/test/java/dev/macula/cloud/iam/authentication/hosted/LoginRequestMatchersTest.java`
+- `macula-cloud-iam/src/test/java/dev/macula/cloud/iam/authentication/inapp/InAppAuthorizationRequestFilterTest.java`
+- `macula-cloud-iam/src/test/java/dev/macula/cloud/iam/authentication/thirdparty/ExternalBindingTicketStoreTest.java`
+- `macula-cloud-iam/src/test/java/dev/macula/cloud/iam/authentication/thirdparty/HttpSessionThirdPartyLoginStateRepositoryTest.java`
+- `macula-cloud-iam/src/test/java/dev/macula/cloud/iam/authentication/verification/RedisVerificationCodeStoreTest.java`
+- `macula-cloud-iam/src/test/java/dev/macula/cloud/iam/authentication/verification/VerificationCodeServiceTest.java`
+- `macula-cloud-iam/src/test/java/dev/macula/cloud/iam/authentication/wecom/WecomLoginModeTest.java`
+- `macula-cloud-iam/src/test/java/dev/macula/cloud/iam/controller/HostedEmailLoginFlowTest.java`
+- `macula-cloud-iam/src/test/java/dev/macula/cloud/iam/handler/BrowserAuthenticationFailureHandlerTest.java`
+- `macula-cloud-iam/src/test/java/dev/macula/cloud/iam/jackson/EmailCodeAuthenticationTokenSerializationTest.java`
+- `macula-cloud-iam/src/test/java/dev/macula/cloud/iam/message/mail/SmtpMailSenderTest.java`
+- `macula-cloud-iam/src/test/java/dev/macula/cloud/iam/message/sms/LoginSmsDispatcherTest.java`
+- `macula-cloud-iam/src/test/java/dev/macula/cloud/iam/message/support/FakeSmtpServer.java`
+- `macula-cloud-iam/src/test/java/dev/macula/cloud/iam/protocol/oauth2/grant/base/OAuth2UserGrantTokenIssuerTest.java`
+- `macula-cloud-iam/src/test/java/dev/macula/cloud/iam/protocol/oauth2/grant/externalcode/ExternalCodeReplayStoreTest.java`
+- `macula-cloud-iam/src/test/java/dev/macula/cloud/iam/protocol/oauth2/grant/externalcode/ExternalCodeVerifierRegistryTest.java`
+
 - `macula-cloud-iam/src/main/java/dev/macula/cloud/iam/service/userdetails/SysUserDetails.java`
 
 - `macula-cloud-iam/docs/architecture.md`
@@ -518,3 +553,5 @@ Status: accepted。Plan review: completed（2 rounds，最终 NO_FINDINGS；工�
 - 用户后续明确要求少用全限定类名、使用import：本轮只整理IAM service下8个已有实现/端口的类型引用与显式导入，不改变字符串、注释、序列化标识、注解含义或业务逻辑；保留已有未提交工作，写入前校验源文件摘要。仅本地修改，未授权自动提交推送。
 
 - import整理完成后，用户明确要求“提交合并”；沿用前文对公开仓库macula-projects/macula-cloud的明确YES授权，仅提交这8个服务文件及工程证据，不部署或删除分支。
+
+- 用户后续明确扩大显式import整理范围到整个macula-cloud-iam：扫描生产及测试Java，按词法区分代码/注释/字符串，仅替换无同名冲突的全限定类型；本轮精确涉及135个现有文件。保留已有AbstractThirdPartyAuthenticationFilter未提交改动，写入前校验各文件摘要；不修改序列化类名字符串、反射字符串、业务行为或新增package-info.java。本轮仅本地编辑与验证，不自动提交、推送或部署。

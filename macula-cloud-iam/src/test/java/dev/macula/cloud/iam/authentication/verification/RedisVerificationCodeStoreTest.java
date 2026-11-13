@@ -22,8 +22,11 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatchers;
+import org.mockito.Mockito;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.data.redis.core.script.RedisScript;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -57,8 +60,8 @@ class RedisVerificationCodeStoreTest {
         properties.setMaxAttempts(5);
         when(redis.opsForValue()).thenReturn(values);
         when(values.setIfAbsent(anyString(), eq("1"), eq(Duration.ofSeconds(60)))).thenReturn(true);
-        when(redis.execute(any(org.springframework.data.redis.core.script.RedisScript.class),
-                any(java.util.List.class), anyString())).thenReturn(1L);
+        when(redis.execute(any(RedisScript.class),
+                any(List.class), anyString())).thenReturn(1L);
         store = new RedisVerificationCodeStore(redis);
     }
 
@@ -71,8 +74,8 @@ class RedisVerificationCodeStoreTest {
         ArgumentCaptor<List<String>> ipRateKeys = ArgumentCaptor.forClass(List.class);
         assertThat(code).matches("[0-9]{6}");
         verify(values).setIfAbsent(phoneRateKey.capture(), eq("1"), eq(Duration.ofSeconds(60)));
-        verify(redis, org.mockito.Mockito.times(2)).execute(
-                any(org.springframework.data.redis.core.script.RedisScript.class),
+        verify(redis, Mockito.times(2)).execute(
+                any(RedisScript.class),
                 ipRateKeys.capture(), eq("60000"));
         assertThat(phoneRateKey.getValue()).startsWith("iam:sms:send:")
                 .doesNotContain("13800000000");
@@ -84,7 +87,7 @@ class RedisVerificationCodeStoreTest {
 
     @Test
     void rejectsWhenEitherRateLimitAlreadyExists() {
-        when(values.setIfAbsent(org.mockito.ArgumentMatchers.startsWith("iam:sms:send:"),
+        when(values.setIfAbsent(ArgumentMatchers.startsWith("iam:sms:send:"),
                 eq("1"), any(Duration.class))).thenReturn(false);
 
         assertThatThrownBy(() -> store.issue(scope(null), "13800000000", "127.0.0.1", properties))
@@ -96,7 +99,7 @@ class RedisVerificationCodeStoreTest {
         store.activate(scope(null), "13800000000", "123456", properties);
 
         ArgumentCaptor<String> stored = ArgumentCaptor.forClass(String.class);
-        verify(values).set(org.mockito.ArgumentMatchers.startsWith("iam:sms:code:"), stored.capture(),
+        verify(values).set(ArgumentMatchers.startsWith("iam:sms:code:"), stored.capture(),
                 eq(Duration.ofMinutes(5)));
         assertThat(stored.getValue()).doesNotContain("123456").endsWith(":5");
     }
@@ -108,7 +111,7 @@ class RedisVerificationCodeStoreTest {
 
         ArgumentCaptor<String> keys = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<String> valuesCaptor = ArgumentCaptor.forClass(String.class);
-        verify(values, org.mockito.Mockito.times(2)).set(keys.capture(), valuesCaptor.capture(),
+        verify(values, Mockito.times(2)).set(keys.capture(), valuesCaptor.capture(),
                 eq(Duration.ofMinutes(5)));
         assertThat(keys.getAllValues()).doesNotHaveDuplicates();
         assertThat(valuesCaptor.getAllValues()).doesNotHaveDuplicates();
@@ -116,22 +119,22 @@ class RedisVerificationCodeStoreTest {
 
     @Test
     void rejectsWhenIpWindowExceedsItsSharedNatAllowance() {
-        when(redis.execute(any(org.springframework.data.redis.core.script.RedisScript.class),
-                any(java.util.List.class), anyString())).thenReturn(1L, 21L);
+        when(redis.execute(any(RedisScript.class),
+                any(List.class), anyString())).thenReturn(1L, 21L);
 
         assertThatThrownBy(() -> store.issue(scope(null), "13800000000", "127.0.0.1", properties))
                 .isInstanceOf(IllegalStateException.class).hasMessage("发送过于频繁");
-        verify(redis).delete(org.mockito.ArgumentMatchers.startsWith("iam:sms:send:"));
+        verify(redis).delete(ArgumentMatchers.startsWith("iam:sms:send:"));
     }
 
     @Test
     void rejectsWhenClientWindowExceedsItsAllowance() {
-        when(redis.execute(any(org.springframework.data.redis.core.script.RedisScript.class),
-                any(java.util.List.class), anyString())).thenReturn(201L);
+        when(redis.execute(any(RedisScript.class),
+                any(List.class), anyString())).thenReturn(201L);
 
         assertThatThrownBy(() -> store.issue(scope("client-a"), "13800000000", "127.0.0.1", properties))
                 .isInstanceOf(IllegalStateException.class).hasMessage("发送过于频繁");
-        verify(redis).delete(org.mockito.ArgumentMatchers.startsWith("iam:sms:send:"));
+        verify(redis).delete(ArgumentMatchers.startsWith("iam:sms:send:"));
     }
 
     /**

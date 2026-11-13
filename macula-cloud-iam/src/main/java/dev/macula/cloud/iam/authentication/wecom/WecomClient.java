@@ -20,10 +20,13 @@ import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.time.Duration;
 
+import dev.macula.cloud.iam.authentication.thirdparty.cache.ProviderApplicationTokenCache;
+import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeConsumptionState;
 import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeInfrastructureException;
 import dev.macula.cloud.iam.service.identity.IdentityProviderConfigService.ProviderConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.security.authentication.AuthenticationServiceException;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
@@ -73,7 +76,7 @@ public class WecomClient {
     private final RestClient restClient;
     private final boolean httpContractTest;
     private final JsonMapper json = JsonMapper.builder().build();
-    private dev.macula.cloud.iam.authentication.thirdparty.cache.ProviderApplicationTokenCache applicationTokens;
+    private ProviderApplicationTokenCache applicationTokens;
 
     public WecomClient() {
         this(RestClient.builder().requestFactory(noRedirectRequestFactory()).build(), false);
@@ -110,9 +113,9 @@ public class WecomClient {
     /**
      * 生产装配来源隔离缓存；显式HTTP测试构造器仍可仅验证平台合同。
      */
-    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    @Autowired(required = false)
     void applicationTokenCache(
-            dev.macula.cloud.iam.authentication.thirdparty.cache.ProviderApplicationTokenCache cache) {
+            ProviderApplicationTokenCache cache) {
         this.applicationTokens = cache;
     }
 
@@ -239,18 +242,18 @@ public class WecomClient {
     String fetchAccessToken(ProviderConfig config) {
         if (applicationTokens == null && !httpContractTest) {
             throw new ExternalCodeInfrastructureException(
-                    dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeConsumptionState.NOT_SUBMITTED);
+                    ExternalCodeConsumptionState.NOT_SUBMITTED);
         }
         return applicationTokens == null ? loadApplicationToken(config).token()
                 : applicationTokens.get(config,
-                dev.macula.cloud.iam.authentication.thirdparty.cache.ProviderApplicationTokenCache.APPLICATION_TOKEN,
+                ProviderApplicationTokenCache.APPLICATION_TOKEN,
                 () -> loadApplicationToken(config));
     }
 
     /**
      * 该HTTP阶段尚未提交用户Code，明确的网络故障可安全释放占用。
      */
-    private dev.macula.cloud.iam.authentication.thirdparty.cache.ProviderApplicationTokenCache.TokenValue loadApplicationToken(
+    private ProviderApplicationTokenCache.TokenValue loadApplicationToken(
             ProviderConfig config) {
         try {
             String tokenBody = restClient.get().uri(UriComponentsBuilder.fromUriString(TOKEN)
@@ -268,19 +271,19 @@ public class WecomClient {
                         TOKEN_STAGE);
                 throw failed();
             }
-            return new dev.macula.cloud.iam.authentication.thirdparty.cache.ProviderApplicationTokenCache.TokenValue(
+            return new ProviderApplicationTokenCache.TokenValue(
                     accessToken, Duration.ofSeconds(tokenJson.path("expires_in").asLong()));
         } catch (RestClientResponseException ex) {
             LOGGER.warn("第三方接口 HTTP 失败 provider=WECOM stage={} status={}", TOKEN_STAGE,
                     ex.getStatusCode().value());
             if (ex.getStatusCode().is5xxServerError()) {
                 throw new ExternalCodeInfrastructureException(
-                        dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeConsumptionState.NOT_SUBMITTED);
+                        ExternalCodeConsumptionState.NOT_SUBMITTED);
             }
             throw failed();
         } catch (RestClientException ex) {
             throw new ExternalCodeInfrastructureException(
-                    dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeConsumptionState.NOT_SUBMITTED);
+                    ExternalCodeConsumptionState.NOT_SUBMITTED);
         }
     }
 

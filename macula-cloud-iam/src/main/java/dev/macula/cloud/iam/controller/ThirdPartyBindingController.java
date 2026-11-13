@@ -16,15 +16,29 @@
  */
 package dev.macula.cloud.iam.controller;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
+
+import dev.macula.cloud.iam.authentication.mfa.AdditionalAuthenticationRequiredException;
+import dev.macula.cloud.iam.authentication.mfa.AuthenticationCheckpoint;
+import dev.macula.cloud.iam.authentication.mfa.AuthenticationMethod;
+import dev.macula.cloud.iam.authentication.mfa.MfaCompletionService;
+import dev.macula.cloud.iam.authentication.thirdparty.ExternalBindingTicketStore;
 import dev.macula.cloud.iam.authentication.thirdparty.PendingThirdPartyBindingRepository;
+import dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyAuthenticationToken;
 import dev.macula.cloud.iam.authentication.thirdparty.binding.ThirdPartyBindingService;
 import dev.macula.cloud.iam.handler.AuthenticationFailureReason;
+import dev.macula.cloud.iam.service.userdetails.SysUserDetails;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.core.endpoint.OAuth2ParameterNames;
@@ -36,6 +50,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestAttribute;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
 
 /**
  * 第三方身份绑定页面与提交入口，仅在本地账号归属证明成功后建立登录会话。
@@ -50,17 +65,17 @@ public class ThirdPartyBindingController {
     public static final String BINDING_CANCEL_PATH = BINDING_PATH + "/cancel";
     private final PendingThirdPartyBindingRepository pending;
     private final ThirdPartyBindingService binding;
-    private final dev.macula.cloud.iam.authentication.thirdparty.ExternalBindingTicketStore tickets;
+    private final ExternalBindingTicketStore tickets;
     private final HttpSessionSecurityContextRepository contexts = new HttpSessionSecurityContextRepository();
-    private dev.macula.cloud.iam.authentication.mfa.MfaCompletionService mfaCompletion =
-            dev.macula.cloud.iam.authentication.mfa.MfaCompletionService.noOp();
+    private MfaCompletionService mfaCompletion =
+            MfaCompletionService.noOp();
 
     /**
      * Spring生产装配必须注入统一策略；显式构造的存储/生成器单测保留默认行为。
      */
-    @org.springframework.beans.factory.annotation.Autowired
-    public void setMfaCompletion(dev.macula.cloud.iam.authentication.mfa.MfaCompletionService completion) {
-        this.mfaCompletion = java.util.Objects.requireNonNull(completion);
+    @Autowired
+    public void setMfaCompletion(MfaCompletionService completion) {
+        this.mfaCompletion = Objects.requireNonNull(completion);
     }
 
     @GetMapping(BINDING_PATH)
@@ -68,7 +83,7 @@ public class ThirdPartyBindingController {
             @RequestAttribute(name = "org.springframework.security.web.csrf.CsrfToken", required = false) CsrfToken csrf) {
         try {
             pending.current(request);
-        } catch (org.springframework.security.core.AuthenticationException ex) {
+        } catch (AuthenticationException ex) {
             return "redirect:/login?" + OAuth2ParameterNames.ERROR + "="
                     + AuthenticationFailureReason.AUTHENTICATION_REJECTED.code();
         }
@@ -77,7 +92,7 @@ public class ThirdPartyBindingController {
         model.addAttribute("enableBindingSms", binding.isSmsAvailable());
         Authentication current = SecurityContextHolder.getContext().getAuthentication();
         model.addAttribute("enableBindingSession", current != null && current.isAuthenticated()
-                && current.getPrincipal() instanceof dev.macula.cloud.iam.service.userdetails.SysUserDetails);
+                && current.getPrincipal() instanceof SysUserDetails);
         secure(response);
         return "third-party-bind";
     }
@@ -97,13 +112,13 @@ public class ThirdPartyBindingController {
             Authentication proof = current instanceof AnonymousAuthenticationToken ? null : current;
             result = binding.bind(request, username, method, password,
                     phone, code, proof);
-        } catch (org.springframework.security.core.AuthenticationException |
-                 org.springframework.dao.DuplicateKeyException ex) {
+        } catch (AuthenticationException |
+                 DuplicateKeyException ex) {
             model.addAttribute("_csrfToken", csrf);
             model.addAttribute("bindingError", "账号绑定失败，请检查信息后重试。");
             model.addAttribute("enableBindingSms", binding.isSmsAvailable());
             model.addAttribute("enableBindingSession", current != null && current.isAuthenticated()
-                    && current.getPrincipal() instanceof dev.macula.cloud.iam.service.userdetails.SysUserDetails);
+                    && current.getPrincipal() instanceof SysUserDetails);
             return "third-party-bind";
         }
         secure(response);
@@ -116,38 +131,38 @@ public class ThirdPartyBindingController {
                 result.user().getAuthorities()));
         try {
             var sourceAuthentication = result.context() == null ? context.getAuthentication()
-                    : dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyAuthenticationToken.authenticated(
+                    : ThirdPartyAuthenticationToken.authenticated(
                     result.context().providerType(), result.user(), result.context());
             var methodVerified = "sms".equals(result.proofMethod())
-                    ? dev.macula.cloud.iam.authentication.mfa.AuthenticationMethod.SMS
+                    ? AuthenticationMethod.SMS
                     : "password".equals(result.proofMethod())
-                    ? dev.macula.cloud.iam.authentication.mfa.AuthenticationMethod.PASSWORD
-                    : dev.macula.cloud.iam.authentication.mfa.AuthenticationMethod.EXISTING_SESSION;
+                    ? AuthenticationMethod.PASSWORD
+                    : AuthenticationMethod.EXISTING_SESSION;
             mfaCompletion.check(context.getAuthentication(),
                     result.context() == null ? null : result.context().clientId(),
-                    dev.macula.cloud.iam.authentication.mfa.AuthenticationCheckpoint.BINDING_SESSION, "binding",
+                    AuthenticationCheckpoint.BINDING_SESSION, "binding",
                     methodVerified,
-                    dev.macula.cloud.iam.authentication.mfa.MfaCompletionService.proof(sourceAuthentication));
-        } catch (dev.macula.cloud.iam.authentication.mfa.AdditionalAuthenticationRequiredException ex) {
+                    MfaCompletionService.proof(sourceAuthentication));
+        } catch (AdditionalAuthenticationRequiredException ex) {
             response.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
             model.addAttribute("_csrfToken", csrf);
             model.addAttribute("bindingComplete", false);
             model.addAttribute("enableBindingSms", binding.isSmsAvailable());
             model.addAttribute("enableBindingSession", current != null && current.isAuthenticated()
-                    && current.getPrincipal() instanceof dev.macula.cloud.iam.service.userdetails.SysUserDetails);
+                    && current.getPrincipal() instanceof SysUserDetails);
             model.addAttribute("bindingError", "认证暂不可用，请重新登录。");
             return "third-party-bind";
         }
         if (result.context() != null) {
-            var external = dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyAuthenticationToken.authenticated(
+            var external = ThirdPartyAuthenticationToken.authenticated(
                     result.context().providerType(), result.user(), result.context());
             // 绑定账号证明完成后保留平台认证时间和私有来源证明；SDK分支此前已返回，不建立SSO。
             context.setAuthentication(
                     UsernamePasswordAuthenticationToken.authenticated(result.user(), null, external.getAuthorities()));
             ((UsernamePasswordAuthenticationToken) context.getAuthentication()).setDetails(
-                    new java.util.HashMap<>(java.util.Map.of(
-                            dev.macula.cloud.iam.authentication.mfa.MfaCompletionService.SOURCE_PROOF,
-                            dev.macula.cloud.iam.authentication.mfa.MfaCompletionService.proof(external))));
+                    new HashMap<>(Map.of(
+                            MfaCompletionService.SOURCE_PROOF,
+                            MfaCompletionService.proof(external))));
         }
         request.changeSessionId();
         SecurityContextHolder.setContext(context);
@@ -175,12 +190,12 @@ public class ThirdPartyBindingController {
      * 专用绑定用途发码，不从SavedRequest或前端clientId取账号路由。
      */
     @PostMapping(BINDING_PATH + "/sms-code")
-    @org.springframework.web.bind.annotation.ResponseBody
-    public java.util.Map<String, String> sendSms(@RequestParam String username, @RequestParam String phone,
+    @ResponseBody
+    public Map<String, String> sendSms(@RequestParam String username, @RequestParam String phone,
             HttpServletRequest request, HttpServletResponse response) {
         secure(response);
         binding.sendSms(request, username, phone);
-        return java.util.Map.of("status", "submitted");
+        return Map.of("status", "submitted");
     }
 
     /**

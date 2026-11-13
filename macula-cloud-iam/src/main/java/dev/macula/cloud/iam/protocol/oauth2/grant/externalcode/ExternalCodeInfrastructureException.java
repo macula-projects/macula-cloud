@@ -16,6 +16,8 @@
  */
 package dev.macula.cloud.iam.protocol.oauth2.grant.externalcode;
 
+import java.util.Objects;
+
 import org.springframework.security.authentication.AuthenticationServiceException;
 
 /**
@@ -39,7 +41,7 @@ public class ExternalCodeInfrastructureException extends AuthenticationServiceEx
      */
     public ExternalCodeInfrastructureException(ExternalCodeConsumptionState consumptionState) {
         super("External identity provider is temporarily unavailable.");
-        this.consumptionState = java.util.Objects.requireNonNull(consumptionState);
+        this.consumptionState = Objects.requireNonNull(consumptionState);
     }
 
     /**

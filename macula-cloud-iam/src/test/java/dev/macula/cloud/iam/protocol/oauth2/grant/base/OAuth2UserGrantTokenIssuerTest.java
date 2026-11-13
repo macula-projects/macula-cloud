@@ -23,6 +23,8 @@ import dev.macula.cloud.iam.protocol.oauth2.ApplicationProtocolResolver;
 import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeClientSettings;
 import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.OAuth2ExternalCodeAuthenticationToken;
 import dev.macula.cloud.iam.service.userdetails.SysUserDetails;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
@@ -32,6 +34,8 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2ClientAuthenticationToken;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
+import org.springframework.security.oauth2.server.authorization.context.AuthorizationServerContext;
+import org.springframework.security.oauth2.server.authorization.context.AuthorizationServerContextHolder;
 import org.springframework.security.oauth2.server.authorization.settings.ClientSettings;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenGenerator;
 
@@ -50,18 +54,18 @@ class OAuth2UserGrantTokenIssuerTest {
     /**
      * 独立签发器需要明确的授权服务器上下文。
      */
-    @org.junit.jupiter.api.BeforeEach
+    @BeforeEach
     void context() {
-        org.springframework.security.oauth2.server.authorization.context.AuthorizationServerContextHolder.setContext(
-                mock(org.springframework.security.oauth2.server.authorization.context.AuthorizationServerContext.class));
+        AuthorizationServerContextHolder.setContext(
+                mock(AuthorizationServerContext.class));
     }
 
     /**
      * 线程上下文不能泄漏到其他测试。
      */
-    @org.junit.jupiter.api.AfterEach
+    @AfterEach
     void clearContext() {
-        org.springframework.security.oauth2.server.authorization.context.AuthorizationServerContextHolder.resetContext();
+        AuthorizationServerContextHolder.resetContext();
     }
 
     /**

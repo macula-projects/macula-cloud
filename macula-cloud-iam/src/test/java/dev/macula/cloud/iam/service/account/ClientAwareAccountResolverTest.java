@@ -16,11 +16,14 @@
  */
 package dev.macula.cloud.iam.service.account;
 
+import dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures;
 import dev.macula.cloud.iam.enums.UserTypeEnum;
 import dev.macula.cloud.iam.pojo.entity.SysUser;
 import dev.macula.cloud.system.security.UserIdentifierNormalizer;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.core.userdetails.UserDetails;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -60,21 +63,21 @@ class ClientAwareAccountResolverTest {
     @Test
     void resolvesOnlyTheExactProviderSubjectBinding() {
         SysUser account = user(9L, "renamed-alice");
-        var service = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.registrationService(
+        var service = IdentitySourceTestFixtures.registrationService(
                 account);
-        var identity = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.sdkIdentity("WECOM",
+        var identity = IdentitySourceTestFixtures.sdkIdentity("WECOM",
                 "member-id").identity();
         assertThat(service.findBound("app", 1L, UserTypeEnum.EMPLOYEE, identity))
-                .get().extracting(org.springframework.security.core.userdetails.UserDetails::getUsername)
+                .get().extracting(UserDetails::getUsername)
                 .isEqualTo("renamed-alice");
-        org.mockito.Mockito.verifyNoInteractions(users);
+        Mockito.verifyNoInteractions(users);
     }
 
     @Test
     void rejectsBindingThatReferencesMissingLocalAccount() {
-        var service = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.registrationService(
+        var service = IdentitySourceTestFixtures.registrationService(
                 null);
-        var identity = dev.macula.cloud.iam.authentication.thirdparty.IdentitySourceTestFixtures.sdkIdentity("WECOM",
+        var identity = IdentitySourceTestFixtures.sdkIdentity("WECOM",
                 "orphan-member-id").identity();
         assertThatThrownBy(() -> service.findBound("app", 1L, UserTypeEnum.EMPLOYEE, identity))
                 .isInstanceOf(BadCredentialsException.class);

@@ -16,6 +16,8 @@
  */
 package dev.macula.cloud.iam.authentication.hosted;
 
+import java.util.List;
+
 import dev.macula.cloud.iam.authentication.github.GithubAuthenticationFilter;
 import dev.macula.cloud.iam.authentication.thirdparty.browser.ThirdPartyLoginFilterConfigurer;
 import org.junit.jupiter.api.Test;
@@ -39,11 +41,11 @@ class LoginRequestMatchersTest {
         var login = new ThirdPartyLoginFilterConfigurer().add(new GithubAuthenticationFilter(), "GITHUB",
                 "/login/github", "/login/github");
         var endpoints = LoginRequestMatchers.loginEndpoints(login);
-        for (String path : java.util.List.of("/login", "/login/github", "/login/email", "/api/v1/email-code",
+        for (String path : List.of("/login", "/login/github", "/login/email", "/api/v1/email-code",
                 "/login/bind/external")) {
             assertThat(endpoints.matches(new MockHttpServletRequest("GET", path))).as(path).isTrue();
         }
-        for (String path : java.util.List.of("/login/admin", "/login/github/evil", "/api/v1/users", "/h2-console/",
+        for (String path : List.of("/login/admin", "/login/github/evil", "/api/v1/users", "/h2-console/",
                 "/")) {
             assertThat(endpoints.matches(new MockHttpServletRequest("GET", path))).as(path).isFalse();
         }

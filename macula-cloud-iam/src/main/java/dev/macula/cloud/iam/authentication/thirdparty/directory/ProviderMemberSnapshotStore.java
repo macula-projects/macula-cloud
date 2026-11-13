@@ -18,12 +18,14 @@ package dev.macula.cloud.iam.authentication.thirdparty.directory;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
 
 import dev.macula.cloud.iam.authentication.thirdparty.VerifiedExternalIdentity;
 import dev.macula.cloud.iam.authentication.thirdparty.cache.ProviderCacheCipher;
 import dev.macula.cloud.iam.authentication.thirdparty.provider.ProviderIntegrationProperties;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -83,13 +85,13 @@ public class ProviderMemberSnapshotStore {
             throw new IllegalStateException("目录快照有效期无效");
         }
         String value = cipher.encrypt(key, json.writeValueAsString(new Snapshot(result, Instant.now().plus(ttl))));
-        var publish = new org.springframework.data.redis.core.script.DefaultRedisScript<Long>("""
+        var publish = new DefaultRedisScript<Long>("""
                 if redis.call('HGET',KEYS[1],'owner')~=ARGV[1] then return 0 end
                 local deadline=redis.call('ZSCORE',KEYS[2],KEYS[1])
                 if not deadline or tonumber(deadline)<=tonumber(ARGV[2]) then return 0 end
                 redis.call('SET',KEYS[3],ARGV[3],'PX',ARGV[4]) return 1
                 """, Long.class);
-        Long published = workRedis.execute(publish, java.util.List.of(jobKey,
+        Long published = workRedis.execute(publish, List.of(jobKey,
                         "iam:provider:{directory-jobs}:ready", key), owner, Long.toString(System.currentTimeMillis()),
                 value, Long.toString(ttl.toMillis()));
         if (!Long.valueOf(1).equals(published)) {

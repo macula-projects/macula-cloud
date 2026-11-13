@@ -17,13 +17,19 @@
 
 package dev.macula.cloud.iam.protocol.oauth2.persistence;
 
+import java.io.File;
 import java.net.ServerSocket;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.Principal;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -32,20 +38,36 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import dev.macula.boot.constants.CacheConstants;
+import dev.macula.cloud.iam.authentication.email.EmailCodeAuthenticationToken;
+import dev.macula.cloud.iam.authentication.sms.SmsAuthenticationToken;
 import dev.macula.cloud.iam.pojo.dto.Authorization;
+import dev.macula.cloud.iam.service.userdetails.SysUserDetails;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import org.redisson.Redisson;
 import org.redisson.api.RedissonClient;
 import org.redisson.config.Config;
 import org.redisson.spring.data.connection.RedissonConnectionFactory;
+import org.springframework.data.redis.RedisConnectionFailureException;
+import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
+import org.springframework.security.authentication.AbstractAuthenticationToken;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.FactorGrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.jackson2.SecurityJackson2Modules;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.core.OAuth2AccessToken;
@@ -54,12 +76,16 @@ import org.springframework.security.oauth2.core.OAuth2DeviceCode;
 import org.springframework.security.oauth2.core.OAuth2ErrorCodes;
 import org.springframework.security.oauth2.core.OAuth2RefreshToken;
 import org.springframework.security.oauth2.core.OAuth2UserCode;
+import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest;
 import org.springframework.security.oauth2.core.oidc.OidcIdToken;
 import org.springframework.security.oauth2.server.authorization.OAuth2Authorization;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationCode;
 import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
 import org.springframework.security.oauth2.server.authorization.client.InMemoryRegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
+import org.springframework.security.web.authentication.WebAuthenticationDetails;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.exc.InvalidTypeIdException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -86,7 +112,7 @@ class MaculaOAuth2AuthorizationServiceTest {
             port = socket.getLocalPort();
         }
         String executable = System.getenv().getOrDefault("TEST_REDIS_SERVER", "/opt/homebrew/bin/redis-server");
-        Assumptions.assumeTrue(new java.io.File(executable).canExecute(),
+        Assumptions.assumeTrue(new File(executable).canExecute(),
                 "设置 TEST_REDIS_SERVER 指向 redis-server 才能执行隔离 Redis 测试");
         redis = new ProcessBuilder(executable, "--bind", "127.0.0.1", "--port", String.valueOf(port),
                 "--save", "", "--appendonly", "no").redirectOutput(ProcessBuilder.Redirect.DISCARD)
@@ -158,16 +184,16 @@ class MaculaOAuth2AuthorizationServiceTest {
 
     @Test
     void redisConnectionFailureIsNotReportedAsMissingToken() {
-        var factory = org.mockito.Mockito.mock(org.springframework.data.redis.connection.RedisConnectionFactory.class);
-        org.mockito.Mockito.when(factory.getConnection()).thenThrow(
-                new org.springframework.data.redis.RedisConnectionFailureException("fixture unavailable"));
+        var factory = Mockito.mock(RedisConnectionFactory.class);
+        Mockito.when(factory.getConnection()).thenThrow(
+                new RedisConnectionFailureException("fixture unavailable"));
         RedisTemplate<String, Object> template = new RedisTemplate<>();
         template.setConnectionFactory(factory);
         template.afterPropertiesSet();
         var unavailable = new MaculaOAuth2AuthorizationService(template,
                 new InMemoryRegisteredClientRepository(client));
         assertThatThrownBy(() -> unavailable.findByToken("fixture", null))
-                .isInstanceOf(org.springframework.data.redis.RedisConnectionFailureException.class);
+                .isInstanceOf(RedisConnectionFailureException.class);
     }
 
     @Test
@@ -178,7 +204,7 @@ class MaculaOAuth2AuthorizationServiceTest {
             fixture = Base64.getMimeDecoder().decode(input.readAllBytes());
         }
         byte[] key = (CacheConstants.OAUTH2_TOKEN_KEY + ":access_token:legacy-binary-access")
-                .getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                .getBytes(StandardCharsets.UTF_8);
         try (var redisConnection = connection.getConnection()) {
             redisConnection.stringCommands().setEx(key, 60, fixture);
         }
@@ -190,11 +216,11 @@ class MaculaOAuth2AuthorizationServiceTest {
     void malformedStoredRecordIsNotReportedAsMissingToken() throws Exception {
         OAuth2Authorization original = authorization();
         service.save(original);
-        String hash = HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
-                .digest(original.getId().getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        String hash = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                .digest(original.getId().getBytes(StandardCharsets.UTF_8)));
         strings.opsForValue()
                 .set(CacheConstants.OAUTH2_TOKEN_KEY + ":resource-v3:{iam-oauth2}:v3:authorization:" + hash,
-                        "not-json", java.time.Duration.ofSeconds(60));
+                        "not-json", Duration.ofSeconds(60));
         assertThatThrownBy(() -> service.findById(original.getId())).isInstanceOf(IllegalStateException.class);
         assertThatThrownBy(() -> service.findByToken(original.getAccessToken().getToken().getTokenValue(), null))
                 .isInstanceOf(IllegalStateException.class);
@@ -253,8 +279,8 @@ class MaculaOAuth2AuthorizationServiceTest {
                         now.minusSeconds(60), now.minusSeconds(1))).build();
         service.save(value);
         assertThat(service.findByToken("short-" + base.getId(), null)).isNotNull();
-        String digest = java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
-                .digest(("short-" + base.getId()).getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        String digest = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                .digest(("short-" + base.getId()).getBytes(StandardCharsets.UTF_8)));
         assertThat(strings.getExpire(CacheConstants.OAUTH2_TOKEN_KEY + ":resource-v3:{iam-oauth2}:v3:code:" + digest,
                 TimeUnit.MILLISECONDS)).isBetween(1L, 2000L);
         assertThat(service.findByToken("expired-" + base.getId(), null)).isNull();
@@ -304,23 +330,23 @@ class MaculaOAuth2AuthorizationServiceTest {
             Authorization record = (Authorization) read.invoke(service, original.getId());
             try (var input = getClass().getResourceAsStream(
                     "/authorization/legacy-email-jackson" + version + "-attributes.json")) {
-                record.setAttributes(new String(java.util.Objects.requireNonNull(input).readAllBytes(),
-                        java.nio.charset.StandardCharsets.UTF_8));
+                record.setAttributes(new String(Objects.requireNonNull(input).readAllBytes(),
+                        StandardCharsets.UTF_8));
             }
             var write = MaculaOAuth2AuthorizationService.class.getDeclaredMethod("writeRecord", Authorization.class);
             write.setAccessible(true);
             String json = (String) write.invoke(service, record);
             String key = CacheConstants.OAUTH2_TOKEN_KEY + ":resource-v3:{iam-oauth2}:v3:authorization:" +
-                    HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
-                            .digest(original.getId().getBytes(java.nio.charset.StandardCharsets.UTF_8)));
-            strings.opsForValue().set(key, json, java.time.Duration.ofSeconds(60));
+                    HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                            .digest(original.getId().getBytes(StandardCharsets.UTF_8)));
+            strings.opsForValue().set(key, json, Duration.ofSeconds(60));
             var restored = service.findByToken(original.getAccessToken().getToken().getTokenValue(),
                     OAuth2TokenType.ACCESS_TOKEN);
             assertThat(restored).isNotNull();
             assertThat(restored.getAccessToken().isActive()).isTrue();
             assertThat(restored.getAuthorizationGrantType().getValue()).isEqualTo("email");
-            org.springframework.security.core.Authentication principal = restored.getAttribute(
-                    java.security.Principal.class.getName());
+            Authentication principal = restored.getAttribute(
+                    Principal.class.getName());
             assertThat(principal.getName()).isEqualTo("fixture-user");
             assertThat(strings.opsForValue().get(key)).isEqualTo(json);
             service.remove(restored);
@@ -332,28 +358,28 @@ class MaculaOAuth2AuthorizationServiceTest {
     @Test
     void readsJackson2RecordsAndCustomAuthenticationWithJackson3() throws Exception {
         // Test-only Jackson 2 writer reproduces the previous wire format; production has no fallback mapper.
-        var oldMapper = new com.fasterxml.jackson.databind.ObjectMapper();
-        oldMapper.registerModules(org.springframework.security.jackson2.SecurityJackson2Modules
+        var oldMapper = new ObjectMapper();
+        oldMapper.registerModules(SecurityJackson2Modules
                 .getModules(getClass().getClassLoader()));
-        oldMapper.registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
-        oldMapper.addMixIn(dev.macula.cloud.iam.authentication.sms.SmsAuthenticationToken.class,
+        oldMapper.registerModule(new JavaTimeModule());
+        oldMapper.addMixIn(SmsAuthenticationToken.class,
                 LegacyAuthenticationMixin.class);
-        var oldRecordMapper = new com.fasterxml.jackson.databind.ObjectMapper()
-                .registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
-        var user = new dev.macula.cloud.iam.service.userdetails.SysUserDetails();
+        var oldRecordMapper = new ObjectMapper()
+                .registerModule(new JavaTimeModule());
+        var user = new SysUserDetails();
         user.setUsername("fixture-user");
         user.setEnabled(true);
         user.setUserId(42L);
         user.setTenantId(1L);
-        user.setAuthorities(List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("USER")));
+        user.setAuthorities(List.of(new SimpleGrantedAuthority("USER")));
         var tokens = List.of(
-                new dev.macula.cloud.iam.authentication.sms.SmsAuthenticationToken(user, null, user.getAuthorities()),
-                new dev.macula.cloud.iam.authentication.sms.SmsAuthenticationToken("fixture-user", null));
+                new SmsAuthenticationToken(user, null, user.getAuthorities()),
+                new SmsAuthenticationToken("fixture-user", null));
         for (var token : tokens) {
-            token.setDetails(new org.springframework.security.web.authentication.WebAuthenticationDetails("127.0.0.1",
+            token.setDetails(new WebAuthenticationDetails("127.0.0.1",
                     "fixture"));
             OAuth2Authorization original = OAuth2Authorization.from(authorization())
-                    .attribute(java.security.Principal.class.getName(), token).attribute("longValue", 42L).build();
+                    .attribute(Principal.class.getName(), token).attribute("longValue", 42L).build();
             var conversion = MaculaOAuth2AuthorizationService.class.getDeclaredMethod("toEntity",
                     OAuth2Authorization.class);
             conversion.setAccessible(true);
@@ -361,15 +387,15 @@ class MaculaOAuth2AuthorizationServiceTest {
             record.setAttributes(oldMapper.writeValueAsString(original.getAttributes()));
             record.setAccessTokenMetadata(oldMapper.writeValueAsString(original.getAccessToken().getMetadata()));
             String key = CacheConstants.OAUTH2_TOKEN_KEY + ":resource-v3:{iam-oauth2}:v3:authorization:" +
-                    HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
-                            .digest(original.getId().getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+                    HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                            .digest(original.getId().getBytes(StandardCharsets.UTF_8)));
             strings.opsForValue()
-                    .set(key, oldRecordMapper.writeValueAsString(record), java.time.Duration.ofSeconds(60));
+                    .set(key, oldRecordMapper.writeValueAsString(record), Duration.ofSeconds(60));
             var restored = service.findById(original.getId());
             assertThat(restored.getAccessToken().getToken().getIssuedAt()).isEqualTo(
                     original.getAccessToken().getToken().getIssuedAt());
-            org.springframework.security.core.Authentication principal = restored.getAttribute(
-                    java.security.Principal.class.getName());
+            Authentication principal = restored.getAttribute(
+                    Principal.class.getName());
             assertThat(principal.getClass()).isEqualTo(token.getClass());
             assertThat(principal.isAuthenticated()).isEqualTo(token.isAuthenticated());
             assertThat(principal.getAuthorities()).isEqualTo(token.getAuthorities());
@@ -377,12 +403,41 @@ class MaculaOAuth2AuthorizationServiceTest {
             assertThat((Object) restored.getAttribute("longValue")).isEqualTo(42L);
             if (token.isAuthenticated()) {
                 assertThat(
-                        ((dev.macula.cloud.iam.service.userdetails.SysUserDetails) principal.getPrincipal()).getUserId()).isEqualTo(
+                        ((SysUserDetails) principal.getPrincipal()).getUserId()).isEqualTo(
                         42L);
             }
             service.save(restored);
             assertThat(service.findById(original.getId()).getAccessToken().getToken()).isEqualTo(
                     restored.getAccessToken().getToken());
+        }
+    }
+
+    /** 两种当前验证码主体通过生产授权Mapper恢复角色、details与真实认证时间。 */
+    @Test
+    void persistsCurrentVerificationCodePrincipalsAndFactors() {
+        var user = new SysUserDetails();
+        user.setUsername("fixture-user");
+        user.setEnabled(true);
+        user.setUserId(42L);
+        user.setTenantId(1L);
+        var authorities = List.of(new SimpleGrantedAuthority("USER"),
+                FactorGrantedAuthority.fromAuthority(FactorGrantedAuthority.OTT_AUTHORITY));
+        List<AbstractAuthenticationToken> tokens = List.of(new SmsAuthenticationToken(user, null, authorities),
+                new EmailCodeAuthenticationToken(user, null, authorities));
+        for (var token : tokens) {
+            token.setDetails(new WebAuthenticationDetails("127.0.0.1", "fixture"));
+            var original = OAuth2Authorization.from(authorization())
+                    .attribute(Principal.class.getName(), token).build();
+            service.save(original);
+            Authentication restored = service.findById(original.getId()).getAttribute(Principal.class.getName());
+            assertThat(restored).isInstanceOf(token.getClass());
+            assertThat(restored.isAuthenticated()).isTrue();
+            assertThat(restored.getCredentials()).isNull();
+            assertThat(restored.getAuthorities()).isEqualTo(token.getAuthorities());
+            assertThat(restored.getDetails()).isEqualTo(token.getDetails());
+            assertThat(restored.getName()).isEqualTo("fixture-user");
+            service.remove(service.findById(original.getId()));
+            assertThat(service.findById(original.getId())).isNull();
         }
     }
 
@@ -393,44 +448,44 @@ class MaculaOAuth2AuthorizationServiceTest {
         var mapper = (tools.jackson.databind.ObjectMapper) field.get(service);
         assertThatThrownBy(() -> mapper.readValue(
                 "{\"@class\":\"java.util.HashMap\",\"unexpected\":{\"@class\":\"java.io.File\",\"path\":\"fixture\"}}",
-                new tools.jackson.core.type.TypeReference<Map<String, Object>>() {
+                new TypeReference<Map<String, Object>>() {
                 }))
-                .isInstanceOf(tools.jackson.databind.exc.InvalidTypeIdException.class);
+                .isInstanceOf(InvalidTypeIdException.class);
     }
 
     @Test
     void serializesAuthenticatedPrincipalAndAuthorizationRequest() {
-        var user = new dev.macula.cloud.iam.service.userdetails.SysUserDetails();
+        var user = new SysUserDetails();
         user.setUsername("fixture-user");
         user.setNickname("测试用户");
         user.setEnabled(true);
         user.setTenantId(1L);
         user.setUserId(42L);
         user.setAuthorities(List.of(
-                new org.springframework.security.core.authority.SimpleGrantedAuthority("USER")));
-        var principal = org.springframework.security.authentication.UsernamePasswordAuthenticationToken.authenticated(
+                new SimpleGrantedAuthority("USER")));
+        var principal = UsernamePasswordAuthenticationToken.authenticated(
                 user, null, user.getAuthorities());
-        var request = org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest.authorizationCode()
+        var request = OAuth2AuthorizationRequest.authorizationCode()
                 .authorizationUri("https://iam.example/oauth2/authorize").clientId(client.getClientId())
                 .redirectUri("https://client.example/callback").scopes(Set.of("openid"))
                 .additionalParameters(Map.of("code_challenge", "fixture-challenge", "code_challenge_method", "S256"))
                 .state("fixture-state").build();
         OAuth2Authorization original = OAuth2Authorization.from(authorization())
-                .attribute(java.security.Principal.class.getName(), principal)
-                .attribute(org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest.class.getName(),
+                .attribute(Principal.class.getName(), principal)
+                .attribute(OAuth2AuthorizationRequest.class.getName(),
                         request)
                 .build();
         service.save(original);
         OAuth2Authorization result = service.findById(original.getId());
-        org.springframework.security.core.Authentication restored = result.getAttribute(
-                java.security.Principal.class.getName());
-        assertThat(restored.getPrincipal()).isInstanceOf(dev.macula.cloud.iam.service.userdetails.SysUserDetails.class);
+        Authentication restored = result.getAttribute(
+                Principal.class.getName());
+        assertThat(restored.getPrincipal()).isInstanceOf(SysUserDetails.class);
         assertThat(
-                ((dev.macula.cloud.iam.service.userdetails.SysUserDetails) restored.getPrincipal()).getUserId()).isEqualTo(
+                ((SysUserDetails) restored.getPrincipal()).getUserId()).isEqualTo(
                 42);
-        org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest restoredRequest =
+        OAuth2AuthorizationRequest restoredRequest =
                 result.getAttribute(
-                org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest.class.getName());
+                OAuth2AuthorizationRequest.class.getName());
         assertThat(restoredRequest.getAdditionalParameters()).containsEntry("code_challenge_method", "S256");
     }
 
@@ -475,12 +530,12 @@ class MaculaOAuth2AuthorizationServiceTest {
      *
      * @since 6.1.0
      */
-    @com.fasterxml.jackson.annotation.JsonTypeInfo(use = com.fasterxml.jackson.annotation.JsonTypeInfo.Id.CLASS,
+    @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS,
             property = "@class")
-    @com.fasterxml.jackson.annotation.JsonAutoDetect(fieldVisibility =
-            com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility.ANY,
-            getterVisibility = com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility.NONE,
-            isGetterVisibility = com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility.NONE)
+    @JsonAutoDetect(fieldVisibility =
+            JsonAutoDetect.Visibility.ANY,
+            getterVisibility = JsonAutoDetect.Visibility.NONE,
+            isGetterVisibility = JsonAutoDetect.Visibility.NONE)
     abstract static class LegacyAuthenticationMixin {
     }
 }

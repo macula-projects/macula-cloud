@@ -16,56 +16,25 @@
  */
 package dev.macula.cloud.iam.authentication.email;
 
-import dev.macula.cloud.iam.authentication.hosted.HostedLoginClientPolicyService;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.http.HttpMethod;
-import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.web.authentication.AbstractAuthenticationProcessingFilter;
-import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
+import dev.macula.cloud.iam.authentication.verification.AbstractVerificationCodeAuthenticationFilter;
 
 /**
- * 将托管邮箱表单适配为认证凭据，不从表单读取Client身份。
+ * Email表单入口，字段边界及可信上下文由共用模板校验。
  *
  * @author Macula
  * @since 6.1.0
  */
-public class EmailCodeAuthenticationFilter extends AbstractAuthenticationProcessingFilter {
+public final class EmailCodeAuthenticationFilter extends AbstractVerificationCodeAuthenticationFilter<EmailCodeAuthenticationToken> {
     public static final String PATH = "/login/email";
 
-    /**
-     * 只接受POST，CSRF及Client方法策略由上游安全过滤器执行。
-     */
+    /** 固定该通道的入口与标识字段。 */
     public EmailCodeAuthenticationFilter() {
-        super(PathPatternRequestMatcher.pathPattern(HttpMethod.POST, PATH));
+        super(PATH, "email", 128);
     }
 
-    /**
-     * 重复、缺失或越界字段不能被静默取第一个值。
-     */
+    /** 保留原载体，不更改持久化类型与字段。 */
     @Override
-    public Authentication attemptAuthentication(HttpServletRequest request, HttpServletResponse response) {
-        String email = single(request, "email", 128);
-        String code = single(request, "code", 6);
-        if (!code.matches("[0-9]{6}")) {
-            throw new BadCredentialsException("邮箱或验证码无效");
-        }
-        var token = new EmailCodeAuthenticationToken(email, code,
-                HostedLoginClientPolicyService.context(request).clientId());
-        token.setDetails(authenticationDetailsSource.buildDetails(request));
-        return getAuthenticationManager().authenticate(token);
-    }
-
-    /**
-     * 凭据只读取单值，错误消息不回显地址或验证码。
-     */
-    private String single(HttpServletRequest request, String name, int limit) {
-        String[] values = request.getParameterValues(name);
-        if (values == null || values.length != 1 || values[0] == null || values[0].isBlank() ||
-                values[0].length() > limit) {
-            throw new BadCredentialsException("邮箱或验证码无效");
-        }
-        return values[0].trim();
+    protected EmailCodeAuthenticationToken createToken(String identifier, String code, String clientId) {
+        return new EmailCodeAuthenticationToken(identifier, code, clientId);
     }
 }

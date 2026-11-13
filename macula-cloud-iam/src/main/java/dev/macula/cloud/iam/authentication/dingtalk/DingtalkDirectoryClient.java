@@ -23,7 +23,9 @@ import java.util.Map;
 import dev.macula.cloud.iam.authentication.thirdparty.VerifiedExternalIdentity;
 import dev.macula.cloud.iam.authentication.thirdparty.directory.ProviderDirectoryAdapter;
 import dev.macula.cloud.iam.authentication.thirdparty.directory.ProviderDirectoryResult;
+import dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeInfrastructureException;
 import dev.macula.cloud.iam.service.identity.IdentityProviderConfigService.ProviderConfig;
+import dev.macula.cloud.system.security.UserIdentifierNormalizer;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -104,7 +106,7 @@ public class DingtalkDirectoryClient implements ProviderDirectoryAdapter {
                 return result(ProviderDirectoryResult.Status.DISABLED, source, Map.of(), false);
             }
             Map<String, String> profile = new HashMap<>();
-            var normalizer = new dev.macula.cloud.system.security.UserIdentifierNormalizer();
+            var normalizer = new UserIdentifierNormalizer();
             String directoryMember = member.path("userid").asText();
             if (!directoryMember.isBlank() && directoryMember.length() <= 255) {
                 profile.put("member_id", directoryMember);
@@ -120,7 +122,7 @@ public class DingtalkDirectoryClient implements ProviderDirectoryAdapter {
             return ex.getStatusCode().value() == 403
                     ? result(ProviderDirectoryResult.Status.PERMISSION_DENIED, source, Map.of(), true)
                     : ProviderDirectoryResult.unavailable(ex.getStatusCode().is5xxServerError());
-        } catch (dev.macula.cloud.iam.protocol.oauth2.grant.externalcode.ExternalCodeInfrastructureException ex) {
+        } catch (ExternalCodeInfrastructureException ex) {
             return ProviderDirectoryResult.unavailable(true);
         } catch (RestClientException ex) {
             return ProviderDirectoryResult.unavailable(true);

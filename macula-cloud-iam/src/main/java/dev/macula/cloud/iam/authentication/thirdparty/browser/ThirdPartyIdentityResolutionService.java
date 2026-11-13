@@ -16,6 +16,8 @@
  */
 package dev.macula.cloud.iam.authentication.thirdparty.browser;
 
+import java.util.Objects;
+
 import dev.macula.cloud.iam.authentication.thirdparty.ThirdPartyLoginContext;
 import dev.macula.cloud.iam.authentication.thirdparty.VerifiedExternalIdentity;
 import dev.macula.cloud.iam.service.identity.IdentitySourceBindingPolicyService;
@@ -39,7 +41,7 @@ public class ThirdPartyIdentityResolutionService {
      * 首次无合法绑定或匹配结果时进入账号归属证明页面。
      */
     public UserDetails resolve(VerifiedExternalIdentity identity, ThirdPartyLoginContext context) {
-        if (!java.util.Objects.equals(identity.sourceVersion(), context.sourceVersion()) ||
+        if (!Objects.equals(identity.sourceVersion(), context.sourceVersion()) ||
                 !identity.flow().equals(context.flow())
                 || !identity.registrationId().equals(context.registrationId()) ||
                 !identity.sourceType().equals(context.sourceType())

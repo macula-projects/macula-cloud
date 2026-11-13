@@ -16,6 +16,8 @@
  */
 package dev.macula.cloud.iam.protocol.oauth2.profile;
 
+import java.util.Collections;
+
 import dev.macula.cloud.iam.vo.ProfileVO;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
@@ -46,7 +48,7 @@ public final class ProfileController {
      */
     @GetMapping(PATH)
     public ProfileVO profile(HttpServletRequest request) {
-        var headers = java.util.Collections.list(request.getHeaders("Authorization"));
+        var headers = Collections.list(request.getHeaders("Authorization"));
         if (headers.size() != 1 || !headers.get(0).regionMatches(true, 0, "Bearer ", 0, 7)
                 || headers.get(0).substring(7).isBlank() || request.getParameter("access_token") != null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);

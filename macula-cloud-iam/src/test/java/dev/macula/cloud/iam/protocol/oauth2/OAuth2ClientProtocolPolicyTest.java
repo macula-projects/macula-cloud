@@ -17,10 +17,10 @@
 
 package dev.macula.cloud.iam.protocol.oauth2;
 
+import dev.macula.cloud.iam.protocol.oauth2.client.OAuth2ClientRegistration;
+import dev.macula.cloud.iam.protocol.oauth2.client.OAuth2ClientRegistrationService;
+import java.util.List;
 import java.util.Set;
-
-import dev.macula.cloud.iam.pojo.entity.SysOAuth2Client;
-import dev.macula.cloud.iam.service.client.SysOAuth2ClientService;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
@@ -56,9 +56,9 @@ class OAuth2ClientProtocolPolicyTest {
         assertFalse(OAuth2ClientProtocolPolicy.enabled(client));
         client.setConfigurationStatus("ENABLED");
         var only = client.getProtocolConfigurations().get(0);
-        client.setProtocolConfigurations(java.util.List.of(only, only));
+        client.setProtocolConfigurations(List.of(only, only));
         assertFalse(OAuth2ClientProtocolPolicy.enabled(client));
-        client.setProtocolConfigurations(java.util.List.of(only));
+        client.setProtocolConfigurations(List.of(only));
         assertTrue(OAuth2ClientProtocolPolicy.enabled(client));
     }
 
@@ -71,8 +71,8 @@ class OAuth2ClientProtocolPolicyTest {
         OAuth2ClientProtocolPolicy.require(client, Set.of("openid", "profile"), "authorization_code");
         assertThrows(OAuth2AuthenticationException.class,
                 () -> OAuth2ClientProtocolPolicy.require(client, Set.of("profile"), "authorization_code"));
-        client.setEnabledProtocols("OAUTH2_1");
-        client.setDefaultProtocol("OAUTH2_1");
+        ProtocolTestFixtures.configure(client, "OAUTH2_1");
+
         client.setAuthorizationGrantTypes("authorization_code,refresh_token");
         ProtocolTestFixtures.configure(client);
         OAuth2ClientProtocolPolicy.require(client, Set.of("profile"), "authorization_code");
@@ -86,15 +86,15 @@ class OAuth2ClientProtocolPolicyTest {
     @Test
     void directGrantsRequireOauthProtocolAndCannotCarryOidcScope() {
         var client = client();
-        client.setEnabledProtocols("OAUTH2_1");
-        client.setDefaultProtocol("OAUTH2_1");
+        ProtocolTestFixtures.configure(client, "OAUTH2_1");
+
         client.setAuthorizationGrantTypes("client_credentials");
         ProtocolTestFixtures.configure(client);
         client.setApplicationType("SERVICE");
         OAuth2ClientProtocolPolicy.require(client, Set.of("api.read"), "client_credentials");
         assertThrows(OAuth2AuthenticationException.class,
                 () -> OAuth2ClientProtocolPolicy.require(client, Set.of("openid"), "client_credentials"));
-        client.setEnabledProtocols("OIDC");
+        ProtocolTestFixtures.configure(client, "OIDC");
         ProtocolTestFixtures.configure(client);
         assertThrows(OAuth2AuthenticationException.class,
                 () -> OAuth2ClientProtocolPolicy.require(client, Set.of("api.read"), "client_credentials"));
@@ -107,7 +107,7 @@ class OAuth2ClientProtocolPolicyTest {
     @SuppressWarnings("unchecked")
     void generatorReadsCurrentStateAndOriginalRefreshScopes() {
         var current = client();
-        var clients = mock(SysOAuth2ClientService.class);
+        var clients = mock(OAuth2ClientRegistrationService.class);
         when(clients.getClientByClientId("client")).thenReturn(current);
         var delegate = (OAuth2TokenGenerator<OAuth2Token>) mock(OAuth2TokenGenerator.class);
         var generator = new ProtocolCheckingTokenGenerator(delegate, clients);
@@ -122,9 +122,9 @@ class OAuth2ClientProtocolPolicyTest {
         when(context.getAuthorization()).thenReturn(OAuth2Authorization.withRegisteredClient(registered)
                 .principalName("user").authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
                 .authorizedScopes(Set.of("openid", "api.read")).build());
-        current.setEnabledProtocols("OAUTH2_1");
+        ProtocolTestFixtures.configure(current, "OAUTH2_1");
         ProtocolTestFixtures.configure(current);
-        current.setDefaultProtocol("OAUTH2_1");
+
         assertThrows(OAuth2AuthenticationException.class, () -> generator.generate(context));
         current.setConfigurationStatus("DRAFT");
         assertThrows(OAuth2AuthenticationException.class, () -> generator.generate(context));
@@ -134,14 +134,14 @@ class OAuth2ClientProtocolPolicyTest {
     /**
      * 明确完整新模型测试素材。
      */
-    private SysOAuth2Client client() {
-        var result = new SysOAuth2Client();
+    private OAuth2ClientRegistration client() {
+        var result = new OAuth2ClientRegistration();
         result.setClientId("client");
         result.setConfigurationStatus("ENABLED");
-        result.setEnabledProtocols("OIDC,OAUTH2_1");
-        result.setDefaultProtocol("OIDC");
+        ProtocolTestFixtures.configure(result, "OIDC,OAUTH2_1");
+
         result.setScopes("openid,profile,api.read");
         result.setAuthorizationGrantTypes("authorization_code,refresh_token,client_credentials");
-        return dev.macula.cloud.iam.protocol.oauth2.ProtocolTestFixtures.configure(result);
+        return ProtocolTestFixtures.configure(result);
     }
 }

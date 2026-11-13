@@ -17,11 +17,15 @@
 
 package dev.macula.cloud.iam.mapper;
 
+import java.util.List;
+
 import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import dev.macula.cloud.iam.pojo.dto.UserAuthInfo;
 import dev.macula.cloud.iam.pojo.entity.SysUser;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 
 /**
  * 用户持久层
@@ -44,7 +48,7 @@ public interface SysUserMapper extends BaseMapper<SysUser> {
     /**
      * 返回当前绑定连接的实际隔离级别，避免READ COMMITTED缺少范围锁而漏掉并发新候选。
      */
-    @org.apache.ibatis.annotations.Select("SELECT @@transaction_isolation")
+    @Select("SELECT @@transaction_isolation")
     String identityBindingIsolation();
 
     /**
@@ -58,10 +62,10 @@ public interface SysUserMapper extends BaseMapper<SysUser> {
      * @return 至多两个候选，不承诺账号或Client准入
      */
     @InterceptorIgnore(tenantLine = "true")
-    java.util.List<SysUser> findIdentityBindingCandidates(@org.apache.ibatis.annotations.Param("target") String target,
-            @org.apache.ibatis.annotations.Param("value") String value,
-            @org.apache.ibatis.annotations.Param("trimPattern") String trimPattern,
-            @org.apache.ibatis.annotations.Param("mobilePattern") String mobilePattern,
-            @org.apache.ibatis.annotations.Param("forUpdate") boolean forUpdate);
+    List<SysUser> findIdentityBindingCandidates(@Param("target") String target,
+            @Param("value") String value,
+            @Param("trimPattern") String trimPattern,
+            @Param("mobilePattern") String mobilePattern,
+            @Param("forUpdate") boolean forUpdate);
 
 }

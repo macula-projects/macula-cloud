@@ -22,10 +22,10 @@ import dev.macula.cloud.iam.authentication.mfa.MfaCompletionService;
 import dev.macula.cloud.iam.protocol.oauth2.CustomOAuth2TokenCustomizer;
 import dev.macula.cloud.iam.protocol.oauth2.CustomOidcTokenCustomizer;
 import dev.macula.cloud.iam.protocol.oauth2.ProtocolCheckingTokenGenerator;
+import dev.macula.cloud.iam.protocol.oauth2.client.OAuth2ClientRegistrationService;
 import dev.macula.cloud.iam.protocol.oauth2.grant.CustomeOAuth2AccessTokenGenerator;
 import dev.macula.cloud.iam.protocol.oauth2.token.claims.AccessTokenClaimsService;
 import dev.macula.cloud.iam.protocol.oauth2.token.claims.DefaultAccessTokenClaimsService;
-import dev.macula.cloud.iam.service.client.SysOAuth2ClientService;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -69,7 +69,7 @@ public class OAuth2TokenConfiguration {
     @Bean
     OAuth2TokenGenerator<OAuth2Token> tokenGenerator(JWKSource<SecurityContext> keys,
             OAuth2TokenCustomizer<OAuth2TokenClaimsContext> opaqueClaims, AccessTokenClaimsService claims,
-            SysOAuth2ClientService clients, MfaCompletionService mfa) {
+            OAuth2ClientRegistrationService clients, MfaCompletionService mfa) {
         var opaque = new CustomeOAuth2AccessTokenGenerator();
         opaque.setAccessTokenCustomizer(opaqueClaims);
         var jwt = new JwtGenerator(new NimbusJwtEncoder(keys));

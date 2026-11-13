@@ -19,6 +19,8 @@ package dev.macula.cloud.system.mapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import dev.macula.cloud.system.pojo.entity.SysIdentityProvider;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 
 /**
  * 身份提供商数据访问。
@@ -28,4 +30,7 @@ import org.apache.ibatis.annotations.Mapper;
  */
 @Mapper
 public interface SysIdentityProviderMapper extends BaseMapper<SysIdentityProvider> {
+    /** 应用写入/来源删除共用的来源行锁；显式查询保留Crypto结果映射。 */
+    @Select("SELECT * FROM sys_identity_provider WHERE id=#{id} FOR UPDATE")
+    SysIdentityProvider selectByIdForUpdate(@Param("id") Long id);
 }

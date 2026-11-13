@@ -67,6 +67,14 @@ macula:
 
 mybatis-plus:
   type-handlers-package: dev.macula.boot.starter.mp.handler
+  configuration:
+    # SQL日志交给SLF4J按Mapper包级INFO控制，避免直接输出凭据。
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+
+logging:
+  level:
+    # 默认保护所有profile，不能只在local关闭SQL参数/结果行日志。
+    dev.macula.cloud.iam.mapper: info
 
 ---
 # local Profile 包含 IDE 本地开发所需的全部默认配置
@@ -99,11 +107,6 @@ macula:
     iam:
       issuer-uri: ${IAM_ISSUER_URI:http://127.0.0.1:${IAM_HOST_PORT:9010}}
 
-mybatis-plus:
-  configuration:
-    # 这个配置会将执行的sql打印出来，在开发或测试的时候可以用
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
-
 feign:
   httpclient:
     enabled: false
@@ -130,6 +133,8 @@ logging:
   level:
     root: info
     dev.macula.cloud: debug
+    # Mapper会读取密码摘要和身份源密文，禁止SQL参数与结果行进入DEBUG日志。
+    dev.macula.cloud.iam.mapper: info
     com.alibaba.nacos.client.naming: warn
   file:
     name: ${user.home}/logs/${spring.application.name}/${spring.application.name}.log
