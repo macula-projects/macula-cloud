@@ -8,6 +8,8 @@ describe('resource-server settings',()=>{
  it('shows only authentication and introspection settings without login grants',()=>{
   const wrapper=mount(ResourceServerSettings,{props:{client:client()},global:{plugins:[ElementPlus]}})
   expect(wrapper.text()).toContain('资源服务器')
+  expect(wrapper.text()).toContain('允许的用户类型')
+  expect(wrapper.text()).toContain('机器令牌不受此项限制')
   expect(wrapper.text()).toContain('不可删除、停用')
   expect(wrapper.findAll('.el-form-item__label').map(label=>label.text())).not.toContain('用户类型')
   expect(wrapper.findAll('.el-form-item__label').map(label=>label.text())).not.toContain('授权方式')
@@ -25,3 +27,14 @@ describe('resource-server settings',()=>{
   expect(configurationIssues(row).length).toBeGreaterThan(0)
  })
 })
+
+describe('resource user types payload',()=>{
+ it('preserves multiple selections and explicit clearing',()=>{
+  const row=client();row.allowedUserTypes=['employee','member'];
+  expect(clientPayload(row).allowedUserTypes).toEqual(['employee','member']);
+  row.allowedUserTypes=[];
+  expect(clientPayload(row).allowedUserTypes).toEqual([]);
+  row.allowedUserTypes=['unknown'];
+  expect(configurationIssues(row)).toContain('允许的用户类型无效');
+ });
+});

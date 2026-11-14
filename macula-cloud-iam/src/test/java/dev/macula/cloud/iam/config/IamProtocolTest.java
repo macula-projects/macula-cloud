@@ -1418,6 +1418,7 @@ public class IamProtocolTest {
     void refreshAndRevocationWorkAndInvalidTokensAreInactive() throws Exception {
         var introspectionCaller = context.getBean(OAuth2ClientRegistrationService.class).getClientByClientId("compat");
         introspectionCaller.setPurpose("RESOURCE_SERVER");
+        introspectionCaller.setAllowedUserTypes(Set.of("employee"));
         introspectionCaller.setProtocolConfigurations(List.of());
 
         when(context.getBean(OAuth2ClientRegistrationService.class).getClientByClientId("compat")).thenReturn(
@@ -1441,10 +1442,32 @@ public class IamProtocolTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.active").value(false));
     }
 
+    /** 收紧资源服务器用户类型后下一次HTTP内省必须拒绝，伪造grant不能绕过。 */
+    @Test
+    void introspectionUserTypePolicyIsEnforcedForEveryRequest() throws Exception {
+        var row = context.getBean(OAuth2ClientRegistrationService.class).getClientByClientId("compat");
+        row.setPurpose("RESOURCE_SERVER");
+        row.setAllowedUserTypes(Set.of("employee"));
+        row.setProtocolConfigurations(List.of());
+        when(context.getBean(OAuth2ClientRegistrationService.class).getClientByClientId("compat")).thenReturn(row);
+        var issued = mvc.perform(exchange("jwt", authorize("jwt", login(), "api.read"), verifier))
+            .andExpect(status().isOk()).andReturn();
+        String token = json.readTree(issued.getResponse().getContentAsString()).get("access_token").asText();
+        mvc.perform(post("/oauth2/introspect").with(httpBasic("compat", "fixture-secret")).param("token", token))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.active").value(true))
+            .andExpect(jsonPath("$.userType").value("employee"));
+        row.setAllowedUserTypes(Set.of("member"));
+        mvc.perform(post("/oauth2/introspect").with(httpBasic("compat", "fixture-secret"))
+                .param("token", token).param("grant_type", "client_credentials"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.active").value(false))
+            .andExpect(jsonPath("$.sub").doesNotExist()).andExpect(jsonPath("$.userType").doesNotExist());
+    }
+
     @Test
     void publicTokenClientAuthenticationIsLimitedToTokenEndpoint() throws Exception {
         var caller = context.getBean(OAuth2ClientRegistrationService.class).getClientByClientId("compat");
         caller.setPurpose("RESOURCE_SERVER");
+        caller.setAllowedUserTypes(Set.of("employee"));
         caller.setProtocolConfigurations(List.of());
 
         when(context.getBean(OAuth2ClientRegistrationService.class).getClientByClientId("compat")).thenReturn(caller);
@@ -1637,6 +1660,7 @@ challenge())
                 .asText();
         var row = context.getBean(OAuth2ClientRegistrationService.class).getClientByClientId("jwt");
         row.setPurpose("RESOURCE_SERVER");
+        row.setAllowedUserTypes(Set.of("employee"));
         row.setProtocolConfigurations(List.of());
         row.setClientAuthenticationMethods("private_key_jwt");
 
@@ -1693,6 +1717,7 @@ challenge())
     void confidentialCallerIntrospectsPublicOidcOnlyTarget() throws Exception {
         var introspectionCaller = context.getBean(OAuth2ClientRegistrationService.class).getClientByClientId("compat");
         introspectionCaller.setPurpose("RESOURCE_SERVER");
+        introspectionCaller.setAllowedUserTypes(Set.of("employee"));
         introspectionCaller.setProtocolConfigurations(List.of());
 
         when(context.getBean(OAuth2ClientRegistrationService.class).getClientByClientId("compat")).thenReturn(
@@ -1770,6 +1795,7 @@ challenge())
         when(context.getBean(ExternalCodeVerifierRegistry.class).require(type)).thenReturn(verifier);
         when(verifier.verify(eq(type), eq(7L), any())).thenReturn(verification);
         var user = new SysUserDetails();
+        user.setUserType("employee");
         user.setUserId(42L);
         user.setTenantId(1L);
         user.setUsername("fixture-user");
@@ -1946,6 +1972,7 @@ challenge())
         when(context.getBean(ExternalCodeVerifierRegistry.class).require(type)).thenReturn(platform);
         when(platform.verify(eq(type), eq(71L), any())).thenReturn(verification);
         var user = new SysUserDetails();
+        user.setUserType("employee");
         user.setUserId(42L);
         user.setTenantId(1L);
         user.setEnabled(true);

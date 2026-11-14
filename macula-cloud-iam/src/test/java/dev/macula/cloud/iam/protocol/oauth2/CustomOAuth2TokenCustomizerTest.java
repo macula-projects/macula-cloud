@@ -51,6 +51,7 @@ class CustomOAuth2TokenCustomizerTest {
     void authenticatedUserAccessClaimsContainTrustedTenantAndExistingClaims() {
         SysUserDetails user = new SysUserDetails();
         user.setUsername("fixture-user");
+        user.setUserType("employee");
         user.setTenantId(12L);
         user.setNickname("Fixture");
         user.setDeptId(8L);
@@ -70,15 +71,14 @@ class CustomOAuth2TokenCustomizerTest {
         assertEquals(List.of("ROLE_USER"), claims.get(SecurityConstants.AUTHORITIES_KEY));
     }
 
+    /** 缺失用户目录的非用户主体不能冒充用户授权签发Token。 */
     @Test
     void nonUserPrincipalDoesNotCreateTenantClaim() {
         UsernamePasswordAuthenticationToken authentication = UsernamePasswordAuthenticationToken.authenticated(
                 "application", null, List.of(new SimpleGrantedAuthority("SCOPE_api")));
 
-        Map<String, Object> claims = accessClaims(authentication);
-
-        assertFalse(claims.containsKey(GlobalConstants.TENANT_ID_NAME));
-        assertEquals("fixture-client", claims.get("client_id"));
+        org.junit.jupiter.api.Assertions.assertThrows(
+            org.springframework.security.oauth2.core.OAuth2AuthenticationException.class, () -> accessClaims(authentication));
     }
 
     /**
@@ -86,6 +86,7 @@ class CustomOAuth2TokenCustomizerTest {
      */
     private Map<String, Object> accessClaims(Authentication principal) {
         var settings = ClientSettings.builder()
+                .setting("macula.user-route.user-type", "employee")
                 .setting(ResourceAuthorizationPolicy.PERMISSIONS,
                         Map.of("api.read", OAuth2ResourcePolicy.SYSTEM_RESOURCE))
                 .setting(OAuth2ResourcePolicy.AUTHORIZATION_VERSION, 1L).build();

@@ -382,3 +382,7 @@ STARTTLS 必须升级成功才认证；证书和主机名始终校验，自建 C
 ## 接口与实现包约定
 
 业务 Service 接口位于 `service`，实现位于 `service/impl`。`ApplicationCredentialCacheService`、`MenuRouteCacheService` 和 `MenuRouteTenantContext` 按具体职责放在 `service/cache`；不为无扩展需求的具体类额外增加接口。包移动不改变缓存键、提交后失效规则或可信租户校验。
+
+## 用户类型准入
+
+资源服务器支持 `allowedUserTypes` 多选，值为 `employee`、`member`、`odc`、`supplier`；空数组拒绝所有用户 Token，机器 Token 不受此项限制。V29 只增加非空 `allowed_user_types` JSON 数组文本列，默认 `[]`，不推断历史许可、不改凭据或绑定。策略纳入原聚合版本及保存冲突校验。升级 schema、System、IAM 和 Admin 后，由维护者明确配置资源服务器允许集合；不做旧 Token 过渡。

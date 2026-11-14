@@ -368,6 +368,7 @@ class MaculaOAuth2AuthorizationServiceTest {
                 .registerModule(new JavaTimeModule());
         var user = new SysUserDetails();
         user.setUsername("fixture-user");
+        user.setUserType("employee");
         user.setEnabled(true);
         user.setUserId(42L);
         user.setTenantId(1L);
@@ -417,6 +418,7 @@ class MaculaOAuth2AuthorizationServiceTest {
     void persistsCurrentVerificationCodePrincipalsAndFactors() {
         var user = new SysUserDetails();
         user.setUsername("fixture-user");
+        user.setUserType("employee");
         user.setEnabled(true);
         user.setUserId(42L);
         user.setTenantId(1L);
@@ -457,6 +459,7 @@ class MaculaOAuth2AuthorizationServiceTest {
     void serializesAuthenticatedPrincipalAndAuthorizationRequest() {
         var user = new SysUserDetails();
         user.setUsername("fixture-user");
+        user.setUserType("employee");
         user.setNickname("测试用户");
         user.setEnabled(true);
         user.setTenantId(1L);
@@ -480,6 +483,7 @@ class MaculaOAuth2AuthorizationServiceTest {
         Authentication restored = result.getAttribute(
                 Principal.class.getName());
         assertThat(restored.getPrincipal()).isInstanceOf(SysUserDetails.class);
+        assertThat(((SysUserDetails) restored.getPrincipal()).getUserType()).isEqualTo("employee");
         assertThat(
                 ((SysUserDetails) restored.getPrincipal()).getUserId()).isEqualTo(
                 42);
@@ -538,4 +542,11 @@ class MaculaOAuth2AuthorizationServiceTest {
             isGetterVisibility = JsonAutoDetect.Visibility.NONE)
     abstract static class LegacyAuthenticationMixin {
     }
+    /** 新增目录字段不能意外更改既有主体的Java序列化UID。 */
+    @Test
+    void principalRetainsOriginalSerialVersionUid() {
+        assertThat(java.io.ObjectStreamClass.lookup(SysUserDetails.class).getSerialVersionUID())
+            .isEqualTo(2532319773031098390L);
+    }
+
 }

@@ -372,6 +372,7 @@ async function loadDetail() {
       original.value = structuredClone(value);
       const prepared = {...value};
       if(value.purpose==='RESOURCE_SERVER') {
+        prepared.allowedUserTypes=[...(value.allowedUserTypes || [])];
         prepared.settings={kind:'oauth2',clientAuthenticationMethods:'client_secret_basic',authorizationGrantTypes:'',scopes:'',signingAlgorithm:'RS256',...value.settings};
       } else if(value.protocol && value.settings && !value.settings.clientAuthenticationMethods) {
         prepared.settings={...protocolDefaults(value,value.protocol),...Object.fromEntries(Object.entries(value.settings).filter(([,item])=>item!=null))};

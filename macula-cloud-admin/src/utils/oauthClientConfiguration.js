@@ -1,6 +1,7 @@
 import {externalCodeAllowed,singleSourceApplication,isInApp,isWebApplication,webLoginMode} from '@/utils/identitySourceCompatibility';
 import {projectProtocol,anyProtocolUses,protocolDefaults,RETIRED_GRANTS} from './applicationProtocolRegistry';
 import {
+  RESOURCE_USER_TYPES,
   AUTHORIZATION_CODE_GRANT,
   EXTERNAL_CODE_GRANT,
 } from "@/api/model/system/oauth2Client";
@@ -108,6 +109,7 @@ export function configurationIssues(client) {
   if (client.purpose==='RESOURCE_SERVER') {
     const auth=csvValues(client.settings?.clientAuthenticationMethods)
     const issues=[]
+    if(!Array.isArray(client.allowedUserTypes ?? []) || (client.allowedUserTypes || []).some(type => !RESOURCE_USER_TYPES.some(option => option.value === type)))issues.push("允许的用户类型无效")
     if(!auth.length || auth.includes('none'))issues.push('资源服务器必须使用机密客户端认证')
     if(auth.includes('private_key_jwt') && !client.settings?.jwkSetUrl?.startsWith('https://'))issues.push('请配置 HTTPS JWKS URL')
     return issues
@@ -421,12 +423,13 @@ export function applicationTemplate(
 export function clientPayload(client) {
   const fields = ['clientId','clientName','purpose','protocol','settings','configurationVersion','configurationStatus',
     'webLoginMode','browserProviderBindings','browserCapabilityBindings','applicationType','miniappPlatform','hostedLoginMethods','externalCodeTypes','externalProviderBindings',
-    'browserLoginProviderTypes','directLoginProviderType','userType','tenantId'];
+    'browserLoginProviderTypes','directLoginProviderType','userType','allowedUserTypes','tenantId'];
   const data = Object.fromEntries(
     fields
       .filter((key) => Object.hasOwn(client, key))
       .map((key) => [key, client[key]])
   );
+  data.allowedUserTypes = client.purpose === "RESOURCE_SERVER" ? [...(client.allowedUserTypes || [])] : [];
   if (!isWebApplication(client)) delete data.webLoginMode;
   if (data.browserCapabilityBindings == null) delete data.browserCapabilityBindings;
   if (

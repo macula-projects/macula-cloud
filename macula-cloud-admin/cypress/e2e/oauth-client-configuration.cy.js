@@ -726,6 +726,35 @@ describe("IAM 应用配置", () => {
       });
     });
   }
+  for (const width of [1440,390]) {
+    it(`saves and clears resource user types at width ${width}`,()=>{
+      cy.viewport(width,900);
+      open({purpose:'RESOURCE_SERVER',applicationType:'SERVICE',protocol:null,userType:null,tenantId:null,
+        allowedUserTypes:['employee'],hostedLoginMethods:[],secretConfigured:true,
+        settings:{kind:'oauth2',clientAuthenticationMethods:'client_secret_basic',authorizationGrantTypes:'',scopes:''}});
+      detail();
+      cy.contains('机器令牌不受此项限制').should('be.visible');
+      field('允许的用户类型').find('.el-select').click();
+      cy.contains('.el-select-dropdown:visible .el-select-dropdown__item','会员').click();
+      cy.contains('h3','资源服务器').click();
+      cy.contains('button','保存并启用').click();
+      cy.wait('@update').then(({request})=>expect(request.body.allowedUserTypes).to.have.members(['employee','member']));
+      field('允许的用户类型').find('.el-tag__close').each(close=>cy.wrap(close).click());
+      cy.contains('button','保存并启用').click();
+      cy.wait('@update').then(({request})=>expect(request.body.allowedUserTypes).to.deep.equal([]));
+      cy.window().then(win=>expect(win.document.documentElement.scrollWidth).to.be.at.most(win.innerWidth+1));
+    });
+  }
+  it('keeps selected resource user types when saving fails',()=>{
+    open({purpose:'RESOURCE_SERVER',applicationType:'SERVICE',protocol:null,userType:null,tenantId:null,
+      allowedUserTypes:['employee','member'],hostedLoginMethods:[],secretConfigured:true,
+      settings:{kind:'oauth2',clientAuthenticationMethods:'client_secret_basic',authorizationGrantTypes:'',scopes:''}});
+    detail();
+    cy.intercept('PUT','**/system/api/v1/oauth2-clients/42*',{statusCode:409,body:{success:false,msg:'配置已变化'}}).as('rejectedPolicy');
+    cy.contains('button','保存并启用').click();cy.wait('@rejectedPolicy');
+    field('允许的用户类型').should('contain','行政员工').and('contain','会员');
+  });
+
   it('does not submit a residual web mode when creating a resource server',()=>{
     open();cy.contains('button','创建应用').click();
     cy.get('.el-dialog').contains('.el-radio','资源服务器').click();

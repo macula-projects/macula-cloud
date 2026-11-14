@@ -40,6 +40,10 @@ import tools.jackson.databind.annotation.JsonDeserialize;
 @Data
 @JsonDeserialize
 public class SysUserDetails implements UserDetails, CredentialsContainer {
+    /** 显式保持新增目录字段之前的Java序列化UID；旧对象缺失字段仍须重新认证。 */
+    private static final long serialVersionUID = 2532319773031098390L;
+    /** 仅由已完成认证的服务端账号目录填写，不从请求参数推断。 */
+    private String userType;
     private Long userId;
     private Long tenantId;
 

@@ -54,7 +54,7 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 @RequiredArgsConstructor
 public class IamApplicationPolicyValidator {
-    private static final Set<String> USERS = Set.of("member", "employee", "odc", "supplier");
+    private static final Set<String> USERS = OAuth2ResourcePolicy.USER_TYPES;
     private final SysTenantInfoMapper tenants;
     private final SysIdentityProviderMapper identityProviders;
 
@@ -92,6 +92,8 @@ public class IamApplicationPolicyValidator {
         }
         require(purpose != IamApplicationPurpose.RESOURCE_SERVER || mode == null, "资源服务器不支持网页登录模式");
         require(!OAuth2ResourcePolicy.ADMIN_MANAGED_KEY.equals(existing.getManagedKey()) || mode == IamWebLoginMode.BROWSER, "平台Admin必须使用浏览器模式");
+        require(form.getAllowedUserTypes() != null && USERS.containsAll(form.getAllowedUserTypes()), "允许的用户类型无效");
+        require(purpose == IamApplicationPurpose.RESOURCE_SERVER || form.getAllowedUserTypes().isEmpty(), "业务应用不能配置资源服务器用户类型");
         form.setPurpose(purpose.name());
         form.setWebLoginMode(mode == null ? null : mode.value());
         require(type == IamApplicationType.MINIAPP ? Set.of("WECHAT", "WECOM").contains(form.getMiniappPlatform() == null ? "" : form.getMiniappPlatform())

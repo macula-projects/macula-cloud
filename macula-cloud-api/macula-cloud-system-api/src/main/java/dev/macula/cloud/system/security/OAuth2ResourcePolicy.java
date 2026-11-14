@@ -16,7 +16,11 @@
  */
 package dev.macula.cloud.system.security;
 
+import java.util.List;
 import java.util.Map;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.json.JsonMapper;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -26,6 +30,9 @@ import java.util.stream.Collectors;
  * @since 6.1.0
  */
 public final class OAuth2ResourcePolicy {
+    public static final String USER_TYPE_CLAIM = "userType";
+    public static final Set<String> USER_TYPES = Set.of("member", "employee", "odc", "supplier");
+
     /** RegisteredClient中受信任的Scope到资源映射设置键。 */
     public static final String PERMISSIONS_SETTING = "macula.resource-permissions";
     public static final String SYSTEM_RESOURCE = "urn:macula:system";
@@ -50,6 +57,24 @@ public final class OAuth2ResourcePolicy {
         return scopes.stream().filter(scope -> !OPENID_SCOPE.equals(scope))
             .map(permissions::get).filter(value -> value != null && !value.isBlank())
             .collect(Collectors.toUnmodifiableSet());
+    }
+
+    /**
+     * 严格读取资源服务器用户类型集合；未知、重复或非字符串值拒绝，不能默认允许。
+     * @param value 非空的 JSON 数组
+     * @return 不可变的稳定用户类型代码集合
+     * @throws IllegalArgumentException 配置损坏时抛出
+     */
+    public static Set<String> allowedUserTypes(String value) {
+        if (value == null) {
+            throw new IllegalArgumentException("允许的用户类型不能为空");
+        }
+        List<Object> raw = JsonMapper.builder().enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS).build().readValue(value, new TypeReference<List<Object>>() { });
+        if (raw == null || raw.stream().anyMatch(item -> !(item instanceof String type) || !USER_TYPES.contains(type))
+            || Set.copyOf(raw).size() != raw.size()) {
+            throw new IllegalArgumentException("允许的用户类型无效");
+        }
+        return raw.stream().map(String.class::cast).collect(Collectors.toUnmodifiableSet());
     }
 
 }

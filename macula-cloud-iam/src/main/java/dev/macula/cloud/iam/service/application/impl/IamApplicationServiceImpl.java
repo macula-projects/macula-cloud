@@ -33,6 +33,7 @@ import dev.macula.cloud.system.enums.IamWebLoginMode;
 import dev.macula.cloud.system.enums.IdentityLoginCapability;
 import dev.macula.cloud.system.protocol.IamApplicationProtocolRegistry;
 import dev.macula.cloud.system.security.IamApplicationLoginPolicy;
+import dev.macula.cloud.system.security.OAuth2ResourcePolicy;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -137,7 +138,7 @@ public class IamApplicationServiceImpl implements IamApplicationService {
             var login = new IamApplicationSnapshot.LoginPolicy(type, mode, app.getMiniappPlatform(), hosted(app.getHostedLoginMethods()), direct, sources);
             return new IamApplicationSnapshot(app.getId(), app.getApplicationCode(), dates.toInstant(app.getApplicationCodeIssuedAt()),
                 app.getApplicationName(), purpose, app.getManagedKey(), app.getAuthorizationVersion(), status,
-                app.getTenantId(), app.getUserType(), permissions, login, protocol,
+                app.getTenantId(), app.getUserType(), OAuth2ResourcePolicy.allowedUserTypes(app.getAllowedUserTypes()), permissions, login, protocol,
                 row != null && row.getCredentialHash() != null && !row.getCredentialHash().isBlank());
         } catch (RuntimeException error) {
             throw invalid();

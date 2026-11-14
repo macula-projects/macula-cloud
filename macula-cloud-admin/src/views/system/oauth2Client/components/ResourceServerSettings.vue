@@ -5,6 +5,12 @@
   <div class="form-grid">
    <el-form-item label="名称" prop="clientName" required><el-input v-model="client.clientName" maxlength="200" /></el-form-item>
   </div>
+  <el-form-item label="允许的用户类型">
+   <el-select v-model="client.allowedUserTypes" multiple clearable placeholder="不接受任何用户类型">
+    <el-option v-for="type in RESOURCE_USER_TYPES" :key="type.value" :label="type.label" :value="type.value" />
+   </el-select>
+  </el-form-item>
+  <p class="hint">只接受所选类型的用户令牌；不选则拒绝所有用户令牌。机器令牌不受此项限制。</p>
   <ClientCredentials v-model:client="client" :settings="client.settings" @copy="value => $emit('copy', value)" />
   <p class="hint">资源服务器与目标令牌所属应用可以不同。接口返回令牌状态及权限信息；不需要配置 client_credentials、回调或用户目录。</p>
   <h4>内省调用示例</h4><pre>POST /oauth2/introspect
@@ -16,6 +22,7 @@ token=&lt;需要验证的Access Token&gt;</pre>
  </section>
 </template>
 <script setup>
+import {RESOURCE_USER_TYPES} from '@/api/model/system/oauth2Client'
 import ClientCredentials from './ClientCredentials.vue'
 const client=defineModel('client',{type:Object,required:true})
 defineEmits(['copy'])

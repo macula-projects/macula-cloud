@@ -39,6 +39,7 @@ import dev.macula.cloud.system.protocol.OAuth2ProtocolConfiguration;
 import dev.macula.cloud.system.protocol.oauth2.OAuth2ProtocolDefinition;
 import dev.macula.cloud.system.protocol.oauth2.OAuth2ProtocolSettings;
 import dev.macula.cloud.system.security.IamApplicationLoginPolicy;
+import dev.macula.cloud.system.security.OAuth2ResourcePolicy;
 import dev.macula.cloud.system.service.IamApplicationCatalogService;
 import dev.macula.cloud.system.vo.IamApplicationVO;
 import lombok.RequiredArgsConstructor;
@@ -177,6 +178,7 @@ public class IamApplicationWireAdapter {
     public IamApplicationVO view(SysIamApplication app, IamApplicationProtocolService.Stored stored) {
         var result = new IamApplicationVO();
         BeanUtils.copyProperties(app, result);
+        result.setAllowedUserTypes(OAuth2ResourcePolicy.allowedUserTypes(app.getAllowedUserTypes()));
         result.setClientId(app.getApplicationCode());
         result.setClientName(app.getApplicationName());
         result.setClientIdIssuedAt(dates.toDate(app.getApplicationCodeIssuedAt()));

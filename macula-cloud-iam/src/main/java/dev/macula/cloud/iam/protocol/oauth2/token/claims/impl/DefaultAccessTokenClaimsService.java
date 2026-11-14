@@ -52,7 +52,18 @@ public final class DefaultAccessTokenClaimsService implements AccessTokenClaimsS
     @Override
     public Map<String, Object> create(Authentication principal,
             RegisteredClient client, Set<String> scopes, String grant) {
+        boolean machine = AuthorizationGrantType.CLIENT_CREDENTIALS.getValue().equals(grant);
         Map<String, Object> claims = accessClaims(principal, client.getClientId());
+        if (!machine) {
+            Object expected = client.getClientSettings().getSetting(ExternalCodeClientSettings.USER_TYPE);
+            if (principal == null || !(principal.getPrincipal() instanceof SysUserDetails user)
+                || !OAuth2ResourcePolicy.USER_TYPES.contains(user.getUserType() == null ? "" : user.getUserType())
+                || !user.getUserType().equals(expected)) {
+                throw new OAuth2AuthenticationException(OAuth2ErrorCodes.INVALID_GRANT);
+            }
+            // 目录类型绑定已认证主体，不能在SSO或Refresh时改按当前Client猜填。
+            claims.put(OAuth2ResourcePolicy.USER_TYPE_CLAIM, user.getUserType());
+        }
         Set<String> audience;
         try {
             audience = OAuth2ResourcePolicy.audiences(scopes,

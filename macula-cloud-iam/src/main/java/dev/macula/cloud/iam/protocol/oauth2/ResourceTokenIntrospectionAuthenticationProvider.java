@@ -25,6 +25,8 @@ import java.util.Set;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
+import org.springframework.security.oauth2.core.AuthorizationGrantType;
+import org.springframework.security.oauth2.core.endpoint.OAuth2ParameterNames;
 import org.springframework.security.oauth2.core.OAuth2ErrorCodes;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.OAuth2TokenIntrospection;
@@ -35,7 +37,7 @@ import org.springframework.security.oauth2.server.authorization.authentication.O
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 
 /**
- * 通过机密Client认证的内省返回Token原始资源与Scope；不增加业务Client间的资源许可配置。
+ * 机密资源服务器内省保留Token原始资源与Scope，并按当前允许集合限制用户目录；机器身份独立判断。
  *
  * @author Rain
  * @since 6.1.0
@@ -59,7 +61,7 @@ public final class ResourceTokenIntrospectionAuthenticationProvider implements A
     }
 
     /**
-     * 校验调用方及Token有效性；业务资源授权由API自己执行，不在内省处额外配置许可。
+     * 校验调用方、Token及用户目录准入；机器Token保留既有有效性规则，业务资源授权仍由API执行。
      */
     @Override
     public Authentication authenticate(Authentication authentication) {
@@ -84,6 +86,13 @@ public final class ResourceTokenIntrospectionAuthenticationProvider implements A
         if (access == null || !access.isActive()) {
             return inactive(request, caller);
         }
+        // 分类仅使用持久化授权的原始grant，缺少类型不能被当作机器Token放行。
+        boolean machine = AuthorizationGrantType.CLIENT_CREDENTIALS.equals(authorization.getAuthorizationGrantType());
+        Object userType = access.getClaims() == null ? null : access.getClaims().get(OAuth2ResourcePolicy.USER_TYPE_CLAIM);
+        if (!machine && (!(userType instanceof String type) || !OAuth2ResourcePolicy.USER_TYPES.contains(type)
+            || client.getAllowedUserTypes() == null || !client.getAllowedUserTypes().contains(type))) {
+            return inactive(request, caller);
+        }
         var nativeResult = (OAuth2TokenIntrospectionAuthenticationToken) delegate.authenticate(authentication);
         if (!nativeResult.getTokenClaims().isActive()) {
             return inactive(request, caller);
@@ -97,6 +106,10 @@ public final class ResourceTokenIntrospectionAuthenticationProvider implements A
         var owner = clients.getClientByClientId(authorization.getRegisteredClientId());
         if (owner == null) {
             return inactive(request, caller);
+        }
+        projection.put(OAuth2ParameterNames.GRANT_TYPE, authorization.getAuthorizationGrantType().getValue());
+        if (!machine) {
+            projection.put(OAuth2ResourcePolicy.USER_TYPE_CLAIM, userType);
         }
         // Scope来自已签发Token，不按内省调用方再建立一套许可或裁剪。
         projection.put("scope", access.getToken().getScopes().stream().sorted().toList());

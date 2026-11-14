@@ -102,7 +102,7 @@ public class DefaultClientAccountDetailsService implements ClientAccountDetailsS
         if (userAuthInfo == null && UserTypeEnum.EMPLOYEE == app.accountUserType()) {
             userAuthInfo = sysUserService.getUserAuthInfo(tenantId, username, null);
         }
-        return details(userAuthInfo, tenantId);
+        return details(userAuthInfo, tenantId, app.accountUserType());
     }
 
     /**
@@ -116,7 +116,7 @@ public class DefaultClientAccountDetailsService implements ClientAccountDetailsS
                 throw new UsernameNotFoundException("缺少可信Client上下文");
             }
             // 无Client门户保留原员工目录，不允许请求自报路由。
-            return details(sysUserService.getUserAuthInfo(1L, identifier, null), 1L);
+            return details(sysUserService.getUserAuthInfo(1L, identifier, null), 1L, UserTypeEnum.EMPLOYEE);
         }
         var client = references.trusted(clientId, null, false);
         if (client == null || !Objects.equals(tenantId, client.tenantId()) ||
@@ -132,7 +132,7 @@ public class DefaultClientAccountDetailsService implements ClientAccountDetailsS
                 info = userAuthInfoService == null ? null :
                         userAuthInfoService.getUserAuthInfo(userType, tenantId, identifier);
             }
-            return details(info, tenantId);
+            return details(info, tenantId, userType);
         }
         var account = (kind == IdentifierType.MOBILE ? identifiers.findByMobile(userType, identifier)
                 : identifiers.findByEmail(userType, identifier)).orElseThrow(
@@ -166,9 +166,9 @@ public class DefaultClientAccountDetailsService implements ClientAccountDetailsS
     }
 
     /**
-     * 统一停用检查和主体转换，不改变两个目录用例的优先级。
+     * 统一停用检查和主体转换，目录类型只取本次已完成认证的服务端路由，不从请求补齐。
      */
-    private SysUserDetails details(UserAuthInfo info, Long tenantId) {
+    private SysUserDetails details(UserAuthInfo info, Long tenantId, UserTypeEnum userType) {
         if (info == null) {
             throw new UsernameNotFoundException("用户不存在");
         }
@@ -176,6 +176,7 @@ public class DefaultClientAccountDetailsService implements ClientAccountDetailsS
             throw new DisabledException("该账户已被禁用!");
         }
         SysUserDetails result = new SysUserDetails(info);
+        result.setUserType(userType.getType());
         result.setTenantId(tenantId);
         return result;
     }

@@ -111,7 +111,7 @@ public final class IamApplicationTestFixtures {
         return new IamApplicationSnapshot(row.getId() == null ? 1L : row.getId(), row.getClientId(),
             row.getClientIdIssuedAt(), row.getClientName(), IamApplicationPurpose.valueOf(row.getPurpose()),
             row.getManagedKey(), row.getAuthorizationVersion(), IamApplicationStatus.valueOf(row.getConfigurationStatus()),
-            row.getTenantId(), row.getUserType() == null ? null : row.getUserType().getType(), Map.of(),
+            row.getTenantId(), row.getUserType() == null ? null : row.getUserType().getType(), row.getAllowedUserTypes(), Map.of(),
             new IamApplicationSnapshot.LoginPolicy(IamApplicationType.valueOf(row.getApplicationType()),
                 row.getWebLoginMode() == null ? null : IamWebLoginMode.valueOf(row.getWebLoginMode()),
                 row.getMiniappPlatform(), methods, direct, routes),

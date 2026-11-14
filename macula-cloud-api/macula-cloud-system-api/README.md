@@ -70,3 +70,7 @@ JSON时间点同样可以使用 `Instant`：Jackson原生支持带时区ISO读�
 ## 接口与实现包约定
 
 公共协议接口保留在 `dev.macula.cloud.system.protocol`；具体 OAuth2 策略 `OAuth2ProtocolDefinition` 和设置类型 `OAuth2ProtocolSettings` 位于 `dev.macula.cloud.system.protocol.oauth2`。引用旧 Java 类路径的调用方需要更新 import 并重新编译；HTTP/JSON 的 `kind: oauth2`、字段和协议版本保持不变，不需要数据迁移。
+
+## 用户类型准入
+
+`OAuth2ResourcePolicy` 提供共享用户类型代码及严格数组解码。`allowedUserTypes` 是资源服务器的准入集合，`userType` 是 Token 的可信目录声明，两者不互相替代。配置视图缓存升级为 `v8-user-type-admission`；不复用旧的派生 Client/Origin 缓存结构。

@@ -48,6 +48,7 @@ class DefaultAccessTokenClaimsServiceTest {
     void businessRolesExcludeFrameworkFactors() {
         var principal = new SysUserDetails();
         principal.setUsername("alice");
+        principal.setUserType("employee");
         principal.setTenantId(1L);
         var authentication = new EmailCodeAuthenticationToken(principal, null,
                 List.of(new SimpleGrantedAuthority("USER"),
@@ -57,10 +58,29 @@ class DefaultAccessTokenClaimsServiceTest {
                 .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
                 .redirectUri("https://client.example/callback")
                 .scope("system:access")
-                .clientSettings(ClientSettings.builder().setting(OAuth2ResourcePolicy.PERMISSIONS_SETTING,
+                .clientSettings(ClientSettings.builder().setting("macula.user-route.user-type", "employee").setting(OAuth2ResourcePolicy.PERMISSIONS_SETTING,
                         Map.of("system:access", OAuth2ResourcePolicy.SYSTEM_RESOURCE)).build()).build();
         var claims = new DefaultAccessTokenClaimsService().create(authentication, client, Set.of("system:access"),
                 "authorization_code");
         assertThat(claims.get(SecurityConstants.AUTHORITIES_KEY)).isEqualTo(List.of("USER"));
     }
+    /** 缺失主体目录或跨目录SSO不得签发新的用户Token。 */
+    @Test
+    void rejectsMissingOrDifferentPrincipalDirectory() {
+        var user = new SysUserDetails();
+        user.setUsername("alice");
+        var authentication = new EmailCodeAuthenticationToken(user, null, List.of());
+        var client = RegisteredClient.withId("fixture").clientId("fixture")
+            .clientAuthenticationMethod(ClientAuthenticationMethod.NONE)
+            .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+            .redirectUri("https://fixture.example/callback")
+            .clientSettings(ClientSettings.builder().setting("macula.user-route.user-type", "employee").build()).build();
+        var claims = new DefaultAccessTokenClaimsService();
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> claims.create(authentication, client, Set.of(), "authorization_code"))
+            .isInstanceOf(org.springframework.security.oauth2.core.OAuth2AuthenticationException.class);
+        user.setUserType("member");
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> claims.create(authentication, client, Set.of(), "authorization_code"))
+            .isInstanceOf(org.springframework.security.oauth2.core.OAuth2AuthenticationException.class);
+    }
+
 }

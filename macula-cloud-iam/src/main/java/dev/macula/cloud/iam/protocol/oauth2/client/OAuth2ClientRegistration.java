@@ -22,6 +22,7 @@ import dev.macula.cloud.iam.enums.UserTypeEnum;
 import dev.macula.cloud.system.protocol.ApplicationProtocolConfiguration;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Set;
 import java.util.List;
 import java.util.Map;
 import lombok.Data;
@@ -168,6 +169,7 @@ public class OAuth2ClientRegistration {
      * 用户类型
      */
     private UserTypeEnum userType;
+    private Set<String> allowedUserTypes = Set.of();
     /**
      * 租户ID
      */
