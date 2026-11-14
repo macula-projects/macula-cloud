@@ -69,3 +69,6 @@ Boot git status --short为空；必要本地Maven工件已从干净源码重新�
 ## 边界
 
 本次只保证实际接收到的/oauth2/introspect请求按当前allowedUserTypes校验用户Token；机器按持久化原grant跳过此项，不改变调用方已有缓存。未执行所有其他Failsafe IT、其他前端Cypress spec、真实第三方设备联调或生产部署；未改业务库、真实凭据。没有提交、推送或部署，本地green不构成人工PR批准。
+
+## 已授权的镜像交付
+本轮用户已授权提交推送及更新镜像；代码已推送PR #38，本地System/IAM/Admin已重建健康。V29及仅platform-gateway允许employee的明确选择已落实，凭据及其他31个容器保持；详细运行证据见[deployment.md](deployment.md)。先前“未提交或部署”的描述为当时验证边界，已由本轮明确授权更新。

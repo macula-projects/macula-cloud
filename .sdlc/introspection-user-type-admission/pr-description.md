@@ -15,3 +15,7 @@ System/Admin 增加允许类型的保存、校验和多选界面；V29 新增默
 ## 当前状态
 
 工程师已明确授权提交推送及更新本地镜像。本轮推送分支并创建PR，定向更新System、IAM、Admin；不合并PR，不修改Boot或其他服务，部署证据另行记录。
+
+## 本地镜像交付
+
+System、IAM、Admin已定向更新并健康；V29已执行。按工程师明确选择，仅platform-gateway允许employee，另一资源服务器保持空集合，凭据不变。其他31个容器ID及运行配置保持。Docker Hub EOF后使用原运行层加本地当前源码构建产物离线构建，产物SHA及运行元数据已核对；HTTP冒烟通过。详见[运行证据](deployment.md)。PR未合并。

@@ -46,7 +46,7 @@ Status: accepted
 - `macula-cloud-system/src/test/java/dev/macula/cloud/system/integration/ResourceUserTypePolicyIT.java`
 - `macula-cloud-system/src/test/java/dev/macula/cloud/system/service/impl/IamApplicationServiceImplTest.java`
 
-本目录另有intent/spec/plan/review-findings/build-notes/verification及pr-description.md（PR说明草稿），均只记录本变更。
+本目录另有intent/spec/plan/review-findings/build-notes/verification及pr-description.md（PR说明草稿）、deployment.md（本轮获授权的本地部署证据），均只记录本变更。
 
 ## Order of work
 1. 逐文件比对本次Boot SHA记录，恢复9个跟踪文件、删除3个本次新增文件与本次Boot SDLC文档；保留其他工作。确认Boot git status --short为空，并将必要本地Maven工件恢复干净基线。
