@@ -132,6 +132,7 @@ public class IamApplicationForm {
     @JsonIgnore
     private String idTokenSignatureAlgorithm;
     private String userType;
+    private Set<String> allowedUserTypes = Set.of();
     private Long tenantId;
     /** 显式设置类型，省略字段时保留旧记录。 */
     public void setApplicationType(String value) {

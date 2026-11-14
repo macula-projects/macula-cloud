@@ -118,6 +118,7 @@ public class OAuth2ClientRegistrationServiceImpl implements OAuth2ClientRegistra
     private OAuth2ClientRegistration project(IamApplicationSnapshot app, SysIamApplicationProtocolConfig row,
         OAuth2ApplicationProtocolSettings payload) {
         var result = new OAuth2ClientRegistration();
+        result.setAllowedUserTypes(app.allowedUserTypes());
         result.setId(app.id());
         result.setPurpose(app.purpose().name());
         result.setManagedKey(app.managedKey());

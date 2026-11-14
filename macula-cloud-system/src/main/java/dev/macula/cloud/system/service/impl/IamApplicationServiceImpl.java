@@ -214,6 +214,7 @@ public class IamApplicationServiceImpl implements IamApplicationService {
         app.setHostedLoginMethods(form.getHostedLoginMethods() == null ? null : String.join(",", new TreeSet<>(form.getHostedLoginMethods())));
         app.setTenantId("RESOURCE_SERVER".equals(app.getPurpose()) ? null : form.getTenantId());
         app.setUserType("RESOURCE_SERVER".equals(app.getPurpose()) ? null : form.getUserType());
+        app.setAllowedUserTypes(json.writeValueAsString(new TreeSet<>(form.getAllowedUserTypes())));
         app.setAuthorizationVersion(previous.getAuthorizationVersion() == null ? 1L : Math.addExact(previous.getAuthorizationVersion(), 1));
         return app;
     }

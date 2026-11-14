@@ -103,6 +103,7 @@ class ResourceAuthorizationIntegrationTest {
         var clients = mock(OAuth2ClientRegistrationService.class);
         var resource = new OAuth2ClientRegistration();
         resource.setPurpose(purpose);
+        resource.setAllowedUserTypes(Set.of("employee"));
         resource.setAuthorizationVersion(1L);
         resource.setClientSecret(caller.getClientSecret());
 
@@ -121,7 +122,7 @@ class ResourceAuthorizationIntegrationTest {
                 .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE).authorizedScopes(scopes)
                 .token(token, metadata -> metadata.put(OAuth2Authorization.Token.CLAIMS_METADATA_NAME,
                         Map.of("sub", "fixture-user", "aud", new ArrayList<>(audiences), "nickname", "hidden-profile",
-                                "preferred_username", "hidden-user", "tenantId", 1L)))
+                                "preferred_username", "hidden-user", "tenantId", 1L, "userType", "employee")))
                 .build());
         var provider = new ResourceTokenIntrospectionAuthenticationProvider(
                 new InMemoryRegisteredClientRepository(owner, caller), store, clients);

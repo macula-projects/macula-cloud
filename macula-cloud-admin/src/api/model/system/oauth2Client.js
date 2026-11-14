@@ -184,3 +184,8 @@ export default {
   resetSecret: (id, secret, configurationVersion) => http.put(`${url}/${id}/secret`, { secret, configurationVersion }),
   remove: (id, configurationVersion) => http.delete(`${url}/${id}?configurationVersion=${encodeURIComponent(configurationVersion)}`),
 };
+
+export const RESOURCE_USER_TYPES = Object.freeze([
+  {value:'employee',label:'行政员工'}, {value:'member',label:'会员'},
+  {value:'odc',label:'外包人员'}, {value:'supplier',label:'供应商'},
+]);

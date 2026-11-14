@@ -49,6 +49,8 @@ public class SysIamApplication extends BaseEntity {
     private String directLoginCapability;
     @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private String userType;
+    /** 资源服务器允许的用户目录代码；空数组不接受用户 Token。 */
+    private String allowedUserTypes = "[]";
     @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private Long tenantId;
     private String configurationStatus;

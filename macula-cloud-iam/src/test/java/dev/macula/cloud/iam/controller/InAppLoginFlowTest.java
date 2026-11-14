@@ -291,6 +291,7 @@ class InAppLoginFlowTest {
      */
     private SysUserDetails user() {
         var user = new SysUserDetails();
+        user.setUserType("employee");
         user.setUserId(9L);
         user.setTenantId(1L);
         user.setUsername("fixture-user");

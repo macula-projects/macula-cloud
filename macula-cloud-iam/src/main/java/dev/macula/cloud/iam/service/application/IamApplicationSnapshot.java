@@ -41,6 +41,7 @@ import java.util.Set;
  * @param status 配置状态
  * @param tenantId 认证租户
  * @param userType 用户目录代码
+ * @param allowedUserTypes 资源服务器允许的用户类型
  * @param resourcePermissions Scope资源许可
  * @param login 公共登录策略
  * @param protocol 唯一非秘密协议登记；空草稿为null
@@ -50,11 +51,12 @@ import java.util.Set;
  */
 public record IamApplicationSnapshot(Long id, String applicationCode, Instant codeIssuedAt, String applicationName,
     IamApplicationPurpose purpose, String managedKey, Long authorizationVersion, IamApplicationStatus status,
-    Long tenantId, String userType, Map<String, String> resourcePermissions, LoginPolicy login,
+    Long tenantId, String userType, Set<String> allowedUserTypes, Map<String, String> resourcePermissions, LoginPolicy login,
     IamApplicationProtocolRegistration<?> protocol, boolean hasCredential) {
 
     /** 防止调用者修改公共权限集合，协议设置由本次事务独立解析。 */
     public IamApplicationSnapshot {
+        allowedUserTypes = Set.copyOf(allowedUserTypes);
         resourcePermissions = Map.copyOf(resourcePermissions);
     }
 

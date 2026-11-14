@@ -93,6 +93,30 @@ class IamApplicationServiceImplTest {
         TransactionSynchronizationManager.clearSynchronization();
     }
 
+    /** 资源服务器允许集合可多选及清空，普通业务应用不能携带该策略。 */
+    @Test
+    void resourceAllowedUserTypesRoundTripAndClear() {
+        var form = f.form();
+        form.setPurpose("RESOURCE_SERVER");
+        form.setApplicationType("SERVICE");
+        form.setWebLoginMode(null);
+        form.setProtocol(null);
+        form.getSettings().setAuthorizationGrantTypes("");
+        form.getSettings().setScopes("");
+        form.getSettings().setRedirectUris(null);
+        form.getSettings().setClientAuthenticationMethods("client_secret_basic");
+        form.setClientSecret("synthetic-resource-secret");
+        form.setAllowedUserTypes(Set.of("employee", "member"));
+        var saved = f.service.save(null, form);
+        assertThat(saved.getAllowedUserTypes()).containsExactlyInAnyOrder("employee", "member");
+        var update = f.wire.form(saved);
+        update.setAllowedUserTypes(Set.of());
+        assertThat(f.service.save(saved.getId(), update).getAllowedUserTypes()).isEmpty();
+        var business = f.form();
+        business.setAllowedUserTypes(Set.of("employee"));
+        assertThrows(ResponseStatusException.class, () -> f.service.save(null, business));
+    }
+
     /** 没有协议的草稿不能生成凭据、租户或默认协议。 */
     @Test
     void createsEmptyDraftWithoutInventingProtocolOrRoute() {

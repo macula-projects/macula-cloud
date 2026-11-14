@@ -241,3 +241,7 @@ STARTTLS 必须升级成功才认证；证书和主机名始终校验，自建 C
 实现按职责分包：`message.mail`、`message.sms` 放抽象接口，`impl` 放供应商实现，IAM 登录编排放 `message.dispatch`，HTTP 配置及传输辅助放 `message.sms.support`。System 与 IAM 不直接引用彼此实现，管理端测试发送与 IAM 实际发码遵循同一契约。
 
 本次沿用现有表结构，无需迁移现有配置；允许后续必要的数据迁移，但不自动改写历史凭据。回滚至旧代码前需先切回旧版支持的供应商。凭据沿用现有存储保护，不代表数据库静态加密；日志不记录认证 Header、验证码、完整手机号或供应商原始响应。真实 Exchange/短信服务需另行联调验收。
+
+## 用户类型准入
+
+用户类型内省准入：资源服务器的 `allowedUserTypes` 为允许的目录代码多选，空集合拒绝全部用户 Token。用户 Access Token 的 `userType` 来自已认证账号目录，签发时与可信业务 Client 的目录一致；内省缺失、不允许或非法类型返回仅 `active:false`。机器身份依据持久化授权的原始 `client_credentials` 判断，跳过用户类型限制，继续执行既有有效期、撤销及客户端校验。旧用户 Token/主体不猜填，需重新认证。

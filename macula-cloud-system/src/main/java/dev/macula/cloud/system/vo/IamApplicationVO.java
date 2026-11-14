@@ -102,6 +102,7 @@ public class IamApplicationVO {
     @JsonIgnore
     private String idTokenSignatureAlgorithm;
     private String userType;
+    private Set<String> allowedUserTypes = Set.of();
     private Long tenantId;
     private boolean secretConfigured;
 }

@@ -22,7 +22,7 @@ package dev.macula.cloud.system.security;
  * @since 6.1.0
  */
 public final class IamApplicationCacheNames {
-    public static final String CONFIGURATION_VERSION = "v7-iam-application";
+    public static final String CONFIGURATION_VERSION = "v8-user-type-admission";
     /** 仅提供稳定常量。 */
     private IamApplicationCacheNames() { }
 }

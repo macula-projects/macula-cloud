@@ -37,4 +37,16 @@ class OAuth2ResourcePolicyTest {
         assertThrows(IllegalArgumentException.class, () -> OAuth2ResourcePolicy.audiences(Set.of("other"), Map.of()));
     }
 
+    /** 配置解析只能接受已知字符串集合，不把损坏存储解释为允许全部。 */
+    @Test
+    void userTypesRejectMalformedStorage() {
+        assertEquals(Set.of(), OAuth2ResourcePolicy.allowedUserTypes("[]"));
+        assertEquals(Set.of("employee", "member"),
+            OAuth2ResourcePolicy.allowedUserTypes("[\"employee\",\"member\"]"));
+        for (String value : new String[] {null, "null", "{}", "[1]", "[\"unknown\"]",
+            "[\"employee\",\"employee\"]", "[] []"}) {
+            assertThrows(RuntimeException.class, () -> OAuth2ResourcePolicy.allowedUserTypes(value));
+        }
+    }
+
 }
